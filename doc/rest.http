@@ -13,12 +13,9 @@
 /// oauth ///
 ### you may need the MFA parameter to log in
 POST http://{{host}}/auth/token
-Content-Type: application/json
+Content-Type: application/x-www-form-urlencoded
 
-{
-    "email": "{{email}}",
-    "password": "{{password}}"
-}
+username={{email}}&password={{password}}
 
 ### 
 POST http://{{host}}/auth/refresh_token
@@ -92,6 +89,14 @@ GET http://{{host}}/public-api/conversation_limit
 
 ### get conversation list
 GET http://{{host}}/backend-api/conversations?offset=0&limit=3&order=updated
+Authorization: {{bearer_token}}
+
+### get share link
+GET http://{{host}}/backend-api/shared_conversations?order=created
+Authorization: {{bearer_token}}
+
+### export data send to email
+POST http://{{host}}/backend-api/accounts/data_export
 Authorization: {{bearer_token}}
 
 ### new conversation

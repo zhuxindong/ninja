@@ -6,7 +6,7 @@ use openai::auth::OAuthAccountBuilder;
 async fn main() -> anyhow::Result<()> {
     let email = std::env::var("EMAIL")?;
     let password = std::env::var("PASSWORD")?;
-    let mut auth = openai::auth::OAuthClientBuilder::builder()
+    let auth = openai::auth::OAuthClientBuilder::builder()
         .user_agent(openai::HEADER_UA)
         .chrome_builder(reqwest::browser::ChromeVersion::V108)
         .cookie_store(true)
@@ -15,16 +15,15 @@ async fn main() -> anyhow::Result<()> {
         .build();
     let token = auth
         .do_access_token(
-            OAuthAccountBuilder::default()
-                .email(email)
+            &OAuthAccountBuilder::default()
+                .username(email)
                 .password(password)
                 .build()?,
         )
         .await?;
-    println!("AccessToken: {}", token.access_token());
-    println!("RefreshToken: {}", token.refresh_token());
-    println!("Profile: {:#?}", token.profile());
+    println!("AccessToken: {}", token.access_token);
+    println!("RefreshToken: {}", token.refresh_token);
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-    auth.do_refresh_token(token.refresh_token()).await?;
+    auth.do_refresh_token(&token.refresh_token).await?;
     Ok(())
 }

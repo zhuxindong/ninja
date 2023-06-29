@@ -17,11 +17,9 @@ use serde::{Deserialize, Serialize};
 use base64::{engine::general_purpose, Engine as _};
 use rand::Rng;
 use reqwest::{Client, Proxy, StatusCode, Url};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-use crate::model::{
-    AuthenticateApiKey, AuthenticateApiKeyList, AuthenticateSession, AuthenticateToken,
-};
 use crate::{debug, OAuthError, OAuthResult};
 
 const CLIENT_ID: &str = "pdlLIX2Y72MIl2rhLhTE9VV9bN905kBh";
@@ -43,7 +41,7 @@ pub struct OAuthClient {
 }
 
 impl OAuthClient {
-    pub async fn do_dashboard_login(&self, access_token: &str) -> OAuthResult<AuthenticateSession> {
+    pub async fn do_dashboard_login(&self, access_token: &str) -> OAuthResult<Session> {
         let resp = self
             .client
             .post(format!("{OPENAI_API_URL}/dashboard/onboarding/login"))
@@ -54,11 +52,7 @@ impl OAuthClient {
         self.response_handle(resp).await
     }
 
-    pub async fn do_get_api_key(
-        &self,
-        sensitive_id: &str,
-        name: &str,
-    ) -> OAuthResult<AuthenticateApiKey> {
+    pub async fn do_get_api_key(&self, sensitive_id: &str, name: &str) -> OAuthResult<ApiKey> {
         let data = ApiKeyDataBuilder::default()
             .action("create")
             .name(name)
@@ -74,10 +68,7 @@ impl OAuthClient {
         self.response_handle(resp).await
     }
 
-    pub async fn do_get_api_key_list(
-        &self,
-        sensitive_id: &str,
-    ) -> OAuthResult<AuthenticateApiKeyList> {
+    pub async fn do_get_api_key_list(&self, sensitive_id: &str) -> OAuthResult<ApiKeyList> {
         let resp = self
             .client
             .get(format!("{OPENAI_API_URL}/dashboard/user/api_keys"))
@@ -93,7 +84,7 @@ impl OAuthClient {
         sensitive_id: &str,
         redacted_key: &str,
         created_at: u64,
-    ) -> OAuthResult<AuthenticateApiKey> {
+    ) -> OAuthResult<ApiKey> {
         let data = ApiKeyDataBuilder::default()
             .action("delete")
             .redacted_key(redacted_key)
@@ -110,11 +101,8 @@ impl OAuthClient {
         self.response_handle(resp).await
     }
 
-    pub async fn do_access_token(
-        &mut self,
-        account: OAuthAccount,
-    ) -> OAuthResult<AuthenticateToken> {
-        if !self.email_regex.is_match(&account.email) || account.password.is_empty() {
+    pub async fn do_access_token(&self, account: &OAuthAccount) -> OAuthResult<AccessToken> {
+        if !self.email_regex.is_match(&account.username) || account.password.is_empty() {
             bail!(OAuthError::InvalidEmailOrPassword)
         }
         let code_verifier = Self::generate_code_verifier();
@@ -153,7 +141,7 @@ impl OAuthClient {
                 &IdentifierDataBuilder::default()
                     .action("default")
                     .state(&state)
-                    .username(&account.email)
+                    .username(&account.username)
                     .js_available(true)
                     .webauthn_available(true)
                     .is_brave(false)
@@ -174,17 +162,17 @@ impl OAuthClient {
     }
 
     async fn authenticate_password(
-        &mut self,
+        &self,
         code_verifier: &str,
         state: &str,
         location: &str,
         referrer: &str,
-        account: OAuthAccount,
-    ) -> OAuthResult<AuthenticateToken> {
+        account: &OAuthAccount,
+    ) -> OAuthResult<AccessToken> {
         let data = AuthenticateDataBuilder::default()
             .action("default")
             .state(state)
-            .username(&account.email)
+            .username(&account.username)
             .password(&account.password)
             .build()?;
 
@@ -214,12 +202,12 @@ impl OAuthClient {
     }
 
     async fn authenticate_resume(
-        &mut self,
+        &self,
         code_verifier: &str,
         location: &str,
         referrer: &str,
-        account: OAuthAccount,
-    ) -> OAuthResult<AuthenticateToken> {
+        account: &OAuthAccount,
+    ) -> OAuthResult<AccessToken> {
         let resp = self
             .client
             .get(&format!("{OPENAI_OAUTH_URL}{location}"))
@@ -237,7 +225,7 @@ impl OAuthClient {
         let location: &str = Self::get_location_path(&headers)?;
         if location.starts_with("/u/mfa-otp-challenge?") {
             let mfa = account.mfa.clone().ok_or(OAuthError::MFARequired)?;
-            self.authenticate_mfa(mfa.as_str(), code_verifier, location, account)
+            self.authenticate_mfa(&mfa, code_verifier, location, account)
                 .await
         } else if !location.starts_with(OPENAI_OAUTH_CALLBACK_URL) {
             bail!(OAuthError::FailedCallbackURL)
@@ -248,12 +236,12 @@ impl OAuthClient {
 
     #[async_recursion]
     async fn authenticate_mfa(
-        &mut self,
+        &self,
         mfa_code: &str,
         code_verifier: &str,
         location: &str,
-        account: OAuthAccount,
-    ) -> OAuthResult<AuthenticateToken> {
+        account: &OAuthAccount,
+    ) -> OAuthResult<AccessToken> {
         let url = format!("{OPENAI_OAUTH_URL}{}", location);
         let state = Self::get_callback_state(&Url::parse(&url)?);
         let data = AuthenticateMfaDataBuilder::default()
@@ -282,15 +270,15 @@ impl OAuthClient {
         if location.starts_with("/authorize/resume?") && account.mfa.is_none() {
             bail!(OAuthError::MFAFailed)
         }
-        self.authenticate_resume(code_verifier, location, &url, account)
+        self.authenticate_resume(code_verifier, location, &url, &account)
             .await
     }
 
     async fn authorization_code(
-        &mut self,
+        &self,
         code_verifier: &str,
         callback_url: &str,
-    ) -> OAuthResult<AuthenticateToken> {
+    ) -> OAuthResult<AccessToken> {
         let url = Url::parse(callback_url)?;
         let code = Self::get_callback_code(&url)?;
         let data = AuthorizationCodeDataBuilder::default()
@@ -310,13 +298,10 @@ impl OAuthClient {
             .map_err(OAuthError::FailedRequest)?;
 
         let access_token = self.response_handle::<AccessToken>(resp).await?;
-        Ok(AuthenticateToken::try_from(access_token)?)
+        Ok(access_token)
     }
 
-    pub async fn do_refresh_token(
-        &mut self,
-        refresh_token: &str,
-    ) -> OAuthResult<AuthenticateToken> {
+    pub async fn do_refresh_token(&self, refresh_token: &str) -> OAuthResult<RefreshToken> {
         let refresh_token = Self::verify_refresh_token(refresh_token)?;
         let data = RefreshTokenDataBuilder::default()
             .redirect_uri(OPENAI_OAUTH_CALLBACK_URL)
@@ -334,10 +319,10 @@ impl OAuthClient {
 
         let mut token = self.response_handle::<RefreshToken>(resp).await?;
         token.refresh_token = refresh_token.to_owned();
-        Ok(AuthenticateToken::try_from(token)?)
+        Ok(token)
     }
 
-    pub async fn do_revoke_token(&mut self, refresh_token: &str) -> OAuthResult<()> {
+    pub async fn do_revoke_token(&self, refresh_token: &str) -> OAuthResult<()> {
         let refresh_token = Self::verify_refresh_token(refresh_token)?;
         let data = RevokeTokenDataBuilder::default()
             .client_id(CLIENT_ID)
@@ -400,17 +385,22 @@ impl OAuthClient {
                 | StatusCode::GATEWAY_TIMEOUT),
             ) => {
                 if status_code == StatusCode::UNAUTHORIZED {
-                    return OAuthError::Unauthorized(err_msg);
+                    return OAuthError::Unauthorized("Unauthorized".to_owned());
                 }
                 if status_code == StatusCode::TOO_MANY_REQUESTS {
-                    return OAuthError::TooManyRequests(err_msg);
+                    return OAuthError::TooManyRequests("Too Many Requests".to_owned());
                 }
+                if status_code == StatusCode::BAD_REQUEST {
+                    return OAuthError::BadRequest("Bad Request".to_owned());
+                }
+
                 if status_code.is_client_error() {
-                    return OAuthError::BadRequest(err_msg);
+                    return OAuthError::FailedLogin;
                 }
+
                 OAuthError::ServerError(err_msg)
             }
-            _ => OAuthError::InvalidRequest(err_msg),
+            _ => OAuthError::InvalidRequest("Invalid Request".to_owned()),
         }
     }
 
@@ -565,7 +555,7 @@ struct RefreshTokenData<'a> {
     refresh_token: &'a str,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AccessToken {
     pub access_token: String,
     pub refresh_token: String,
@@ -573,7 +563,7 @@ pub struct AccessToken {
     pub expires_in: i64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RefreshToken {
     pub access_token: String,
     #[serde(default)]
@@ -584,15 +574,127 @@ pub struct RefreshToken {
 
 #[derive(Deserialize, Builder)]
 pub struct OAuthAccount {
-    email: String,
+    username: String,
     password: String,
     #[builder(setter(into, strip_option), default)]
     mfa: Option<String>,
 }
 
+impl OAuthAccount {
+    pub fn username(&self) -> &str {
+        self.username.as_ref()
+    }
+
+    pub fn password(&self) -> &str {
+        self.password.as_ref()
+    }
+
+    pub fn mfa(&self) -> Option<&str> {
+        self.mfa.as_deref()
+    }
+}
+
 pub struct OAuthClientBuilder {
     builder: reqwest::ClientBuilder,
     oauth: OAuthClient,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Session {
+    pub object: String,
+    pub user: User,
+    pub invites: Vec<Value>,
+}
+
+impl Session {
+    pub fn sensitive_id(&self) -> &str {
+        &self.user.session.sensitive_id
+    }
+
+    pub fn picture(&self) -> &str {
+        &self.user.picture
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct User {
+    pub object: String,
+    pub id: String,
+    pub email: String,
+    pub name: String,
+    pub picture: String,
+    pub created: i64,
+    pub groups: Vec<Value>,
+    pub session: VSession,
+    pub orgs: Orgs,
+    #[serde(rename = "intercom_hash")]
+    pub intercom_hash: String,
+    pub amr: Vec<Value>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VSession {
+    #[serde(rename = "sensitive_id")]
+    pub sensitive_id: String,
+    pub object: String,
+    pub name: Value,
+    pub created: i64,
+    #[serde(rename = "last_use")]
+    pub last_use: i64,
+    pub publishable: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Orgs {
+    pub object: String,
+    pub data: Vec<Daum>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Daum {
+    pub object: String,
+    pub id: String,
+    pub created: i64,
+    pub title: String,
+    pub name: String,
+    pub description: String,
+    pub personal: bool,
+    #[serde(rename = "is_default")]
+    pub is_default: bool,
+    pub role: String,
+    pub groups: Vec<Value>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApiKey {
+    pub result: String,
+    pub key: Option<Key>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApiKeyList {
+    pub object: String,
+    pub data: Vec<Key>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Key {
+    #[serde(rename = "sensitive_id")]
+    pub sensitive_id: String,
+    pub object: String,
+    pub name: String,
+    pub created: i64,
+    #[serde(rename = "last_use")]
+    pub last_use: Value,
+    pub publishable: bool,
 }
 
 impl OAuthClientBuilder {

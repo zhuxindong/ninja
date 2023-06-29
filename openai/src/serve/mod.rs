@@ -4,11 +4,15 @@ pub mod sign;
 #[cfg(feature = "limit")]
 pub mod tokenbucket;
 
+#[cfg(feature = "template")]
+pub mod template;
+
 use actix_web::http::header;
 use actix_web::middleware::Logger;
 use actix_web::web::Json;
 use actix_web::{get, post, App, HttpResponse, HttpServer, Responder};
 use actix_web::{web, HttpRequest};
+
 use derive_builder::Builder;
 use reqwest::browser::ChromeVersion;
 use reqwest::Client;
@@ -17,6 +21,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::sync::Once;
 use std::time::Duration;
+use url::Url;
 
 use std::net::IpAddr;
 use std::path::PathBuf;
@@ -24,6 +29,7 @@ use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 
 use crate::arkose::ArkoseToken;
 use crate::auth::OAuthClient;
+use crate::serve::template::TemplateData;
 use crate::serve::tokenbucket::TokenBucketContext;
 use crate::{auth, info};
 
@@ -33,14 +39,14 @@ static INIT: Once = Once::new();
 static mut CLIENT: Option<Client> = None;
 static mut OAUTH_CLIENT: Option<OAuthClient> = None;
 
-fn client() -> Client {
+pub(super) fn client() -> Client {
     if let Some(client) = unsafe { &CLIENT } {
         return client.clone();
     }
     panic!("The requesting client must be initialized")
 }
 
-fn oauth_client() -> OAuthClient {
+pub(super) fn oauth_client() -> OAuthClient {
     if let Some(oauth_client) = unsafe { &OAUTH_CLIENT } {
         return oauth_client.clone();
     }
@@ -59,6 +65,8 @@ pub struct Launcher {
     tcp_keepalive: Duration,
     /// TLS keypair
     tls_keypair: Option<(PathBuf, PathBuf)>,
+    /// Web UI api prefix
+    api_prefix: Option<Url>,
     /// Enable url signature (signature secret key)
     #[cfg(feature = "sign")]
     sign_secret_key: Option<String>,
@@ -76,8 +84,6 @@ pub struct Launcher {
     #[cfg(feature = "limit")]
     tb_expired: u32,
 }
-
-include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
 impl Launcher {
     pub async fn run(self) -> anyhow::Result<()> {
@@ -106,41 +112,50 @@ impl Launcher {
             self.host, self.port
         );
 
+        if let Some(url) = &self.api_prefix {
+            info!("Web UI site use api: {url}")
+        }
+
+        // template data
+        let template_data = TemplateData {
+            api_prefix: self.api_prefix.map_or("".to_owned(), |v| v.to_string()),
+        };
+        // serve
         let serve = HttpServer::new(move || {
             let app = App::new()
                 .wrap(Logger::default())
+                // official dashboard api endpoint
                 .service(
                     web::resource("/dashboard/{tail:.*}")
                         .wrap(middleware::TokenAuthorization)
                         .route(web::to(official_proxy)),
                 )
-                .service(
-                    web::resource("/backend-api/{tail:.*}")
-                        .wrap(middleware::TokenAuthorization)
-                        .route(web::to(unofficial_proxy)),
-                )
-                .service(
-                    web::resource("/api/{tail:.*}")
-                        .wrap(middleware::TokenAuthorization)
-                        .route(web::to(unofficial_proxy)),
-                )
+                // official v1 api endpoint
                 .service(
                     web::resource("/v1/{tail:.*}")
                         .wrap(middleware::TokenAuthorization)
                         .route(web::to(official_proxy)),
                 )
-                .service(web::resource("/public-api/{tail:.*}").route(web::to(unofficial_proxy)))
+                // unofficial backend api endpoint
                 .service(
-                    web::scope("/auth")
-                        .service(post_access_token)
-                        .service(post_refresh_token)
-                        .service(post_revoke_token),
+                    web::resource("/backend-api/{tail:.*}")
+                        .wrap(middleware::TokenAuthorization)
+                        .route(web::to(unofficial_proxy)),
                 )
-                .service(arkose_token)
-                .service(auth0_index)
+                // unofficial public api endpoint
+                .service(web::resource("/public-api/{tail:.*}").route(web::to(unofficial_proxy)))
+                // auth endpoint
+                .service(post_access_token)
+                .service(post_refresh_token)
+                .service(post_revoke_token)
+                .service(get_arkose_token)
+                // static files endpoint
                 .service(
                     web::scope(EMPTY)
-                        .service(actix_web_static_files::ResourceFiles::new("/", generate())),
+                        // templates data
+                        .app_data(template_data.clone())
+                        // templates page endpoint
+                        .configure(template::config),
                 );
 
             #[cfg(all(not(feature = "sign"), feature = "limit"))]
@@ -238,27 +253,15 @@ impl Launcher {
     }
 }
 
-#[get("/auth0")]
-async fn auth0_index() -> impl Responder {
-    #[cfg(target_family = "windows")]
-    {
-        HttpResponse::Ok().body(include_str!(r"..\..\templates\auth0.html"))
-    }
-    #[cfg(target_family = "unix")]
-    {
-        HttpResponse::Ok().body(include_str!("../../templates/auth0.html"))
-    }
-}
-
-#[post("/token")]
-async fn post_access_token(account: Json<auth::OAuthAccount>) -> impl Responder {
-    match oauth_client().do_access_token(account.into_inner()).await {
+#[post("/auth/token")]
+async fn post_access_token(account: web::Form<auth::OAuthAccount>) -> impl Responder {
+    match oauth_client().do_access_token(&account.into_inner()).await {
         Ok(token) => HttpResponse::Ok().json(token),
         Err(err) => HttpResponse::BadRequest().json(err.to_string()),
     }
 }
 
-#[post("/refresh_token")]
+#[post("/auth/refresh_token")]
 async fn post_refresh_token(req: HttpRequest) -> impl Responder {
     let refresh_token = req
         .headers()
@@ -270,7 +273,7 @@ async fn post_refresh_token(req: HttpRequest) -> impl Responder {
     }
 }
 
-#[post("/revoke_token")]
+#[post("/auth/revoke_token")]
 async fn post_revoke_token(req: HttpRequest) -> impl Responder {
     let refresh_token = req
         .headers()
@@ -279,6 +282,14 @@ async fn post_revoke_token(req: HttpRequest) -> impl Responder {
     match oauth_client().do_revoke_token(refresh_token).await {
         Ok(token) => HttpResponse::Ok().json(token),
         Err(err) => HttpResponse::BadRequest().json(err.to_string()),
+    }
+}
+
+#[get("/auth/arkose_token")]
+async fn get_arkose_token() -> impl Responder {
+    match ArkoseToken::new("gpt4").await {
+        Ok(arkose) => HttpResponse::Ok().json(arkose),
+        Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
     }
 }
 
@@ -357,14 +368,6 @@ async fn unofficial_proxy(req: HttpRequest, mut body: Option<Json<Value>>) -> im
         None => builder.send().await,
     };
     response_handle(resp)
-}
-
-#[actix_web::get("/arkose/token")]
-async fn arkose_token() -> impl Responder {
-    match ArkoseToken::new("gpt4").await {
-        Ok(arkose) => HttpResponse::Ok().json(arkose),
-        Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
-    }
 }
 
 fn header_convert(headers: &actix_web::http::header::HeaderMap) -> reqwest::header::HeaderMap {
