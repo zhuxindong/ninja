@@ -16,7 +16,7 @@ use actix_web::{web, HttpRequest};
 use derive_builder::Builder;
 use reqwest::browser::ChromeVersion;
 use reqwest::Client;
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::fs::File;
 use std::io::BufReader;
 use std::sync::Once;
@@ -95,6 +95,8 @@ pub struct Launcher {
 
 impl Launcher {
     pub async fn run(self) -> anyhow::Result<()> {
+        env_logger::init_from_env(env_logger::Env::default());
+
         // client
         let mut client_builder = reqwest::Client::builder();
         if let Some(url) = self.proxy.clone() {
@@ -141,6 +143,7 @@ impl Launcher {
         let template_data = TemplateData {
             api_prefix: self.api_prefix.map_or("".to_owned(), |v| v.to_string()),
         };
+
         // serve
         let serve = HttpServer::new(move || {
             let app = App::new()
@@ -390,26 +393,29 @@ async fn unofficial_proxy(req: HttpRequest, mut body: Option<Json<Value>>) -> im
 }
 
 fn header_convert(headers: &actix_web::http::header::HeaderMap) -> reqwest::header::HeaderMap {
-    headers
+    let mut res = headers
         .iter()
         .filter(|v| v.0.eq(&header::AUTHORIZATION))
         .map(|(k, v)| (k.clone(), v.clone()))
-        .collect()
+        .collect::<reqwest::header::HeaderMap>();
+    if let Some(puid) = headers.get("PUID") {
+        let puid = puid.to_str().unwrap();
+        res.insert(
+            "cookie",
+            reqwest::header::HeaderValue::from_str(&format!("_puid={puid};")).unwrap(),
+        );
+    }
+    res
 }
 
 async fn gpt4_body_handle(req: &HttpRequest, body: &mut Option<Json<Value>>) {
     if req.uri().path().contains("/backend-api/conversation") && req.method().as_str() == "POST" {
         if let Some(body) = body.as_mut().and_then(|b| b.as_object_mut()) {
             if let Some(v) = body.get("model").and_then(|m| m.as_str()) {
-                match ArkoseToken::new(v).await {
-                    Ok(arkose) => {
-                        if body.get("arkose_token").is_none() {
-                            if let Ok(x) = serde_json::to_value(arkose) {
-                                let _ = body.insert("arkose_token".to_owned(), x);
-                            }
-                        }
+                if body.get("arkose_token").is_none() {
+                    if let Ok(arkose) = ArkoseToken::new(v).await {
+                        let _ = body.insert("arkose_token".to_owned(), json!(arkose));
                     }
-                    Err(_) => {}
                 }
             }
         }

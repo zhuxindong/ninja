@@ -1,11 +1,7 @@
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 use openai::serve::{tokenbucket, LauncherBuilder};
-use std::{
-    io::Write,
-    path::PathBuf,
-    sync::{Arc, Once},
-};
+use std::{path::PathBuf, sync::Arc};
 use url::Url;
 
 pub mod account;
@@ -18,15 +14,15 @@ pub mod util;
 struct Opt {
     #[clap(subcommand)]
     command: Option<SubCommands>,
+    /// Log level (info/debug/warn/trace/error)
+    #[clap(short = 'L', long, global=true, env = "OPENGPT_LOG_LEVEL", value_parser = initialize_log, default_value = "info")]
+    level: String,
 }
 
 #[derive(Subcommand)]
 enum SubCommands {
     /// Start the http server
     Serve {
-        /// Enable debug
-        #[clap(short = 'D', long, env = "OPENGPT_DEBUG", value_parser = initialize_log)]
-        debug: bool,
         /// Server Listen host
         #[clap(short = 'H', long, env = "OPENGPT_HOST", default_value = "0.0.0.0", value_parser = parse_host)]
         host: Option<std::net::IpAddr>,
@@ -134,7 +130,6 @@ async fn main() -> anyhow::Result<()> {
                 unofficial_proxy: _,
             } => {}
             SubCommands::Serve {
-                debug: _,
                 host,
                 port,
                 workers,
@@ -214,28 +209,9 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-static ONCE_INIT: Once = Once::new();
-
-fn initialize_log(s: &str) -> anyhow::Result<bool> {
-    let debug = s.parse::<bool>()?;
-    match debug {
-        true => std::env::set_var("RUST_LOG", "DEBUG"),
-        false => std::env::set_var("RUST_LOG", "INFO"),
-    };
-    ONCE_INIT.call_once(|| {
-        env_logger::builder()
-            .format(|buf, record| {
-                writeln!(
-                    buf,
-                    "{} {}: {}",
-                    record.level(),
-                    chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                    record.args()
-                )
-            })
-            .init();
-    });
-    Ok(debug)
+fn initialize_log(s: &str) -> anyhow::Result<String> {
+    std::env::set_var("RUST_LOG", s);
+    Ok(String::from(s))
 }
 
 const PORT_RANGE: std::ops::RangeInclusive<usize> = 1024..=65535;
