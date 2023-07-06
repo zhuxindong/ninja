@@ -15,7 +15,13 @@ struct Opt {
     #[clap(subcommand)]
     command: Option<SubCommands>,
     /// Log level (info/debug/warn/trace/error)
-    #[clap(short = 'L', long, global=true, env = "OPENGPT_LOG_LEVEL", value_parser = initialize_log, default_value = "info")]
+    #[clap(
+        short = 'L',
+        long,
+        global = true,
+        env = "OPENGPT_LOG_LEVEL",
+        default_value = "info"
+    )]
     level: String,
 }
 
@@ -118,8 +124,10 @@ enum SubCommands {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let _opt = Opt::parse();
-    match _opt.command {
+    let args = Opt::parse();
+    std::env::set_var("RUST_LOG", args.level);
+    env_logger::init_from_env(env_logger::Env::default());
+    match args.command {
         Some(command) => match command {
             SubCommands::Account => {
                 prompt::account_prompt()?;
@@ -207,11 +215,6 @@ async fn main() -> anyhow::Result<()> {
         }
     }
     Ok(())
-}
-
-fn initialize_log(s: &str) -> anyhow::Result<String> {
-    std::env::set_var("RUST_LOG", s);
-    Ok(String::from(s))
 }
 
 const PORT_RANGE: std::ops::RangeInclusive<usize> = 1024..=65535;

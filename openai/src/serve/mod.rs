@@ -95,8 +95,6 @@ pub struct Launcher {
 
 impl Launcher {
     pub async fn run(self) -> anyhow::Result<()> {
-        env_logger::init_from_env(env_logger::Env::default());
-
         // client
         let mut client_builder = reqwest::Client::builder();
         if let Some(url) = self.proxy.clone() {
