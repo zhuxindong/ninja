@@ -674,7 +674,7 @@ async fn get_error_404(tmpl: web::Data<tera::Tera>) -> Result<HttpResponse> {
 
 fn extract_session(cookie_value: &str) -> Result<Session> {
     Session::try_from(cookie_value)
-        .map_err(|err| error::ErrorUnauthorized("invalid session"))
+        .map_err(|_| error::ErrorUnauthorized("invalid session"))
         .and_then(|session| match check_token(&session.access_token) {
             Ok(_) => Ok(session),
             Err(err) => Err(err),

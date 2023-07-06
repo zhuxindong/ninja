@@ -36,6 +36,9 @@ enum SubCommands {
         /// Server worker-pool size (Recommended number of CPU cores)
         #[clap(short = 'W', long, env = "OPENGPT_WORKERS", default_value = "1")]
         workers: usize,
+        /// Server proxy, example: protocol://user:pass@ip:port
+        #[clap(long, env = "OPENGPT_PROXY", value_parser = parse_proxy_url)]
+        proxy: Option<String>,
         /// Client timeout(secends)
         #[clap(long, env = "OPENGPT_TIMEOUT", default_value = "600")]
         timeout: usize,
@@ -135,6 +138,7 @@ async fn main() -> anyhow::Result<()> {
                 host,
                 port,
                 workers,
+                proxy,
                 timeout,
                 connect_timeout,
                 tcp_keepalive,
@@ -158,6 +162,7 @@ async fn main() -> anyhow::Result<()> {
                 let builder = builder
                     .host(host.unwrap())
                     .port(port.unwrap())
+                    .proxy(proxy)
                     .tls_keypair(None)
                     .tcp_keepalive(tcp_keepalive)
                     .timeout(timeout)
@@ -259,12 +264,12 @@ fn parse_host(s: &str) -> anyhow::Result<std::net::IpAddr> {
 }
 
 // proxy proto
-fn parse_proxy_url(proxy_url: &str) -> anyhow::Result<url::Url> {
+fn parse_proxy_url(proxy_url: &str) -> anyhow::Result<String> {
     let url = url::Url::parse(proxy_url)
         .context("The Proxy Url format must be `protocol://user:pass@ip:port`")?;
     let protocol = url.scheme().to_string();
     match protocol.as_str() {
-        "http" | "https" => Ok(url),
+        "http" | "https" | "socks5" => Ok(url.to_string()),
         _ => anyhow::bail!("Unsupported protocol: {}", protocol),
     }
 }

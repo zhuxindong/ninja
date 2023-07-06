@@ -61,6 +61,8 @@ pub struct Launcher {
     port: u16,
     /// Machine worker pool
     workers: usize,
+    /// Server proxy
+    proxy: Option<String>,
     /// TCP keepalive (second)
     tcp_keepalive: usize,
     /// Client timeout
@@ -93,7 +95,14 @@ pub struct Launcher {
 
 impl Launcher {
     pub async fn run(self) -> anyhow::Result<()> {
-        let client = reqwest::Client::builder()
+        // client
+        let mut client_builder = reqwest::Client::builder();
+        if let Some(url) = self.proxy.clone() {
+            info!("Server proxy using: {url}");
+            let proxy = reqwest::Proxy::all(url)?;
+            client_builder = client_builder.proxy(proxy)
+        }
+        let client = client_builder
             .user_agent(HEADER_UA)
             .chrome_builder(ChromeVersion::V108)
             .tcp_keepalive(Some(Duration::from_secs((self.tcp_keepalive + 1) as u64)))
@@ -103,7 +112,9 @@ impl Launcher {
             .cookie_store(false)
             .build()?;
 
+        // auth client
         let auth_client = auth::AuthClientBuilder::builder()
+            .proxy(self.proxy)
             .user_agent(HEADER_UA)
             .chrome_builder(ChromeVersion::V108)
             .cookie_store(true)

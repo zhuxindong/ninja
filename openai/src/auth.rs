@@ -701,9 +701,11 @@ pub struct Key {
 
 impl AuthClientBuilder {
     // Proxy options
-    pub fn proxy(mut self, proxy: Option<Proxy>) -> Self {
-        if let Some(proxy) = proxy {
-            self.builder = self.builder.proxy(proxy);
+    pub fn proxy(mut self, proxy: Option<String>) -> Self {
+        if let Some(url) = proxy {
+            self.builder = self.builder.proxy(
+                Proxy::all(url.clone()).expect(&format!("reqwest: invalid proxy url: {url}")),
+            );
         } else {
             self.builder = self.builder.no_proxy();
         }
