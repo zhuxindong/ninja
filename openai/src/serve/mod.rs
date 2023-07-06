@@ -144,7 +144,6 @@ impl Launcher {
         // serve
         let serve = HttpServer::new(move || {
             let app = App::new()
-                .wrap(actix_web::middleware::Compress::default())
                 .wrap(Logger::default())
                 // official dashboard api endpoint
                 .service(
