@@ -39,6 +39,8 @@ Options:
           Server Listen port [env: OPENGPT_PORT=] [default: 7999]
   -W, --workers <WORKERS>
           Server worker-pool size (Recommended number of CPU cores) [env: OPENGPT_WORKERS=] [default: 1]
+      --proxy <PROXY>
+          Server proxy, example: protocol://user:pass@ip:port [env: OPENGPT_PROXY=]
       --tcp-keepalive <TCP_KEEPALIVE>
           TCP keepalive (second) [env: OPENGPT_TCP_KEEPALIVE=] [default: 5]
       --tls-cert <TLS_CERT>
