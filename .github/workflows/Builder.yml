@@ -1,7 +1,6 @@
 name: Builder
 
 on:
-  push:
   workflow_dispatch:
 
 
