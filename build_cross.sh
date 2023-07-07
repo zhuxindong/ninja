@@ -12,7 +12,7 @@ cargo install cargo-deb cargo-generate-rpm
 target_list=(x86_64-unknown-linux-musl aarch64-unknown-linux-musl armv7-unknown-linux-musleabi armv7-unknown-linux-musleabihf arm-unknown-linux-musleabi arm-unknown-linux-musleabihf)
 for target in ${target_list[@]}; do
     docker pull ghcr.io/gngpp/opengpt-builder:$target
-    docker run --rm -it \
+    docker run --rm -t \
         -v $(pwd):/home/rust/src \
         -v $HOME/.cargo/registry:/root/.cargo/registry \
         -v $HOME/.cargo/git:/root/.cargo/git \
