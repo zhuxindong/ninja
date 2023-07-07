@@ -56,10 +56,6 @@ hex = "0.4.3"
 ring = "0.16.20"
 cbc = "0.1.2"
 
-[patch.crates-io]
-hyper = { git = "https://github.com/gngpp/hyper.git", branch = "v0.14.18-patched"}
-h2 = { git = "https://github.com/gngpp/h2.git", branch = "imp"}
-
 [build-dependencies]
 static-files = "0.2.3"
 

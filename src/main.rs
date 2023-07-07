@@ -126,7 +126,6 @@ enum SubCommands {
 async fn main() -> anyhow::Result<()> {
     let args = Opt::parse();
     std::env::set_var("RUST_LOG", args.level);
-    env_logger::init_from_env(env_logger::Env::default());
     match args.command {
         Some(command) => match command {
             SubCommands::Account => {
@@ -161,6 +160,7 @@ async fn main() -> anyhow::Result<()> {
                 #[cfg(feature = "limit")]
                 tb_expired,
             } => {
+                env_logger::init_from_env(env_logger::Env::default());
                 let mut builder = LauncherBuilder::default();
                 let builder = builder
                     .host(host.unwrap())

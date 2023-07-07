@@ -2,7 +2,7 @@
 name = "opengpt"
 version = "0.1.0"
 edition = "2021"
-description = "OpenGPT - A command-line interface to ChatGPT\nGithub: https://github.com/gngpp/opengpt"
+description = "OpenGPT - Not just a unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)\nGithub: https://github.com/gngpp/opengpt"
 license = "MIT"
 homepage = "https://github.com/gngpp/opengpt"
 repository = "https://github.com/gngpp/opengpt.git"
@@ -60,3 +60,16 @@ opt-level = 'z'
 codegen-units = 1
 panic = "abort"
 strip = true
+
+[package.metadata.deb]
+maintainer = "gngpp <gngppz@gmail.com>"
+copyright = "2023, gngpp <gngppz@gmail.com>"
+license-file = ["LICENSE", "4"]
+extended-description = "Not just a unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)"
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/opengpt", "usr/bin/opengpt", "755"],
+    ["README.md", "usr/share/doc/opengpt/README", "644"],
+]

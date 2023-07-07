@@ -24,4 +24,5 @@ thunder-tests
 .env
 ./arkose
 opengpt
+uploads
 ./vendor
