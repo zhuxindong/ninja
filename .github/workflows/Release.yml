@@ -19,7 +19,7 @@ jobs:
 
       - name: Install depends
         run: |
-          apt update && apt install upx rename -y
+          sudo apt update && sudo apt install upx rename -y
 
       - name: Get tag
         if: startsWith(github.ref, 'refs/tags/')
