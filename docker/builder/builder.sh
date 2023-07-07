@@ -13,5 +13,5 @@ for key in "${!map[@]}"; do
   docker buildx build --platform linux/amd64,linux/arm64 \
     --tag gngpp/opengpt-builder:"$key" \
     --tag ghcr.io/gngpp/opengpt-builder:"$key" \
-    --build-arg BASE_IMAGE=messense/rust-musl-cross:"${map[$key]}" . --push 
+    --build-arg BASE_IMAGE=ghcr.io/messense/rust-musl-cross:"${map[$key]}" . --push 
 done
