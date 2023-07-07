@@ -1,6 +1,7 @@
 #!/bin/bash
 
 declare -A map
+
 map["x86_64-unknown-linux-musl"]="x86_64-musl"
 map["aarch64-unknown-linux-musl"]="aarch64-musl"
 map["armv7-unknown-linux-musleabi"]="armv7-musleabi"

@@ -3,7 +3,7 @@ ARG BASE_IMAGE
 ARG TARGETPLATFORM
 
 FROM $BASE_IMAGE
-WORKDIR /src
+WORKDIR /home/rust/src
 
 LABEL org.opencontainers.image.authors "gngpp <gngppz@gmail.com>"
 LABEL org.opencontainers.image.source https://github.com/gngpp/opengpt
