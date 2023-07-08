@@ -23,6 +23,6 @@ Cargo.lock
 thunder-tests
 .env
 ./arkose
-opengpt
+./opengpt
 uploads
 ./vendor
