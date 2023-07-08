@@ -168,7 +168,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 }
 
 async fn get_auth(tmpl: web::Data<tera::Tera>) -> Result<HttpResponse> {
-    render_template(tmpl, TEMP_SHARE, &tera::Context::new())
+    render_template(tmpl, TEMP_AUTH, &tera::Context::new())
 }
 
 async fn get_login(
