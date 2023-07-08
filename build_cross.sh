@@ -17,7 +17,7 @@ for target in ${target_list[@]}; do
         -v $HOME/.cargo/registry:/root/.cargo/registry \
         -v $HOME/.cargo/git:/root/.cargo/git \
         ghcr.io/gngpp/opengpt-builder:$target cargo build --release        
-    sudo chmod 755 target/$target/release/opengpt
+    sudo chmod -R 777 target
     sudo upx --lzma target/$target/release/opengpt
 
     cargo deb --target=$target --no-build --no-strip
