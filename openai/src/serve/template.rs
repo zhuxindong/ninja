@@ -219,10 +219,8 @@ async fn post_login(
 }
 
 async fn post_login_token(req: HttpRequest) -> Result<HttpResponse> {
-    match req.headers().get(header::AUTHORIZATION) {
-        Some(token) => {
-            let access_token = token.to_str().unwrap_or_default();
-
+    if let Some(token) = req.headers().get(header::AUTHORIZATION) {
+        let access_token = token.to_str().unwrap_or_default();
             let profile = crate::token::check(access_token)
                 .map_err(|e| error::ErrorUnauthorized(e.to_string()))?
                 .ok_or(error::ErrorInternalServerError("Get Profile Erorr"))?;
@@ -230,7 +228,7 @@ async fn post_login_token(req: HttpRequest) -> Result<HttpResponse> {
             let dash_session = auth_client()
                 .do_dashboard_login(access_token)
                 .await
-                .map_err(|e| error::ErrorInternalServerError(e.to_string()))?;
+                .map_err(|e| error::ErrorUnauthorized(e.to_string()))?;
 
             let session = Session::from((
                 access_token,
@@ -239,7 +237,7 @@ async fn post_login_token(req: HttpRequest) -> Result<HttpResponse> {
                 profile.expires(),
             ));
 
-            Ok(HttpResponse::SeeOther()
+            return Ok(HttpResponse::Ok()
                 .insert_header((header::LOCATION, "/"))
                 .cookie(
                     Cookie::build(SESSION_ID, session.to_string())
@@ -251,9 +249,8 @@ async fn post_login_token(req: HttpRequest) -> Result<HttpResponse> {
                         .finish(),
                 )
                 .finish())
-        }
-        None => redirect_login(),
     }
+    redirect_login()
 }
 
 async fn get_logout() -> impl Responder {

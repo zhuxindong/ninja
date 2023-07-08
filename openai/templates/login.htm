@@ -349,14 +349,14 @@
                             if (!result.isConfirmed || !result.value) {
                                 return
                             }
-                            fetch('/login/token', {
+                            fetch('/auth/login/token', {
                                 method: 'POST',
                                 headers: {
-                                    'Authorization': encodeURIComponent(result.value)
+                                    'Authorization': result.value
                                 }
-                            }).then(response => response.json()).then(data => {
-                                if (0 === data.code) {
-                                    window.location.href = data.url
+                            }).then(response => {
+                                if (200 === response.status) {
+                                    window.location.href = response.headers.get('Location')
                                 } else {
                                     Swal.fire('Error', data.message, 'error')
                                 }

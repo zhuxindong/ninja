@@ -42,6 +42,7 @@ pub struct AuthClient {
 
 impl AuthClient {
     pub async fn do_dashboard_login(&self, access_token: &str) -> OAuthResult<DashSession> {
+        let access_token = access_token.replace("Bearer ", "");
         let resp = self
             .client
             .post(format!("{OPENAI_API_URL}/dashboard/onboarding/login"))
@@ -646,9 +647,9 @@ pub struct User {
 pub struct Session {
     pub sensitive_id: String,
     pub object: String,
-    pub name: Value,
+    pub name: Option<String>,
     pub created: i64,
-    pub last_use: i64,
+    pub last_use: Option<i64>,
     pub publishable: bool,
 }
 
