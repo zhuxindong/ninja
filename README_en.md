@@ -9,21 +9,21 @@
   </a>
   [![Docker Image](https://img.shields.io/docker/pulls/gngpp/opengpt.svg)](https://hub.docker.com/r/gngpp/opengpt/)
 
-<br>简体中文 | [English](README_en.md)
+<br>English | [简体中文](README.md)
 
 # opengpt
 
-不仅仅是非官方的 ChatGPT 代理（绕过 Cloudflare 403 Access Denied）
+Not just an unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)
 
-- API密钥获取，电子邮件/密码帐户认证 (由于作者没有账号，暂不支持Google/微软第三方登录)
-- Http API 代理 (供其他客户端接入)
-- 原汁原味ChatGPT WebUI
+- API key acquisition, email/password account authentication (because the author does not have an account, Google/Microsoft third-party login is not currently supported)
+- Http API proxy (for other clients to access)
+- Authentic ChatGPT WebUI
 
-> 局限性: 这无法绕过 OpenAI 的彻底 IP 禁令
+> Limitations: This cannot bypass OpenAI's outright IP ban
 
 ### Compile
 
-> Ubuntu机器为例:
+> Ubuntu machine for example:
 
 ```shell
 
@@ -39,7 +39,7 @@ git clone https://github.com/gngpp/opengpt.git && cd opengpt
 
 ### Ubuntu(Other Linux)
 
-GitHub [Releases](https://github.com/gngpp/opengpt/releases/latest) 中有预编译的 deb包，二进制文件，以Ubuntu为例：
+Making [Releases](https://github.com/gngpp/opengpt/releases/latest) has a precompiled deb package, binaries, in Ubuntu, for example:
 
 ```shell
 wget https://github.com/gngpp/opengpt/releases/download/v0.1.1/opengpt-0.1.1-x86_64-unknown-linux-musl.deb
@@ -66,18 +66,18 @@ docker run --rm -it -p 7999:7999 --hostname=opengpt \
 - Support unofficial/official API, forward to proxy
 - The API prefix is the same as the official one, only the host name is changed
 
-- API文档
+- Parameter Description
   - Platfrom API [doc](https://platform.openai.com/docs/api-reference)
   - Backend API [doc](doc/rest.http)
 
-- 参数说明
-  - `--host`，环境变量 `OPENGPT_HOST`， 服务监听地址: 默认0.0.0.0，
-  - `--port`，环境变量 `OPENGPT_PORT`， 监听端口: 默认7999
-  - `--workers`，环境变量 `OPENGPT_WORKERS`， 服务线程数: 默认1
-  - `--level`，环境变量 `OPENGPT_LOG_LEVEL`，日志级别: 默认info
-  - `--tls-cert`，环境变量 `OPENGPT_TLS_CERT`，TLS证书公钥，支持格式: EC/PKCS8/RSA
-  - `--tls-key`，环境变量 `OPENGPT_TLS_KEY`，TLS证书私钥
-  - `--proxy`，环境变量 `OPENGPT_PROXY`，代理，格式: protocol://user:pass@ip:port
+- Parameter Description
+- `--host`, environment variable `OPENGPT_HOST`, service listening address: default 0.0.0.0,
+- `--port`, environment variable `OPENGPT_PORT`, listening port: default 7999
+- `--workers`, environment variable `OPENGPT_WORKERS`, number of service threads: default 1
+- `--level`, environment variable `OPENGPT_LOG_LEVEL`, log level: default info
+- `-- TLs-cert`, environment variable `OPENGPT_TLS_CERT`', TLS certificate public key. Supported format: EC/PKCS8/RSA
+- `-- TLs-key`, environment variable `OPENGPT_TLS_KEY`, TLS certificate private key
+- `--proxy`, environment variable `OPENGPT_PROXY`, proxy, format: protocol://user:pass@ip:port
 
 ```shell
 $ opengpt serve --help
@@ -118,7 +118,7 @@ Options:
           Print help
 ```
 
-### 参考
+### Reference
 
 - <https://github.com/tjardoo/openai-client>
 - <https://github.com/jpopesculian/reqwest-eventsource>
