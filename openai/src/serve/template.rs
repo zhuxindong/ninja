@@ -219,41 +219,38 @@ async fn post_login(
 }
 
 async fn post_login_token(req: HttpRequest) -> Result<HttpResponse> {
-    match req.headers().get(header::AUTHORIZATION) {
-        Some(token) => {
-            let access_token = token.to_str().unwrap_or_default();
+    if let Some(token) = req.headers().get(header::AUTHORIZATION) {
+        let access_token = token.to_str().unwrap_or_default();
+        let profile = crate::token::check(access_token)
+            .map_err(|e| error::ErrorUnauthorized(e.to_string()))?
+            .ok_or(error::ErrorInternalServerError("Get Profile Erorr"))?;
 
-            let profile = crate::token::check(access_token)
-                .map_err(|e| error::ErrorUnauthorized(e.to_string()))?
-                .ok_or(error::ErrorInternalServerError("Get Profile Erorr"))?;
+        let dash_session = auth_client()
+            .do_dashboard_login(access_token)
+            .await
+            .map_err(|e| error::ErrorUnauthorized(e.to_string()))?;
 
-            let dash_session = auth_client()
-                .do_dashboard_login(access_token)
-                .await
-                .map_err(|e| error::ErrorInternalServerError(e.to_string()))?;
+        let session = Session::from((
+            access_token,
+            dash_session,
+            profile.expires_in(),
+            profile.expires(),
+        ));
 
-            let session = Session::from((
-                access_token,
-                dash_session,
-                profile.expires_in(),
-                profile.expires(),
-            ));
-
-            Ok(HttpResponse::SeeOther()
-                .insert_header((header::LOCATION, "/"))
-                .cookie(
-                    Cookie::build(SESSION_ID, session.to_string())
-                        .path("/")
-                        .max_age(cookie::time::Duration::seconds(session.expires_in))
-                        .same_site(cookie::SameSite::Lax)
-                        .secure(false)
-                        .http_only(true)
-                        .finish(),
-                )
-                .finish())
-        }
-        None => redirect_login(),
+        return Ok(HttpResponse::Ok()
+            .insert_header((header::LOCATION, "/"))
+            .cookie(
+                Cookie::build(SESSION_ID, session.to_string())
+                    .path("/")
+                    .max_age(cookie::time::Duration::seconds(session.expires_in))
+                    .same_site(cookie::SameSite::Lax)
+                    .secure(false)
+                    .http_only(true)
+                    .finish(),
+            )
+            .finish());
     }
+    redirect_login()
 }
 
 async fn get_logout() -> impl Responder {
