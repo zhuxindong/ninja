@@ -1,3 +1,5 @@
+<br>简体中文 | [English](README_en.md)
+
 [![CI](https://github.com/gngpp/opengpt/actions/workflows/CI.yml/badge.svg)](https://github.com/gngpp/opengpt/actions/workflows/CI.yml)
 <a href="/LICENSE">
     <img src="https://img.shields.io/github/license/gngpp/opengpt?style=flat">
@@ -9,8 +11,6 @@
   </a>
   [![Docker Image](https://img.shields.io/docker/pulls/gngpp/opengpt.svg)](https://hub.docker.com/r/gngpp/opengpt/)
 
-<br>简体中文 | [English](README_en.md)
-
 # opengpt
 
 不仅仅是非官方的 ChatGPT 代理（绕过 Cloudflare 403 Access Denied）
@@ -19,27 +19,11 @@
 - Http API 代理 (供其他客户端接入)
 - 原汁原味ChatGPT WebUI
 
-> 局限性: 这无法绕过 OpenAI 的彻底 IP 禁令
+> 局限性: 无法绕过 OpenAI 的彻底 IP 禁令
 
-### 编译
-
-> Ubuntu机器为例:
-
-```shell
-
-sudo apt update -y && sudo apt install rename
-
-# Native compilation
-git clone https://github.com/gngpp/opengpt.git && cd opengpt
-./build.sh
-
-# Cross-platform compilation, relying on docker (if you can solve cross-platform compilation dependencies on your own)
-./corss-build.sh
-```
-
-### Ubuntu(Other Linux)
-
-GitHub [Releases](https://github.com/gngpp/opengpt/releases/latest) 中有预编译的 deb包，二进制文件，以Ubuntu为例：
+### 安装
+  > #### Ubuntu(Other Linux)
+  GitHub [Releases](https://github.com/gngpp/opengpt/releases/latest) 中有预编译的 deb包，二进制文件，以Ubuntu为例：
 
 ```shell
 wget https://github.com/gngpp/opengpt/releases/download/v0.1.1/opengpt-0.1.1-x86_64-unknown-linux-musl.deb
@@ -49,25 +33,27 @@ dpkg -i opengpt-0.1.1-x86_64-unknown-linux-musl.deb
 opengpt serve
 ```
 
-### Docker
+  > #### Docker 运行
 
 ```shell
 docker run --rm -it -p 7999:7999 --hostname=opengpt \
+  -e OPENGPT_WORKERS=1 \
+  -e OPENGPT_LOG_LEVEL=info \
   -e OPENGPT_TLS_CERT=/path/to/cert \
   -e OPENGPT_TLS_KEY=/path/to/key \
-  gngpp/opengpt:latest opengpt serve
+  gngpp/opengpt:latest serve
 ```
 
-### OpenWrt(dev)
+ > #### OpenWrt(dev)
 
 ### Command Line(dev)
 
-### Http Server
+### Http 服务
 
-- 附带原始 ChatGPT WebUI
-- 支持非官方/官方API，转发至代理
-- API前缀与官方一致，仅更改主机名
-
+- 原汁原味ChatGPT WebUI
+- 支持非官方/官方API代理
+- API前缀与官方一致
+- 可接入第三方客户端
 - API文档
   - Platfrom API [doc](https://platform.openai.com/docs/api-reference)
   - Backend API [doc](doc/rest.http)
@@ -118,6 +104,20 @@ Options:
           Token bucket expired (second) [env: OPENGPT_TB_EXPIRED=] [default: 86400]
   -h, --help
           Print help
+```
+
+### 自行编译
+
+> Ubuntu机器为例:
+
+```shell
+# Native compilation
+git clone https://github.com/gngpp/opengpt.git && cd opengpt
+./build.sh
+
+# Cross-platform compilation, relying on docker (if you can solve cross-platform compilation dependencies on your own)
+sudo apt update -y && sudo apt install rename
+./corss-build.sh
 ```
 
 ### 参考
