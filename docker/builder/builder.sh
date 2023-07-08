@@ -10,7 +10,7 @@ map["arm-unknown-linux-musleabi"]="arm-musleabi"
 map["arm-unknown-linux-musleabihf"]="arm-musleabihf"
 
 for key in "${!map[@]}"; do
-  docker buildx build --platform linux/amd64,linux/arm64,linux/arm32v7,linux/arm32v5 \
+  docker buildx build --platform linux/amd64,linux/arm64 \
     --tag gngpp/opengpt-builder:"$key" \
     --tag ghcr.io/gngpp/opengpt-builder:"$key" \
     --build-arg BASE_IMAGE=ghcr.io/messense/rust-musl-cross:"${map[$key]}" . --push 

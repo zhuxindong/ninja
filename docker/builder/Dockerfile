@@ -1,4 +1,3 @@
-# 定义参数
 ARG BASE_IMAGE
 
 FROM $BASE_IMAGE
