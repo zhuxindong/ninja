@@ -58,6 +58,8 @@ docker run --rm -it -p 7999:7999 --hostname=opengpt \
   gngpp/opengpt:latest opengpt serve
 ```
 
+### OpenWrt(dev)
+
 ### Command Line(dev)
 
 ### Http Server
