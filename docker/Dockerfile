@@ -30,3 +30,5 @@ LABEL url https://github.com/gngpp/opengpt
 ENV LANG=C.UTF-8 DEBIAN_FRONTEND=noninteractive LANG=zh_CN.UTF-8 LANGUAGE=zh_CN.UTF-8 LC_ALL=C
 
 COPY --from=builder /opengpt /bin/opengpt
+
+ENTRYPOINT ["/bin/opengpt"]
