@@ -67,6 +67,7 @@ start_service() {
 	fi
 
 	if [ $tb_enable -ne 0 ]; then 
+		args="$args --tb-enable"
 		if [ -n "$tb_redis_url" ]; then
 		    args="$args --tb-redis-url $tb_redis_url"
         fi
