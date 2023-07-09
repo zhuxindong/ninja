@@ -35,7 +35,7 @@ dpkg -i opengpt-0.1.2-x86_64-unknown-linux-musl.deb
 opengpt serve
 ```
 
-  > #### Docker 运行
+  > #### Docker
 
 ```shell
 docker run --rm -it -p 7999:7999 --hostname=opengpt \
@@ -122,16 +122,25 @@ Options:
 
 ### 自行编译
 
-> Ubuntu机器为例:
+- Linux编译，Ubuntu机器为例:
 
 ```shell
-# Native compilation
+# 本机编译
 git clone https://github.com/gngpp/opengpt.git && cd opengpt
 ./build.sh
 
-# Cross-platform compilation, relying on docker (if you can solve cross-platform compilation dependencies on your own)
-sudo apt update -y && sudo apt install rename
+# 跨平台编译，依赖于docker(如果您可以自己解决跨平台编译依赖)
 ./corss-build.sh
+```
+
+- OpenWrt 编译
+
+```shell
+cd package
+svn co https://github.com/gngpp/opengpt/trunk/openwrt
+cd -
+make menuconfig # choose LUCI->Applications->luci-app-opengpt  
+make V=s
 ```
 
 ### 预览

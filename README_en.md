@@ -122,7 +122,7 @@ Options:
 
 ### Compile
 
-> Ubuntu machine for example:
+- Linux compile, Ubuntu machine for example:
 
 ```shell
 
@@ -134,6 +134,16 @@ git clone https://github.com/gngpp/opengpt.git && cd opengpt
 
 # Cross-platform compilation, relying on docker (if you can solve cross-platform compilation dependencies on your own)
 ./corss-build.sh
+```
+
+- OpenWrt compile
+
+```shell
+cd package
+svn co https://github.com/gngpp/opengpt/trunk/openwrt
+cd -
+make menuconfig # choose LUCI->Applications->luci-app-opengpt  
+make V=s
 ```
 
 ### Preview
