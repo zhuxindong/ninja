@@ -41,11 +41,11 @@ enum SubCommands {
         /// Server proxy, example: protocol://user:pass@ip:port
         #[clap(long, env = "OPENGPT_PROXY", value_parser = parse_proxy_url)]
         proxy: Option<String>,
-        /// Client timeout(secends)
+        /// Client timeout (secends)
         #[clap(long, env = "OPENGPT_TIMEOUT", default_value = "600")]
         timeout: usize,
-        /// Client connect timeout(secends)
-        #[clap(long, env = "OPENGPT_CONNECT_TIMEOUT", default_value = "10")]
+        /// Client connect timeout (secends)
+        #[clap(long, env = "OPENGPT_CONNECT_TIMEOUT", default_value = "60")]
         connect_timeout: usize,
         /// TCP keepalive (secends)
         #[clap(long, env = "OPENGPT_TCP_KEEPALIVE", default_value = "60")]
