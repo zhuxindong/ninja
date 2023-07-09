@@ -38,7 +38,7 @@ msgid "Proxy"
 msgstr "代理"
 
 msgid "TCP Keep-Alive (seconds)"
-msgstr "TCP Keep-Alive (秒)"
+msgstr "TCP保活机制 (秒)"
 
 msgid "TLS certificate file path"
 msgstr "TLS证书文件路径"
@@ -71,10 +71,37 @@ msgid "Token bucket storage strategy, mem/redis"
 msgstr "令牌桶存储策略，Memory/Redis"
 
 msgid "Token bucket capacity, the default is 60"
-msgstr "令牌桶容量，默认为60"
+msgstr "令牌桶容量，默认为 60"
 
 msgid "Token bucket fill rate, the default is 1"
-msgstr "令牌桶填充速率，默认为1"
+msgstr "令牌桶填充速率，默认为 1"
 
 msgid "Token bucket expired time, the default is 86400 seconds"
-msgstr "令牌桶过期时间，默认为86400秒"
+msgstr "令牌桶过期时间，默认为 86400 秒"
+
+msgid "Default listening address: 0.0.0.0"
+msgstr "默认监听地址: 0.0.0.0"
+
+msgid "Default listening port: 7999"
+msgstr "默认监听端口: 7999"
+
+msgid "Default 1 worker thread"
+msgstr "默认 1 个工作线程"
+
+msgid "Supports http/https/socks5, format: http://user:pass@ip:port"
+msgstr "支持http/https/socks5，格式: http://user:pass@ip:port"
+
+msgid "Default 60 seconds"
+msgstr "默认 60 秒"
+
+msgid "Timeout"
+msgstr "客户端超时"
+
+msgid "Connect timeout"
+msgstr "客户端连接超时"
+
+msgid "Client timeout (secends), default 600 secends"
+msgstr "客户端超时，默认 600 秒"
+
+msgid "Client connect timeout (secends), default 60 secends"
+msgstr "客户端连接超时，默认 30 秒"
