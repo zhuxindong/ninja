@@ -26,9 +26,9 @@
   GitHub [Releases](https://github.com/gngpp/opengpt/releases/latest) 中有预编译的 deb包，二进制文件，以Ubuntu为例：
 
 ```shell
-wget https://github.com/gngpp/opengpt/releases/download/v0.1.1/opengpt-0.1.1-x86_64-unknown-linux-musl.deb
+wget https://github.com/gngpp/opengpt/releases/download/v0.1.2/opengpt-0.1.2-x86_64-unknown-linux-musl.deb
 
-dpkg -i opengpt-0.1.1-x86_64-unknown-linux-musl.deb
+dpkg -i opengpt-0.1.2-x86_64-unknown-linux-musl.deb
 
 opengpt serve
 ```

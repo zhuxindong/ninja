@@ -28,9 +28,9 @@ Not just an unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)
 Making [Releases](https://github.com/gngpp/opengpt/releases/latest) has a precompiled deb package, binaries, in Ubuntu, for example:
 
 ```shell
-wget https://github.com/gngpp/opengpt/releases/download/v0.1.1/opengpt-0.1.1-x86_64-unknown-linux-musl.deb
+wget https://github.com/gngpp/opengpt/releases/download/v0.1.2/opengpt-0.1.2-x86_64-unknown-linux-musl.deb
 
-dpkg -i opengpt-0.1.1-x86_64-unknown-linux-musl.deb
+dpkg -i opengpt-0.1.2-x86_64-unknown-linux-musl.deb
 
 opengpt serve
 ```
