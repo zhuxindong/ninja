@@ -76,11 +76,11 @@ enum SubCommands {
         )]
         #[cfg(feature = "limit")]
         tb_store_strategy: tokenbucket::Strategy,
-        /// Token bucket redis url(support cluster), examples: redis://user:pass@ip:port
+        /// Token bucket redis url(support cluster), example: redis://user:pass@ip:port
         #[clap(
             long,
             env = "OPENGPT_TB_REDIS_URL",
-            default_value = "mem",
+            default_value = "redis://127.0.0.1:6379",
             requires = "tb_enable"
         )]
         #[cfg(feature = "limit")]
