@@ -112,6 +112,7 @@ impl TokenBucket for MemTokenBucket {
     }
 }
 
+#[derive(Clone, derive_builder::Builder)]
 pub struct RedisTokenBucket {
     enable: bool,
     /// token bucket capacity `capacity`
@@ -121,13 +122,19 @@ pub struct RedisTokenBucket {
     /// token bucket expired
     expired: u32,
     /// redis client
-    client: redis::Client,
+    client: redis::cluster::ClusterClient,
 }
 
 impl RedisTokenBucket {
-    pub fn new(enable: bool, capacity: u32, fill_rate: u32, expired: u32) -> RedisResult<Self> {
+    pub fn new(
+        enable: bool,
+        capacity: u32,
+        fill_rate: u32,
+        expired: u32,
+        nodes: Vec<String>,
+    ) -> RedisResult<Self> {
         // connect to redis
-        let client = redis::Client::open("redis://127.0.0.1/")?;
+        let client = redis::cluster::ClusterClient::new(nodes)?;
         Ok(Self {
             enable,
             capacity,
@@ -145,7 +152,7 @@ impl TokenBucket for RedisTokenBucket {
         if !self.enable {
             return Ok(true);
         }
-        let mut con = self.client.get_tokio_connection().await?;
+        let mut con = self.client.get_async_connection().await?;
         let now_timestamp = now_timestamp();
         let mut bucket: BucketState = con
             .get_ex(ip.to_string(), redis::Expiry::EX(self.expired as usize))
@@ -173,14 +180,14 @@ impl TokenBucket for RedisTokenBucket {
 
 pub struct TokenBucketContext(Box<dyn TokenBucket>);
 
-impl From<(Strategy, bool, u32, u32, u32)> for TokenBucketContext {
-    fn from(value: (Strategy, bool, u32, u32, u32)) -> Self {
+impl From<(Strategy, bool, u32, u32, u32, Vec<String>)> for TokenBucketContext {
+    fn from(value: (Strategy, bool, u32, u32, u32, Vec<String>)) -> Self {
         let strategy = match value.0 {
             Strategy::Mem => Self(Box::new(MemTokenBucket::new(
                 value.1, value.2, value.3, value.4,
             ))),
             Strategy::Redis => Self(Box::new(
-                RedisTokenBucket::new(value.1, value.2, value.3, value.4).unwrap(),
+                RedisTokenBucket::new(value.1, value.2, value.3, value.4, value.5).unwrap(),
             )),
         };
         strategy
