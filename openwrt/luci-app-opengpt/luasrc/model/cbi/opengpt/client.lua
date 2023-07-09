@@ -13,7 +13,7 @@ o = s:option(Flag, "enabled", translate("Enabled"))
 o.rmempty = false
 
 o = s:option(Value, "level", translate("Log Level"), translate("info/debug/warn/trace/error"))
-o.rmempty = "info"
+o.default = "info"
 
 o = s:option(Value, "host", translate("Host"))
 o.default = "0.0.0.0"
@@ -22,6 +22,7 @@ o.datatype = "ipaddr"
 o = s:option(Value, "port", translate("Port"))
 o.datatype = "and(port,min(1))"
 o.default = "7999"
+o.rmempty = false
 
 o = s:option(Value, "workers", translate("Workers"))
 o.default = "1"
@@ -40,12 +41,21 @@ o = s:option(Value, "sign_secret_key", translate("API Signature Secret Key"))
 o = s:option(Flag, "tb_enable", translate("Enable Token Bucket Limit"))
 o.rmempty = false
 
-o = s:option(Value, "tb_store_strategy", translate("Token Bucket Storage Strategy"), translate("Token bucket storage strategy, memory/redis"))
+o = s:option(ListValue, "tb_store_strategy", translate("Token Bucket Storage Strategy"), translate("Token bucket storage strategy, mem/redis"))
+o:value("mem", "mem");
+o:value("redis", "redis");
+o.default = "mem"
+
+o = s:option(Value, "tb_redis_url", translate("Token bucket redis url(support cluster)"), translate("Example: redis://user:pass@ip:port"))
+o.default = "redis://127.0.0.1:6379"
 
 o = s:option(Value, "tb_capacity", translate("Token Bucket Capacity"), translate("Token bucket capacity, the default is 60"))
+o.default = "60"
 
 o = s:option(Value, "tb_fill_rate", translate("Token Bucket Fill Rate"), translate("Token bucket fill rate, the default is 1"))
+o.default = "1"
 
 o = s:option(Value, "tb_expired", translate("Token Bucket Expired"), translate("Token bucket expired time, the default is 86400 seconds"))
+o.default = "86400"
 
 return m

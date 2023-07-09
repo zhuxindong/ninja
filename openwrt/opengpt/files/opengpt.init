@@ -17,6 +17,7 @@ get_config() {
 	config_get tls_key $1 tls_key ''
 	config_get sign_secret_key $1 sign_secret_key ''
 	config_get tb_store_strategy $1 tb_store_strategy "mem"
+	config_get tb_redis_url $1 tb_redis_url 'redis://127.0.0.1:6379'
 	config_get tb_capacity $1 tb_capacity "60"
 	config_get tb_fill_rate $1 tb_fill_rate "1"
 	config_get tb_expired $1 tb_expired "86400"
@@ -30,7 +31,7 @@ start_service() {
     args=""
     
 	if [ -n "$level" ]; then
-		args="$args --level $auth_user"
+		args="$args --level $level"
 	fi
 
 	if [ -n "$host" ]; then
@@ -66,6 +67,9 @@ start_service() {
 	fi
 
 	if [ $tb_enable -ne 0 ]; then 
+		if [ -n "$tb_redis_url" ]; then
+		    args="$args --tb-redis-url $tb_redis_url"
+        fi
 		if [ -n "$tb_store_strategy" ]; then
 		    args="$args --tb-store-strategy $tb_store_strategy"
         fi

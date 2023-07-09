@@ -23,7 +23,7 @@ msgid "Collecting data..."
 msgstr "收集数据..."
 
 msgid "Open Web Interface"
-msgstr "打开 WebUI"
+msgstr "打开 Web"
 
 msgid "Host"
 msgstr "监听主机"
@@ -55,6 +55,9 @@ msgstr "启用令牌桶限流"
 msgid "Token Bucket Storage Strategy"
 msgstr "令牌桶存储策略"
 
+msgid "Token bucket redis url(support cluster)"
+msgstr "令牌桶Redis URL(支持集群)"
+
 msgid "Token Bucket Capacity"
 msgstr "令牌桶容量"
 
@@ -64,8 +67,8 @@ msgstr "令牌桶填充速率"
 msgid "Token Bucket Expired"
 msgstr "令牌桶过期"
 
-msgid "Token bucket storage strategy, memory/redis"
-msgstr "令牌桶存储策略，内存/Redis"
+msgid "Token bucket storage strategy, mem/redis"
+msgstr "令牌桶存储策略，memory/Redis"
 
 msgid "Token bucket capacity, the default is 60"
 msgstr "令牌桶容量，默认为60"
