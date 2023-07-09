@@ -48,7 +48,7 @@ enum SubCommands {
         #[clap(long, env = "OPENGPT_CONNECT_TIMEOUT", default_value = "10")]
         connect_timeout: usize,
         /// TCP keepalive (secends)
-        #[clap(long, env = "OPENGPT_TCP_KEEPALIVE", default_value = "5")]
+        #[clap(long, env = "OPENGPT_TCP_KEEPALIVE", default_value = "60")]
         tcp_keepalive: usize,
         /// TLS certificate file path
         #[clap(long, env = "OPENGPT_TLS_CERT", requires = "tls_key")]
