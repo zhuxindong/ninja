@@ -48,7 +48,7 @@ enum SubCommands {
         #[clap(long, env = "OPENGPT_CONNECT_TIMEOUT", default_value = "10")]
         connect_timeout: usize,
         /// TCP keepalive (secends)
-        #[clap(long, env = "OPENGPT_TCP_KEEPALIVE", default_value = "5")]
+        #[clap(long, env = "OPENGPT_TCP_KEEPALIVE", default_value = "60")]
         tcp_keepalive: usize,
         /// TLS certificate file path
         #[clap(long, env = "OPENGPT_TLS_CERT", requires = "tls_key")]
@@ -76,6 +76,15 @@ enum SubCommands {
         )]
         #[cfg(feature = "limit")]
         tb_store_strategy: tokenbucket::Strategy,
+        /// Token bucket redis url(support cluster), examples: redis://user:pass@ip:port
+        #[clap(
+            long,
+            env = "OPENGPT_TB_REDIS_URL",
+            default_value = "mem",
+            requires = "tb_enable"
+        )]
+        #[cfg(feature = "limit")]
+        tb_redis_url: Vec<String>,
         /// Token bucket capacity
         #[clap(
             long,
@@ -159,6 +168,8 @@ async fn main() -> anyhow::Result<()> {
                 tb_fill_rate,
                 #[cfg(feature = "limit")]
                 tb_expired,
+                #[cfg(feature = "limit")]
+                tb_redis_url,
             } => {
                 env_logger::init_from_env(env_logger::Env::default());
                 let mut builder = LauncherBuilder::default();
@@ -177,11 +188,12 @@ async fn main() -> anyhow::Result<()> {
                 let builder = builder
                     .tb_enable(tb_enable)
                     .tb_store_strategy(tb_store_strategy)
+                    .tb_redis_url(tb_redis_url)
                     .tb_capacity(tb_capacity)
                     .tb_fill_rate(tb_fill_rate)
                     .tb_expired(tb_expired);
 
-                #[cfg(feature = "limit")]
+                #[cfg(feature = "sign")]
                 let mut builder = builder.sign_secret_key(sign_secret_key);
 
                 if tls_key.is_some() && tls_cert.is_some() {
