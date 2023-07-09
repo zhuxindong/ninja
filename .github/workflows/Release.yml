@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   linux:
+    name: Linux
     runs-on: ubuntu-latest
     environment: Linux
     steps:
@@ -52,87 +53,87 @@ jobs:
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
           generate_release_notes: true
 
-  # openwrt:
-  #   name: OpenWrt Package
-  #   runs-on: ubuntu-20.04
-  #   needs: [ linux ]
-  #   environment: OpenWrt
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       target:
-  #         - arch: "aarch64_generic"
-  #           sdk: "https://downloads.openwrt.org/releases/22.03.2/targets/rockchip/armv8/openwrt-sdk-22.03.2-rockchip-armv8_gcc-11.2.0_musl.Linux-x86_64.tar.xz"
-  #         - arch: "aarch64_cortex-a53"
-  #           sdk: "https://downloads.openwrt.org/releases/22.03.2/targets/bcm27xx/bcm2710/openwrt-sdk-22.03.2-bcm27xx-bcm2710_gcc-11.2.0_musl.Linux-x86_64.tar.xz"
-  #         - arch: "aarch64_cortex-a72"
-  #           sdk: "https://downloads.openwrt.org/releases/22.03.2/targets/bcm27xx/bcm2711/openwrt-sdk-22.03.2-bcm27xx-bcm2711_gcc-11.2.0_musl.Linux-x86_64.tar.xz"
-  #         - arch: "x86_64"
-  #           sdk: "https://downloads.openwrt.org/releases/18.06.9/targets/x86/64/openwrt-sdk-18.06.9-x86-64_gcc-7.3.0_musl.Linux-x86_64.tar.xz"
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #     - name: Install build requirements
-  #       run: |
-  #         set -e
-  #         sudo apt-get update
-  #         sudo apt-get install -y build-essential ccache ecj fastjar file g++ gawk \
-  #         gettext git java-propose-classpath libelf-dev libncurses5-dev \
-  #         libncursesw5-dev libssl-dev python2.7-dev python3 unzip wget \
-  #         python3-distutils python3-setuptools python3-dev rsync subversion \
-  #         swig time xsltproc zlib1g-dev
-  #     - name: Install OpenWrt SDK
-  #       run: |
-  #         set -e
-  #         wget -O openwrt-sdk.tar.xz ${{ matrix.target.sdk }}
-  #         xz -q -d openwrt-sdk.tar.xz && tar -xvf openwrt-sdk.tar
-  #         mv -f openwrt-sdk-* openwrt-sdk
-  #     - name: Build Package
-  #       run: |
-  #         set -e
-  #         echo "src-link opengpt $GITHUB_WORKSPACE/openwrt" > openwrt-sdk/feeds.conf
-  #         echo 'CONFIG_PACKAGE_opengpt=y
-  #         CONFIG_PACKAGE_luci-app-opengpt=y
-  #         ' >> openwrt-sdk/.config
-  #         cd openwrt-sdk
-  #         cat feeds.conf.default >> feeds.conf
-  #         cat feeds.conf
+  openwrt:
+    name: OpenWrt
+    runs-on: ubuntu-20.04
+    needs: [ linux ]
+    environment: OpenWrt
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - arch: "aarch64_generic"
+            sdk: "https://downloads.openwrt.org/releases/22.03.2/targets/rockchip/armv8/openwrt-sdk-22.03.2-rockchip-armv8_gcc-11.2.0_musl.Linux-x86_64.tar.xz"
+          - arch: "aarch64_cortex-a53"
+            sdk: "https://downloads.openwrt.org/releases/22.03.2/targets/bcm27xx/bcm2710/openwrt-sdk-22.03.2-bcm27xx-bcm2710_gcc-11.2.0_musl.Linux-x86_64.tar.xz"
+          - arch: "aarch64_cortex-a72"
+            sdk: "https://downloads.openwrt.org/releases/22.03.2/targets/bcm27xx/bcm2711/openwrt-sdk-22.03.2-bcm27xx-bcm2711_gcc-11.2.0_musl.Linux-x86_64.tar.xz"
+          - arch: "x86_64"
+            sdk: "https://downloads.openwrt.org/releases/18.06.9/targets/x86/64/openwrt-sdk-18.06.9-x86-64_gcc-7.3.0_musl.Linux-x86_64.tar.xz"
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install build requirements
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y build-essential ccache ecj fastjar file g++ gawk \
+          gettext git java-propose-classpath libelf-dev libncurses5-dev \
+          libncursesw5-dev libssl-dev python2.7-dev python3 unzip wget \
+          python3-distutils python3-setuptools python3-dev rsync subversion \
+          swig time xsltproc zlib1g-dev
+      - name: Install OpenWrt SDK
+        run: |
+          set -e
+          wget -O openwrt-sdk.tar.xz ${{ matrix.target.sdk }}
+          xz -q -d openwrt-sdk.tar.xz && tar -xvf openwrt-sdk.tar
+          mv -f openwrt-sdk-* openwrt-sdk
+      - name: Build Package
+        run: |
+          set -e
+          echo "src-link opengpt $GITHUB_WORKSPACE/openwrt" > openwrt-sdk/feeds.conf
+          echo 'CONFIG_PACKAGE_opengpt=y
+          CONFIG_PACKAGE_luci-app-opengpt=y
+          ' >> openwrt-sdk/.config
+          cd openwrt-sdk
+          cat feeds.conf.default >> feeds.conf
+          cat feeds.conf
 
-  #         ./scripts/feeds update -a > /dev/null
-  #         make defconfig
+          ./scripts/feeds update -a > /dev/null
+          make defconfig
 
-  #         ./scripts/feeds install -d y -f -a
-  #         make package/opengpt/compile V=s
-  #         make package/luci-app-opengpt/compile V=s
-  #         tree bin/packages/
-  #     - name: Archive package
-  #       uses: actions/upload-artifact@v3
-  #       with:
-  #         name: opengpt-${{ matrix.target.arch }}
-  #         path: openwrt-sdk/bin/packages/${{ matrix.target.arch }}/opengpt/opengpt*.ipk
-  #         if-no-files-found: error
-  #     - name: Archive luci packages
-  #       if: ${{ matrix.target.arch == 'x86_64' }}
-  #       uses: actions/upload-artifact@v3
-  #       with:
-  #         name: opengpt-luci-${{ matrix.target.arch }}
-  #         path: openwrt-sdk/bin/packages/${{ matrix.target.arch }}/opengpt/luci-*.ipk
-  #         if-no-files-found: error
-  #     - name: Upload package to GitHub Release
-  #       uses: softprops/action-gh-release@v1
-  #       if: startsWith(github.ref, 'refs/tags/')
-  #       with:
-  #         token: ${{ secrets.TOKEN }}
-  #         files: |
-  #           openwrt-sdk/bin/packages/${{ matrix.target.arch }}/opengpt/opengpt*.ipk
-  #         generate_release_notes: true
-  #     - name: Upload luci packages to GitHub Release
-  #       uses: softprops/action-gh-release@v1
-  #       if: ${{ startsWith(github.ref, 'refs/tags/') && matrix.target.arch == 'x86_64' }}
-  #       with:
-  #         token: ${{ secrets.TOKEN }}
-  #         files: |
-  #           openwrt-sdk/bin/packages/${{ matrix.target.arch }}/opengpt/luci-*.ipk
-  #         generate_release_notes: true
+          ./scripts/feeds install -d y -f -a
+          make package/opengpt/compile V=s
+          make package/luci-app-opengpt/compile V=s
+          tree bin/packages/
+      - name: Archive package
+        uses: actions/upload-artifact@v3
+        with:
+          name: opengpt-${{ matrix.target.arch }}
+          path: openwrt-sdk/bin/packages/${{ matrix.target.arch }}/opengpt/opengpt*.ipk
+          if-no-files-found: error
+      - name: Archive luci packages
+        if: ${{ matrix.target.arch == 'x86_64' }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: opengpt-luci-${{ matrix.target.arch }}
+          path: openwrt-sdk/bin/packages/${{ matrix.target.arch }}/opengpt/luci-*.ipk
+          if-no-files-found: error
+      - name: Upload package to GitHub Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          token: ${{ secrets.TOKEN }}
+          files: |
+            openwrt-sdk/bin/packages/${{ matrix.target.arch }}/opengpt/opengpt*.ipk
+          generate_release_notes: true
+      - name: Upload luci packages to GitHub Release
+        uses: softprops/action-gh-release@v1
+        if: ${{ startsWith(github.ref, 'refs/tags/') && matrix.target.arch == 'x86_64' }}
+        with:
+          token: ${{ secrets.TOKEN }}
+          files: |
+            openwrt-sdk/bin/packages/${{ matrix.target.arch }}/opengpt/luci-*.ipk
+          generate_release_notes: true
 
   docker:
     name: Build Docker Image

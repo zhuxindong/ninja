@@ -1,0 +1,11 @@
+#!/bin/sh
+
+uci -q batch <<-EOF >/dev/null
+	delete ucitrack.@opengpt[-1]
+	add ucitrack opengpt
+	set ucitrack.@opengpt[-1].init=opengpt
+	commit ucitrack
+EOF
+
+rm -rf /tmp/luci-*
+exit 0

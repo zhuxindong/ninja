@@ -1,0 +1,11 @@
+{
+	"luci-app-opengpt": {
+		"description": "Grant UCI access for luci-app-opengpt",
+		"read": {
+			"uci": [ "opengpt" ]
+		},
+		"write": {
+			"uci": [ "opengpt" ]
+		}
+	}
+}

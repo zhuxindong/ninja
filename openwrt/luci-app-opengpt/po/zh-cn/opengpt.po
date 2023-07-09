@@ -1,0 +1,77 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "OpenGPT"
+msgstr "OpenGPT"
+
+msgid "<a>A unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)</a> | <a href=\"https://github.com/gngpp/nas-opengpt\" target=\"_blank\">Project GitHub URL</a>"
+msgstr "<a>非官方的 ChatGPT 代理（绕过 Cloudflare 403 Access Denied）</a> | <a href=\"https://github.com/gngpp/opengpt\" target=\"_blank\">GitHub 项目地址</a>"
+
+msgid "Enabled"
+msgstr "启用"
+
+msgid "Log Level"
+msgstr "日志级别"
+
+msgid "RUNNING"
+msgstr "运行中"
+
+msgid "NOT RUNNING"
+msgstr "未运行"
+
+msgid "Collecting data..."
+msgstr "收集数据..."
+
+msgid "Open Web Interface"
+msgstr "打开 WebUI"
+
+msgid "Host"
+msgstr "监听主机"
+
+msgid "Port"
+msgstr "监听端口"
+
+msgid "Workers"
+msgstr "工作线程"
+
+msgid "Proxy"
+msgstr "代理"
+
+msgid "TCP Keep-Alive (seconds)"
+msgstr "TCP Keep-Alive (秒)"
+
+msgid "TLS certificate file path"
+msgstr "TLS证书文件路径"
+
+msgid "TLS private key file path"
+msgstr "TLS私钥文件路径"
+
+msgid "API Signature Secret Key"
+msgstr "API签名密钥"
+
+msgid "Enable Token Bucket Limit"
+msgstr "启用令牌桶限流"
+
+msgid "Token Bucket Storage Strategy"
+msgstr "令牌桶存储策略"
+
+msgid "Token Bucket Capacity"
+msgstr "令牌桶容量"
+
+msgid "Token Bucket Fill Rate"
+msgstr "令牌桶填充速率"
+
+msgid "Token Bucket Expired"
+msgstr "令牌桶过期"
+
+msgid "Token bucket storage strategy, memory/redis"
+msgstr "令牌桶存储策略，内存/Redis"
+
+msgid "Token bucket capacity, the default is 60"
+msgstr "令牌桶容量，默认为60"
+
+msgid "Token bucket fill rate, the default is 1"
+msgstr "令牌桶填充速率，默认为1"
+
+msgid "Token bucket expired time, the default is 86400 seconds"
+msgstr "令牌桶过期时间，默认为86400秒"

@@ -1,3 +1,5 @@
+# Copyright (C) 2023 gngpp <gngppz@gmail.com>
+
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=opengpt
