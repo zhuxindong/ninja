@@ -68,7 +68,7 @@ msgid "Token Bucket Expired"
 msgstr "令牌桶过期"
 
 msgid "Token bucket storage strategy, mem/redis"
-msgstr "令牌桶存储策略，memory/Redis"
+msgstr "令牌桶存储策略，Memory/Redis"
 
 msgid "Token bucket capacity, the default is 60"
 msgstr "令牌桶容量，默认为60"
