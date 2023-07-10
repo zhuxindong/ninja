@@ -15,7 +15,7 @@ o.rmempty = false
 o = s:option(Value, "level", translate("Log Level"), translate("info/debug/warn/trace/error"))
 o.default = "info"
 
-o = s:option(Value, "host", translate("Host"), translate("Default listening address: 0.0.0.0")))
+o = s:option(Value, "host", translate("Host"), translate("Default listening address: 0.0.0.0"))
 o.default = "0.0.0.0"
 o.datatype = "ipaddr"
 
