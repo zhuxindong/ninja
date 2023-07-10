@@ -22,6 +22,7 @@ use super::auth_client;
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
+const DEFAULT_INDEX: &str = "/";
 const SESSION_ID: &str = "opengpt_session";
 const BUILD_ID: &str = "WLHd8p-1ysAW_5sZZPJIy";
 const TEMP_404: &str = "404.htm";
@@ -187,7 +188,7 @@ async fn post_login(
     query: web::Query<HashMap<String, String>>,
     account: web::Form<auth::OAuthAccount>,
 ) -> Result<HttpResponse> {
-    let default_next = "/".to_owned();
+    let default_next = DEFAULT_INDEX.to_owned();
     let next = query.get("next").unwrap_or(&default_next);
     let account = account.into_inner();
     match super::auth_client().do_access_token(&account).await {
@@ -238,10 +239,10 @@ async fn post_login_token(req: HttpRequest) -> Result<HttpResponse> {
         ));
 
         return Ok(HttpResponse::Ok()
-            .insert_header((header::LOCATION, "/"))
+            .insert_header((header::LOCATION, DEFAULT_INDEX))
             .cookie(
                 Cookie::build(SESSION_ID, session.to_string())
-                    .path("/")
+                    .path(DEFAULT_INDEX)
                     .max_age(cookie::time::Duration::seconds(session.expires_in))
                     .same_site(cookie::SameSite::Lax)
                     .secure(false)
@@ -257,7 +258,7 @@ async fn get_logout() -> impl Responder {
     HttpResponse::SeeOther()
         .cookie(
             Cookie::build(SESSION_ID, "")
-                .path("/")
+                .path(DEFAULT_INDEX)
                 .secure(false)
                 .http_only(true)
                 .finish(),
@@ -307,7 +308,7 @@ async fn get_chat(
                         query.insert("chatId".to_string(), conversation_id.into_inner());
                         (TEMP_DETAIL, "/c/[chatId]")
                     }
-                    None => (TEMP_CHAT, "/"),
+                    None => (TEMP_CHAT, DEFAULT_INDEX),
                 };
                 let props = serde_json::json!({
                     "props": {
