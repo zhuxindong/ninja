@@ -1,6 +1,6 @@
 {
-  "short_name": "ChatGPT",
-  "name": "ChatGPT app powered by OpenGPT",
+  "short_name": "OpenGPT",
+  "name": "OpenGPT app powered by gngpp",
   "icons": [
     {
       "src": "/apple-touch-icon.png",
