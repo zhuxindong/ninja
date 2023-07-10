@@ -105,3 +105,12 @@ msgstr "客户端超时，默认 600 秒"
 
 msgid "Client connect timeout (secends), default 60 secends"
 msgstr "客户端连接超时，默认 30 秒"
+
+msgid "Enable API signature"
+msgstr "开启API签名"
+
+msgid "Supports EC/PKCS8/RSA type formats"
+msgstr "支持 EC/PKCS8/RSA 类型格式"
+
+msgid "Certificate in DER format"
+msgstr "DER 格式证书"

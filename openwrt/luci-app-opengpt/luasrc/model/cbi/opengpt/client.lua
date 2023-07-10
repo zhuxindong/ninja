@@ -12,6 +12,8 @@ s.anonymous = true
 o = s:option(Flag, "enabled", translate("Enabled"))
 o.rmempty = false
 
+o = s:option(Value, "proxy", translate("Proxy"), translate("Supports http/https/socks5, format: http://user:pass@ip:port"))
+
 o = s:option(Value, "level", translate("Log Level"), translate("info/debug/warn/trace/error"))
 o.default = "info"
 
@@ -24,7 +26,7 @@ o.datatype = "and(port,min(1))"
 o.default = "7999"
 o.rmempty = false
 
-o = s:option(Value, "workers", translate("Workers"), translate("Default 1 worker thread")))
+o = s:option(Value, "workers", translate("Workers"), translate("Default 1 worker thread"))
 o.default = "1"
 
 o = s:option(Value, "timeout", translate("Timeout"), translate("Client timeout (secends), default 600 secends"))
@@ -36,13 +38,11 @@ o.default = "60"
 o = s:option(Value, "tcp_keepalive", translate("TCP Keep-Alive"), translate("Default 60 seconds"))
 o.default = "60"
 
-o = s:option(Value, "tls_cert", translate("TLS certificate file path"))
+o = s:option(Value, "tls_cert", translate("TLS certificate file path"), translate("Certificate in DER format"))
 
-o = s:option(Value, "tls_key", translate("TLS private key file path"))
+o = s:option(Value, "tls_key", translate("TLS private key file path"), translate("Supports EC/PKCS8/RSA type formats"))
 
-o = s:option(Value, "proxy", translate("Proxy"), translate("Supports http/https/socks5, format: http://user:pass@ip:port"))
-
-o = s:option(Value, "sign_secret_key", translate("API Signature Secret Key"))
+o = s:option(Value, "sign_secret_key", translate("API Signature Secret Key"), translate("Enable API signature"))
 
 o = s:option(Flag, "tb_enable", translate("Enable Token Bucket Limit"))
 o.rmempty = false
