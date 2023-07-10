@@ -19,7 +19,7 @@ o = s:option(Value, "host", translate("Host"), translate("Default listening addr
 o.default = "0.0.0.0"
 o.datatype = "ipaddr"
 
-o = s:option(Value, "port", translate("Port"), translate("Default listening port: 7999")
+o = s:option(Value, "port", translate("Port"), translate("Default listening port: 7999"))
 o.datatype = "and(port,min(1))"
 o.default = "7999"
 o.rmempty = false
