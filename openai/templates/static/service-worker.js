@@ -66,29 +66,10 @@ self.addEventListener('install', event=>{
 }
 );
 self.addEventListener('fetch', function(event) {
-    if (event.request.url.startsWith('com.openai.chat://')) {
-        event.respondWith(interceptCustomRequest(event.request));
-    } else {
-        event.respondWith(caches.match(event.request).then(function(response) {
-            if (response) {
-                return response;
-            }
-            return fetch(event.request);
-        }));
-    }
+    event.respondWith(caches.match(event.request).then(function(response) {
+        if (response) {
+            return response;
+        }
+        return fetch(event.request);
+    }));
 });
-
-async function interceptCustomRequest(request) {
-    // 提取请求的前缀
-    const prefix = 'com.openai.chat://';
-    const url = request.url;
-    const path = url.substring(prefix.length);
-  
-    // 处理自定义请求逻辑
-    // ...
-
-    console.log(url);
-  
-    // 返回自定义的响应对象
-    return new Response('Custom Response', { status: 200, headers: { 'Content-Type': 'text/plain' } });
-  }
