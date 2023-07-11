@@ -35,7 +35,6 @@ const TEMP_SHARE: &str = "share.htm";
 #[derive(Serialize, Deserialize)]
 struct Session {
     user_id: String,
-    nickname: String,
     email: String,
     picture: String,
     access_token: String,
@@ -66,7 +65,6 @@ impl From<(&str, DashSession, i64, i64)> for Session {
             email: value.1.email().to_owned(),
             picture: value.1.picture().to_owned(),
             access_token: value.0.to_owned(),
-            nickname: value.1.nickname().to_owned(),
             expires_in: value.2,
             expires: value.3,
         }
@@ -77,7 +75,6 @@ impl From<AuthenticateToken> for Session {
     fn from(value: AuthenticateToken) -> Self {
         Session {
             user_id: value.user_id().to_owned(),
-            nickname: value.nickname().to_owned(),
             email: value.email().to_owned(),
             picture: value.picture().to_owned(),
             access_token: value.access_token().to_owned(),
@@ -199,9 +196,9 @@ async fn post_login(
             Ok(HttpResponse::SeeOther()
                 .cookie(
                     Cookie::build(SESSION_ID, session.to_string())
-                        .path(next)
+                        .path(DEFAULT_INDEX)
                         .max_age(cookie::time::Duration::seconds(session.expires_in))
-                        .same_site(cookie::SameSite::Lax)
+                        .same_site(cookie::SameSite::None)
                         .secure(false)
                         .http_only(true)
                         .finish(),
@@ -244,7 +241,7 @@ async fn post_login_token(req: HttpRequest) -> Result<HttpResponse> {
                 Cookie::build(SESSION_ID, session.to_string())
                     .path(DEFAULT_INDEX)
                     .max_age(cookie::time::Duration::seconds(session.expires_in))
-                    .same_site(cookie::SameSite::Lax)
+                    .same_site(cookie::SameSite::None)
                     .secure(false)
                     .http_only(true)
                     .finish(),

@@ -53,7 +53,7 @@ byteorder = "1.4.3"
 # arkose
 aes = "0.8.2"
 hex = "0.4.3"
-ring = "0.16.20"
+ring = { version = "0.16.20", features = ["std"] }
 cbc = "0.1.2"
 
 [build-dependencies]
