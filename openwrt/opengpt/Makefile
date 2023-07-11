@@ -9,7 +9,17 @@ PKG_VERSION:=0.1.2
 PKG_LICENSE:=MIT
 PKG_MAINTAINER:=gngpp <gngppz@gmail.com>
 
-PKG_SOURCE:=opengpt-$(PKG_VERSION)-$(ARCH)-unknown-linux-musl.tar.gz
+PKG_LIBC:=musl
+ifeq ($(ARCH),arm)
+  PKG_LIBC:=musleabi
+
+  ARM_CPU_FEATURES:=$(word 2,$(subst +,$(space),$(call qstrip,$(CONFIG_CPU_TYPE))))
+  ifneq ($(filter $(ARM_CPU_FEATURES),vfp vfpv2),)
+    PKG_LIBC:=musleabihf
+  endif
+endif
+
+PKG_SOURCE:=opengpt-$(PKG_VERSION)-$(PKG_ARCH)-unknown-linux-$(PKG_LIBC).tar.gz
 PKG_SOURCE_URL:=https://github.com/gngpp/opengpt/releases/download/v$(PKG_VERSION)/
 PKG_HASH:=skip
 STRIP:=false
@@ -21,7 +31,6 @@ define Package/$(PKG_NAME)
   CATEGORY:=Network
   SUBMENU:=Web Servers/Proxies
   TITLE:=opengpt
-  DEPENDS:=@(aarch64||x86_64)
   URL:=https://github.com/gngpp/opengpt
 endef
 
