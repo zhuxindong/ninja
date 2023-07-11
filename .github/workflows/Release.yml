@@ -17,20 +17,22 @@ jobs:
     environment: Linux
     steps:
       - uses: actions/checkout@v3
-      - name: Free disk space
-        run: |
-          sudo -E swapoff -a
-          sudo -E rm -f /swapfile
-          sudo -E docker image prune -a -f
-          sudo -E systemctl stop docker
-          sudo -E snap set system refresh.retain=2
-          sudo -E apt-get -y purge dotnet* firefox clang* gcc-10* ghc* google* hhvm* llvm* mono* mongo* mysql* openjdk* php* zulu*
-          sudo -E apt-get -y autoremove --purge
-          sudo -E apt-get clean
-          sudo -E rm -rf /etc/mysql /etc/php /usr/lib/jvm /usr/local /usr/src/* /var/lib/gems /var/lib/mysql /var/lib/snapd /etc/skel /opt/{microsoft,az,hostedtoolcache,cni,mssql-tools,pipx} /usr/share/{az*,dotnet,swift,miniconda,gradle*,java,kotlinc,ri,sbt} /root/{.sbt,.local,.npm}
-          sudo sed -i '/NVM_DIR/d;/skel/d' /root/{.bashrc,.profile}
-          [ -n "$AGENT_TOOLSDIRECTORY" ] && sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          df -h
+
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          # this might remove tools that are actually needed,
+          # if set to "true" but frees about 6 GB
+          tool-cache: false
+        
+          # all of these default to true, but feel free to set to
+          # "false" if necessary for your workflow
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
 
       - name: Install depends
         run: |
