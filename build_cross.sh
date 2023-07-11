@@ -19,16 +19,17 @@ for target in ${target_list[@]}; do
             -v $HOME/.cargo/registry:/usr/local/cargo/registry \
             -v $HOME/.cargo/git:/usr/local/cargo/git \
             ghcr.io/gngpp/opengpt-builder:$target cargo xwin build --release --target x86_64-pc-windows-msvc
+        sudo chmod -R 777 target
+        sudo upx --lzma target/$target/release/opengpt.exe
     else
         docker run --rm -t \
             -v $(pwd):/home/rust/src \
             -v $HOME/.cargo/registry:/root/.cargo/registry \
             -v $HOME/.cargo/git:/root/.cargo/git \
             ghcr.io/gngpp/opengpt-builder:$target cargo build --release
+        sudo chmod -R 777 target
+        sudo upx --lzma target/$target/release/opengpt
     fi
-
-    sudo chmod -R 777 target
-    sudo upx --lzma target/$target/release/opengpt
 
     cargo deb --target=$target --no-build --no-strip
     cd target/$target/debian
