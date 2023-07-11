@@ -6,8 +6,8 @@ use actix_web::{
     http::header,
     web, HttpRequest, HttpResponse, Responder, Result,
 };
-use chrono::prelude::{DateTime, Utc};
 use chrono::NaiveDateTime;
+use chrono::{prelude::DateTime, Utc};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -198,9 +198,9 @@ async fn post_login(
                     Cookie::build(SESSION_ID, session.to_string())
                         .path(DEFAULT_INDEX)
                         .max_age(cookie::time::Duration::seconds(session.expires_in))
-                        .same_site(cookie::SameSite::None)
+                        .same_site(cookie::SameSite::Lax)
                         .secure(false)
-                        .http_only(true)
+                        .http_only(false)
                         .finish(),
                 )
                 .append_header((header::LOCATION, next.to_owned()))
@@ -241,9 +241,9 @@ async fn post_login_token(req: HttpRequest) -> Result<HttpResponse> {
                 Cookie::build(SESSION_ID, session.to_string())
                     .path(DEFAULT_INDEX)
                     .max_age(cookie::time::Duration::seconds(session.expires_in))
-                    .same_site(cookie::SameSite::None)
+                    .same_site(cookie::SameSite::Lax)
                     .secure(false)
-                    .http_only(true)
+                    .http_only(false)
                     .finish(),
             )
             .finish());
@@ -256,8 +256,10 @@ async fn get_logout() -> impl Responder {
         .cookie(
             Cookie::build(SESSION_ID, "")
                 .path(DEFAULT_INDEX)
+                .max_age(cookie::time::Duration::seconds(0))
+                .same_site(cookie::SameSite::Lax)
                 .secure(false)
-                .http_only(true)
+                .http_only(false)
                 .finish(),
         )
         .insert_header((header::LOCATION, "/auth/login"))

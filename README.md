@@ -131,6 +131,7 @@ Options:
   - `arm-unknown-linux-musleabi`
   - `arm-unknown-linux-musleabihf`
   - `armv5te-unknown-linux-musleabi`
+  - `x86_64-pc-windows-msvc`
 
 - Linux compile, Ubuntu machine for example:
 
