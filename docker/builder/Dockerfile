@@ -15,7 +15,6 @@ RUN mkdir -p /root/.cargo/git
 
 RUN if [ "${BASE_IMAGE}" = "messense/cargo-xwin:latest" ]; then \
         apt update -y && apt install -y nasm; \
-        alias cargo build --release='cargo xwin build --release --target x86_64-pc-windows-msvc'; \
         mkdir /usr/local/cargo/git /usr/local/cargo/registry; \
         ln -s /usr/local/cargo/git /root/.cargo/git; \
         ln -s /usr/local/cargo/registry /root/.cargo/registry; \
