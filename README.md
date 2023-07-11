@@ -1,4 +1,4 @@
-<br>English | [简体中文](README-zh.md)
+<br>English | [简体中文](README_zh.md)
 
 [![CI](https://github.com/gngpp/opengpt/actions/workflows/CI.yml/badge.svg)](https://github.com/gngpp/opengpt/actions/workflows/CI.yml)
 <a href="/LICENSE">
