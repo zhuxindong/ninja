@@ -7,7 +7,7 @@
 			{
 				if (data.running)
 				{
-					tb.innerHTML = '<em style=\"color:green\"><b>' + data.application + '<%:RUNNING%></b></em>' + "<input class=\"cbi-button cbi-button-reload mar-10\" type=\"button\" value=\" <%:Open Web Interface%> \" onclick=\"window.open('//" + window.location.hostname + ":" + <%=luci.sys.exec("uci -q get opengpt.@opengpt[0].port"):gsub("^%s*(.-)%s*$", "%1")%> + "/')\"/>";
+					tb.innerHTML = '<em style=\"color:green\"><b>' + data.application + '<%:RUNNING%></b></em>' + "<input class=\"cbi-button cbi-button-reload mar-10\" type=\"button\" value=\" <%:Open WebUI%> \" onclick=\"window.open('//" + window.location.hostname + ":" + <%=luci.sys.exec("uci -q get opengpt.@opengpt[0].port"):gsub("^%s*(.-)%s*$", "%1")%> + "/')\"/>";
 				}
 				else
 				{
