@@ -9,6 +9,7 @@ PKG_VERSION:=0.1.4
 PKG_LICENSE:=MIT
 PKG_MAINTAINER:=gngpp <gngppz@gmail.com>
 
+PKG_ARCH=$(ARCH)
 PKG_LIBC:=musl
 ifeq ($(ARCH),arm)
   PKG_LIBC:=musleabi
