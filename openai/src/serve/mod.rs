@@ -15,6 +15,7 @@ use actix_web::{web, HttpRequest};
 
 use derive_builder::Builder;
 use reqwest::browser::ChromeVersion;
+use reqwest::header::HeaderValue;
 use reqwest::Client;
 use serde_json::{json, Value};
 use std::fs::File;
@@ -31,7 +32,7 @@ use crate::arkose::ArkoseToken;
 use crate::auth::AuthClient;
 use crate::serve::template::TemplateData;
 use crate::serve::tokenbucket::TokenBucketContext;
-use crate::{auth, info};
+use crate::{auth, info, HOST_CHATGPT, ORIGIN_CHATGPT};
 
 use crate::{HEADER_UA, URL_CHATGPT_API, URL_PLATFORM_API};
 const EMPTY: &str = "";
@@ -105,7 +106,6 @@ impl Launcher {
             client_builder = client_builder.proxy(proxy)
         }
         let client = client_builder
-            .user_agent(HEADER_UA)
             .chrome_builder(ChromeVersion::V108)
             .tcp_keepalive(Some(Duration::from_secs((self.tcp_keepalive + 1) as u64)))
             .timeout(Duration::from_secs((self.timeout + 1) as u64))
@@ -356,7 +356,7 @@ async fn official_proxy(req: HttpRequest, body: Option<Json<Value>>) -> impl Res
             req.method().clone(),
             format!("{URL_PLATFORM_API}{}?{}", req.path(), req.query_string()),
         )
-        .headers(header_convert(req.headers()));
+        .headers(header_convert(&req));
     let resp = match body {
         Some(body) => builder.json(&body).send().await,
         None => builder.send().await,
@@ -385,7 +385,7 @@ async fn unofficial_proxy(req: HttpRequest, mut body: Option<Json<Value>>) -> im
             req.method().clone(),
             format!("{URL_CHATGPT_API}{}?{}", req.path(), req.query_string()),
         )
-        .headers(header_convert(req.headers()));
+        .headers(header_convert(&req));
     let resp = match body {
         Some(body) => builder.json(&body).send().await,
         None => builder.send().await,
@@ -393,17 +393,47 @@ async fn unofficial_proxy(req: HttpRequest, mut body: Option<Json<Value>>) -> im
     response_handle(resp)
 }
 
-fn header_convert(headers: &actix_web::http::header::HeaderMap) -> reqwest::header::HeaderMap {
+fn header_convert(req: &HttpRequest) -> reqwest::header::HeaderMap {
+    let headers = req.headers();
     let mut res = headers
         .iter()
         .filter(|v| v.0.eq(&header::AUTHORIZATION))
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect::<reqwest::header::HeaderMap>();
+
+    res.insert(header::HOST, HeaderValue::from_static(HOST_CHATGPT));
+    res.insert(header::ORIGIN, HeaderValue::from_static(ORIGIN_CHATGPT));
+    res.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
+    );
+    res.insert(header::USER_AGENT, HeaderValue::from_static(HEADER_UA));
+    res.insert(
+        "sec-ch-ua",
+        HeaderValue::from_static(
+            "\"Chromium\";v=\"112\", \"Brave\";v=\"112\", \"Not:A-Brand\";v=\"99\"",
+        ),
+    );
+    res.insert("sec-ch-ua-mobile", HeaderValue::from_static("?0"));
+    res.insert("sec-ch-ua-platform", HeaderValue::from_static("Linux"));
+    res.insert("sec-fetch-dest", HeaderValue::from_static("empty"));
+    res.insert("sec-fetch-mode", HeaderValue::from_static("cors"));
+    res.insert("sec-fetch-site", HeaderValue::from_static("same-origin"));
+    res.insert("sec-gpc", HeaderValue::from_static("1"));
+
+    let mut cookie = String::new();
     if let Some(puid) = headers.get("PUID") {
         let puid = puid.to_str().unwrap();
+        cookie.push_str(&format!("_puid={puid};"))
+    }
+    if let Some(cf_bm) = req.cookie("__cf_bm") {
+        cookie.push_str(&format!("__cf_bm={};", cf_bm.value()));
+    }
+    // setting cookie
+    if !cookie.is_empty() {
         res.insert(
-            "cookie",
-            reqwest::header::HeaderValue::from_str(&format!("_puid={puid};")).unwrap(),
+            header::COOKIE,
+            HeaderValue::from_str(cookie.as_str()).expect("setting cookie error"),
         );
     }
     res
