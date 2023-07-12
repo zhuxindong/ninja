@@ -398,7 +398,7 @@ impl AuthClient {
                     return OAuthError::InvalidClientRequest(err_msg);
                 }
 
-                OAuthError::ServerError
+                OAuthError::ServerError(err_msg)
             }
             _ => OAuthError::InvalidRequest("Invalid Request".to_owned()),
         }

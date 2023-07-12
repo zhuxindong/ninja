@@ -16,6 +16,8 @@ pub mod token;
 pub const HEADER_UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36";
 pub const URL_CHATGPT_API: &str = "https://chat.openai.com";
 pub const URL_PLATFORM_API: &str = "https://api.openai.com";
+pub const HOST_CHATGPT: &str = "chat.openai.com";
+pub const ORIGIN_CHATGPT: &str = "https://chat.openai.com/chat";
 
 pub type OAuthResult<T, E = anyhow::Error> = anyhow::Result<T, E>;
 
@@ -31,8 +33,8 @@ pub enum OAuthError {
     TooManyRequests(String),
     #[error("Unauthorized request (error {0:?}")]
     Unauthorized(String),
-    #[error("Server error")]
-    ServerError,
+    #[error("Server error {0:?}")]
+    ServerError(String),
     #[error("failed to get public key")]
     FailedPubKeyRequest,
     #[error("failed login")]
