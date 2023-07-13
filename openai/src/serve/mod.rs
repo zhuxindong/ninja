@@ -32,7 +32,7 @@ use crate::arkose::ArkoseToken;
 use crate::auth::AuthClient;
 use crate::serve::template::TemplateData;
 use crate::serve::tokenbucket::TokenBucketContext;
-use crate::{auth, info, HOST_CHATGPT, ORIGIN_CHATGPT};
+use crate::{auth, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 
 use crate::{HEADER_UA, URL_CHATGPT_API, URL_PLATFORM_API};
 const EMPTY: &str = "";
@@ -105,30 +105,34 @@ impl Launcher {
             let proxy = reqwest::Proxy::all(url)?;
             client_builder = client_builder.proxy(proxy)
         }
-        let client = client_builder
-            .chrome_builder(ChromeVersion::V108)
+
+        let api_client = client_builder
+            .user_agent(HEADER_UA)
+            .chrome_builder(ChromeVersion::V110)
             .tcp_keepalive(Some(Duration::from_secs((self.tcp_keepalive + 1) as u64)))
             .timeout(Duration::from_secs((self.timeout + 1) as u64))
             .connect_timeout(Duration::from_secs((self.connect_timeout + 1) as u64))
             .pool_max_idle_per_host(self.workers)
-            .cookie_store(false)
+            .cookie_store(true)
             .build()?;
 
         // auth client
         let auth_client = auth::AuthClientBuilder::builder()
-            .proxy(self.proxy)
             .user_agent(HEADER_UA)
             .chrome_builder(ChromeVersion::V108)
-            .cookie_store(true)
             .timeout(Duration::from_secs((self.timeout + 1) as u64))
             .connect_timeout(Duration::from_secs((self.connect_timeout + 1) as u64))
             .pool_max_idle_per_host(self.workers)
+            .cookie_store(true)
+            .proxy(self.proxy)
             .build();
 
         INIT.call_once(|| unsafe {
-            CLIENT = Some(client);
+            CLIENT = Some(api_client);
             AUTH_CLIENT = Some(auth_client);
         });
+
+        check_self_ip(client()).await;
 
         info!(
             "Starting HTTP(S) server at http(s)://{}:{}",
@@ -351,11 +355,14 @@ async fn get_arkose_token() -> impl Responder {
 /// Deprecated GET https://api.openai.com/v1/engines
 /// Deprecated GET https://api.openai.com/v1/engines/{engine_id}
 async fn official_proxy(req: HttpRequest, body: Option<Json<Value>>) -> impl Responder {
+    let url = if req.query_string().is_empty() {
+        format!("{URL_PLATFORM_API}{}", req.path())
+    } else {
+        format!("{URL_PLATFORM_API}{}?{}", req.path(), req.query_string())
+    };
+
     let builder = client()
-        .request(
-            req.method().clone(),
-            format!("{URL_PLATFORM_API}{}?{}", req.path(), req.query_string()),
-        )
+        .request(req.method().clone(), url)
         .headers(header_convert(&req));
     let resp = match body {
         Some(body) => builder.json(&body).send().await,
@@ -380,11 +387,15 @@ async fn official_proxy(req: HttpRequest, body: Option<Json<Value>>) -> impl Res
 /// POST http://{{host}}/backend-api/conversation/message_feedback
 async fn unofficial_proxy(req: HttpRequest, mut body: Option<Json<Value>>) -> impl Responder {
     gpt4_body_handle(&req, &mut body).await;
+
+    let url = if req.query_string().is_empty() {
+        format!("{URL_CHATGPT_API}{}", req.path())
+    } else {
+        format!("{URL_CHATGPT_API}{}?{}", req.path(), req.query_string())
+    };
+
     let builder = client()
-        .request(
-            req.method().clone(),
-            format!("{URL_CHATGPT_API}{}?{}", req.path(), req.query_string()),
-        )
+        .request(req.method().clone(), url)
         .headers(header_convert(&req));
     let resp = match body {
         Some(body) => builder.json(&body).send().await,
@@ -403,15 +414,15 @@ fn header_convert(req: &HttpRequest) -> reqwest::header::HeaderMap {
 
     res.insert(header::HOST, HeaderValue::from_static(HOST_CHATGPT));
     res.insert(header::ORIGIN, HeaderValue::from_static(ORIGIN_CHATGPT));
+    res.insert(header::USER_AGENT, HeaderValue::from_static(HEADER_UA));
     res.insert(
         header::CONTENT_TYPE,
         HeaderValue::from_static("application/json"),
     );
-    res.insert(header::USER_AGENT, HeaderValue::from_static(HEADER_UA));
     res.insert(
         "sec-ch-ua",
         HeaderValue::from_static(
-            "\"Chromium\";v=\"112\", \"Brave\";v=\"112\", \"Not:A-Brand\";v=\"99\"",
+            r#""Chromium";v="110", "Not A(Brand";v="24", "Google Chrome";v="110"#,
         ),
     );
     res.insert("sec-ch-ua-mobile", HeaderValue::from_static("?0"));
@@ -420,15 +431,19 @@ fn header_convert(req: &HttpRequest) -> reqwest::header::HeaderMap {
     res.insert("sec-fetch-mode", HeaderValue::from_static("cors"));
     res.insert("sec-fetch-site", HeaderValue::from_static("same-origin"));
     res.insert("sec-gpc", HeaderValue::from_static("1"));
+    res.insert("Pragma", HeaderValue::from_static("no-cache"));
 
     let mut cookie = String::new();
+
     if let Some(puid) = headers.get("PUID") {
         let puid = puid.to_str().unwrap();
         cookie.push_str(&format!("_puid={puid};"))
     }
-    if let Some(cf_bm) = req.cookie("__cf_bm") {
-        cookie.push_str(&format!("__cf_bm={};", cf_bm.value()));
-    }
+
+    // if let Some(cookier) = req.cookie(template::PUID_SESSION_ID) {
+    //     cookie.push_str(&format!("_puid={};", cookier.value()));
+    // }
+
     // setting cookie
     if !cookie.is_empty() {
         res.insert(
@@ -444,7 +459,7 @@ async fn gpt4_body_handle(req: &HttpRequest, body: &mut Option<Json<Value>>) {
         if let Some(body) = body.as_mut().and_then(|b| b.as_object_mut()) {
             if let Some(v) = body.get("model").and_then(|m| m.as_str()) {
                 if body.get("arkose_token").is_none() {
-                    if let Ok(arkose) = ArkoseToken::new(v).await {
+                    if let Ok(arkose) = ArkoseToken::new_from_endpoint(v).await {
                         let _ = body.insert("arkose_token".to_owned(), json!(arkose));
                     }
                 }
@@ -464,5 +479,26 @@ fn response_handle(resp: Result<reqwest::Response, reqwest::Error>) -> HttpRespo
             builder.streaming(resp.bytes_stream())
         }
         Err(err) => HttpResponse::InternalServerError().json(err.to_string()),
+    }
+}
+
+async fn check_self_ip(client: reqwest::Client) {
+    match client
+        .get("https://ifconfig.me")
+        .header("Accept", "application/json")
+        .send()
+        .await
+    {
+        Ok(resp) => match resp.text().await {
+            Ok(res) => {
+                info!("What is my IP address: {}", res.trim())
+            }
+            Err(err) => {
+                warn!("Check IP address error: {}", err.to_string())
+            }
+        },
+        Err(err) => {
+            warn!("Check IP request error: {}", err)
+        }
     }
 }

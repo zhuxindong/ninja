@@ -23,7 +23,8 @@ use super::auth_client;
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
 const DEFAULT_INDEX: &str = "/";
-const SESSION_ID: &str = "opengpt_session";
+pub(super) const SESSION_ID: &str = "opengpt_session";
+pub(super) const PUID_SESSION_ID: &str = "_puid";
 const BUILD_ID: &str = "WLHd8p-1ysAW_5sZZPJIy";
 const TEMP_404: &str = "404.htm";
 const TEMP_AUTH: &str = "auth.htm";
@@ -38,6 +39,7 @@ struct Session {
     email: String,
     picture: String,
     access_token: String,
+    refresh_token: Option<String>,
     expires_in: i64,
     expires: i64,
 }
@@ -65,6 +67,7 @@ impl From<(&str, DashSession, i64, i64)> for Session {
             email: value.1.email().to_owned(),
             picture: value.1.picture().to_owned(),
             access_token: value.0.to_owned(),
+            refresh_token: None,
             expires_in: value.2,
             expires: value.3,
         }
@@ -78,6 +81,7 @@ impl From<AuthenticateToken> for Session {
             email: value.email().to_owned(),
             picture: value.picture().to_owned(),
             access_token: value.access_token().to_owned(),
+            refresh_token: Some(value.refresh_token().to_owned()),
             expires_in: value.expires_in(),
             expires: value.expires(),
         }
@@ -251,8 +255,14 @@ async fn post_login_token(req: HttpRequest) -> Result<HttpResponse> {
     redirect_login()
 }
 
-async fn get_logout() -> impl Responder {
-    HttpResponse::SeeOther()
+async fn get_logout(req: HttpRequest) -> Result<HttpResponse> {
+    if let Some(cookie) = req.cookie(SESSION_ID) {
+        let session = extract_session(cookie.value())?;
+        if let Some(refresh_token) = session.refresh_token {
+            let _ = auth_client().do_revoke_token(&refresh_token).await;
+        }
+    }
+    Ok(HttpResponse::SeeOther()
         .cookie(
             Cookie::build(SESSION_ID, "")
                 .path(DEFAULT_INDEX)
@@ -263,7 +273,7 @@ async fn get_logout() -> impl Responder {
                 .finish(),
         )
         .insert_header((header::LOCATION, "/auth/login"))
-        .finish()
+        .finish())
 }
 
 async fn get_session(req: HttpRequest) -> Result<HttpResponse> {
@@ -288,7 +298,19 @@ async fn get_session(req: HttpRequest) -> Result<HttpResponse> {
             "authProvider": "auth0"
         });
 
-        return Ok(HttpResponse::Ok().json(props));
+        return Ok(HttpResponse::Ok()
+            .cookie(
+                Cookie::build(PUID_SESSION_ID, session.user_id)
+                    .path(DEFAULT_INDEX)
+                    .expires(
+                        cookie::time::OffsetDateTime::from_unix_timestamp(session.expires).unwrap(),
+                    )
+                    .same_site(cookie::SameSite::Lax)
+                    .secure(false)
+                    .http_only(false)
+                    .finish(),
+            )
+            .json(props));
     }
     redirect_login()
 }
