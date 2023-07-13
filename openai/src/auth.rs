@@ -28,6 +28,7 @@ const OPENAI_OAUTH_TOKEN_URL: &str = "https://auth0.openai.com/oauth/token";
 const OPENAI_OAUTH_REVOKE_URL: &str = "https://auth0.openai.com/oauth/revoke";
 const OPENAI_OAUTH_CALLBACK_URL: &str =
     "com.openai.chat://auth0.openai.com/ios/com.openai.chat/callback";
+const OPENAI_OAUTH_PRE_AUTH_COOKIE: &str = "12345678-0707-0707-0707-123456789ABC%3A1689216803-UDB7Sr72DpdIO%2BCtsYEzms8uwGkzYetstlvTflB7%2BA0%3D";
 
 const OPENAI_API_URL: &str = "https://api.openai.com";
 /// You do **not** have to wrap the `Client` in an [`Rc`] or [`Arc`] to **reuse** it,
@@ -109,7 +110,7 @@ impl AuthClient {
         let code_verifier = Self::generate_code_verifier();
         let code_challenge = Self::generate_code_challenge(&code_verifier);
 
-        let url = format!("{OPENAI_OAUTH_URL}/authorize?client_id={CLIENT_ID}&audience=https%3A%2F%2Fapi.openai.com%2Fv1&redirect_uri=com.openai.chat%3A%2F%2Fauth0.openai.com%2Fios%2Fcom.openai.chat%2Fcallback&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write%20offline&response_type=code&code_challenge={code_challenge}&code_challenge_method=S256&prompt=login");
+        let url = format!("https://auth0.openai.com/authorize?state=4DJBNv86mezKHDv-i2wMuDBea2-rHAo5nA_ZT4zJeak&ios_app_version=1744&client_id={CLIENT_ID}&redirect_uri={OPENAI_OAUTH_CALLBACK_URL}&code_challenge={code_challenge}&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write&prompt=login&preauth_cookie={OPENAI_OAUTH_PRE_AUTH_COOKIE}&audience=https://api.openai.com/v1&code_challenge_method=S256&response_type=code&auth0Client=eyJ2ZXJzaW9uIjoiMi4zLjIiLCJuYW1lIjoiQXV0aDAuc3dpZnQiLCJlbnYiOnsic3dpZnQiOiI1LngiLCJpT1MiOiIxNi4yIn19");
 
         let resp = self
             .client
