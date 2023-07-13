@@ -28,7 +28,6 @@ const OPENAI_OAUTH_TOKEN_URL: &str = "https://auth0.openai.com/oauth/token";
 const OPENAI_OAUTH_REVOKE_URL: &str = "https://auth0.openai.com/oauth/revoke";
 const OPENAI_OAUTH_CALLBACK_URL: &str =
     "com.openai.chat://auth0.openai.com/ios/com.openai.chat/callback";
-const OPENAI_OAUTH_PRE_AUTH_COOKIE: &str = "12345678-0707-0707-0707-123456789ABC%3A1689216803-UDB7Sr72DpdIO%2BCtsYEzms8uwGkzYetstlvTflB7%2BA0%3D";
 
 const OPENAI_API_URL: &str = "https://api.openai.com";
 /// You do **not** have to wrap the `Client` in an [`Rc`] or [`Arc`] to **reuse** it,
@@ -109,8 +108,8 @@ impl AuthClient {
         }
         let code_verifier = Self::generate_code_verifier();
         let code_challenge = Self::generate_code_challenge(&code_verifier);
-
-        let url = format!("https://auth0.openai.com/authorize?state=4DJBNv86mezKHDv-i2wMuDBea2-rHAo5nA_ZT4zJeak&ios_app_version=1744&client_id={CLIENT_ID}&redirect_uri={OPENAI_OAUTH_CALLBACK_URL}&code_challenge={code_challenge}&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write&prompt=login&preauth_cookie={OPENAI_OAUTH_PRE_AUTH_COOKIE}&audience=https://api.openai.com/v1&code_challenge_method=S256&response_type=code&auth0Client=eyJ2ZXJzaW9uIjoiMi4zLjIiLCJuYW1lIjoiQXV0aDAuc3dpZnQiLCJlbnYiOnsic3dpZnQiOiI1LngiLCJpT1MiOiIxNi4yIn19");
+        let preauth_cookie = self.official_preauth_cookie().await?;
+        let url = format!("https://auth0.openai.com/authorize?state=4DJBNv86mezKHDv-i2wMuDBea2-rHAo5nA_ZT4zJeak&ios_app_version=1744&client_id={CLIENT_ID}&redirect_uri={OPENAI_OAUTH_CALLBACK_URL}&code_challenge={code_challenge}&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write&prompt=login&preauth_cookie={preauth_cookie}&audience=https://api.openai.com/v1&code_challenge_method=S256&response_type=code&auth0Client=eyJ2ZXJzaW9uIjoiMi4zLjIiLCJuYW1lIjoiQXV0aDAuc3dpZnQiLCJlbnYiOnsic3dpZnQiOiI1LngiLCJpT1MiOiIxNi4yIn19");
 
         let resp = self
             .client
@@ -340,6 +339,68 @@ impl AuthClient {
             .map_err(OAuthError::FailedRequest)?;
 
         self.response_handle_unit(resp).await
+    }
+}
+
+impl AuthClient {
+
+    /// It may fail at any time
+    #[allow(dead_code)]
+    async fn official_preauth_cookie(&self) -> OAuthResult<String> {
+        let mut kv = HashMap::new();
+        kv.insert("bundle_id", "com.openai.chat");
+        kv.insert("device_id", "0E92DAF9-94F0-4F77-BDF4-53A60D19EC65");
+        kv.insert("request_flag", "true");
+        kv.insert("device_token", "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");
+
+        let resp = self
+            .client
+            .post("https://ios.chat.openai.com/backend-api/preauth_devicecheck")
+            .json(&kv)
+            .send()
+            .await
+            .map_err(OAuthError::FailedRequest)?;
+
+        if resp.status().is_success() {
+
+            if let Some(preauth_cookie) = resp
+                .cookies()
+                .into_iter()
+                .find(|c| c.name().eq("_preauth_devicecheck"))
+            {
+                return Ok(preauth_cookie.value().to_owned());
+            }
+        } else {
+            let text = resp.text().await?;
+            println!("{}", text);
+        }
+
+        bail!(OAuthError::FailedLogin)
+    }
+
+    #[allow(dead_code)]
+    async fn unofficial_preauth_cookie(&self) -> OAuthResult<String> {
+        let resp = self
+            .client
+            .get("https://ai.fakeopen.com/auth/preauth")
+            .send()
+            .await
+            .map_err(OAuthError::FailedRequest)?;
+
+        if resp.status().is_success() {
+            let json = resp.json::<serde_json::Value>().await?;
+
+            if let Some(kv) = json.as_object() {
+                if let Some(preauth_cookie) = kv.get("preauth_cookie") {
+                    return Ok(preauth_cookie
+                        .as_str()
+                        .expect("failed to extract preauth_cookie")
+                        .to_owned());
+                }
+            }
+        }
+
+        bail!(OAuthError::FailedLogin)
     }
 
     async fn response_handle<U: DeserializeOwned>(
