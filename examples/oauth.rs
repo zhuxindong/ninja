@@ -1,6 +1,6 @@
 use std::time;
 
-use openai::auth::OAuthAccountBuilder;
+use openai::auth::{AuthAccountBuilder, AuthHandle};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -8,14 +8,15 @@ async fn main() -> anyhow::Result<()> {
     let password = std::env::var("PASSWORD")?;
     let auth = openai::auth::AuthClientBuilder::builder()
         .user_agent(openai::HEADER_UA)
-        .chrome_builder(reqwest::browser::ChromeVersion::V108)
+        .chrome_builder(reqwest::browser::ChromeVersion::V110)
         .cookie_store(true)
         .timeout(time::Duration::from_secs(1000))
         .connect_timeout(time::Duration::from_secs(1000))
+        .handle(openai::auth::AuthStrategy::PLATFROM)
         .build();
     let token = auth
         .do_access_token(
-            &OAuthAccountBuilder::default()
+            &AuthAccountBuilder::default()
                 .username(email)
                 .password(password)
                 .build()?,

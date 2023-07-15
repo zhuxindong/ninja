@@ -1157,7 +1157,7 @@ impl AuthClientBuilder {
         }));
         AuthClientBuilder {
             builder: client_builder,
-            strategy: AuthStrategy::PLATFROM,
+            strategy: AuthStrategy::IOS,
         }
     }
 }
