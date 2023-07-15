@@ -4,6 +4,7 @@ set -e
 
 root=$(pwd)
 : ${tag=latest}
+: ${rmi=false}
 [ ! -d uploads ] && mkdir uploads
 
 cargo update
@@ -11,6 +12,10 @@ cargo install cargo-deb
 
 pull_docker_image() {
     docker pull ghcr.io/gngpp/opengpt-builder:$1
+}
+
+rmi_docker_image() {
+    docker rmi ghcr.io/gngpp/opengpt-builder:$1
 }
 
 build_target() {
@@ -59,6 +64,10 @@ for target in "${target_list[@]}"; do
         build_windows_target "$target"
     else
         build_target "$target"
+    fi
+
+    if [ "$rmi" = "true" ]; then
+        rmi_docker_image "$target"
     fi
 done
 
