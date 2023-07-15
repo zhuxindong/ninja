@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{
-    auth::{self, DashSession},
+    auth::{self, AuthHandle, DashSession},
     model::AuthenticateToken,
     URL_CHATGPT_API,
 };
@@ -23,8 +23,7 @@ use super::auth_client;
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
 const DEFAULT_INDEX: &str = "/";
-pub(super) const SESSION_ID: &str = "opengpt_session";
-pub(super) const PUID_SESSION_ID: &str = "_puid";
+const SESSION_ID: &str = "opengpt_session";
 const BUILD_ID: &str = "WLHd8p-1ysAW_5sZZPJIy";
 const TEMP_404: &str = "404.htm";
 const TEMP_AUTH: &str = "auth.htm";
@@ -187,7 +186,7 @@ async fn get_login(
 async fn post_login(
     tmpl: web::Data<tera::Tera>,
     query: web::Query<HashMap<String, String>>,
-    account: web::Form<auth::OAuthAccount>,
+    account: web::Form<auth::AuthAccount>,
 ) -> Result<HttpResponse> {
     let default_next = DEFAULT_INDEX.to_owned();
     let next = query.get("next").unwrap_or(&default_next);
@@ -298,19 +297,7 @@ async fn get_session(req: HttpRequest) -> Result<HttpResponse> {
             "authProvider": "auth0"
         });
 
-        return Ok(HttpResponse::Ok()
-            .cookie(
-                Cookie::build(PUID_SESSION_ID, session.user_id)
-                    .path(DEFAULT_INDEX)
-                    .expires(
-                        cookie::time::OffsetDateTime::from_unix_timestamp(session.expires).unwrap(),
-                    )
-                    .same_site(cookie::SameSite::Lax)
-                    .secure(false)
-                    .http_only(false)
-                    .finish(),
-            )
-            .json(props));
+        return Ok(HttpResponse::Ok().json(props));
     }
     redirect_login()
 }
@@ -664,7 +651,7 @@ async fn get_share_chat_continue_info(
 async fn get_image(params: Option<web::Query<ImageQuery>>) -> Result<HttpResponse> {
     let query = params.ok_or(error::ErrorBadRequest("Missing URL parameter"))?;
     let resp = super::client().get(&query.url).send().await;
-    Ok(super::response_handle(resp))
+    Ok(super::response_convert(resp))
 }
 
 async fn get_error_404(tmpl: web::Data<tera::Tera>) -> Result<HttpResponse> {

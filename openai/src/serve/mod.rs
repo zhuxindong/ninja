@@ -7,6 +7,7 @@ pub mod tokenbucket;
 #[cfg(feature = "template")]
 pub mod template;
 
+use actix_web::cookie::{self, Cookie};
 use actix_web::http::header;
 use actix_web::middleware::Logger;
 use actix_web::web::Json;
@@ -21,7 +22,7 @@ use serde_json::{json, Value};
 use std::fs::File;
 use std::io::BufReader;
 use std::sync::Once;
-use std::time::Duration;
+use std::time::{Duration, UNIX_EPOCH};
 use url::Url;
 
 use std::net::IpAddr;
@@ -29,10 +30,10 @@ use std::path::PathBuf;
 use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 
 use crate::arkose::ArkoseToken;
-use crate::auth::AuthClient;
+use crate::auth::{AuthClient, AuthHandle};
 use crate::serve::template::TemplateData;
 use crate::serve::tokenbucket::TokenBucketContext;
-use crate::{auth, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
+use crate::{auth, debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 
 use crate::{HEADER_UA, URL_CHATGPT_API, URL_PLATFORM_API};
 const EMPTY: &str = "";
@@ -281,7 +282,7 @@ impl Launcher {
 }
 
 #[post("/auth/token")]
-async fn post_access_token(account: web::Form<auth::OAuthAccount>) -> impl Responder {
+async fn post_access_token(account: web::Form<auth::AuthAccount>) -> impl Responder {
     match auth_client().do_access_token(&account.into_inner()).await {
         Ok(token) => HttpResponse::Ok().json(token),
         Err(err) => HttpResponse::BadRequest().json(err.to_string()),
@@ -368,7 +369,7 @@ async fn official_proxy(req: HttpRequest, body: Option<Json<Value>>) -> impl Res
         Some(body) => builder.json(&body).send().await,
         None => builder.send().await,
     };
-    response_handle(resp)
+    response_convert(resp)
 }
 
 /// reference: doc/http.rest
@@ -401,7 +402,47 @@ async fn unofficial_proxy(req: HttpRequest, mut body: Option<Json<Value>>) -> im
         Some(body) => builder.json(&body).send().await,
         None => builder.send().await,
     };
-    response_handle(resp)
+    response_convert(resp)
+}
+
+fn response_convert(resp: Result<reqwest::Response, reqwest::Error>) -> HttpResponse {
+    match resp {
+        Ok(resp) => {
+            let status = resp.status();
+            let mut builder = HttpResponse::build(status);
+            resp.headers().into_iter().for_each(|kv| {
+                builder.insert_header(kv);
+            });
+
+            for c in resp
+                .cookies()
+                .into_iter()
+                .filter(|c| c.name().eq("_puid") || c.name().eq("__cf_bm"))
+            {
+                if let Some(expires) = c.expires() {
+                    let timestamp_nanos = expires
+                        .duration_since(UNIX_EPOCH)
+                        .expect("Failed to get timestamp")
+                        .as_nanos() as i128;
+                    let cookie = Cookie::build(c.name(), c.value())
+                        .path("/")
+                        .expires(
+                            cookie::time::OffsetDateTime::from_unix_timestamp_nanos(
+                                timestamp_nanos,
+                            )
+                            .expect("get cookie expires exception"),
+                        )
+                        .same_site(cookie::SameSite::Lax)
+                        .secure(true)
+                        .http_only(false)
+                        .finish();
+                    builder.cookie(cookie);
+                }
+            }
+            builder.streaming(resp.bytes_stream())
+        }
+        Err(err) => HttpResponse::InternalServerError().json(err.to_string()),
+    }
 }
 
 fn header_convert(req: &HttpRequest) -> reqwest::header::HeaderMap {
@@ -440,9 +481,17 @@ fn header_convert(req: &HttpRequest) -> reqwest::header::HeaderMap {
         cookie.push_str(&format!("_puid={puid};"))
     }
 
-    // if let Some(cookier) = req.cookie(template::PUID_SESSION_ID) {
-    //     cookie.push_str(&format!("_puid={};", cookier.value()));
-    // }
+    if let Some(cookier) = req.cookie("_puid") {
+        let c = &format!("_puid={};", puid_cookie_encoded(cookier.value()));
+        cookie.push_str(c);
+        debug!("request cookie `puid`: {}", c);
+    }
+
+    if let Some(cookier) = req.cookie("__cf_bm") {
+        let c = &format!("__cf_bm={};", cookier.value());
+        cookie.push_str(c);
+        debug!("request cookie `__cf_bm`: {}", c);
+    }
 
     // setting cookie
     if !cookie.is_empty() {
@@ -452,6 +501,26 @@ fn header_convert(req: &HttpRequest) -> reqwest::header::HeaderMap {
         );
     }
     res
+}
+
+fn puid_cookie_encoded(input: &str) -> String {
+    let separator = ':';
+    if let Some((name, value)) = input.split_once(separator) {
+        let encoded_value = value
+            .chars()
+            .map(|ch| match ch {
+                '!' | '#' | '$' | '%' | '&' | '\'' | '(' | ')' | '*' | '+' | ',' | '/' | ':'
+                | ';' | '=' | '?' | '@' | '[' | ']' | '~' => {
+                    format!("%{:02X}", ch as u8)
+                }
+                _ => ch.to_string(),
+            })
+            .collect::<String>();
+
+        format!("{}:{}", name, encoded_value)
+    } else {
+        input.to_string()
+    }
 }
 
 async fn gpt4_body_handle(req: &HttpRequest, body: &mut Option<Json<Value>>) {
@@ -468,24 +537,11 @@ async fn gpt4_body_handle(req: &HttpRequest, body: &mut Option<Json<Value>>) {
     }
 }
 
-fn response_handle(resp: Result<reqwest::Response, reqwest::Error>) -> HttpResponse {
-    match resp {
-        Ok(resp) => {
-            let status = resp.status();
-            let mut builder = HttpResponse::build(status);
-            resp.headers().into_iter().for_each(|kv| {
-                builder.insert_header(kv);
-            });
-            builder.streaming(resp.bytes_stream())
-        }
-        Err(err) => HttpResponse::InternalServerError().json(err.to_string()),
-    }
-}
-
 async fn check_self_ip(client: reqwest::Client) {
     match client
         .get("https://ifconfig.me")
-        .header("Accept", "application/json")
+        .timeout(Duration::from_secs(10))
+        .header(header::ACCEPT, "application/json")
         .send()
         .await
     {

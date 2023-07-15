@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use base64::{engine::general_purpose, Engine};
 
-use crate::OAuthError;
+use crate::AuthError;
 use serde_json::Value;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -119,7 +119,7 @@ impl TryFrom<String> for Profile {
         let split_jwt_strings: Vec<_> = value.split('.').collect();
         let jwt_body = split_jwt_strings
             .get(1)
-            .ok_or(OAuthError::InvalidAccessToken)?;
+            .ok_or(AuthError::InvalidAccessToken)?;
         let decoded_jwt_body = general_purpose::URL_SAFE_NO_PAD.decode(jwt_body)?;
         let converted_jwt_body = String::from_utf8(decoded_jwt_body)?;
         let profile = serde_json::from_str::<Profile>(&converted_jwt_body)?;

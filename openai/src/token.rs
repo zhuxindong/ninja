@@ -4,7 +4,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::{model::AuthenticateToken, OAuthError, TokenStoreError};
+use crate::{model::AuthenticateToken, AuthError, TokenStoreError};
 use anyhow::Context;
 
 use jsonwebtokens::{Algorithm, AlgorithmID, Verifier};
@@ -239,7 +239,7 @@ async fn keys() -> TokenResult<KeyResult> {
         let keys = resp.json::<KeyResult>().await?;
         return Ok(keys);
     }
-    anyhow::bail!(OAuthError::FailedPubKeyRequest)
+    anyhow::bail!(AuthError::FailedPubKeyRequest)
 }
 
 fn check_info(token: &str, pub_key: &[u8], alg: AlgorithmID) -> TokenResult<TokenProfile> {
@@ -255,7 +255,7 @@ fn check_info(token: &str, pub_key: &[u8], alg: AlgorithmID) -> TokenResult<Toke
     {
         return Ok(serde_json::from_value(claims)?);
     }
-    anyhow::bail!(OAuthError::InvalidAccessToken)
+    anyhow::bail!(AuthError::InvalidAccessToken)
 }
 
 pub fn check_for_u8(token: &[u8]) -> TokenResult<Option<TokenProfile>> {
@@ -279,8 +279,8 @@ pub fn await_check(token: &str) -> TokenResult<Option<TokenProfile>> {
     let key = key_result
         .keys
         .first()
-        .ok_or(OAuthError::FailedPubKeyRequest)?;
-    let pub_key = key.x5c.first().ok_or(OAuthError::FailedPubKeyRequest)?;
+        .ok_or(AuthError::FailedPubKeyRequest)?;
+    let pub_key = key.x5c.first().ok_or(AuthError::FailedPubKeyRequest)?;
     let pub_key = format!("-----BEGIN PUBLIC KEY-----{pub_key}-----END PUBLIC KEY-----");
     let alg = AlgorithmID::from_str(key.alg.as_str())?;
     Ok(Some(check_info(token, pub_key.as_bytes(), alg)))
