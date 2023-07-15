@@ -10,16 +10,18 @@ use async_recursion::async_recursion;
 use derive_builder::Builder;
 use regex::Regex;
 use reqwest::browser::ChromeVersion;
-use reqwest::header::{HeaderMap, HeaderValue, self};
+use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::redirect::Policy;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use base64::{engine::general_purpose, Engine as _};
 use rand::Rng;
 use reqwest::{Client, Proxy, StatusCode, Url};
-use serde_json::{json, Value};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
+
+pub mod model;
 
 use crate::{debug, AuthError, AuthResult, URL_CHATGPT_API};
 
@@ -33,13 +35,16 @@ const OPENAI_OAUTH_CALLBACK_URL: &str =
 const OPENAI_API_URL: &str = "https://api.openai.com";
 
 pub enum AuthStrategy {
-    IOS,
-    PLATFROM,
+    Apple,
+    Web,
 }
 
 #[async_trait::async_trait]
 pub trait AuthHandle: Send + Sync {
-    async fn do_access_token(&self, account: &AuthAccount) -> AuthResult<AccessToken>;
+    async fn do_access_token(
+        &self,
+        account: &model::AuthAccount,
+    ) -> AuthResult<model::AccessTokenOption>;
 }
 /// You do **not** have to wrap the `Client` in an [`Rc`] or [`Arc`] to **reuse** it,
 /// because it already uses an [`Arc`] internally.
@@ -54,7 +59,10 @@ pub struct AuthClient {
 
 #[async_trait::async_trait]
 impl AuthHandle for AuthClient {
-    async fn do_access_token(&self, account: &AuthAccount) -> AuthResult<AccessToken> {
+    async fn do_access_token(
+        &self,
+        account: &model::AuthAccount,
+    ) -> AuthResult<model::AccessTokenOption> {
         if !self.email_regex.is_match(&account.username) || account.password.is_empty() {
             bail!(AuthError::InvalidEmailOrPassword)
         }
@@ -63,7 +71,7 @@ impl AuthHandle for AuthClient {
 }
 
 impl AuthClient {
-    pub async fn do_dashboard_login(&self, access_token: &str) -> AuthResult<DashSession> {
+    pub async fn do_dashboard_login(&self, access_token: &str) -> AuthResult<model::DashSession> {
         let access_token = access_token.replace("Bearer ", "");
         let resp = self
             .client
@@ -75,7 +83,11 @@ impl AuthClient {
         Self::response_handle(resp).await
     }
 
-    pub async fn do_get_api_key(&self, sensitive_id: &str, name: &str) -> AuthResult<ApiKey> {
+    pub async fn do_get_api_key(
+        &self,
+        sensitive_id: &str,
+        name: &str,
+    ) -> AuthResult<model::ApiKey> {
         let data = ApiKeyDataBuilder::default()
             .action("create")
             .name(name)
@@ -91,7 +103,7 @@ impl AuthClient {
         Self::response_handle(resp).await
     }
 
-    pub async fn do_get_api_key_list(&self, sensitive_id: &str) -> AuthResult<ApiKeyList> {
+    pub async fn do_get_api_key_list(&self, sensitive_id: &str) -> AuthResult<model::ApiKeyList> {
         let resp = self
             .client
             .get(format!("{OPENAI_API_URL}/dashboard/user/api_keys"))
@@ -107,7 +119,7 @@ impl AuthClient {
         sensitive_id: &str,
         redacted_key: &str,
         created_at: u64,
-    ) -> AuthResult<ApiKey> {
+    ) -> AuthResult<model::ApiKey> {
         let data = ApiKeyDataBuilder::default()
             .action("delete")
             .redacted_key(redacted_key)
@@ -124,7 +136,7 @@ impl AuthClient {
         Self::response_handle(resp).await
     }
 
-    pub async fn do_refresh_token(&self, refresh_token: &str) -> AuthResult<RefreshToken> {
+    pub async fn do_refresh_token(&self, refresh_token: &str) -> AuthResult<model::RefreshToken> {
         let refresh_token = Self::verify_refresh_token(refresh_token)?;
         let data = RefreshTokenDataBuilder::default()
             .redirect_uri(OPENAI_OAUTH_CALLBACK_URL)
@@ -140,7 +152,7 @@ impl AuthClient {
             .send()
             .await?;
 
-        let mut token = Self::response_handle::<RefreshToken>(resp).await?;
+        let mut token = Self::response_handle::<model::RefreshToken>(resp).await?;
         token.refresh_token = refresh_token.to_owned();
         Ok(token)
     }
@@ -292,56 +304,70 @@ impl AuthClient {
     }
 }
 
-struct PlatformAuthHandle {
+struct WebAuthHandle {
     client: Client,
 }
 
 #[async_trait::async_trait]
-impl AuthHandle for PlatformAuthHandle {
-    async fn do_access_token(&self, account: &AuthAccount) -> AuthResult<AccessToken> {
+impl AuthHandle for WebAuthHandle {
+    async fn do_access_token(
+        &self,
+        account: &model::AuthAccount,
+    ) -> AuthResult<model::AccessTokenOption> {
+        // get csrf token
         let csrf_token = self.get_csrf_token().await?;
 
+        // authorized url
         let authorized_url = self.get_authorized_url(csrf_token).await?;
 
-        let state = AuthClient::get_callback_state(&authorized_url);
+        // state code
+        let state = self.get_state(authorized_url).await?;
 
         // check username
         self.authenticate_username(&state, &account.username)
             .await?;
 
         // check password and username
-        self.authenticate_password(&state, &account).await?;
-        todo!()
+        self.authenticate_password(&state, &account).await
     }
 }
 
-impl PlatformAuthHandle {
-    async fn get_authorized_url(&self, csrf_token: String) -> AuthResult<Url> {
-        debug!("csrf_token: {csrf_token}");
-        let form = [("callbackUrl", "/"), ("csrfToken", &csrf_token), ("json", "true")];
+impl WebAuthHandle {
+    async fn get_state(&self, authorized_url: String) -> AuthResult<String> {
         let resp = self
             .client
-            .post(format!(
-                "{URL_CHATGPT_API}/api/auth/signin/auth0?prompt=login"
-            ))
-            .form(&form)
+            .get(authorized_url)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
 
-        println!("{}", resp.status());
-
         if resp.status().is_success() {
-            let res = resp.json::<Value>().await?;
-            // let url = res
-            //     .as_object()
-            //     .context(AuthError::FailedAuthorizedUrl)?
-            //     .get("url")
-            //     .context(AuthError::FailedAuthorizedUrl)?;
-            println!("url: {}", res);
+            let html = resp.text().await?;
+            let tag_start = "<input";
+            let attribute_name = "name=\"state\"";
+            let value_start = "value=\"";
+            let mut remaining = html.as_str();
+
+            while let Some(tag_start_index) = remaining.find(tag_start) {
+                remaining = &remaining[tag_start_index..];
+
+                if let Some(attribute_index) = remaining.find(attribute_name) {
+                    remaining = &remaining[attribute_index..];
+
+                    if let Some(value_start_index) = remaining.find(value_start) {
+                        remaining = &remaining[value_start_index + value_start.len()..];
+
+                        if let Some(value_end_index) = remaining.find("\"") {
+                            let value = &remaining[..value_end_index];
+                            return Ok(value.trim().to_string());
+                        }
+                    }
+                }
+                remaining = &remaining[tag_start.len()..];
+            }
         }
 
-        bail!(AuthError::FailedAuthorizedUrl)
+        bail!(AuthError::FailedState)
     }
 
     async fn get_csrf_token(&self) -> AuthResult<String> {
@@ -357,10 +383,45 @@ impl PlatformAuthHandle {
                 .as_object()
                 .context(AuthError::FailedCsrfToken)?
                 .get("csrfToken")
+                .context(AuthError::FailedCsrfToken)?
+                .as_str()
                 .context(AuthError::FailedCsrfToken)?;
             return Ok(csrf_token.to_string());
         }
         bail!(AuthError::FailedCsrfToken)
+    }
+
+    async fn get_authorized_url(&self, csrf_token: String) -> AuthResult<String> {
+        let form = [
+            ("callbackUrl", "/"),
+            ("csrfToken", &csrf_token),
+            ("json", "true"),
+        ];
+
+        let resp = self
+            .client
+            .post(format!(
+                "{URL_CHATGPT_API}/api/auth/signin/auth0?prompt=login"
+            ))
+            .form(&form)
+            .send()
+            .await
+            .map_err(AuthError::FailedRequest)?;
+
+        if resp.status().is_success() {
+            let res = resp.json::<Value>().await?;
+            let url = res
+                .as_object()
+                .context(AuthError::FailedAuthorizedUrl)?
+                .get("url")
+                .context(AuthError::FailedAuthorizedUrl)?
+                .as_str()
+                .context(AuthError::FailedAuthorizedUrl)?
+                .to_owned();
+            return Ok(url);
+        }
+
+        bail!(AuthError::FailedAuthorizedUrl)
     }
 
     async fn authenticate_username(&self, state: &str, username: &str) -> AuthResult<()> {
@@ -395,8 +456,8 @@ impl PlatformAuthHandle {
     async fn authenticate_password(
         &self,
         state: &str,
-        account: &AuthAccount,
-    ) -> AuthResult<AccessToken> {
+        account: &model::AuthAccount,
+    ) -> AuthResult<model::AccessTokenOption> {
         let data = AuthenticateDataBuilder::default()
             .action("default")
             .state(state)
@@ -404,11 +465,9 @@ impl PlatformAuthHandle {
             .password(&account.password)
             .build()?;
 
-        let url = format!("{OPENAI_OAUTH_URL}/u/login/password?state={state}");
-
         let resp = self
             .client
-            .post(&url)
+            .post(format!("{OPENAI_OAUTH_URL}/u/login/password?state={state}"))
             .json(&data)
             .send()
             .await
@@ -448,7 +507,7 @@ impl PlatformAuthHandle {
                         bail!(AuthError::InvalidEmailOrPassword)
                     }
                     _ => {
-                        bail!("Failed to get access token")
+                        bail!(AuthError::FailedLogin)
                     }
                 };
             }
@@ -460,8 +519,8 @@ impl PlatformAuthHandle {
         &self,
         mfa_code: &str,
         location: &str,
-        account: &AuthAccount,
-    ) -> AuthResult<AccessToken> {
+        account: &model::AuthAccount,
+    ) -> AuthResult<model::AccessTokenOption> {
         let url = format!("{OPENAI_OAUTH_URL}{}", location);
         let state = AuthClient::get_callback_state(&Url::parse(&url)?);
         let data = AuthenticateMfaDataBuilder::default()
@@ -495,7 +554,7 @@ impl PlatformAuthHandle {
         todo!()
     }
 
-    async fn get_access_token(&self) -> AuthResult<AccessToken> {
+    async fn get_access_token(&self) -> AuthResult<model::AccessTokenOption> {
         let resp = self
             .client
             .get("https://chat.openai.com/api/auth/session")
@@ -503,7 +562,9 @@ impl PlatformAuthHandle {
             .await
             .map_err(AuthError::FailedRequest)?;
         match resp.status() {
-            StatusCode::OK => Ok(resp.json::<AccessToken>().await?),
+            StatusCode::OK => Ok(model::AccessTokenOption::Web(
+                resp.json::<model::WebAccessToken>().await?,
+            )),
             StatusCode::TOO_MANY_REQUESTS => {
                 bail!(AuthError::TooManyRequests("Too Many Requests".to_owned()))
             }
@@ -514,19 +575,20 @@ impl PlatformAuthHandle {
     }
 }
 
-struct IosAuthHandle {
+struct AppleAuthHandle {
     client: Client,
 }
 
 #[async_trait::async_trait]
-impl AuthHandle for IosAuthHandle {
-    async fn do_access_token(&self, account: &AuthAccount) -> AuthResult<AccessToken> {
+impl AuthHandle for AppleAuthHandle {
+    async fn do_access_token(
+        &self,
+        account: &model::AuthAccount,
+    ) -> AuthResult<model::AccessTokenOption> {
         let code_verifier = AuthClient::generate_code_verifier();
         let code_challenge = AuthClient::generate_code_challenge(&code_verifier);
 
-        let url = self
-            .get_authorized_url(&code_challenge)
-            .await?;
+        let url = self.get_authorized_url(&code_challenge).await?;
         let state = AuthClient::get_callback_state(&url);
 
         // check username
@@ -538,11 +600,8 @@ impl AuthHandle for IosAuthHandle {
     }
 }
 
-impl IosAuthHandle {
-    async fn get_authorized_url(
-        &self,
-        code_challenge: &str,
-    ) -> AuthResult<Url> {
+impl AppleAuthHandle {
+    async fn get_authorized_url(&self, code_challenge: &str) -> AuthResult<Url> {
         let preauth_cookie = self.unofficial_preauth_cookie().await?;
         let url = format!("https://auth0.openai.com/authorize?state=4DJBNv86mezKHDv-i2wMuDBea2-rHAo5nA_ZT4zJeak&ios_app_version=1744&client_id={CLIENT_ID}&redirect_uri={OPENAI_OAUTH_CALLBACK_URL}&code_challenge={code_challenge}&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write&prompt=login&preauth_cookie={preauth_cookie}&audience=https://api.openai.com/v1&code_challenge_method=S256&response_type=code&auth0Client=eyJ2ZXJzaW9uIjoiMi4zLjIiLCJuYW1lIjoiQXV0aDAuc3dpZnQiLCJlbnYiOnsic3dpZnQiOiI1LngiLCJpT1MiOiIxNi4yIn19");
         let resp = self
@@ -565,7 +624,11 @@ impl IosAuthHandle {
         Ok(url.clone())
     }
 
-    async fn authenticate_username(&self, state: &str, account: &AuthAccount) -> AuthResult<()> {
+    async fn authenticate_username(
+        &self,
+        state: &str,
+        account: &model::AuthAccount,
+    ) -> AuthResult<()> {
         let url = format!("{OPENAI_OAUTH_URL}/u/login/identifier?state={state}");
         let resp = self
             .client
@@ -598,8 +661,8 @@ impl IosAuthHandle {
         &self,
         code_verifier: &str,
         state: &str,
-        account: &AuthAccount,
-    ) -> AuthResult<AccessToken> {
+        account: &model::AuthAccount,
+    ) -> AuthResult<model::AccessTokenOption> {
         debug!("authenticate_password state: {state}");
         let data = AuthenticateDataBuilder::default()
             .action("default")
@@ -635,8 +698,8 @@ impl IosAuthHandle {
         &self,
         code_verifier: &str,
         location: &str,
-        account: &AuthAccount,
-    ) -> AuthResult<AccessToken> {
+        account: &model::AuthAccount,
+    ) -> AuthResult<model::AccessTokenOption> {
         let resp = self
             .client
             .get(&format!("{OPENAI_OAUTH_URL}{location}"))
@@ -669,8 +732,8 @@ impl IosAuthHandle {
         mfa_code: &str,
         code_verifier: &str,
         location: &str,
-        account: &AuthAccount,
-    ) -> AuthResult<AccessToken> {
+        account: &model::AuthAccount,
+    ) -> AuthResult<model::AccessTokenOption> {
         let url = format!("{OPENAI_OAUTH_URL}{}", location);
         let state = AuthClient::get_callback_state(&Url::parse(&url)?);
         let data = AuthenticateMfaDataBuilder::default()
@@ -707,7 +770,7 @@ impl IosAuthHandle {
         &self,
         code_verifier: &str,
         location: &str,
-    ) -> AuthResult<AccessToken> {
+    ) -> AuthResult<model::AccessTokenOption> {
         debug!("authorization_code location path: {location}");
         let code = AuthClient::get_callback_code(&Url::parse(location)?)?;
         let data = AuthorizationCodeDataBuilder::default()
@@ -725,8 +788,8 @@ impl IosAuthHandle {
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
-
-        AuthClient::response_handle::<AccessToken>(resp).await
+        let access_token = AuthClient::response_handle::<model::AppleAccessToken>(resp).await?;
+        Ok(model::AccessTokenOption::Apple(access_token))
     }
 
     /// It may fail at any time
@@ -869,144 +932,6 @@ struct RefreshTokenData<'a> {
     refresh_token: &'a str,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AccessToken {
-    pub access_token: String,
-    pub refresh_token: String,
-    pub id_token: String,
-    pub expires_in: i64,
-    pub puid: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RefreshToken {
-    pub access_token: String,
-    #[serde(default)]
-    pub refresh_token: String,
-    pub id_token: String,
-    pub expires_in: i64,
-}
-
-#[derive(Deserialize, Builder)]
-pub struct AuthAccount {
-    username: String,
-    password: String,
-    #[builder(setter(into, strip_option), default)]
-    mfa: Option<String>,
-}
-
-impl AuthAccount {
-    pub fn username(&self) -> &str {
-        self.username.as_ref()
-    }
-
-    pub fn password(&self) -> &str {
-        self.password.as_ref()
-    }
-
-    pub fn mfa(&self) -> Option<&str> {
-        self.mfa.as_deref()
-    }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct DashSession {
-    pub object: String,
-    pub user: User,
-    pub invites: Vec<Value>,
-}
-
-impl DashSession {
-    pub fn sensitive_id(&self) -> &str {
-        &self.user.session.sensitive_id
-    }
-
-    pub fn user_id(&self) -> &str {
-        &self.user.id
-    }
-
-    pub fn nickname(&self) -> &str {
-        &self.user.name
-    }
-
-    pub fn email(&self) -> &str {
-        &self.user.email
-    }
-
-    pub fn picture(&self) -> &str {
-        &self.user.picture
-    }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct User {
-    pub object: String,
-    pub id: String,
-    pub email: String,
-    pub name: String,
-    pub picture: String,
-    pub created: i64,
-    pub groups: Vec<Value>,
-    pub session: Session,
-    pub orgs: Orgs,
-    pub intercom_hash: String,
-    pub amr: Vec<Value>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Session {
-    pub sensitive_id: String,
-    pub object: String,
-    pub name: Option<String>,
-    pub created: i64,
-    pub last_use: Option<i64>,
-    pub publishable: bool,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Orgs {
-    pub object: String,
-    pub data: Vec<OrgsData>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct OrgsData {
-    pub object: String,
-    pub id: String,
-    pub created: i64,
-    pub title: String,
-    pub name: String,
-    pub description: String,
-    pub personal: bool,
-    pub is_default: bool,
-    pub role: String,
-    pub groups: Vec<Value>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ApiKey {
-    pub result: String,
-    pub key: Option<Key>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ApiKeyList {
-    pub object: String,
-    pub data: Vec<Key>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Key {
-    #[serde(rename = "sensitive_id")]
-    pub sensitive_id: String,
-    pub object: String,
-    pub name: String,
-    pub created: i64,
-    #[serde(rename = "last_use")]
-    pub last_use: Value,
-    pub publishable: bool,
-}
-
 pub struct AuthClientBuilder {
     builder: reqwest::ClientBuilder,
     strategy: AuthStrategy,
@@ -1120,14 +1045,14 @@ impl AuthClientBuilder {
         let client = self.builder.build().expect("ClientBuilder::build()");
 
         let handle: Box<dyn AuthHandle + Send + Sync> = match self.strategy {
-            AuthStrategy::IOS => {
-                let handle = IosAuthHandle {
+            AuthStrategy::Apple => {
+                let handle = AppleAuthHandle {
                     client: client.clone(),
                 };
                 Box::new(handle)
             }
-            AuthStrategy::PLATFROM => {
-                let handle = PlatformAuthHandle {
+            AuthStrategy::Web => {
+                let handle = WebAuthHandle {
                     client: client.clone(),
                 };
                 Box::new(handle)
@@ -1144,10 +1069,9 @@ impl AuthClientBuilder {
 
     pub fn builder() -> AuthClientBuilder {
         let client_builder = Client::builder().redirect(Policy::custom(|attempt| {
-            if attempt
-                .url()
-                .to_string()
-                .contains("https://auth0.openai.com/u/login/identifier")
+            let url = attempt.url().to_string();
+            if url.contains("https://auth0.openai.com/u/login/identifier")
+                || url.contains("https://auth0.openai.com/auth/login?callbackUrl")
             {
                 // redirects to 'https://auth0.openai.com/u/login/identifier'
                 attempt.follow()
@@ -1157,7 +1081,7 @@ impl AuthClientBuilder {
         }));
         AuthClientBuilder {
             builder: client_builder,
-            strategy: AuthStrategy::IOS,
+            strategy: AuthStrategy::Apple,
         }
     }
 }

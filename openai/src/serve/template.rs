@@ -1,10 +1,8 @@
 use std::collections::HashMap;
 
+use actix_web::cookie;
 use actix_web::{
-    cookie::{self, Cookie},
-    error,
-    http::header,
-    web, HttpRequest, HttpResponse, Responder, Result,
+    cookie::Cookie, error, http::header, web, HttpRequest, HttpResponse, Responder, Result,
 };
 use chrono::NaiveDateTime;
 use chrono::{prelude::DateTime, Utc};
@@ -13,7 +11,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{
-    auth::{self, AuthHandle, DashSession},
+    auth::{
+        model::{AuthAccount, DashSession},
+        AuthHandle,
+    },
     model::AuthenticateToken,
     URL_CHATGPT_API,
 };
@@ -38,7 +39,6 @@ struct Session {
     email: String,
     picture: String,
     access_token: String,
-    refresh_token: Option<String>,
     expires_in: i64,
     expires: i64,
 }
@@ -66,7 +66,6 @@ impl From<(&str, DashSession, i64, i64)> for Session {
             email: value.1.email().to_owned(),
             picture: value.1.picture().to_owned(),
             access_token: value.0.to_owned(),
-            refresh_token: None,
             expires_in: value.2,
             expires: value.3,
         }
@@ -80,7 +79,6 @@ impl From<AuthenticateToken> for Session {
             email: value.email().to_owned(),
             picture: value.picture().to_owned(),
             access_token: value.access_token().to_owned(),
-            refresh_token: Some(value.refresh_token().to_owned()),
             expires_in: value.expires_in(),
             expires: value.expires(),
         }
@@ -186,7 +184,7 @@ async fn get_login(
 async fn post_login(
     tmpl: web::Data<tera::Tera>,
     query: web::Query<HashMap<String, String>>,
-    account: web::Form<auth::AuthAccount>,
+    account: web::Form<AuthAccount>,
 ) -> Result<HttpResponse> {
     let default_next = DEFAULT_INDEX.to_owned();
     let next = query.get("next").unwrap_or(&default_next);
@@ -254,18 +252,12 @@ async fn post_login_token(req: HttpRequest) -> Result<HttpResponse> {
     redirect_login()
 }
 
-async fn get_logout(req: HttpRequest) -> Result<HttpResponse> {
-    if let Some(cookie) = req.cookie(SESSION_ID) {
-        let session = extract_session(cookie.value())?;
-        if let Some(refresh_token) = session.refresh_token {
-            let _ = auth_client().do_revoke_token(&refresh_token).await;
-        }
-    }
+async fn get_logout() -> Result<HttpResponse> {
     Ok(HttpResponse::SeeOther()
         .cookie(
             Cookie::build(SESSION_ID, "")
                 .path(DEFAULT_INDEX)
-                .max_age(cookie::time::Duration::seconds(0))
+                .expires(cookie::time::OffsetDateTime::now_utc())
                 .same_site(cookie::SameSite::Lax)
                 .secure(false)
                 .http_only(false)

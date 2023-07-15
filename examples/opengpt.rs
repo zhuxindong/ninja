@@ -2,8 +2,8 @@ use std::time;
 
 use futures_util::StreamExt;
 use openai::{
-    auth::{AuthAccountBuilder, AuthHandle},
-    opengpt::models::req::{self, PostConvoRequest},
+    auth::{model::AuthAccountBuilder, AuthHandle},
+    opengpt::model::req::{self, PostConvoRequest},
 };
 use tokio::io::AsyncWriteExt;
 
@@ -13,7 +13,7 @@ async fn main() -> anyhow::Result<()> {
     let password = std::env::var("PASSWORD")?;
     let auth = openai::auth::AuthClientBuilder::builder()
         .user_agent(openai::HEADER_UA)
-        .chrome_builder(reqwest::browser::ChromeVersion::V108)
+        .chrome_builder(reqwest::browser::ChromeVersion::V110)
         .cookie_store(true)
         .timeout(std::time::Duration::from_secs(20))
         .build();
@@ -25,8 +25,9 @@ async fn main() -> anyhow::Result<()> {
                 .build()?,
         )
         .await?;
+    let auth_token = openai::model::AuthenticateToken::try_from(token)?;
     let api = openai::opengpt::OpenGPTBuilder::builder()
-        .access_token(token.access_token.to_owned())
+        .access_token(auth_token.access_token().to_owned())
         .cookie_store(false)
         .client_timeout(time::Duration::from_secs(1000))
         .client_connect_timeout(time::Duration::from_secs(1000))

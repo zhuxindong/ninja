@@ -1,6 +1,6 @@
 use std::time;
 
-use openai::auth::{AuthAccountBuilder, AuthHandle};
+use openai::auth::{model::AuthAccountBuilder, AuthHandle};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -12,7 +12,7 @@ async fn main() -> anyhow::Result<()> {
         .cookie_store(true)
         .timeout(time::Duration::from_secs(1000))
         .connect_timeout(time::Duration::from_secs(1000))
-        .handle(openai::auth::AuthStrategy::PLATFROM)
+        .handle(openai::auth::AuthStrategy::Web)
         .build();
     let token = auth
         .do_access_token(
@@ -22,9 +22,14 @@ async fn main() -> anyhow::Result<()> {
                 .build()?,
         )
         .await?;
-    println!("AccessToken: {}", token.access_token);
-    println!("RefreshToken: {}", token.refresh_token);
+    let auth_token = openai::model::AuthenticateToken::try_from(token)?;
+    println!("AuthenticationToken: {:?}", auth_token);
+    println!("AccessToken: {}", auth_token.access_token());
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-    auth.do_refresh_token(&token.refresh_token).await?;
+    if let Some(refrsh_token) = auth_token.refresh_token() {
+        println!("RefreshToken: {:?}", refrsh_token);
+        auth.do_refresh_token(refrsh_token).await?;
+    }
+
     Ok(())
 }
