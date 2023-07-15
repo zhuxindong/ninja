@@ -224,17 +224,22 @@ async fn post_login_token(req: HttpRequest) -> Result<HttpResponse> {
             .map_err(|e| error::ErrorUnauthorized(e.to_string()))?
             .ok_or(error::ErrorInternalServerError("Get Profile Erorr"))?;
 
-        let dash_session = auth_client()
-            .do_dashboard_login(access_token)
-            .await
-            .map_err(|e| error::ErrorUnauthorized(e.to_string()))?;
-
-        let session = Session::from((
-            access_token,
-            dash_session,
-            profile.expires_in(),
-            profile.expires(),
-        ));
+        let session = match auth_client().do_dashboard_login(access_token).await {
+            Ok(dash_session) => Session::from((
+                access_token,
+                dash_session,
+                profile.expires_in(),
+                profile.expires(),
+            )),
+            Err(_) => Session {
+                user_id: profile.user_id().to_owned(),
+                email: profile.email().to_owned(),
+                picture: String::new(),
+                access_token: access_token.to_owned(),
+                expires_in: profile.expires_in(),
+                expires: profile.expires(),
+            },
+        };
 
         return Ok(HttpResponse::Ok()
             .insert_header((header::LOCATION, DEFAULT_INDEX))
