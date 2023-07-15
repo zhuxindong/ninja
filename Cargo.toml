@@ -1,6 +1,6 @@
 [package]
 name = "opengpt"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 description = "OpenGPT - Not just a unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)\nGithub: https://github.com/gngpp/opengpt"
 license = "MIT"
@@ -24,7 +24,7 @@ url = "2.3.1"
 openai = { path = "openai" }
 futures-util = "0.3.27"
 inquire = "0.6.2"
-async-trait = "0.1.68"
+async-trait = "0.1.78"
 reqwest = { path = "reqwest", default-features = false, features = [ "chrome" ] }
 
 # UI
