@@ -49,6 +49,8 @@ pub enum AuthError {
     FailedCallbackURL,
     #[error("failed to get authorized url")]
     FailedAuthorizedUrl,
+    #[error("Failed to get state")]
+    FailedState,
     #[error("failed get csrf token")]
     FailedCsrfToken,
     #[error("invalid request login url (error {0:?}")]

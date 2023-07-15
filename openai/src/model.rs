@@ -1,34 +1,34 @@
+use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
 use base64::{engine::general_purpose, Engine};
 
-use crate::AuthError;
+use crate::{auth, AuthError};
 use serde_json::Value;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AuthenticateToken {
     access_token: String,
-    refresh_token: String,
+    refresh_token: Option<String>,
     expires: i64,
     expires_in: i64,
-    profile: Profile,
+    user_id: String,
+    name: String,
+    email: String,
+    picture: String,
 }
 
 impl AuthenticateToken {
     pub fn user_id(&self) -> &str {
-        &self.profile.https_api_openai_com_auth.user_id
-    }
-
-    pub fn nickname(&self) -> &str {
-        &self.profile.nickname
+        &self.user_id
     }
 
     pub fn email(&self) -> &str {
-        &self.profile.email
+        &self.email
     }
 
     pub fn picture(&self) -> &str {
-        &self.profile.picture
+        &self.picture
     }
 
     pub fn access_token(&self) -> &str {
@@ -38,8 +38,8 @@ impl AuthenticateToken {
     pub fn bearer_access_token(&self) -> String {
         format!("Bearer {}", &self.access_token)
     }
-    pub fn refresh_token(&self) -> &str {
-        &self.refresh_token
+    pub fn refresh_token(&self) -> Option<&str> {
+        self.refresh_token.as_deref()
     }
 
     pub fn is_expired(&self) -> bool {
@@ -53,63 +53,91 @@ impl AuthenticateToken {
     pub fn expires_in(&self) -> i64 {
         self.expires_in
     }
+}
 
-    pub fn profile(&self) -> &Profile {
-        &self.profile
+impl TryFrom<auth::model::AccessTokenOption> for AuthenticateToken {
+    type Error = anyhow::Error;
+
+    fn try_from(value: auth::model::AccessTokenOption) -> Result<Self, Self::Error> {
+        match value {
+            auth::model::AccessTokenOption::Web(value) => {
+                let expires_timestamp = chrono::DateTime::parse_from_rfc3339(&value.expires)
+                    .context("Failed to parse time string")?
+                    .naive_utc()
+                    .timestamp();
+
+                // current timestamp (secends)
+                let current_timestamp = chrono::Utc::now().timestamp();
+                // expires (secends)
+                let expires_in = expires_timestamp - current_timestamp;
+
+                Ok(Self {
+                    access_token: value.access_token,
+                    refresh_token: None,
+                    expires: expires_timestamp,
+                    expires_in: expires_in,
+                    user_id: value.user.id,
+                    name: value.user.name,
+                    email: value.user.email,
+                    picture: value.user.picture,
+                })
+            }
+            auth::model::AccessTokenOption::Apple(value) => {
+                let profile = Profile::try_from(value.id_token)?;
+                let expires =
+                    (chrono::Utc::now() + chrono::Duration::seconds(value.expires_in)).timestamp();
+                Ok(Self {
+                    access_token: value.access_token,
+                    refresh_token: Some(value.refresh_token),
+                    expires,
+                    expires_in: value.expires_in,
+                    user_id: profile.https_api_openai_com_auth.user_id,
+                    name: profile.name,
+                    email: profile.email,
+                    picture: profile.picture,
+                })
+            }
+        }
     }
 }
 
-impl TryFrom<crate::auth::AccessToken> for AuthenticateToken {
+impl TryFrom<auth::model::RefreshToken> for AuthenticateToken {
     type Error = anyhow::Error;
 
-    fn try_from(value: crate::auth::AccessToken) -> Result<Self, Self::Error> {
+    fn try_from(value: auth::model::RefreshToken) -> Result<Self, Self::Error> {
         let profile = Profile::try_from(value.id_token)?;
         let expires =
             (chrono::Utc::now() + chrono::Duration::seconds(value.expires_in)).timestamp();
         Ok(Self {
             access_token: value.access_token,
-            refresh_token: value.refresh_token,
+            refresh_token: Some(value.refresh_token),
             expires,
-            profile,
             expires_in: value.expires_in,
-        })
-    }
-}
-
-impl TryFrom<crate::auth::RefreshToken> for AuthenticateToken {
-    type Error = anyhow::Error;
-
-    fn try_from(value: crate::auth::RefreshToken) -> Result<Self, Self::Error> {
-        let profile = Profile::try_from(value.id_token)?;
-        let expires =
-            (chrono::Utc::now() + chrono::Duration::seconds(value.expires_in)).timestamp();
-        Ok(Self {
-            access_token: value.access_token,
-            refresh_token: value.refresh_token,
-            expires,
-            profile,
-            expires_in: value.expires_in,
+            user_id: profile.https_api_openai_com_auth.user_id,
+            name: profile.name,
+            email: profile.email,
+            picture: profile.picture,
         })
     }
 }
 
 #[allow(dead_code)]
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Profile {
+#[derive(Deserialize)]
+struct Profile {
     #[serde(rename = "https://api.openai.com/auth")]
-    pub https_api_openai_com_auth: HttpsApiOpenaiComAuth,
-    pub nickname: String,
-    pub name: String,
-    pub picture: String,
-    pub updated_at: String,
-    pub email_verified: bool,
-    pub email: String,
-    pub iss: String,
-    pub aud: String,
-    pub iat: i64,
-    pub exp: i64,
-    pub sub: String,
-    pub auth_time: i64,
+    https_api_openai_com_auth: HttpsApiOpenaiComAuth,
+    nickname: String,
+    name: String,
+    picture: String,
+    updated_at: String,
+    email_verified: bool,
+    email: String,
+    iss: String,
+    aud: String,
+    iat: i64,
+    exp: i64,
+    sub: String,
+    auth_time: i64,
 }
 
 impl TryFrom<String> for Profile {
@@ -128,16 +156,16 @@ impl TryFrom<String> for Profile {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct HttpsApiOpenaiComAuth {
-    pub groups: Vec<Value>,
-    pub organizations: Vec<Organization>,
-    pub user_id: String,
+struct HttpsApiOpenaiComAuth {
+    groups: Vec<Value>,
+    organizations: Vec<Organization>,
+    user_id: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Organization {
-    pub id: String,
-    pub is_default: bool,
-    pub role: String,
-    pub title: String,
+struct Organization {
+    id: String,
+    is_default: bool,
+    prole: String,
+    title: String,
 }

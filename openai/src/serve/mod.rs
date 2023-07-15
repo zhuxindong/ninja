@@ -30,6 +30,7 @@ use std::path::PathBuf;
 use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 
 use crate::arkose::ArkoseToken;
+use crate::auth::model::AuthAccount;
 use crate::auth::{AuthClient, AuthHandle};
 use crate::serve::template::TemplateData;
 use crate::serve::tokenbucket::TokenBucketContext;
@@ -282,7 +283,7 @@ impl Launcher {
 }
 
 #[post("/auth/token")]
-async fn post_access_token(account: web::Form<auth::AuthAccount>) -> impl Responder {
+async fn post_access_token(account: web::Form<AuthAccount>) -> impl Responder {
     match auth_client().do_access_token(&account.into_inner()).await {
         Ok(token) => HttpResponse::Ok().json(token),
         Err(err) => HttpResponse::BadRequest().json(err.to_string()),

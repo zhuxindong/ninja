@@ -1,4 +1,4 @@
-pub mod models;
+pub mod model;
 
 use std::pin::Pin;
 
@@ -68,7 +68,7 @@ use reqwest::{
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::RwLock;
 
-use self::models::{req, resp};
+use self::model::{req, resp};
 
 use crate::{HEADER_UA, URL_CHATGPT_API};
 
