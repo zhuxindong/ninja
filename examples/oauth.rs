@@ -12,13 +12,13 @@ async fn main() -> anyhow::Result<()> {
         .cookie_store(true)
         .timeout(time::Duration::from_secs(1000))
         .connect_timeout(time::Duration::from_secs(1000))
-        .handle(openai::auth::AuthStrategy::Web)
         .build();
     let token = auth
         .do_access_token(
             &AuthAccountBuilder::default()
                 .username(email)
                 .password(password)
+                .option(openai::auth::AuthStrategy::Web)
                 .build()?,
         )
         .await?;
