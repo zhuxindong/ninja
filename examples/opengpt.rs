@@ -2,7 +2,7 @@ use std::time;
 
 use futures_util::StreamExt;
 use openai::{
-    auth::OAuthAccountBuilder,
+    auth::{AuthAccountBuilder, AuthHandle},
     opengpt::models::req::{self, PostConvoRequest},
 };
 use tokio::io::AsyncWriteExt;
@@ -19,7 +19,7 @@ async fn main() -> anyhow::Result<()> {
         .build();
     let token = auth
         .do_access_token(
-            &OAuthAccountBuilder::default()
+            &AuthAccountBuilder::default()
                 .username(email)
                 .password(password)
                 .build()?,
