@@ -13,7 +13,7 @@ use reqwest::browser::ChromeVersion;
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::redirect::Policy;
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use base64::{engine::general_purpose, Engine as _};
 use rand::Rng;
@@ -34,6 +34,8 @@ const OPENAI_OAUTH_CALLBACK_URL: &str =
 
 const OPENAI_API_URL: &str = "https://api.openai.com";
 
+#[derive(Clone, PartialEq, Eq, Hash, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum AuthStrategy {
     Apple,
     Web,
@@ -54,7 +56,7 @@ pub trait AuthHandle: Send + Sync {
 pub struct AuthClient {
     client: Client,
     email_regex: Regex,
-    handle: Arc<Box<dyn AuthHandle + Send + Sync>>,
+    handle_strategies: Arc<HashMap<AuthStrategy, Box<dyn AuthHandle + Send + Sync>>>,
 }
 
 #[async_trait::async_trait]
@@ -66,7 +68,12 @@ impl AuthHandle for AuthClient {
         if !self.email_regex.is_match(&account.username) || account.password.is_empty() {
             bail!(AuthError::InvalidEmailOrPassword)
         }
-        self.handle.do_access_token(account).await
+
+        self.handle_strategies
+            .get(&account.option)
+            .context("Logon implementation is not supported")?
+            .do_access_token(account)
+            .await
     }
 }
 
@@ -306,6 +313,12 @@ impl AuthClient {
 
 struct WebAuthHandle {
     client: Client,
+}
+
+impl WebAuthHandle {
+    fn new(client: Client) -> impl AuthHandle + Send + Sync {
+        Self { client }
+    }
 }
 
 #[async_trait::async_trait]
@@ -577,6 +590,12 @@ impl WebAuthHandle {
 
 struct AppleAuthHandle {
     client: Client,
+}
+
+impl AppleAuthHandle {
+    fn new(client: Client) -> impl AuthHandle + Send + Sync {
+        Self { client }
+    }
 }
 
 #[async_trait::async_trait]
@@ -934,7 +953,6 @@ struct RefreshTokenData<'a> {
 
 pub struct AuthClientBuilder {
     builder: reqwest::ClientBuilder,
-    strategy: AuthStrategy,
 }
 
 impl AuthClientBuilder {
@@ -1035,35 +1053,24 @@ impl AuthClientBuilder {
         self
     }
 
-    /// Handle auth strategy, default is `AuthStrategy::IOS`
-    pub fn handle(mut self, strategy: AuthStrategy) -> Self {
-        self.strategy = strategy;
-        self
-    }
-
     pub fn build(self) -> AuthClient {
         let client = self.builder.build().expect("ClientBuilder::build()");
 
-        let handle: Box<dyn AuthHandle + Send + Sync> = match self.strategy {
-            AuthStrategy::Apple => {
-                let handle = AppleAuthHandle {
-                    client: client.clone(),
-                };
-                Box::new(handle)
-            }
-            AuthStrategy::Web => {
-                let handle = WebAuthHandle {
-                    client: client.clone(),
-                };
-                Box::new(handle)
-            }
-        };
-
+        let mut handle_strategies: HashMap<AuthStrategy, Box<dyn AuthHandle + Send + Sync>> =
+            HashMap::new();
+        handle_strategies.insert(
+            AuthStrategy::Web,
+            Box::new(WebAuthHandle::new(client.clone())),
+        );
+        handle_strategies.insert(
+            AuthStrategy::Apple,
+            Box::new(AppleAuthHandle::new(client.clone())),
+        );
         AuthClient {
             client,
             email_regex: Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b")
                 .expect("Regex::new()"),
-            handle: Arc::new(handle),
+            handle_strategies: Arc::new(handle_strategies),
         }
     }
 
@@ -1081,7 +1088,6 @@ impl AuthClientBuilder {
         }));
         AuthClientBuilder {
             builder: client_builder,
-            strategy: AuthStrategy::Apple,
         }
     }
 }

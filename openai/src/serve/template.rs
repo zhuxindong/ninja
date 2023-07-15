@@ -35,10 +35,11 @@ const TEMP_SHARE: &str = "share.htm";
 
 #[derive(Serialize, Deserialize)]
 struct Session {
+    refresh_token: Option<String>,
+    access_token: String,
     user_id: String,
     email: String,
     picture: Option<String>,
-    access_token: String,
     expires_in: i64,
     expires: i64,
 }
@@ -68,12 +69,18 @@ impl From<(&str, DashSession, i64, i64)> for Session {
             access_token: value.0.to_owned(),
             expires_in: value.2,
             expires: value.3,
+            refresh_token: None,
         }
     }
 }
 
 impl From<AuthenticateToken> for Session {
     fn from(value: AuthenticateToken) -> Self {
+        let refresh_token = if let Some(refresh_token) = value.refresh_token() {
+            Some(refresh_token.to_owned())
+        } else {
+            None
+        };
         Session {
             user_id: value.user_id().to_owned(),
             email: value.email().to_owned(),
@@ -81,6 +88,7 @@ impl From<AuthenticateToken> for Session {
             access_token: value.access_token().to_owned(),
             expires_in: value.expires_in(),
             expires: value.expires(),
+            refresh_token,
         }
     }
 }
@@ -238,6 +246,7 @@ async fn post_login_token(req: HttpRequest) -> Result<HttpResponse> {
                 access_token: access_token.to_owned(),
                 expires_in: profile.expires_in(),
                 expires: profile.expires(),
+                refresh_token: None,
             },
         };
 
@@ -257,7 +266,17 @@ async fn post_login_token(req: HttpRequest) -> Result<HttpResponse> {
     redirect_login()
 }
 
-async fn get_logout() -> Result<HttpResponse> {
+async fn get_logout(req: HttpRequest) -> Result<HttpResponse> {
+    if let Some(c) = req.cookie(SESSION_ID) {
+        match Session::try_from(c.value()) {
+            Ok(session) => {
+                if let Some(refresh_token) = session.refresh_token {
+                    let _ = auth_client().do_revoke_token(&refresh_token).await;
+                }
+            }
+            Err(_) => {}
+        }
+    }
     Ok(HttpResponse::SeeOther()
         .cookie(
             Cookie::build(SESSION_ID, "")

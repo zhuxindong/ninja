@@ -166,6 +166,6 @@ struct HttpsApiOpenaiComAuth {
 struct Organization {
     id: String,
     is_default: bool,
-    prole: String,
+    role: String,
     title: String,
 }

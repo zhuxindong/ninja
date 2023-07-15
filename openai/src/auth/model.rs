@@ -2,6 +2,8 @@ use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use super::AuthStrategy;
+
 #[derive(Serialize, Deserialize)]
 pub struct AppleAccessToken {
     pub access_token: String,
@@ -25,6 +27,7 @@ pub struct AuthAccount {
     pub(super) password: String,
     #[builder(setter(into, strip_option), default)]
     pub(super) mfa: Option<String>,
+    pub(super) option: AuthStrategy,
 }
 
 impl AuthAccount {
