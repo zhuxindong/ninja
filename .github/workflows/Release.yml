@@ -43,30 +43,7 @@ jobs:
       - name: Build
         shell: bash
         run: | 
-          root=$(pwd)
-          mkdir uploads
-
-          brew install upx
-          rustup target add aarch64-apple-darwin x86_64-apple-darwin
-          cargo update
-
-          cargo build --release --target x86_64-apple-darwin
-          cd target/x86_64-apple-darwin/release
-          sudo upx --lzma opengpt
-          tar czvf opengpt-$tag-x86_64-apple-darwin.tar.gz opengpt
-          shasum -a 256 opengpt-$tag-x86_64-apple-darwin.tar.gz >opengpt-$tag-x86_64-apple-darwin.tar.gz.sha256
-          mv opengpt-$tag-x86_64-apple-darwin.tar.gz $root/uploads/
-          mv opengpt-$tag-x86_64-apple-darwin.tar.gz.sha256 $root/uploads/
-          cd -
-
-          cargo build --release --target aarch64-apple-darwin
-          cd target/aarch64-apple-darwin/release
-          sudo upx --lzma opengpt
-          tar czvf opengpt-$tag-aarch64-apple-darwin.tar.gz opengpt
-          shasum -a 256 opengpt-$tag-aarch64-apple-darwin.tar.gz >opengpt-$tag-aarch64-apple-darwin.tar.gz.sha256
-          mv opengpt-$tag-aarch64-apple-darwin.tar.gz $root/uploads/
-          mv opengpt-$tag-aarch64-apple-darwin.tar.gz.sha256 $root/uploads/
-          cd -
+          os=macos ./build_cross.sh
 
       - name: Upload binaries to GitHub Release
         uses: softprops/action-gh-release@v1
@@ -139,6 +116,15 @@ jobs:
             sdk: "https://downloads.openwrt.org/releases/22.03.2/targets/bcm27xx/bcm2711/openwrt-sdk-22.03.2-bcm27xx-bcm2711_gcc-11.2.0_musl.Linux-x86_64.tar.xz"
           - arch: "x86_64"
             sdk: "https://downloads.openwrt.org/releases/18.06.9/targets/x86/64/openwrt-sdk-18.06.9-x86-64_gcc-7.3.0_musl.Linux-x86_64.tar.xz"
+          - arch: "arm_cortex-a9"
+            sdk: "https://downloads.openwrt.org/releases/22.03.2/targets/bcm53xx/generic/openwrt-sdk-22.03.2-bcm53xx-generic_gcc-11.2.0_musl_eabi.Linux-x86_64.tar.xz"
+          - arch: "arm_mpcore"
+            sdk: "https://downloads.openwrt.org/releases/22.03.2/targets/oxnas/ox820/openwrt-sdk-22.03.2-oxnas-ox820_gcc-11.2.0_musl_eabi.Linux-x86_64.tar.xz"
+          - arch: "arm_cortex-a5_vfpv4"
+            sdk: "https://downloads.openwrt.org/releases/22.03.2/targets/at91/sama5/openwrt-sdk-22.03.2-at91-sama5_gcc-11.2.0_musl_eabi.Linux-x86_64.tar.xz"
+          - arch: "arm_cortex-a7_neon-vfpv4"
+            sdk: "https://downloads.openwrt.org/releases/22.03.2/targets/ipq40xx/generic/openwrt-sdk-22.03.2-ipq40xx-generic_gcc-11.2.0_musl_eabi.Linux-x86_64.tar.xz"
+
     steps:
       - uses: actions/checkout@v3
       - name: Install build requirements
