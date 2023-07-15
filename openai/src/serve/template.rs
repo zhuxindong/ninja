@@ -37,7 +37,7 @@ const TEMP_SHARE: &str = "share.htm";
 struct Session {
     user_id: String,
     email: String,
-    picture: String,
+    picture: Option<String>,
     access_token: String,
     expires_in: i64,
     expires: i64,
@@ -64,7 +64,7 @@ impl From<(&str, DashSession, i64, i64)> for Session {
         Session {
             user_id: value.1.user_id().to_owned(),
             email: value.1.email().to_owned(),
-            picture: value.1.picture().to_owned(),
+            picture: Some(value.1.picture().to_owned()),
             access_token: value.0.to_owned(),
             expires_in: value.2,
             expires: value.3,
@@ -77,7 +77,7 @@ impl From<AuthenticateToken> for Session {
         Session {
             user_id: value.user_id().to_owned(),
             email: value.email().to_owned(),
-            picture: value.picture().to_owned(),
+            picture: Some(value.picture().to_owned()),
             access_token: value.access_token().to_owned(),
             expires_in: value.expires_in(),
             expires: value.expires(),
@@ -234,7 +234,7 @@ async fn post_login_token(req: HttpRequest) -> Result<HttpResponse> {
             Err(_) => Session {
                 user_id: profile.user_id().to_owned(),
                 email: profile.email().to_owned(),
-                picture: String::new(),
+                picture: None,
                 access_token: access_token.to_owned(),
                 expires_in: profile.expires_in(),
                 expires: profile.expires(),
