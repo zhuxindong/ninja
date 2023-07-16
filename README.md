@@ -44,8 +44,6 @@ opengpt serve
 docker run --rm -it -p 7999:7999 --hostname=opengpt \
   -e OPENGPT_WORKERS=1 \
   -e OPENGPT_LOG_LEVEL=info \
-  -e OPENGPT_TLS_CERT=/path/to/cert \
-  -e OPENGPT_TLS_KEY=/path/to/key \
   gngpp/opengpt:latest serve
 ```
 
