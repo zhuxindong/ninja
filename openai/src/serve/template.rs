@@ -11,10 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::{
-    auth::{
-        model::{AuthAccount, DashSession},
-        AuthHandle,
-    },
+    auth::{model::AuthAccount, AuthHandle},
     model::AuthenticateToken,
     URL_CHATGPT_API,
 };
@@ -57,20 +54,6 @@ impl TryFrom<&str> for Session {
     fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
         serde_json::from_str::<Session>(value)
             .map_err(|err| error::ErrorUnauthorized(err.to_string()))
-    }
-}
-
-impl From<(&str, DashSession, i64, i64)> for Session {
-    fn from(value: (&str, DashSession, i64, i64)) -> Self {
-        Session {
-            user_id: value.1.user_id().to_owned(),
-            email: value.1.email().to_owned(),
-            picture: Some(value.1.picture().to_owned()),
-            access_token: value.0.to_owned(),
-            expires_in: value.2,
-            expires: value.3,
-            refresh_token: None,
-        }
     }
 }
 
@@ -232,13 +215,16 @@ async fn post_login_token(req: HttpRequest) -> Result<HttpResponse> {
             .map_err(|e| error::ErrorUnauthorized(e.to_string()))?
             .ok_or(error::ErrorInternalServerError("Get Profile Erorr"))?;
 
-        let session = match auth_client().do_dashboard_login(access_token).await {
-            Ok(dash_session) => Session::from((
-                access_token,
-                dash_session,
-                profile.expires_in(),
-                profile.expires(),
-            )),
+        let session = match auth_client().do_get_user_picture(access_token).await {
+            Ok(picture) => Session {
+                refresh_token: None,
+                access_token: access_token.to_owned(),
+                user_id: profile.user_id().to_owned(),
+                email: profile.email().to_owned(),
+                picture: picture,
+                expires_in: profile.expires_in(),
+                expires: profile.expires(),
+            },
             Err(_) => Session {
                 user_id: profile.user_id().to_owned(),
                 email: profile.email().to_owned(),
