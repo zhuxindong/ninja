@@ -434,7 +434,7 @@ fn response_convert(resp: Result<reqwest::Response, reqwest::Error>) -> HttpResp
                             .expect("get cookie expires exception"),
                         )
                         .same_site(cookie::SameSite::Lax)
-                        .secure(true)
+                        .secure(false)
                         .http_only(false)
                         .finish();
                     builder.cookie(cookie);
