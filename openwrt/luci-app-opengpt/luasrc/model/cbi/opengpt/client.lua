@@ -1,7 +1,7 @@
 local m, s
 
 m = Map("opengpt", translate("OpenGPT"))
-m.description = translate("<a>A unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)</a> | <a href=\"https://github.com/gngpp/opengpt\" target=\"_blank\">Project GitHub URL</a>")
+m.description = translate("<a>A reverse engineered unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)</a> | <a href=\"https://github.com/gngpp/opengpt\" target=\"_blank\">Project GitHub URL</a>")
 
 m:section(SimpleSection).template = "opengpt/opengpt_status"
 
