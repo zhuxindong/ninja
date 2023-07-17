@@ -32,7 +32,7 @@ pub(super) enum ServeSubcommand {
     Stop,
     /// View the status of the Http server daemon process
     Status,
-    /// generate config template file (toml)
+    /// Generate config template file (toml format file)
     GT {
         /// Configuration template output to file
         #[clap(short, long, env = "OPENGPT_SERVE_GT")]
