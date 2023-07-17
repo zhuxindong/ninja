@@ -23,7 +23,6 @@ use std::fs::File;
 use std::io::BufReader;
 use std::sync::Once;
 use std::time::{Duration, UNIX_EPOCH};
-use url::Url;
 
 use std::net::IpAddr;
 use std::path::PathBuf;
@@ -75,7 +74,7 @@ pub struct Launcher {
     /// TLS keypair
     tls_keypair: Option<(PathBuf, PathBuf)>,
     /// Web UI api prefix
-    api_prefix: Option<Url>,
+    api_prefix: Option<String>,
     /// Enable url signature (signature secret key)
     #[cfg(feature = "sign")]
     sign_secret_key: Option<String>,

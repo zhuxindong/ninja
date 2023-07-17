@@ -23,13 +23,14 @@ use sha2::{Digest, Sha256};
 
 pub mod model;
 
-use crate::{debug, AuthError, AuthResult, URL_CHATGPT_API};
+use crate::error::AuthError;
+use crate::{debug, AuthResult, URL_CHATGPT_API};
 
 const CLIENT_ID: &str = "pdlLIX2Y72MIl2rhLhTE9VV9bN905kBh";
 const OPENAI_OAUTH_URL: &str = "https://auth0.openai.com";
 const OPENAI_OAUTH_TOKEN_URL: &str = "https://auth0.openai.com/oauth/token";
 const OPENAI_OAUTH_REVOKE_URL: &str = "https://auth0.openai.com/oauth/revoke";
-const OPENAI_OAUTH_CALLBACK_URL: &str =
+const OPENAI_OAUTH_APPLE_CALLBACK_URL: &str =
     "com.openai.chat://auth0.openai.com/ios/com.openai.chat/callback";
 
 const OPENAI_API_URL: &str = "https://api.openai.com";
@@ -78,6 +79,27 @@ impl AuthHandle for AuthClient {
 }
 
 impl AuthClient {
+    pub async fn do_get_user_picture(&self, access_token: &str) -> AuthResult<Option<String>> {
+        let access_token = access_token.replace("Bearer ", "");
+        let resp = self
+            .client
+            .get(format!("https://openai.openai.auth0app.com/userinfo"))
+            .bearer_auth(access_token)
+            .send()
+            .await
+            .map_err(AuthError::FailedRequest)?;
+        if resp.status().is_success() {
+            return Ok(resp
+                .json::<Value>()
+                .await?
+                .as_object()
+                .and_then(|v| v.get("picture"))
+                .and_then(|v| v.as_str())
+                .and_then(|v| Some(v.to_string())));
+        }
+        bail!(AuthError::InvalidRequest(resp.text().await?))
+    }
+
     pub async fn do_dashboard_login(&self, access_token: &str) -> AuthResult<model::DashSession> {
         let access_token = access_token.replace("Bearer ", "");
         let resp = self
@@ -146,7 +168,7 @@ impl AuthClient {
     pub async fn do_refresh_token(&self, refresh_token: &str) -> AuthResult<model::RefreshToken> {
         let refresh_token = Self::verify_refresh_token(refresh_token)?;
         let data = RefreshTokenDataBuilder::default()
-            .redirect_uri(OPENAI_OAUTH_CALLBACK_URL)
+            .redirect_uri(OPENAI_OAUTH_APPLE_CALLBACK_URL)
             .grant_type(GrantType::RefreshToken)
             .client_id(CLIENT_ID)
             .refresh_token(refresh_token)
@@ -337,8 +359,7 @@ impl AuthHandle for WebAuthHandle {
         let state = self.get_state(authorized_url).await?;
 
         // check username
-        self.authenticate_username(&state, &account.username)
-            .await?;
+        self.authenticate_username(&state, &account).await?;
 
         // check password and username
         self.authenticate_password(&state, &account).await
@@ -371,8 +392,8 @@ impl WebAuthHandle {
                         remaining = &remaining[value_start_index + value_start.len()..];
 
                         if let Some(value_end_index) = remaining.find("\"") {
-                            let value = &remaining[..value_end_index];
-                            return Ok(value.trim().to_string());
+                            let state = &remaining[..value_end_index];
+                            return Ok(state.trim().to_string());
                         }
                     }
                 }
@@ -431,13 +452,18 @@ impl WebAuthHandle {
                 .as_str()
                 .context(AuthError::FailedAuthorizedUrl)?
                 .to_owned();
+            debug!("WebAuthHandle authorized url: {url}");
             return Ok(url);
         }
 
         bail!(AuthError::FailedAuthorizedUrl)
     }
 
-    async fn authenticate_username(&self, state: &str, username: &str) -> AuthResult<()> {
+    async fn authenticate_username(
+        &self,
+        state: &str,
+        account: &model::AuthAccount,
+    ) -> AuthResult<()> {
         let url = format!("{OPENAI_OAUTH_URL}/u/login/identifier?state={state}");
         let resp = self
             .client
@@ -451,7 +477,7 @@ impl WebAuthHandle {
                 &IdentifierDataBuilder::default()
                     .action("default")
                     .state(&state)
-                    .username(username)
+                    .username(&account.username)
                     .js_available(true)
                     .webauthn_available(true)
                     .is_brave(false)
@@ -570,7 +596,7 @@ impl WebAuthHandle {
     async fn get_access_token(&self) -> AuthResult<model::AccessTokenOption> {
         let resp = self
             .client
-            .get("https://chat.openai.com/api/auth/session")
+            .get(format!("{URL_CHATGPT_API}/auth/session"))
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
@@ -622,7 +648,7 @@ impl AuthHandle for AppleAuthHandle {
 impl AppleAuthHandle {
     async fn get_authorized_url(&self, code_challenge: &str) -> AuthResult<Url> {
         let preauth_cookie = self.unofficial_preauth_cookie().await?;
-        let url = format!("https://auth0.openai.com/authorize?state=4DJBNv86mezKHDv-i2wMuDBea2-rHAo5nA_ZT4zJeak&ios_app_version=1744&client_id={CLIENT_ID}&redirect_uri={OPENAI_OAUTH_CALLBACK_URL}&code_challenge={code_challenge}&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write&prompt=login&preauth_cookie={preauth_cookie}&audience=https://api.openai.com/v1&code_challenge_method=S256&response_type=code&auth0Client=eyJ2ZXJzaW9uIjoiMi4zLjIiLCJuYW1lIjoiQXV0aDAuc3dpZnQiLCJlbnYiOnsic3dpZnQiOiI1LngiLCJpT1MiOiIxNi4yIn19");
+        let url = format!("{OPENAI_OAUTH_URL}/authorize?state=4DJBNv86mezKHDv-i2wMuDBea2-rHAo5nA_ZT4zJeak&ios_app_version=1744&client_id={CLIENT_ID}&redirect_uri={OPENAI_OAUTH_APPLE_CALLBACK_URL}&code_challenge={code_challenge}&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write&prompt=login&preauth_cookie={preauth_cookie}&audience=https://api.openai.com/v1&code_challenge_method=S256&response_type=code&auth0Client=eyJ2ZXJzaW9uIjoiMi4zLjIiLCJuYW1lIjoiQXV0aDAuc3dpZnQiLCJlbnYiOnsic3dpZnQiOiI1LngiLCJpT1MiOiIxNi4yIn19");
         let resp = self
             .client
             .get(&url)
@@ -738,7 +764,7 @@ impl AppleAuthHandle {
             let mfa = account.mfa.clone().ok_or(AuthError::MFARequired)?;
             self.authenticate_mfa(&mfa, code_verifier, location, account)
                 .await
-        } else if !location.starts_with(OPENAI_OAUTH_CALLBACK_URL) {
+        } else if !location.starts_with(OPENAI_OAUTH_APPLE_CALLBACK_URL) {
             bail!(AuthError::FailedCallbackURL)
         } else {
             self.authorization_code(code_verifier, location).await
@@ -793,7 +819,7 @@ impl AppleAuthHandle {
         debug!("authorization_code location path: {location}");
         let code = AuthClient::get_callback_code(&Url::parse(location)?)?;
         let data = AuthorizationCodeDataBuilder::default()
-            .redirect_uri(OPENAI_OAUTH_CALLBACK_URL)
+            .redirect_uri(OPENAI_OAUTH_APPLE_CALLBACK_URL)
             .grant_type(GrantType::AuthorizationCode)
             .client_id(CLIENT_ID)
             .code(&code)
@@ -1075,17 +1101,19 @@ impl AuthClientBuilder {
     }
 
     pub fn builder() -> AuthClientBuilder {
-        let client_builder = Client::builder().redirect(Policy::custom(|attempt| {
-            let url = attempt.url().to_string();
-            if url.contains("https://auth0.openai.com/u/login/identifier")
-                || url.contains("https://auth0.openai.com/auth/login?callbackUrl")
-            {
-                // redirects to 'https://auth0.openai.com/u/login/identifier'
-                attempt.follow()
-            } else {
-                attempt.stop()
-            }
-        }));
+        let client_builder = Client::builder()
+            .chrome_builder(ChromeVersion::V110)
+            .redirect(Policy::custom(|attempt| {
+                let url = attempt.url().to_string();
+                if url.contains("https://auth0.openai.com/u/login/identifier")
+                    || url.contains("https://auth0.openai.com/auth/login?callbackUrl")
+                {
+                    // redirects to 'https://auth0.openai.com/u/login/identifier'
+                    attempt.follow()
+                } else {
+                    attempt.stop()
+                }
+            }));
         AuthClientBuilder {
             builder: client_builder,
         }
