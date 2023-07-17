@@ -144,6 +144,10 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         )
         // user picture
         .route("/_next/image", web::get().to(get_image))
+        // arkose token captcha endpoint
+        .route("/v2/{tail:.*}", web::get().to(get_tcr9i))
+        .route("/fc/{tail:.*}", web::get().to(get_tcr9i))
+        .route("/cdn/{tail:.*}", web::get().to(get_tcr9i))
         // static resource endpoints
         .route(
             "/{filename:.+\\.(png|js|css|webp|json)}",
@@ -653,6 +657,20 @@ async fn get_share_chat_continue_info(
 async fn get_image(params: Option<web::Query<ImageQuery>>) -> Result<HttpResponse> {
     let query = params.ok_or(error::ErrorBadRequest("Missing URL parameter"))?;
     let resp = super::client().get(&query.url).send().await;
+    Ok(super::response_convert(resp))
+}
+
+async fn get_tcr9i(req: HttpRequest) -> Result<HttpResponse> {
+    let url = if req.query_string().is_empty() {
+        format!("https://tcr9i.chat.openai.com{}", req.path())
+    } else {
+        format!(
+            "https://tcr9i.chat.openai.com{}?{}",
+            req.path(),
+            req.query_string()
+        )
+    };
+    let resp = super::client().get(url).send().await;
     Ok(super::response_convert(resp))
 }
 
