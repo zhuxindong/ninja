@@ -88,6 +88,7 @@ fi
 
 if [ "$os" = "macos" ]; then
     brew install upx
+    rustup target add x86_64-apple-darwin aarch64-apple-darwin
     target_list=(x86_64-apple-darwin aarch64-apple-darwin)
     for target in "${target_list[@]}"; do
         build_macos_target "$target"
