@@ -1,4 +1,4 @@
-use std::{fs::Permissions, ops::Not, path::PathBuf};
+use std::{ops::Not, path::PathBuf};
 
 use crate::args::ServeArgs;
 
@@ -63,6 +63,7 @@ pub(super) async fn generate_template(output_file: Option<PathBuf>) -> anyhow::R
     let template = "host = \"0.0.0.0\"\nport = 7999\nworkers = 1\ntimeout = 600\nconnect_timeout = 60\ntcp_keepalive = 60\ntb_enable = false\ntb_store_strategy = \"mem\"\ntb_redis_url = [\"redis://127.0.0.1:6379\"]\ntb_capacity = 60\ntb_fill_rate = 1\ntb_expired = 86400";
     #[cfg(target_family = "unix")]
     {
+        use std::fs::Permissions;
         use std::os::unix::prelude::PermissionsExt;
         tokio::fs::File::create(&out)
             .await?
