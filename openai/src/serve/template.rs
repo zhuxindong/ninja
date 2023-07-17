@@ -4,6 +4,7 @@ use actix_web::cookie;
 use actix_web::{
     cookie::Cookie, error, http::header, web, HttpRequest, HttpResponse, Responder, Result,
 };
+use base64::Engine;
 use chrono::NaiveDateTime;
 use chrono::{prelude::DateTime, Utc};
 
@@ -43,8 +44,9 @@ struct Session {
 
 impl ToString for Session {
     fn to_string(&self) -> String {
-        serde_json::to_string(self)
-            .expect("An error occurred during the internal serialization session")
+        let json = serde_json::to_string(self)
+            .expect("An error occurred during the internal serialization session");
+        base64::engine::general_purpose::URL_SAFE.encode(json.as_bytes())
     }
 }
 
@@ -52,8 +54,10 @@ impl TryFrom<&str> for Session {
     type Error = error::Error;
 
     fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
-        serde_json::from_str::<Session>(value)
-            .map_err(|err| error::ErrorUnauthorized(err.to_string()))
+        let data = base64::engine::general_purpose::URL_SAFE
+            .decode(value)
+            .map_err(|err| error::ErrorUnauthorized(err.to_string()))?;
+        serde_json::from_slice(&data).map_err(|err| error::ErrorUnauthorized(err.to_string()))
     }
 }
 
@@ -178,11 +182,8 @@ async fn get_login(
 
 async fn post_login(
     tmpl: web::Data<tera::Tera>,
-    query: web::Query<HashMap<String, String>>,
     account: web::Form<AuthAccount>,
 ) -> Result<HttpResponse> {
-    let default_next = DEFAULT_INDEX.to_owned();
-    let next = query.get("next").unwrap_or(&default_next);
     let account = account.into_inner();
     match super::auth_client().do_access_token(&account).await {
         Ok(access_token) => {
@@ -199,12 +200,11 @@ async fn post_login(
                         .http_only(false)
                         .finish(),
                 )
-                .append_header((header::LOCATION, next.to_owned()))
+                .append_header((header::LOCATION, DEFAULT_INDEX))
                 .finish())
         }
         Err(e) => {
             let mut ctx = tera::Context::new();
-            ctx.insert("next", next.as_str());
             ctx.insert("username", account.username());
             ctx.insert("error", &e.to_string());
             render_template(tmpl, TEMP_LOGIN, &ctx)
