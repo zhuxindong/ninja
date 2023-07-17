@@ -392,8 +392,8 @@ impl WebAuthHandle {
                         remaining = &remaining[value_start_index + value_start.len()..];
 
                         if let Some(value_end_index) = remaining.find("\"") {
-                            let state = &remaining[..value_end_index];
-                            return Ok(state.trim().to_string());
+                            let value = &remaining[..value_end_index];
+                            return Ok(value.trim().to_string());
                         }
                     }
                 }
@@ -426,12 +426,11 @@ impl WebAuthHandle {
     }
 
     async fn get_authorized_url(&self, csrf_token: String) -> AuthResult<String> {
-        let form = [
-            ("callbackUrl", "/"),
-            ("csrfToken", &csrf_token),
-            ("json", "true"),
-        ];
-
+        let form = GetAuthorizedUrlDataBuilder::default()
+            .callback_url("/")
+            .csrf_token(&csrf_token)
+            .json("true")
+            .build()?;
         let resp = self
             .client
             .post(format!(
@@ -588,15 +587,13 @@ impl WebAuthHandle {
         if location.starts_with("/authorize/resume?") && account.mfa.is_none() {
             bail!(AuthError::MFAFailed)
         }
-        // self.authenticate_resume(location, &url, &account)
-        //     .await
-        todo!()
+        self.get_access_token().await
     }
 
     async fn get_access_token(&self) -> AuthResult<model::AccessTokenOption> {
         let resp = self
             .client
-            .get(format!("{URL_CHATGPT_API}/auth/session"))
+            .get(format!("{URL_CHATGPT_API}/api/auth/session"))
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
@@ -977,6 +974,15 @@ struct RefreshTokenData<'a> {
     refresh_token: &'a str,
 }
 
+#[derive(Serialize, Builder)]
+pub struct GetAuthorizedUrlData<'a> {
+    #[serde(rename = "callbackUrl")]
+    callback_url: &'a str,
+    #[serde(rename = "csrfToken")]
+    csrf_token: &'a str,
+    json: &'a str,
+}
+
 pub struct AuthClientBuilder {
     builder: reqwest::ClientBuilder,
 }
@@ -1103,6 +1109,7 @@ impl AuthClientBuilder {
     pub fn builder() -> AuthClientBuilder {
         let client_builder = Client::builder()
             .chrome_builder(ChromeVersion::V110)
+            .connect_timeout(Duration::from_secs(30))
             .redirect(Policy::custom(|attempt| {
                 let url = attempt.url().to_string();
                 if url.contains("https://auth0.openai.com/u/login/identifier")
