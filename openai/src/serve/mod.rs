@@ -95,10 +95,17 @@ pub struct Launcher {
     /// Tokenbucket expired (second)
     #[cfg(feature = "limit")]
     tb_expired: u32,
+    /// Cloudflare turnstile captcha site key
+    cf_site_key: Option<String>,
+    /// Cloudflare turnstile captcha secret key
+    cf_secret_key: Option<String>,
 }
 
 impl Launcher {
     pub async fn run(self) -> anyhow::Result<()> {
+        // template data
+        let template_data = TemplateData::from(self.clone());
+
         // client
         let mut client_builder = reqwest::Client::builder();
         if let Some(url) = self.proxy.clone() {
@@ -144,11 +151,6 @@ impl Launcher {
             info!("Web UI site use api: {url}")
         }
 
-        // template data
-        let template_data = TemplateData {
-            api_prefix: self.api_prefix.map_or("".to_owned(), |v| v.to_string()),
-        };
-
         // serve
         let serve = HttpServer::new(move || {
             let app = App::new()
@@ -178,8 +180,8 @@ impl Launcher {
                 .service(post_refresh_token)
                 .service(post_revoke_token)
                 .service(get_arkose_token)
-                // templates data
-                .app_data(template_data.clone())
+                // template data
+                .app_data(web::Data::new(template_data.clone()))
                 // templates page endpoint
                 .configure(template::config);
 

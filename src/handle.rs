@@ -23,7 +23,9 @@ pub(super) async fn run_serve(mut args: ServeArgs) -> anyhow::Result<()> {
         .tcp_keepalive(args.tcp_keepalive.max(60))
         .timeout(args.timeout.max(600))
         .connect_timeout(args.connect_timeout.max(60))
-        .workers(args.workers.max(1));
+        .workers(args.workers.max(1))
+        .cf_site_key(args.cf_site_key)
+        .cf_secret_key(args.cf_secret_key);
 
     #[cfg(feature = "limit")]
     let builder = builder
@@ -43,36 +45,41 @@ pub(super) async fn run_serve(mut args: ServeArgs) -> anyhow::Result<()> {
     builder.build()?.run().await
 }
 
-pub(super) async fn generate_template(output_file: Option<PathBuf>) -> anyhow::Result<()> {
-    let out = if let Some(output_file) = output_file {
-        match output_file.is_dir() {
+pub(super) async fn generate_template(cover: bool, out: Option<PathBuf>) -> anyhow::Result<()> {
+    let out = if let Some(out) = out {
+        match out.is_dir() {
             false => {
-                if let Some(parent) = output_file.parent() {
+                if let Some(parent) = out.parent() {
                     if parent.exists().not() {
                         tokio::fs::create_dir_all(parent).await?;
                     }
                 }
             }
-            true => anyhow::bail!("{} not a file", output_file.display()),
+            true => anyhow::bail!("{} not a file", out.display()),
         };
-        output_file
+        out
     } else {
         std::env::current_dir()?.join("opengpt-serve.toml")
     };
 
-    let template = "host = \"0.0.0.0\"\nport = 7999\nworkers = 1\ntimeout = 600\nconnect_timeout = 60\ntcp_keepalive = 60\ntb_enable = false\ntb_store_strategy = \"mem\"\ntb_redis_url = [\"redis://127.0.0.1:6379\"]\ntb_capacity = 60\ntb_fill_rate = 1\ntb_expired = 86400";
-    #[cfg(target_family = "unix")]
-    {
-        use std::fs::Permissions;
-        use std::os::unix::prelude::PermissionsExt;
-        tokio::fs::File::create(&out)
-            .await?
-            .set_permissions(Permissions::from_mode(0o755))
-            .await?;
+    let template = "host=\"0.0.0.0\"\nport=7999\nworkers=1\n#proxy=\ntimeout=600\nconnect_timeout=60\ntcp_keepalive=60\n#tls_cert=\n#tls_key=\n#api_prefix=\ntb_enable=false\ntb_store_strategy=\"mem\"\ntb_redis_url=[\"redis://127.0.0.1:6379\"]\ntb_capacity=60\ntb_fill_rate=1\ntb_expired=86400\n#sign_secret_key=\n#cf_site_key=\n#cf_secret_key=\n";
+
+    if cover {
+        #[cfg(target_family = "unix")]
+        {
+            use std::fs::Permissions;
+            use std::os::unix::prelude::PermissionsExt;
+            tokio::fs::File::create(&out)
+                .await?
+                .set_permissions(Permissions::from_mode(0o755))
+                .await?;
+        }
+
+        #[cfg(target_family = "windows")]
+        tokio::fs::File::create(&out).await?;
+
+        Ok(tokio::fs::write(out, template).await?)
+    } else {
+        Ok(())
     }
-
-    #[cfg(target_family = "windows")]
-    tokio::fs::File::create(&out).await?;
-
-    Ok(tokio::fs::write(out, template).await?)
 }
