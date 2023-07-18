@@ -8,9 +8,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 <!-- insertion marker -->
 ## Unreleased
 
-<small>[Compare with latest](https://github.com/gngpp/opengpt/compare/v0.1.8...HEAD)</small>
+<small>[Compare with latest](https://github.com/gngpp/opengpt/compare/v0.1.9...HEAD)</small>
 
 <!-- insertion marker -->
+## [v0.1.9](https://github.com/gngpp/opengpt/releases/tag/v0.1.9) - 2023-07-18
+
+<small>[Compare with v0.1.8](https://github.com/gngpp/opengpt/compare/v0.1.8...v0.1.9)</small>
+
 ## [v0.1.8](https://github.com/gngpp/opengpt/releases/tag/v0.1.8) - 2023-07-17
 
 <small>[Compare with v0.1.7](https://github.com/gngpp/opengpt/compare/v0.1.7...v0.1.8)</small>
