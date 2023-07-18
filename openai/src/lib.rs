@@ -6,9 +6,10 @@ pub mod error;
 pub mod eventsource;
 pub mod log;
 pub mod model;
-pub mod opengpt;
+pub mod chatgpt;
 pub mod platform;
 pub mod unescape;
+pub mod uuid;
 
 #[cfg(feature = "serve")]
 pub mod serve;
@@ -19,5 +20,3 @@ pub const URL_CHATGPT_API: &str = "https://chat.openai.com";
 pub const URL_PLATFORM_API: &str = "https://api.openai.com";
 pub const ORIGIN_CHATGPT: &str = "https://chat.openai.com/chat";
 pub const HOST_CHATGPT: &str = "chat.openai.com";
-
-pub type AuthResult<T, E = anyhow::Error> = anyhow::Result<T, E>;

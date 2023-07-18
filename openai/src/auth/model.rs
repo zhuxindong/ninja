@@ -10,6 +10,7 @@ pub struct AuthAccount {
     #[builder(setter(into, strip_option), default)]
     pub mfa: Option<String>,
     pub option: AuthStrategy,
+    #[builder(setter(into, strip_option), default)]
     #[serde(rename = "cf-turnstile-response")]
     pub cf_turnstile_response: Option<String>,
 }

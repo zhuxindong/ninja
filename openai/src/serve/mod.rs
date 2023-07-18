@@ -114,6 +114,7 @@ impl Launcher {
             client_builder = client_builder.proxy(proxy)
         }
 
+        // api client
         let api_client = client_builder
             .user_agent(HEADER_UA)
             .chrome_builder(ChromeVersion::V110)
