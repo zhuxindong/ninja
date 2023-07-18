@@ -17,7 +17,7 @@ pub(super) async fn run_serve(mut args: ServeArgs) -> anyhow::Result<()> {
                 .unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0))),
         )
         .port(args.port.unwrap_or(7999))
-        .proxies(args.proxies)
+        .proxies(args.proxies.unwrap_or_default())
         .api_prefix(args.api_prefix)
         .tls_keypair(None)
         .tcp_keepalive(args.tcp_keepalive.max(60))

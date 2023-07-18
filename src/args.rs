@@ -59,7 +59,7 @@ pub(super) struct ServeArgs {
     pub(super) workers: usize,
     /// Server proxies pool, example: protocol://user:pass@ip:port
     #[clap(long, env = "OPENGPT_PROXY", value_parser = parse_url)]
-    pub(super) proxies: std::vec::Vec<String>,
+    pub(super) proxies: Option<std::vec::Vec<String>>,
     /// Client timeout (secends)
     #[clap(long, env = "OPENGPT_TIMEOUT", default_value = "600")]
     pub(super) timeout: usize,
