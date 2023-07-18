@@ -442,7 +442,7 @@ async fn get_share_chat(
     if let Some(cookie) = req.cookie(SESSION_ID) {
         return match extract_session(cookie.value()) {
             Ok(_) => {
-                let resp = super::client()
+                let resp = super::api_client()
                     .get(format!("{URL_CHATGPT_API}/backend-api/share/{share_id}"))
                     .bearer_auth(cookie.value())
                     .send()
@@ -531,7 +531,7 @@ async fn get_share_chat_info(
     let share_id = share_id.into_inner();
     if let Some(cookie) = req.cookie(SESSION_ID) {
         if extract_session(cookie.value()).is_ok() {
-            let resp = super::client()
+            let resp = super::api_client()
                 .get(format!("{URL_CHATGPT_API}/backend-api/share/{share_id}"))
                 .bearer_auth(cookie.value())
                 .send()
@@ -596,7 +596,7 @@ async fn get_share_chat_continue_info(
     if let Some(cookie) = req.cookie(SESSION_ID) {
         return match extract_session(cookie.value()) {
             Ok(session) => {
-                let resp = super::client()
+                let resp = super::api_client()
                 .get(format!("{URL_CHATGPT_API}/backend-api/share/{share_id}"))
                 .bearer_auth(cookie.value())
                 .send()
@@ -683,7 +683,7 @@ async fn get_share_chat_continue_info(
 
 async fn get_image(params: Option<web::Query<ImageQuery>>) -> Result<HttpResponse> {
     let query = params.ok_or(error::ErrorBadRequest("Missing URL parameter"))?;
-    let resp = super::client().get(&query.url).send().await;
+    let resp = super::api_client().get(&query.url).send().await;
     Ok(super::response_convert(resp))
 }
 
@@ -773,7 +773,7 @@ async fn cf_captcha_check(
                     idempotency_key: crate::uuid::uuid(),
                 };
 
-                let resp = super::client()
+                let resp = super::api_client()
                     .post("https://challenges.cloudflare.com/turnstile/v0/siteverify")
                     .form(&form)
                     .send()

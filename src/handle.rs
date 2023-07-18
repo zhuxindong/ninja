@@ -17,7 +17,7 @@ pub(super) async fn run_serve(mut args: ServeArgs) -> anyhow::Result<()> {
                 .unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0))),
         )
         .port(args.port.unwrap_or(7999))
-        .proxy(args.proxy)
+        .proxies(args.proxies.unwrap_or_default())
         .api_prefix(args.api_prefix)
         .tls_keypair(None)
         .tcp_keepalive(args.tcp_keepalive.max(60))
@@ -62,7 +62,7 @@ pub(super) async fn generate_template(cover: bool, out: Option<PathBuf>) -> anyh
         std::env::current_dir()?.join("opengpt-serve.toml")
     };
 
-    let template = "host=\"0.0.0.0\"\nport=7999\nworkers=1\n#proxy=\ntimeout=600\nconnect_timeout=60\ntcp_keepalive=60\n#tls_cert=\n#tls_key=\n#api_prefix=\ntb_enable=false\ntb_store_strategy=\"mem\"\ntb_redis_url=[\"redis://127.0.0.1:6379\"]\ntb_capacity=60\ntb_fill_rate=1\ntb_expired=86400\n#sign_secret_key=\n#cf_site_key=\n#cf_secret_key=\n";
+    let template = "host=\"0.0.0.0\"\nport=7999\nworkers=1\n#proxies=[]\ntimeout=600\nconnect_timeout=60\ntcp_keepalive=60\n#tls_cert=\n#tls_key=\n#api_prefix=\ntb_enable=false\ntb_store_strategy=\"mem\"\ntb_redis_url=[\"redis://127.0.0.1:6379\"]\ntb_capacity=60\ntb_fill_rate=1\ntb_expired=86400\n#sign_secret_key=\n#cf_site_key=\n#cf_secret_key=\n";
 
     if cover {
         #[cfg(target_family = "unix")]

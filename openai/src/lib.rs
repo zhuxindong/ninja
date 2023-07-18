@@ -1,12 +1,12 @@
 #![recursion_limit = "256"]
 pub mod arkose;
 pub mod auth;
+pub mod chatgpt;
 pub mod error;
 #[cfg(feature = "stream")]
 pub mod eventsource;
 pub mod log;
 pub mod model;
-pub mod chatgpt;
 pub mod platform;
 pub mod unescape;
 pub mod uuid;

@@ -7,6 +7,8 @@ pub mod tokenbucket;
 #[cfg(feature = "template")]
 pub mod template;
 
+pub mod load_balancer;
+
 use actix_web::cookie::{self, Cookie};
 use actix_web::http::header;
 use actix_web::middleware::Logger;
@@ -15,7 +17,6 @@ use actix_web::{get, post, App, HttpResponse, HttpServer, Responder};
 use actix_web::{web, HttpRequest};
 
 use derive_builder::Builder;
-use reqwest::browser::ChromeVersion;
 use reqwest::header::HeaderValue;
 use reqwest::Client;
 use serde_json::{json, Value};
@@ -33,24 +34,24 @@ use crate::auth::model::AuthAccount;
 use crate::auth::{AuthClient, AuthHandle};
 use crate::serve::template::TemplateData;
 use crate::serve::tokenbucket::TokenBucketContext;
-use crate::{auth, debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
+use crate::{debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 
 use crate::{HEADER_UA, URL_CHATGPT_API, URL_PLATFORM_API};
 const EMPTY: &str = "";
 static INIT: Once = Once::new();
-static mut CLIENT: Option<Client> = None;
-static mut AUTH_CLIENT: Option<AuthClient> = None;
+static mut API_CLIENT: Option<load_balancer::ClientLoadBalancer<Client>> = None;
+static mut AUTH_CLIENT: Option<load_balancer::ClientLoadBalancer<AuthClient>> = None;
 
-pub(super) fn client() -> Client {
-    if let Some(client) = unsafe { &CLIENT } {
-        return client.clone();
+pub(super) fn api_client() -> Client {
+    if let Some(lb) = unsafe { &API_CLIENT } {
+        return lb.next().clone();
     }
     panic!("The requesting client must be initialized")
 }
 
 pub(super) fn auth_client() -> AuthClient {
-    if let Some(oauth_client) = unsafe { &AUTH_CLIENT } {
-        return oauth_client.clone();
+    if let Some(lb) = unsafe { &AUTH_CLIENT } {
+        return lb.next().clone();
     }
     panic!("The requesting oauth client must be initialized")
 }
@@ -63,8 +64,8 @@ pub struct Launcher {
     port: u16,
     /// Machine worker pool
     workers: usize,
-    /// Server proxy
-    proxy: Option<String>,
+    /// Server proxies
+    proxies: Vec<String>,
     /// TCP keepalive (second)
     tcp_keepalive: usize,
     /// Client timeout
@@ -106,42 +107,18 @@ impl Launcher {
         // template data
         let template_data = TemplateData::from(self.clone());
 
-        // client
-        let mut client_builder = reqwest::Client::builder();
-        if let Some(url) = self.proxy.clone() {
-            info!("Server proxy using: {url}");
-            let proxy = reqwest::Proxy::all(url)?;
-            client_builder = client_builder.proxy(proxy)
-        }
-
-        // api client
-        let api_client = client_builder
-            .user_agent(HEADER_UA)
-            .chrome_builder(ChromeVersion::V110)
-            .tcp_keepalive(Some(Duration::from_secs((self.tcp_keepalive + 1) as u64)))
-            .timeout(Duration::from_secs((self.timeout + 1) as u64))
-            .connect_timeout(Duration::from_secs((self.connect_timeout + 1) as u64))
-            .pool_max_idle_per_host(self.workers)
-            .cookie_store(true)
-            .build()?;
-
-        // auth client
-        let auth_client = auth::AuthClientBuilder::builder()
-            .user_agent(HEADER_UA)
-            .chrome_builder(ChromeVersion::V108)
-            .timeout(Duration::from_secs((self.timeout + 1) as u64))
-            .connect_timeout(Duration::from_secs((self.connect_timeout + 1) as u64))
-            .pool_max_idle_per_host(self.workers)
-            .cookie_store(true)
-            .proxy(self.proxy)
-            .build();
-
         INIT.call_once(|| unsafe {
-            CLIENT = Some(api_client);
-            AUTH_CLIENT = Some(auth_client);
+            API_CLIENT = Some(
+                load_balancer::ClientLoadBalancer::<Client>::new_api_client(&self)
+                    .expect("Failed to initialize the requesting client"),
+            );
+            AUTH_CLIENT = Some(
+                load_balancer::ClientLoadBalancer::<AuthClient>::new_auth_client(&self)
+                    .expect("Failed to initialize the requesting oauth client"),
+            );
         });
 
-        check_self_ip(client()).await;
+        check_self_ip(&api_client()).await;
 
         info!(
             "Starting HTTP(S) server at http(s)://{}:{}",
@@ -365,7 +342,7 @@ async fn official_proxy(req: HttpRequest, body: Option<Json<Value>>) -> impl Res
         format!("{URL_PLATFORM_API}{}?{}", req.path(), req.query_string())
     };
 
-    let builder = client()
+    let builder = api_client()
         .request(req.method().clone(), url)
         .headers(header_convert(&req));
     let resp = match body {
@@ -398,7 +375,7 @@ async fn unofficial_proxy(req: HttpRequest, mut body: Option<Json<Value>>) -> im
         format!("{URL_CHATGPT_API}{}?{}", req.path(), req.query_string())
     };
 
-    let builder = client()
+    let builder = api_client()
         .request(req.method().clone(), url)
         .headers(header_convert(&req));
     let resp = match body {
@@ -540,7 +517,7 @@ async fn gpt4_body_handle(req: &HttpRequest, body: &mut Option<Json<Value>>) {
     }
 }
 
-async fn check_self_ip(client: reqwest::Client) {
+async fn check_self_ip(client: &Client) {
     match client
         .get("https://ifconfig.me")
         .timeout(Duration::from_secs(10))
