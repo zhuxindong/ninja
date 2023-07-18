@@ -8,7 +8,6 @@ use base64::Engine;
 use chrono::NaiveDateTime;
 use chrono::{prelude::DateTime, Utc};
 
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -765,23 +764,13 @@ async fn cf_captcha_check(
                 if cf_response.is_empty() {
                     return Err(error::ErrorBadRequest("Missing cf_captcha_response"));
                 }
-                let mut rng = rand::thread_rng();
 
-                // 生成随机的字节序列
-                let bytes: [u8; 16] = rng.gen();
-
-                // 转换为 UUID 格式的字符串
-                let uuid_string = format!(
-                    "{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}",
-                    bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
-                    bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
-                );
                 let conn = req.connection_info();
                 let form = CfCaptchaForm {
                     secret: data.cf_secret_key.as_ref().unwrap(),
                     response: cf_response,
                     remoteip: conn.peer_addr().unwrap(),
-                    idempotency_key: uuid_string,
+                    idempotency_key: crate::uuid::uuid(),
                 };
 
                 let resp = super::client()

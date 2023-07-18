@@ -24,7 +24,7 @@ use sha2::{Digest, Sha256};
 pub mod model;
 
 use crate::error::AuthError;
-use crate::{debug, AuthResult, URL_CHATGPT_API};
+use crate::{debug, URL_CHATGPT_API};
 
 const CLIENT_ID: &str = "pdlLIX2Y72MIl2rhLhTE9VV9bN905kBh";
 const OPENAI_OAUTH_URL: &str = "https://auth0.openai.com";
@@ -34,6 +34,8 @@ const OPENAI_OAUTH_APPLE_CALLBACK_URL: &str =
     "com.openai.chat://auth0.openai.com/ios/com.openai.chat/callback";
 
 const OPENAI_API_URL: &str = "https://api.openai.com";
+
+pub type AuthResult<T, E = anyhow::Error> = anyhow::Result<T, E>;
 
 #[derive(Clone, PartialEq, Eq, Hash, Deserialize)]
 #[serde(rename_all = "snake_case")]
