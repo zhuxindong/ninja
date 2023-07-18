@@ -7,12 +7,12 @@ use std::{
 use crate::auth::AuthClient;
 use crate::{auth, info, HEADER_UA};
 
-pub(super) struct ClientLoadBalancer<T> {
+pub(super) struct ClientLoadBalancer<T: Clone> {
     clients: Vec<T>,
     index: AtomicUsize,
 }
 
-impl<T> ClientLoadBalancer<T> {
+impl<T: Clone> ClientLoadBalancer<T> {
     pub(super) fn new_auth_client(
         args: &super::Launcher,
     ) -> anyhow::Result<ClientLoadBalancer<AuthClient>> {
@@ -90,7 +90,7 @@ impl<T> ClientLoadBalancer<T> {
         Ok(load)
     }
 
-    pub(super) fn next_client(&self) -> &T {
+    pub(super) fn next(&self) -> &T {
         let len = self.clients.len();
         let mut old = self.index.load(Ordering::Relaxed);
         let mut new;

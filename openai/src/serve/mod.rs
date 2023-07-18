@@ -42,16 +42,16 @@ static INIT: Once = Once::new();
 static mut API_CLIENT: Option<load_balancer::ClientLoadBalancer<Client>> = None;
 static mut AUTH_CLIENT: Option<load_balancer::ClientLoadBalancer<AuthClient>> = None;
 
-pub(super) fn client() -> &'static Client {
-    if let Some(client) = unsafe { &API_CLIENT } {
-        return client.next_client();
+pub(super) fn api_client() -> Client {
+    if let Some(lb) = unsafe { &API_CLIENT } {
+        return lb.next().clone();
     }
     panic!("The requesting client must be initialized")
 }
 
-pub(super) fn auth_client() -> &'static AuthClient {
-    if let Some(oauth_client) = unsafe { &AUTH_CLIENT } {
-        return oauth_client.next_client();
+pub(super) fn auth_client() -> AuthClient {
+    if let Some(lb) = unsafe { &AUTH_CLIENT } {
+        return lb.next().clone();
     }
     panic!("The requesting oauth client must be initialized")
 }
@@ -118,7 +118,7 @@ impl Launcher {
             );
         });
 
-        check_self_ip(client()).await;
+        check_self_ip(&api_client()).await;
 
         info!(
             "Starting HTTP(S) server at http(s)://{}:{}",
@@ -342,7 +342,7 @@ async fn official_proxy(req: HttpRequest, body: Option<Json<Value>>) -> impl Res
         format!("{URL_PLATFORM_API}{}?{}", req.path(), req.query_string())
     };
 
-    let builder = client()
+    let builder = api_client()
         .request(req.method().clone(), url)
         .headers(header_convert(&req));
     let resp = match body {
@@ -375,7 +375,7 @@ async fn unofficial_proxy(req: HttpRequest, mut body: Option<Json<Value>>) -> im
         format!("{URL_CHATGPT_API}{}?{}", req.path(), req.query_string())
     };
 
-    let builder = client()
+    let builder = api_client()
         .request(req.method().clone(), url)
         .headers(header_convert(&req));
     let resp = match body {
