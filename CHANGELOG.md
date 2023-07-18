@@ -10,18 +10,22 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 <small>[Compare with latest](https://github.com/gngpp/opengpt/compare/v0.1.8...HEAD)</small>
 
-### Changed
-
-- change template Help & FQA link ([a4c8b42](https://github.com/gngpp/opengpt/commit/a4c8b429f15f4bf7c55a8306bd2bd9057daceea8) by gngpp).
-
 <!-- insertion marker -->
 ## [v0.1.8](https://github.com/gngpp/opengpt/releases/tag/v0.1.8) - 2023-07-17
 
 <small>[Compare with v0.1.7](https://github.com/gngpp/opengpt/compare/v0.1.7...v0.1.8)</small>
 
+### Added
+
+- Add CHANGELOG.md ([3c25f21](https://github.com/gngpp/opengpt/commit/3c25f21ce9946746e0d2d941a408f58cd5e148fe) by gngpp).
+
 ### Fixed
 
 - fix windows build ([9ef8bce](https://github.com/gngpp/opengpt/commit/9ef8bce747c932abc191ebf30849dc299c54afb2) by gngpp).
+
+### Changed
+
+- change template Help & FQA link ([a4c8b42](https://github.com/gngpp/opengpt/commit/a4c8b429f15f4bf7c55a8306bd2bd9057daceea8) by gngpp).
 
 ## [v0.1.7](https://github.com/gngpp/opengpt/releases/tag/v0.1.7) - 2023-07-15
 
