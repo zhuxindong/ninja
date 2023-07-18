@@ -57,9 +57,9 @@ pub(super) struct ServeArgs {
     /// Server worker-pool size (Recommended number of CPU cores)
     #[clap(short = 'W', long, env = "OPENGPT_WORKERS", default_value = "1")]
     pub(super) workers: usize,
-    /// Server proxy, example: protocol://user:pass@ip:port
-    #[clap(long, env = "OPENGPT_PROXY", value_parser = parse_proxy_url)]
-    pub(super) proxy: Option<String>,
+    /// Server proxies pool, example: protocol://user:pass@ip:port
+    #[clap(long, env = "OPENGPT_PROXY", value_parser = parse_url)]
+    pub(super) proxies: std::vec::Vec<String>,
     /// Client timeout (secends)
     #[clap(long, env = "OPENGPT_TIMEOUT", default_value = "600")]
     pub(super) timeout: usize,
@@ -76,7 +76,7 @@ pub(super) struct ServeArgs {
     #[clap(long, env = "OPENGPT_TLS_KEY", requires = "tls_cert")]
     pub(super) tls_key: Option<PathBuf>,
     /// Web UI api prefix
-    #[clap(long, env = "OPENGPT_UI_API_PREFIX", value_parser = parse_proxy_url)]
+    #[clap(long, env = "OPENGPT_UI_API_PREFIX", value_parser = parse_url)]
     pub(super) api_prefix: Option<String>,
     /// Enable url signature (signature secret key)
     #[clap(short = 'S', long, env = "OPENGPT_SIGNATURE")]
@@ -100,10 +100,11 @@ pub(super) struct ServeArgs {
         long,
         env = "OPENGPT_TB_REDIS_URL",
         default_value = "redis://127.0.0.1:6379",
-        requires = "tb_enable"
+        requires = "tb_enable",
+        value_parser = parse_url
     )]
     #[cfg(feature = "limit")]
-    pub(super) tb_redis_url: Vec<String>,
+    pub(super) tb_redis_url: std::vec::Vec<String>,
     /// Token bucket capacity
     #[clap(
         long,
@@ -158,7 +159,7 @@ pub(super) enum SubCommands {
         unofficial_api: Option<String>,
 
         /// Unofficial API http proxy. Format: protocol://user:pass@ip:port
-        #[clap(long, env = "OPENGPT_PROXY", value_parser = parse_proxy_url)]
+        #[clap(long, env = "OPENGPT_PROXY", value_parser = parse_url)]
         unofficial_proxy: Option<url::Url>,
     },
 }
@@ -189,14 +190,19 @@ fn parse_host(s: &str) -> anyhow::Result<std::net::IpAddr> {
 }
 
 // proxy proto
-fn parse_proxy_url(proxy_url: &str) -> anyhow::Result<String> {
-    let url = url::Url::parse(proxy_url)
-        .context("The Proxy Url format must be `protocol://user:pass@ip:port`")?;
-    let protocol = url.scheme().to_string();
-    match protocol.as_str() {
-        "http" | "https" | "socks5" => Ok(url.to_string()),
-        _ => anyhow::bail!("Unsupported protocol: {}", protocol),
+fn parse_url(s: &str) -> anyhow::Result<Vec<String>> {
+    let split = s.split(",");
+    let mut proxies: Vec<_> = vec![];
+    for ele in split {
+        let url = url::Url::parse(ele)
+            .context("The Proxy Url format must be `protocol://user:pass@ip:port`")?;
+        let protocol = url.scheme().to_string();
+        match protocol.as_str() {
+            "http" | "https" | "socks5" | "redis" => proxies.push(ele.to_string()),
+            _ => anyhow::bail!("Unsupported protocol: {}", protocol),
+        };
     }
+    Ok(proxies)
 }
 
 fn parse_config(s: &str) -> anyhow::Result<PathBuf> {
