@@ -30,8 +30,8 @@ async fn main() -> anyhow::Result<()> {
                 args::ServeSubcommand::Restart => todo!(),
                 args::ServeSubcommand::Status => todo!(),
                 args::ServeSubcommand::Start => todo!(),
-                args::ServeSubcommand::GT { output_file } => {
-                    handle::generate_template(output_file).await?;
+                args::ServeSubcommand::GT { cover, out } => {
+                    handle::generate_template(cover, out).await?;
                 }
             },
         },

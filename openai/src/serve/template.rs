@@ -8,6 +8,7 @@ use base64::Engine;
 use chrono::NaiveDateTime;
 use chrono::{prelude::DateTime, Utc};
 
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -83,7 +84,22 @@ impl From<AuthenticateToken> for Session {
 #[allow(dead_code)]
 #[derive(Clone)]
 pub(super) struct TemplateData {
-    pub(crate) api_prefix: String,
+    /// WebSite api prefix
+    api_prefix: Option<String>,
+    /// Cloudflare captcha site key
+    cf_site_key: Option<String>,
+    /// Cloudflare captcha secret key
+    cf_secret_key: Option<String>,
+}
+
+impl From<super::Launcher> for TemplateData {
+    fn from(value: super::Launcher) -> Self {
+        Self {
+            api_prefix: Some(value.api_prefix.unwrap_or("".to_owned())),
+            cf_site_key: value.cf_site_key,
+            cf_secret_key: value.cf_secret_key,
+        }
+    }
 }
 
 async fn get_static_resource(
@@ -148,10 +164,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         )
         // user picture
         .route("/_next/image", web::get().to(get_image))
-        // arkose token captcha endpoint
-        .route("/v2/{tail:.*}", web::get().to(get_tcr9i))
-        .route("/fc/{tail:.*}", web::get().to(get_tcr9i))
-        .route("/cdn/{tail:.*}", web::get().to(get_tcr9i))
         // static resource endpoints
         .route(
             "/{filename:.+\\.(png|js|css|webp|json)}",
@@ -165,26 +177,42 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .default_service(web::route().to(get_error_404));
 }
 
-async fn get_auth(tmpl: web::Data<tera::Tera>) -> Result<HttpResponse> {
-    render_template(tmpl, TEMP_AUTH, &tera::Context::new())
+async fn get_auth(
+    tmpl: web::Data<tera::Tera>,
+    data: web::Data<TemplateData>,
+) -> Result<HttpResponse> {
+    let mut ctx = tera::Context::new();
+    settings_template_data(&mut ctx, &data);
+    render_template(tmpl, TEMP_AUTH, &ctx)
 }
 
 async fn get_login(
     tmpl: web::Data<tera::Tera>,
-    query: web::Query<HashMap<String, String>>,
+    data: web::Data<TemplateData>,
 ) -> Result<HttpResponse> {
     let mut ctx = tera::Context::new();
-    ctx.insert("next", query.get("next").unwrap_or(&"".to_owned()));
     ctx.insert("error", "");
     ctx.insert("username", "");
+    settings_template_data(&mut ctx, &data);
     render_template(tmpl, TEMP_LOGIN, &ctx)
 }
 
 async fn post_login(
     tmpl: web::Data<tera::Tera>,
+    data: web::Data<TemplateData>,
+    req: HttpRequest,
     account: web::Form<AuthAccount>,
 ) -> Result<HttpResponse> {
     let account = account.into_inner();
+    if let Some(err) = cf_captcha_check(&req, &data, account.cf_turnstile_response.as_deref())
+        .await
+        .err()
+    {
+        let mut ctx = tera::Context::new();
+        ctx.insert("username", &account.username);
+        ctx.insert("error", &err.to_string());
+        return render_template(tmpl, TEMP_LOGIN, &ctx);
+    }
     match super::auth_client().do_access_token(&account).await {
         Ok(access_token) => {
             let authentication_token = AuthenticateToken::try_from(access_token)
@@ -205,7 +233,7 @@ async fn post_login(
         }
         Err(e) => {
             let mut ctx = tera::Context::new();
-            ctx.insert("username", account.username());
+            ctx.insert("username", &account.username);
             ctx.insert("error", &e.to_string());
             render_template(tmpl, TEMP_LOGIN, &ctx)
         }
@@ -660,20 +688,6 @@ async fn get_image(params: Option<web::Query<ImageQuery>>) -> Result<HttpRespons
     Ok(super::response_convert(resp))
 }
 
-async fn get_tcr9i(req: HttpRequest) -> Result<HttpResponse> {
-    let url = if req.query_string().is_empty() {
-        format!("https://tcr9i.chat.openai.com{}", req.path())
-    } else {
-        format!(
-            "https://tcr9i.chat.openai.com{}?{}",
-            req.path(),
-            req.query_string()
-        )
-    };
-    let resp = super::client().get(url).send().await;
-    Ok(super::response_convert(resp))
-}
-
 async fn get_error_404(tmpl: web::Data<tera::Tera>) -> Result<HttpResponse> {
     let mut ctx = tera::Context::new();
     let props = json!(
@@ -715,19 +729,75 @@ fn redirect_login() -> Result<HttpResponse> {
 
 fn render_template(
     tmpl: web::Data<tera::Tera>,
-    template_name: &str,
+    name: &str,
     context: &tera::Context,
 ) -> Result<HttpResponse> {
     let tm = tmpl
-        .render(template_name, context)
+        .render(name, context)
         .map_err(|e| error::ErrorInternalServerError(e.to_string()))?;
     Ok(HttpResponse::Ok()
         .content_type(header::ContentType::html())
         .body(tm))
 }
 
+fn settings_template_data(ctx: &mut tera::Context, data: &web::Data<TemplateData>) {
+    if let Some(site_key) = &data.cf_site_key {
+        ctx.insert("site_key", site_key);
+    }
+    if let Some(api_prefix) = &data.api_prefix {
+        ctx.insert("api_prefix", api_prefix);
+    }
+}
+
 fn check_token(token: &str) -> Result<()> {
     let _ = crate::token::check(token).map_err(|e| error::ErrorUnauthorized(e.to_string()))?;
+    Ok(())
+}
+
+async fn cf_captcha_check(
+    req: &HttpRequest,
+    data: &web::Data<TemplateData>,
+    cf_response: Option<&str>,
+) -> Result<()> {
+    if data.cf_site_key.is_some() && data.cf_secret_key.is_some() {
+        return match cf_response {
+            Some(cf_response) => {
+                if cf_response.is_empty() {
+                    return Err(error::ErrorBadRequest("Missing cf_captcha_response"));
+                }
+                let mut rng = rand::thread_rng();
+
+                // 生成随机的字节序列
+                let bytes: [u8; 16] = rng.gen();
+
+                // 转换为 UUID 格式的字符串
+                let uuid_string = format!(
+                    "{:02X}{:02X}{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}",
+                    bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+                    bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+                );
+                let conn = req.connection_info();
+                let form = CfCaptchaForm {
+                    secret: data.cf_secret_key.as_ref().unwrap(),
+                    response: cf_response,
+                    remoteip: conn.peer_addr().unwrap(),
+                    idempotency_key: uuid_string,
+                };
+
+                let resp = super::client()
+                    .post("https://challenges.cloudflare.com/turnstile/v0/siteverify")
+                    .form(&form)
+                    .send()
+                    .await
+                    .map_err(|e| error::ErrorInternalServerError(e.to_string()))?;
+                match resp.error_for_status() {
+                    Ok(_) => Ok(()),
+                    Err(e) => Err(error::ErrorUnauthorized(e.to_string())),
+                }
+            }
+            None => Err(error::ErrorBadRequest("Missing cf_captcha_response")),
+        };
+    };
     Ok(())
 }
 
@@ -737,4 +807,12 @@ struct ImageQuery {
     url: String,
     w: String,
     q: String,
+}
+
+#[derive(serde::Serialize)]
+struct CfCaptchaForm<'a> {
+    secret: &'a str,
+    response: &'a str,
+    remoteip: &'a str,
+    idempotency_key: String,
 }

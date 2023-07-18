@@ -26,17 +26,20 @@ pub(super) enum ServeSubcommand {
     Run(ServeArgs),
     /// Start the HTTP server daemon
     Start,
-    /// Restart the HTTP server daemon
-    Restart,
     /// Stop the HTTP server daemon
     Stop,
-    /// View the status of the Http server daemon process
+    /// Restart the HTTP server daemon
+    Restart,
+    /// Status of the Http server daemon process
     Status,
     /// Generate config template file (toml format file)
     GT {
-        /// Configuration template output to file
-        #[clap(short, long, env = "OPENGPT_SERVE_GT")]
-        output_file: Option<PathBuf>,
+        /// Overwrite existing configuration file
+        #[clap(short, long, env = "OPENGPT_SERVE_GT_COVER")]
+        cover: bool,
+        /// Configuration template output to file (toml format file)
+        #[clap(short, long, env = "OPENGPT_SERVE_GT_OUT")]
+        out: Option<PathBuf>,
     },
 }
 
@@ -128,6 +131,13 @@ pub(super) struct ServeArgs {
     )]
     #[cfg(feature = "limit")]
     pub(super) tb_expired: u32,
+
+    /// Cloudflare turnstile captcha site key
+    #[clap(long, env = "OPENGPT_CF_SITE_KEY", requires = "cf_secret_key")]
+    pub(super) cf_site_key: Option<String>,
+    /// Cloudflare turnstile captcha secret key
+    #[clap(long, env = "OPENGPT_CF_SECRET_KEY", requires = "cf_site_key")]
+    pub(super) cf_secret_key: Option<String>,
 }
 
 #[derive(Subcommand)]
