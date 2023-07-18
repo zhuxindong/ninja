@@ -24,6 +24,9 @@ openai = { path = "openai" }
 inquire = "0.6.2"
 async-trait = "0.1.68"
 
+[dev-dependencies]
+futures-util = "0.3.27"
+
 # UI
 tui = { version = "0.19.0", default-features = false, features = ["crossterm"] }
 crossterm = { version = "0.26.1", features = [ "serde" ] }
