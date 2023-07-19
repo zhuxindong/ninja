@@ -81,9 +81,12 @@ opkg install luci-i18n-opengpt-zh-cn_1.0.2-1_all.ipk
 
 ### Http Server
 
-- Comes with original ChatGPT WebUI
-- Support unofficial/official API, forward to proxy
-- The API prefix is the same as the official one, only the host name is changed
+- Authentic ChatGPT WebUI
+- Support unofficial/official API proxy
+- The API prefix is consistent with the official
+- Accessible to third-party clients
+- Access to IP proxy pool to increase concurrency
+- API documentation
 
 - Parameter Description
   - Platfrom API [doc](https://platform.openai.com/docs/api-reference)
@@ -96,7 +99,7 @@ opkg install luci-i18n-opengpt-zh-cn_1.0.2-1_all.ipk
   - `--workers`, environment variable `OPENGPT_WORKERS`, worker threads: default 1
   - `--tls-cert`, environment variable `OPENGPT_TLS_CERT`', TLS certificate public key. Supported format: EC/PKCS8/RSA
   - `--tls-key`, environment variable `OPENGPT_TLS_KEY`, TLS certificate private key
-  - `--proxy`, environment variable `OPENGPT_PROXY`, proxy, format: protocol://user:pass@ip:port
+  - `--proxies`, environment variable `OPENGPT_PROXY`, proxies，support multiple proxy pools, format: protocol://user:pass@ip:port
 
 ```shell
 $ opengpt serve --help
@@ -113,8 +116,8 @@ Options:
           Server worker-pool size (Recommended number of CPU cores) [env: OPENGPT_WORKERS=] [default: 1]
   -L, --level <LEVEL>
           Log level (info/debug/warn/trace/error) [env: OPENGPT_LOG_LEVEL=] [default: info]
-      --proxy <PROXY>
-          Server proxy, example: protocol://user:pass@ip:port [env: OPENGPT_PROXY=]
+      --proxies <PROXIES>
+          Server proxies pool, example: protocol://user:pass@ip:port [env: OPENGPT_PROXY=]
       --tcp-keepalive <TCP_KEEPALIVE>
           TCP keepalive (second) [env: OPENGPT_TCP_KEEPALIVE=] [default: 5]
       --tls-cert <TLS_CERT>

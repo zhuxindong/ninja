@@ -85,6 +85,7 @@ opkg install luci-i18n-opengpt-zh-cn_1.0.2-1_all.ipk
 - 支持非官方/官方API代理
 - API前缀与官方一致
 - 可接入第三方客户端
+- 可接入IP代理池，提高并发量
 - API文档
   - Platfrom API [doc](https://platform.openai.com/docs/api-reference)
   - Backend API [doc](doc/rest.http)
@@ -96,7 +97,7 @@ opkg install luci-i18n-opengpt-zh-cn_1.0.2-1_all.ipk
   - `--workers`，环境变量 `OPENGPT_WORKERS`， 工作线程: 默认1
   - `--tls-cert`，环境变量 `OPENGPT_TLS_CERT`，TLS证书公钥，支持格式: EC/PKCS8/RSA
   - `--tls-key`，环境变量 `OPENGPT_TLS_KEY`，TLS证书私钥
-  - `--proxy`，环境变量 `OPENGPT_PROXY`，代理，格式: protocol://user:pass@ip:port
+  - `--proxies`，环境变量 `OPENGPT_PROXY`，代理，支持代理池，格式: protocol://user:pass@ip:port
 
 ```shell
 $ opengpt serve --help
@@ -113,8 +114,8 @@ Options:
           Server worker-pool size (Recommended number of CPU cores) [env: OPENGPT_WORKERS=] [default: 1]
   -L, --level <LEVEL>
           Log level (info/debug/warn/trace/error) [env: OPENGPT_LOG_LEVEL=] [default: info]
-      --proxy <PROXY>
-          Server proxy, example: protocol://user:pass@ip:port [env: OPENGPT_PROXY=]
+      --proxies <PROXIES>
+          Server proxies pool, example: protocol://user:pass@ip:port [env: OPENGPT_PROXY=]
       --tcp-keepalive <TCP_KEEPALIVE>
           TCP keepalive (second) [env: OPENGPT_TCP_KEEPALIVE=] [default: 5]
       --tls-cert <TLS_CERT>
