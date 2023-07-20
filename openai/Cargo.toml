@@ -10,7 +10,7 @@ log = "0.4.18"
 anyhow = "1.0.71"
 thiserror = "1.0"
 chrono = { version = "0.4.26", features = ["serde"] }
-reqwest = { path = "../reqwest", default-features = false, features = [
+reqwest = { git = "https://github.com/gngpp/reqwest.git", branch ="main", default-features = false, features = [
     "chrome","json", "cookies", "stream", "multipart", "socks"
 ] }
 tokio = { version = "1.28.2", features = ["fs", "sync"] }
