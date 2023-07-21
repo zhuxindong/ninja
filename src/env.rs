@@ -1,6 +1,12 @@
+use crate::args::ServeArgs;
+
+#[cfg(target_family = "unix")]
 pub(crate) const PID_PATH: &str = "/var/run/opengpt.pid";
+#[cfg(target_family = "unix")]
 pub(crate) const DEFAULT_STDOUT_PATH: &str = "/var/run/opengpt.out";
+#[cfg(target_family = "unix")]
 pub(crate) const DEFAULT_STDERR_PATH: &str = "/var/run/opengpt.err";
+#[cfg(target_family = "unix")]
 pub(crate) const DEFAULT_WORK_DIR: &str = "/";
 
 #[cfg(target_family = "unix")]
@@ -20,4 +26,17 @@ pub(crate) fn get_pid() -> Option<String> {
         return Some(binding.trim().to_string());
     }
     None
+}
+
+pub(crate) fn fix_relative_path(args: &mut ServeArgs) {
+    if let Some(c) = args.config.as_mut() {
+        // fix relative path
+        if c.is_relative() {
+            args.config = Some(
+                std::env::current_dir()
+                    .expect("cannot get current exe")
+                    .join(c),
+            )
+        }
+    }
 }

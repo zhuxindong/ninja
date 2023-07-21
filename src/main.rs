@@ -5,7 +5,6 @@ use clap::Parser;
 
 pub mod account;
 pub mod args;
-#[cfg(target_family = "unix")]
 pub mod env;
 pub mod handle;
 pub mod prompt;
@@ -26,7 +25,7 @@ fn main() -> anyhow::Result<()> {
                 unofficial_proxy: _,
             } => {}
             SubCommands::Serve(commands) => match commands {
-                args::ServeSubcommand::Run(args) => handle::serve(args)?,
+                args::ServeSubcommand::Run(args) => handle::serve(args, true)?,
                 #[cfg(target_family = "unix")]
                 args::ServeSubcommand::Stop => handle::serve_stop()?,
                 #[cfg(target_family = "unix")]

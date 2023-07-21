@@ -1,10 +1,15 @@
 use std::{ops::Not, path::PathBuf};
 
-use crate::args::ServeArgs;
+use crate::{args::ServeArgs, env::fix_relative_path};
 
 #[tokio::main]
-pub(super) async fn serve(mut args: ServeArgs) -> anyhow::Result<()> {
+pub(super) async fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<()> {
     env_logger::init_from_env(env_logger::Env::default());
+
+    if relative_path {
+        fix_relative_path(&mut args);
+    }
+
     if let Some(config_path) = args.config {
         log::info!("Using config file: {}", config_path.display());
         let bytes = tokio::fs::read(config_path).await?;
@@ -47,7 +52,7 @@ pub(super) async fn serve(mut args: ServeArgs) -> anyhow::Result<()> {
 }
 
 #[cfg(target_family = "unix")]
-pub(super) fn serve_start(args: ServeArgs) -> anyhow::Result<()> {
+pub(super) fn serve_start(mut args: ServeArgs) -> anyhow::Result<()> {
     use crate::env::{self, check_root, get_pid};
     use daemonize::Daemonize;
     use std::{
@@ -91,12 +96,14 @@ pub(super) fn serve_start(args: ServeArgs) -> anyhow::Result<()> {
         Err(_) => println!("Could not interpret SUDO_USER"),
     }
 
+    fix_relative_path(&mut args);
+
     match daemonize.start() {
         Ok(_) => println!("Success, daemonized"),
         Err(e) => eprintln!("Error, {}", e),
     }
 
-    serve(args)
+    serve(args, false)
 }
 
 #[cfg(target_family = "unix")]
@@ -108,9 +115,11 @@ pub(super) fn serve_stop() -> anyhow::Result<()> {
     check_root();
 
     if let Some(pid) = get_pid() {
-        if nix::sys::signal::kill(Pid::from_raw(pid.parse::<i32>()?), signal::SIGINT).is_ok() {
-            std::fs::remove_file(env::PID_PATH)?;
+        let pid = pid.parse::<i32>()?;
+        if let Err(_) = nix::sys::signal::kill(Pid::from_raw(pid), signal::SIGINT) {
+            println!("OpenGPT is not running");
         }
+        let _ = std::fs::remove_file(env::PID_PATH);
     } else {
         println!("OpenGPT is not running")
     };

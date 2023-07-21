@@ -17,7 +17,7 @@ use actix_web::{get, post, App, HttpResponse, HttpServer, Responder};
 use actix_web::{web, HttpRequest};
 
 use derive_builder::Builder;
-use reqwest::header::HeaderValue;
+use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::Client;
 use serde_json::{json, Value};
 use std::fs::File;
@@ -435,12 +435,17 @@ fn response_convert(resp: Result<reqwest::Response, reqwest::Error>) -> HttpResp
 
 fn header_convert(req: &HttpRequest) -> reqwest::header::HeaderMap {
     let headers = req.headers();
-    let mut res = headers
-        .iter()
-        .filter(|v| v.0.eq(&header::AUTHORIZATION))
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect::<reqwest::header::HeaderMap>();
 
+    let authorization = match headers.get(header::AUTHORIZATION) {
+        Some(v) => Some(v),
+        // pandora will pass X-Authorization header
+        None => headers.get("X-Authorization"),
+    };
+
+    let mut res = HeaderMap::new();
+    if let Some(h) = authorization {
+        res.insert(header::AUTHORIZATION, h.clone());
+    }
     res.insert(header::HOST, HeaderValue::from_static(HOST_CHATGPT));
     res.insert(header::ORIGIN, HeaderValue::from_static(ORIGIN_CHATGPT));
     res.insert(header::USER_AGENT, HeaderValue::from_static(HEADER_UA));
