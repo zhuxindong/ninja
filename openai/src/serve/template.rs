@@ -31,6 +31,8 @@ const TEMP_DETAIL: &str = "detail.htm";
 const TEMP_LOGIN: &str = "login.htm";
 const TEMP_SHARE: &str = "share.htm";
 
+static mut STATIC_FILES: Option<HashMap<&'static str, static_files::Resource>> = None;
+
 #[derive(Serialize, Deserialize)]
 struct Session {
     refresh_token: Option<String>,
@@ -101,29 +103,21 @@ impl From<super::Launcher> for TemplateData {
     }
 }
 
-async fn get_static_resource(
-    resource_map: web::Data<HashMap<&'static str, ::static_files::Resource>>,
-    path: web::Path<String>,
-) -> impl Responder {
-    let path = path.into_inner();
-    match resource_map.iter().find(|(k, _v)| k.contains(&path)) {
-        Some((_, v)) => HttpResponse::Ok().content_type(v.mime_type).body(v.data),
-        None => HttpResponse::NotFound().finish(),
-    }
-}
-
 // this function could be located in a different module
 pub fn config(cfg: &mut web::ServiceConfig) {
     let mut tera = tera::Tera::default();
     tera.add_raw_templates(vec![
-        (TEMP_404, include_str!("../../templates/404.htm")),
-        (TEMP_AUTH, include_str!("../../templates/auth.htm")),
-        (TEMP_LOGIN, include_str!("../../templates/login.htm")),
-        (TEMP_CHAT, include_str!("../../templates/chat.htm")),
-        (TEMP_DETAIL, include_str!("../../templates/detail.htm")),
-        (TEMP_SHARE, include_str!("../../templates/share.htm")),
+        (TEMP_404, include_str!("../../ui/404.htm")),
+        (TEMP_AUTH, include_str!("../../ui/auth.htm")),
+        (TEMP_LOGIN, include_str!("../../ui/login.htm")),
+        (TEMP_CHAT, include_str!("../../ui/chat.htm")),
+        (TEMP_DETAIL, include_str!("../../ui/detail.htm")),
+        (TEMP_SHARE, include_str!("../../ui/share.htm")),
     ])
     .expect("The static template failed to load");
+
+    unsafe { STATIC_FILES = Some(generate()) }
+
     cfg.app_data(web::Data::new(tera))
         .app_data(web::Data::new(generate()))
         .route("/auth", web::get().to(get_auth))
@@ -788,6 +782,15 @@ async fn cf_captcha_check(
         };
     };
     Ok(())
+}
+
+async fn get_static_resource(path: web::Path<String>) -> impl Responder {
+    let path = path.into_inner();
+    let mut x = unsafe { STATIC_FILES.as_ref().unwrap().iter() };
+    match x.find(|(k, _v)| k.contains(&path)) {
+        Some((_, v)) => HttpResponse::Ok().content_type(v.mime_type).body(v.data),
+        None => HttpResponse::NotFound().finish(),
+    }
 }
 
 #[allow(dead_code)]
