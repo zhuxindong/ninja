@@ -5,7 +5,6 @@ use clap::Parser;
 
 pub mod account;
 pub mod args;
-#[cfg(target_family = "unix")]
 pub mod env;
 pub mod handle;
 pub mod prompt;
