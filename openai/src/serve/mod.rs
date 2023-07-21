@@ -393,10 +393,11 @@ fn response_convert(resp: Result<reqwest::Response, reqwest::Error>) -> HttpResp
             resp.headers()
                 .into_iter()
                 .filter(|(k, _v)| {
-                    k.as_str().ne("__cf_bm")
-                        || k.as_str().ne("__cfduid")
-                        || k.as_str().ne("_cfuvid")
-                        || k.as_str().ne("set-cookie")
+                    let name = k.as_str().to_lowercase();
+                    name.ne("__cf_bm")
+                        || name.ne("__cfduid")
+                        || name.ne("_cfuvid")
+                        || name.ne("set-cookie")
                 })
                 .for_each(|kv| {
                     builder.insert_header(kv);
