@@ -126,7 +126,7 @@ impl Launcher {
         );
 
         if let Some(url) = &self.api_prefix {
-            info!("Web UI site use api: {url}")
+            info!("WebUI site use api: {url}")
         }
 
         // serve
@@ -390,14 +390,22 @@ fn response_convert(resp: Result<reqwest::Response, reqwest::Error>) -> HttpResp
         Ok(resp) => {
             let status = resp.status();
             let mut builder = HttpResponse::build(status);
-            resp.headers().into_iter().for_each(|kv| {
-                builder.insert_header(kv);
-            });
+            resp.headers()
+                .into_iter()
+                .filter(|(k, _v)| {
+                    k.as_str().ne("__cf_bm")
+                        || k.as_str().ne("__cfduid")
+                        || k.as_str().ne("_cfuvid")
+                        || k.as_str().ne("set-cookie")
+                })
+                .for_each(|kv| {
+                    builder.insert_header(kv);
+                });
 
             for c in resp
                 .cookies()
                 .into_iter()
-                .filter(|c| c.name().eq("_puid") || c.name().eq("__cf_bm"))
+                .filter(|c| c.name().eq("_puid") || c.name().eq("_account"))
             {
                 if let Some(expires) = c.expires() {
                     let timestamp_nanos = expires
@@ -465,12 +473,6 @@ fn header_convert(req: &HttpRequest) -> reqwest::header::HeaderMap {
         let c = &format!("_puid={};", puid_cookie_encoded(cookier.value()));
         cookie.push_str(c);
         debug!("request cookie `puid`: {}", c);
-    }
-
-    if let Some(cookier) = req.cookie("__cf_bm") {
-        let c = &format!("__cf_bm={};", cookier.value());
-        cookie.push_str(c);
-        debug!("request cookie `__cf_bm`: {}", c);
     }
 
     // setting cookie
