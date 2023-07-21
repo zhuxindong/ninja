@@ -8,13 +8,13 @@ services:
     environment:
       - TZ=Asia/Shanghai
       - OPENGPT_CONFIG=/opengpt-serve.toml
-      - OPENGPT_PORT=8080
-      - OPENGPT_HOST=0.0.0.0
-      - OPENGPT_WORKERS=10
+      # - OPENGPT_PORT=8080
+      # - OPENGPT_HOST=0.0.0.0
+      # - OPENGPT_WORKERS=10
       # - OPENGPT_PROXY=
-      - OPENGPT_TIMEOUT=360
-      - OPENGPT_CONNECT_TIMEOUT=60
-      - OPENGPT_TCP_KEEPALIVE=60
+      # - OPENGPT_TIMEOUT=360
+      # - OPENGPT_CONNECT_TIMEOUT=60
+      # - OPENGPT_TCP_KEEPALIVE=60
       # - OPENGPT_TLS_CERT=
       # - OPENGPT_TLS_KEY=
       # - OPENGPT_UI_API_PREFIX=
@@ -32,7 +32,7 @@ services:
       - ${PWD}/opengpt-serve.toml:/opengpt-serve.toml
     command: serve run
     ports:
-      - "7999:8080"
+      - "7999:7999"
 
   watchtower:
     container_name: watchtower
