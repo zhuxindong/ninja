@@ -5,7 +5,7 @@ pub mod sign;
 pub mod tokenbucket;
 
 #[cfg(feature = "template")]
-pub mod template;
+pub mod ui;
 
 pub mod load_balancer;
 
@@ -32,7 +32,7 @@ use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 use crate::arkose::ArkoseToken;
 use crate::auth::model::AuthAccount;
 use crate::auth::{AuthClient, AuthHandle};
-use crate::serve::template::TemplateData;
+use crate::serve::ui::TemplateData;
 use crate::serve::tokenbucket::TokenBucketContext;
 use crate::{debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 
@@ -161,7 +161,7 @@ impl Launcher {
                 // template data
                 .app_data(web::Data::new(template_data.clone()))
                 // templates page endpoint
-                .configure(template::config);
+                .configure(ui::config);
 
             #[cfg(all(not(feature = "sign"), feature = "limit"))]
             {
