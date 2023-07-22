@@ -331,6 +331,7 @@ async fn get_session(req: HttpRequest) -> Result<HttpResponse> {
 
 async fn get_chat(
     tmpl: web::Data<tera::Tera>,
+    data: web::Data<TemplateData>,
     req: HttpRequest,
     conversation_id: Option<web::Path<String>>,
     mut query: web::Query<HashMap<String, String>>,
@@ -380,6 +381,7 @@ async fn get_chat(
                     &serde_json::to_string(&props)
                         .map_err(|e| error::ErrorInternalServerError(e.to_string()))?,
                 );
+                settings_template_data(&mut ctx, &data);
                 return render_template(tmpl, template_name, &ctx);
             }
             Err(_) => redirect_login(),
@@ -429,6 +431,7 @@ async fn get_chat_info(req: HttpRequest) -> Result<HttpResponse> {
 
 async fn get_share_chat(
     tmpl: web::Data<tera::Tera>,
+    data: web::Data<TemplateData>,
     req: HttpRequest,
     share_id: web::Path<String>,
 ) -> Result<HttpResponse> {
@@ -484,6 +487,7 @@ async fn get_share_chat(
                         );
                         let mut ctx = tera::Context::new();
                         ctx.insert("props", &props.to_string());
+                        settings_template_data(&mut ctx, &data);
                         render_template(tmpl, TEMP_SHARE, &ctx)
                     }
                     Err(_) => {
@@ -502,6 +506,7 @@ async fn get_share_chat(
 
                         let mut ctx = tera::Context::new();
                         ctx.insert("props", &props.to_string());
+                        settings_template_data(&mut ctx, &data);
                         render_template(tmpl, TEMP_404, &ctx)
                     }
                 }
