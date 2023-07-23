@@ -104,10 +104,10 @@ pub struct Launcher {
 
 impl Launcher {
     pub async fn run(self) -> anyhow::Result<()> {
-        // template data
-        let template_data = TemplateData::from(self.clone());
-
         INIT.call_once(|| unsafe {
+            // template data
+            let template_data = TemplateData::from(self.clone());
+            ui::TEMPLATE_DATA = Some(template_data);
             API_CLIENT = Some(
                 load_balancer::ClientLoadBalancer::<Client>::new_api_client(&self)
                     .expect("Failed to initialize the requesting client"),
@@ -141,6 +141,8 @@ impl Launcher {
                         .max_age(3600),
                 )
                 .wrap(Logger::default())
+                // ab pressure test
+                .route("/ab", web::to(|| HttpResponse::Ok()))
                 // official dashboard api endpoint
                 .service(
                     web::resource("/dashboard/{tail:.*}")
@@ -166,8 +168,6 @@ impl Launcher {
                 .service(post_refresh_token)
                 .service(post_revoke_token)
                 .service(get_arkose_token)
-                // template data
-                .app_data(web::Data::new(template_data.clone()))
                 // templates page endpoint
                 .configure(ui::config);
 
