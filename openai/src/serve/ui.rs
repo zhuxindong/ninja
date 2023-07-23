@@ -110,70 +110,72 @@ impl From<super::Launcher> for TemplateData {
 
 // this function could be located in a different module
 pub fn config(cfg: &mut web::ServiceConfig) {
-    let mut tera = tera::Tera::default();
-    tera.add_raw_templates(vec![
-        (TEMP_404, include_str!("../../ui/404.htm")),
-        (TEMP_AUTH, include_str!("../../ui/auth.htm")),
-        (TEMP_LOGIN, include_str!("../../ui/login.htm")),
-        (TEMP_CHAT, include_str!("../../ui/chat.htm")),
-        (TEMP_DETAIL, include_str!("../../ui/detail.htm")),
-        (TEMP_SHARE, include_str!("../../ui/share.htm")),
-    ])
-    .expect("The static template failed to load");
+    if !unsafe { super::DISABLE_UI } {
+        let mut tera = tera::Tera::default();
+        tera.add_raw_templates(vec![
+            (TEMP_404, include_str!("../../ui/404.htm")),
+            (TEMP_AUTH, include_str!("../../ui/auth.htm")),
+            (TEMP_LOGIN, include_str!("../../ui/login.htm")),
+            (TEMP_CHAT, include_str!("../../ui/chat.htm")),
+            (TEMP_DETAIL, include_str!("../../ui/detail.htm")),
+            (TEMP_SHARE, include_str!("../../ui/share.htm")),
+        ])
+        .expect("The static template failed to load");
 
-    INIT.call_once(|| unsafe {
-        STATIC_FILES = Some(generate());
-        TEMPLATE = Some(tera);
-    });
+        INIT.call_once(|| unsafe {
+            STATIC_FILES = Some(generate());
+            TEMPLATE = Some(tera);
+        });
 
-    cfg.route("/auth", web::get().to(get_auth))
-        .route("/auth/login", web::get().to(get_login))
-        .route("/auth/login", web::post().to(post_login))
-        .route("/auth/login/token", web::post().to(post_login_token))
-        .route("/auth/logout", web::get().to(get_logout))
-        .route("/auth/session", web::get().to(get_session))
-        .route("/", web::get().to(get_chat))
-        .route("/c", web::get().to(get_chat))
-        .route("/c/{conversation_id}", web::get().to(get_chat))
-        .service(web::redirect("/chat", "/"))
-        .service(web::redirect("/chat/{conversation_id}", "/"))
-        .route("/share/{share_id}", web::get().to(get_share_chat))
-        .route(
-            "/share/{share_id}/continue",
-            web::get().to(get_share_chat_continue),
-        )
-        .route(
-            &format!("/_next/data/{BUILD_ID}/index.json"),
-            web::get().to(get_chat_info),
-        )
-        .route(
-            &format!("/_next/data/{BUILD_ID}/c/{}.json", "{conversation_id}"),
-            web::get().to(get_chat_info),
-        )
-        .route(
-            &format!("/_next/data/{BUILD_ID}/share/{}.json", "{share_id}"),
-            web::get().to(get_share_chat_info),
-        )
-        .route(
-            &format!(
-                "/_next/data/{BUILD_ID}/share/{}/continue.json",
-                "{share_id}"
-            ),
-            web::get().to(get_share_chat_continue_info),
-        )
-        // user picture
-        .route("/_next/image", web::get().to(get_image))
-        // static resource endpoints
-        .route(
-            "/{filename:.+\\.(png|js|css|webp|json)}",
-            web::get().to(get_static_resource),
-        )
-        .route("/_next/static/{tail:.*}", web::to(get_static_resource))
-        .route("/fonts/{tail:.*}", web::to(get_static_resource))
-        .route("/ulp/{tail:.*}", web::to(get_static_resource))
-        .route("/sweetalert2/{tail:.*}", web::to(get_static_resource))
-        // 404 endpoint
-        .default_service(web::route().to(get_error_404));
+        cfg.route("/auth", web::get().to(get_auth))
+            .route("/auth/login", web::get().to(get_login))
+            .route("/auth/login", web::post().to(post_login))
+            .route("/auth/login/token", web::post().to(post_login_token))
+            .route("/auth/logout", web::get().to(get_logout))
+            .route("/auth/session", web::get().to(get_session))
+            .route("/", web::get().to(get_chat))
+            .route("/c", web::get().to(get_chat))
+            .route("/c/{conversation_id}", web::get().to(get_chat))
+            .service(web::redirect("/chat", "/"))
+            .service(web::redirect("/chat/{conversation_id}", "/"))
+            .route("/share/{share_id}", web::get().to(get_share_chat))
+            .route(
+                "/share/{share_id}/continue",
+                web::get().to(get_share_chat_continue),
+            )
+            .route(
+                &format!("/_next/data/{BUILD_ID}/index.json"),
+                web::get().to(get_chat_info),
+            )
+            .route(
+                &format!("/_next/data/{BUILD_ID}/c/{}.json", "{conversation_id}"),
+                web::get().to(get_chat_info),
+            )
+            .route(
+                &format!("/_next/data/{BUILD_ID}/share/{}.json", "{share_id}"),
+                web::get().to(get_share_chat_info),
+            )
+            .route(
+                &format!(
+                    "/_next/data/{BUILD_ID}/share/{}/continue.json",
+                    "{share_id}"
+                ),
+                web::get().to(get_share_chat_continue_info),
+            )
+            // user picture
+            .route("/_next/image", web::get().to(get_image))
+            // static resource endpoints
+            .route(
+                "/{filename:.+\\.(png|js|css|webp|json)}",
+                web::get().to(get_static_resource),
+            )
+            .route("/_next/static/{tail:.*}", web::to(get_static_resource))
+            .route("/fonts/{tail:.*}", web::to(get_static_resource))
+            .route("/ulp/{tail:.*}", web::to(get_static_resource))
+            .route("/sweetalert2/{tail:.*}", web::to(get_static_resource))
+            // 404 endpoint
+            .default_service(web::route().to(get_error_404));
+    }
 }
 
 async fn get_auth() -> Result<HttpResponse> {
