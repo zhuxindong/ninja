@@ -39,6 +39,8 @@ use crate::{debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 use crate::{HEADER_UA, URL_CHATGPT_API, URL_PLATFORM_API};
 const EMPTY: &str = "";
 static INIT: Once = Once::new();
+
+static mut DISABLE_UI: bool = false;
 static mut API_CLIENT: Option<load_balancer::ClientLoadBalancer<Client>> = None;
 static mut AUTH_CLIENT: Option<load_balancer::ClientLoadBalancer<AuthClient>> = None;
 
@@ -100,14 +102,13 @@ pub struct Launcher {
     cf_site_key: Option<String>,
     /// Cloudflare turnstile captcha secret key
     cf_secret_key: Option<String>,
+    /// Disable web ui
+    disable_ui: bool,
 }
 
 impl Launcher {
     pub async fn run(self) -> anyhow::Result<()> {
         INIT.call_once(|| unsafe {
-            // template data
-            let template_data = TemplateData::from(self.clone());
-            ui::TEMPLATE_DATA = Some(template_data);
             API_CLIENT = Some(
                 load_balancer::ClientLoadBalancer::<Client>::new_api_client(&self)
                     .expect("Failed to initialize the requesting client"),
@@ -116,6 +117,10 @@ impl Launcher {
                 load_balancer::ClientLoadBalancer::<AuthClient>::new_auth_client(&self)
                     .expect("Failed to initialize the requesting oauth client"),
             );
+
+            DISABLE_UI = self.disable_ui;
+
+            ui::TEMPLATE_DATA = Some(TemplateData::from(self.clone()));
         });
 
         check_self_ip(&api_client()).await;
