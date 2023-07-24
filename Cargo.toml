@@ -36,7 +36,7 @@ nix = { version = "0.26.2", features = ["signal", "user", "ptrace"]}
 [dev-dependencies]
 futures-util = "0.3.27"
 reqwest = { git = "https://github.com/gngpp/reqwest.git", branch ="main", default-features = false, features = [
-    "chrome","json", "cookies", "stream", "multipart", "socks"
+    "impersonate","json", "cookies", "stream", "multipart", "socks"
 ] }
 
 [patch.crates-io]
