@@ -12,7 +12,6 @@ pub mod ui;
 pub mod util;
 
 fn main() -> anyhow::Result<()> {
-
     let opt = args::Opt::parse();
     std::env::set_var("RUST_LOG", opt.level);
     env_logger::init_from_env(env_logger::Env::default());

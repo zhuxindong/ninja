@@ -4,7 +4,6 @@ use crate::{args::ServeArgs, env::fix_relative_path};
 
 #[tokio::main]
 pub(super) async fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<()> {
- 
     if relative_path {
         fix_relative_path(&mut args);
     }
