@@ -36,12 +36,8 @@ nix = { version = "0.26.2", features = ["signal", "user", "ptrace"]}
 [dev-dependencies]
 futures-util = "0.3.27"
 reqwest = { git = "https://github.com/gngpp/reqwest.git", branch ="main", default-features = false, features = [
-    "impersonate","json", "cookies", "stream", "multipart", "socks"
+    "boring-tls", "impersonate","json", "cookies", "stream", "multipart", "socks"
 ] }
-
-[patch.crates-io]
-hyper = { git = "https://github.com/gngpp/hyper.git", branch = "v0.14.18-patched" }
-h2 = { git = "https://github.com/gngpp/h2.git", branch = "imp" }
 
 [features]
 default = ["limit", "sign"]
