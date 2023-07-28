@@ -175,8 +175,3 @@ make V=s
 ![img0](./doc/img/img0.png)
 ![img1](./doc/img/img1.png)
 ![img2](./doc/img/img2.png)
-
-### 参考
-
-- <https://github.com/tjardoo/openai-client>
-- <https://github.com/jpopesculian/reqwest-eventsource>
