@@ -1,9 +1,9 @@
 self.addEventListener('install', event => {
 	event.waitUntil(caches.open('opengpt-cache')
 		.then(function(cache) {
-			return cache.addAll(['/apple-touch-icon.png', 
-            '/favicon-16x16.png', 
-            '/favicon-32x32.png', 
+			return cache.addAll(['/resources/apple-touch-icon.png', 
+            '/resources/favicon-16x16.png', 
+            '/resources/favicon-32x32.png', 
             '/ulp/react-components/1.66.5/css/main.cdn.min.css', 
             '/sweetalert2/bulma.min.css', 
             '/sweetalert2/sweetalert2.all.min-bc15590d.js', 

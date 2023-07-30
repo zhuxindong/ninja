@@ -3,7 +3,7 @@
   "name": "OpenGPT app powered by gngpp",
   "icons": [
     {
-      "src": "/apple-touch-icon.png",
+      "src": "/resources/apple-touch-icon.png",
       "sizes": "180x180",
       "type": "image/png"
     }
