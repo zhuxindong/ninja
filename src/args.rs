@@ -64,6 +64,9 @@ pub(super) struct ServeArgs {
     /// Server worker-pool size (Recommended number of CPU cores)
     #[clap(short = 'W', long, env = "OPENGPT_WORKERS", default_value = "1")]
     pub(super) workers: usize,
+    /// Concurrent limit (Enforces a limit on the concurrent number of requests the underlying)
+    #[clap(long, env = "OPENGPT_CONCUURENT_LIMIT", default_value = "65535")]
+    pub(super) concurrent_limit: usize,
     /// Server proxies pool, example: protocol://user:pass@ip:port
     #[clap(long, env = "OPENGPT_PROXY", value_parser = parse_url)]
     pub(super) proxies: Option<std::vec::Vec<String>>,

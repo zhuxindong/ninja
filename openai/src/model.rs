@@ -56,12 +56,12 @@ impl AuthenticateToken {
     }
 }
 
-impl TryFrom<auth::model::AccessTokenOption> for AuthenticateToken {
+impl TryFrom<auth::model::AccessToken> for AuthenticateToken {
     type Error = anyhow::Error;
 
-    fn try_from(value: auth::model::AccessTokenOption) -> Result<Self, Self::Error> {
+    fn try_from(value: auth::model::AccessToken) -> Result<Self, Self::Error> {
         match value {
-            auth::model::AccessTokenOption::Web(value) => {
+            auth::model::AccessToken::Web(value) => {
                 let expires_timestamp = chrono::DateTime::parse_from_rfc3339(&value.expires)
                     .context("Failed to parse time string")?
                     .naive_utc()
@@ -83,7 +83,7 @@ impl TryFrom<auth::model::AccessTokenOption> for AuthenticateToken {
                     picture: value.user.picture,
                 })
             }
-            auth::model::AccessTokenOption::Apple(value) => {
+            auth::model::AccessToken::Apple(value) => {
                 let profile = Profile::try_from(value.id_token)?;
                 let expires =
                     (chrono::Utc::now() + chrono::Duration::seconds(value.expires_in)).timestamp();

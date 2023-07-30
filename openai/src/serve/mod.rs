@@ -7,40 +7,47 @@ pub mod tokenbucket;
 #[cfg(feature = "template")]
 pub mod ui;
 
+pub mod err;
+
 pub mod load_balancer;
 
-use actix_web::cookie::{self, Cookie};
-use actix_web::http::header;
-use actix_web::middleware::Logger;
-use actix_web::web::Json;
-use actix_web::{get, post, App, HttpResponse, HttpServer, Responder};
-use actix_web::{web, HttpRequest};
+use axum::body::StreamBody;
+use axum::http::Response;
+use axum::routing::{any, get, post};
+use axum::Json;
 
+use axum::http::header;
+use axum::http::method::Method;
+use axum::http::uri::Uri;
+use axum_extra::extract::cookie::Cookie;
+use axum_extra::extract::{cookie, CookieJar};
+use axum_server::tls_rustls::RustlsConfig;
+use axum_server::HttpConfig;
 use derive_builder::Builder;
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::Client;
 use serde_json::{json, Value};
-use std::fs::File;
-use std::io::BufReader;
-use std::sync::Once;
+use std::sync::{Arc, Once};
 use std::time::{Duration, UNIX_EPOCH};
+use tokio::runtime::Builder;
+use tower_http::cors;
 
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
-use tokio_rustls::rustls::{Certificate, PrivateKey, ServerConfig};
 
 use crate::arkose::ArkoseToken;
-use crate::auth::model::AuthAccount;
+use crate::auth::model::{AccessToken, AuthAccount, RefreshToken};
 use crate::auth::{AuthClient, AuthHandle};
-use crate::serve::tokenbucket::TokenBucketContext;
+use crate::serve::tokenbucket::TokenBucketLimitContext;
 use crate::serve::ui::TemplateData;
 use crate::{debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 
+use crate::serve::err::ResponseError;
 use crate::{HEADER_UA, URL_CHATGPT_API, URL_PLATFORM_API};
+
 const EMPTY: &str = "";
 static INIT: Once = Once::new();
 
-static mut DISABLE_UI: bool = false;
 static mut API_CLIENT: Option<load_balancer::ClientLoadBalancer<Client>> = None;
 static mut AUTH_CLIENT: Option<load_balancer::ClientLoadBalancer<AuthClient>> = None;
 
@@ -66,6 +73,8 @@ pub struct Launcher {
     port: u16,
     /// Machine worker pool
     workers: usize,
+    /// Concurrent limit (Enforces a limit on the concurrent number of requests the underlying)
+    concurrent_limit: usize,
     /// Server proxies
     proxies: Vec<String>,
     /// TCP keepalive (second)
@@ -107,7 +116,7 @@ pub struct Launcher {
 }
 
 impl Launcher {
-    pub async fn run(self) -> anyhow::Result<()> {
+    pub fn run(self) -> anyhow::Result<()> {
         INIT.call_once(|| unsafe {
             API_CLIENT = Some(
                 load_balancer::ClientLoadBalancer::<Client>::new_api_client(&self)
@@ -118,199 +127,187 @@ impl Launcher {
                     .expect("Failed to initialize the requesting oauth client"),
             );
 
-            DISABLE_UI = self.disable_ui;
-
+            ui::DISABLE_UI = self.disable_ui;
             ui::TEMPLATE_DATA = Some(TemplateData::from(self.clone()));
         });
 
-        check_self_ip(&api_client()).await;
+        let global_layer = tower::ServiceBuilder::new()
+            .layer(tower_http::trace::TraceLayer::new_for_http())
+            .layer(tower::limit::ConcurrencyLimitLayer::new(
+                self.concurrent_limit,
+            ))
+            .layer(
+                tower_http::cors::CorsLayer::new()
+                    .max_age(Duration::from_secs(3600))
+                    .allow_origin(cors::AllowOrigin::any())
+                    .allow_headers(cors::AllowHeaders::any())
+                    .allow_methods(cors::AllowMethods::any()),
+            )
+            .layer(axum::error_handling::HandleErrorLayer::new(
+                |_: axum::BoxError| async { axum::http::StatusCode::REQUEST_TIMEOUT },
+            ))
+            .layer(tower::timeout::TimeoutLayer::new(Duration::from_secs(
+                self.timeout as u64,
+            )));
 
-        info!(
-            "Starting HTTP(S) server at http(s)://{}:{}",
-            self.host, self.port
-        );
+        let http_config = HttpConfig::new()
+            .http1_keep_alive(true)
+            .http1_header_read_timeout(Duration::from_secs(self.tcp_keepalive as u64))
+            .http2_keep_alive_timeout(Duration::from_secs(self.tcp_keepalive as u64))
+            .http1_only(false)
+            .http2_only(false)
+            .build();
 
-        if let Some(url) = &self.api_prefix {
-            info!("WebUI site use api: {url}")
-        }
+        let tokio_runtime = Builder::new_multi_thread()
+            .worker_threads(self.workers)
+            .enable_all()
+            .build()?;
 
-        // serve
-        let serve = HttpServer::new(move || {
-            let app = App::new()
-                .wrap(
-                    actix_cors::Cors::default()
-                        .supports_credentials()
-                        .allow_any_origin()
-                        .allow_any_header()
-                        .allow_any_method()
-                        .max_age(3600),
-                )
-                .wrap(Logger::default())
-                // ab pressure test
-                .route("/ab", web::to(|| HttpResponse::Ok()))
-                // official dashboard api endpoint
-                .service(
-                    web::resource("/dashboard/{tail:.*}")
-                        .wrap(middleware::TokenAuthorization)
-                        .route(web::to(official_proxy)),
-                )
-                // official v1 api endpoint
-                .service(
-                    web::resource("/v1/{tail:.*}")
-                        .wrap(middleware::TokenAuthorization)
-                        .route(web::to(official_proxy)),
-                )
-                // unofficial backend api endpoint
-                .service(
-                    web::resource("/backend-api/{tail:.*}")
-                        .wrap(middleware::TokenAuthorization)
-                        .route(web::to(unofficial_proxy)),
-                )
-                // unofficial public api endpoint
-                .service(web::resource("/public-api/{tail:.*}").route(web::to(unofficial_proxy)))
-                // auth endpoint
-                .service(post_access_token)
-                .service(post_refresh_token)
-                .service(post_revoke_token)
-                .service(get_arkose_token)
-                // templates page endpoint
-                .configure(ui::config);
+        tokio_runtime.block_on(async {
+            info!(
+                "Starting HTTP(S) server at http(s)://{}:{}",
+                self.host, self.port
+            );
 
-            #[cfg(all(not(feature = "sign"), feature = "limit"))]
-            {
-                return app.wrap(middleware::TokenBucketRateLimiter::new(
-                    TokenBucketContext::from((
-                        self.tb_store_strategy.clone(),
-                        self.tb_enable,
-                        self.tb_capacity,
-                        self.tb_fill_rate,
-                        self.tb_expired,
-                    )),
-                ));
-            }
+            info!("Starting {} workers", self.workers);
+
+            info!("Concurrent limit {}", self.concurrent_limit);
+
+            check_self_ip(&api_client()).await;
 
             #[cfg(all(feature = "sign", feature = "limit"))]
-            {
-                return app
-                    .wrap(middleware::ApiSign::new(self.sign_secret_key.clone()))
-                    .wrap(middleware::TokenBucketRateLimiter::new(
-                        TokenBucketContext::from((
-                            self.tb_store_strategy.clone(),
-                            self.tb_enable,
-                            self.tb_capacity,
-                            self.tb_fill_rate,
-                            self.tb_expired,
-                            self.tb_redis_url.clone(),
-                        )),
-                    ));
-            }
+            let app_layer = {
+                let limit_context = TokenBucketLimitContext::from((
+                    self.tb_store_strategy.clone(),
+                    self.tb_enable,
+                    self.tb_capacity,
+                    self.tb_fill_rate,
+                    self.tb_expired,
+                    self.tb_redis_url.clone(),
+                ));
+
+                tower::ServiceBuilder::new()
+                    .layer(axum::middleware::from_fn_with_state(
+                        Arc::new(limit_context),
+                        middleware::token_bucket_limit_middleware,
+                    ))
+                    .layer(axum::middleware::from_fn_with_state(
+                        Arc::new(self.sign_secret_key),
+                        middleware::sign_middleware,
+                    ))
+                    .layer(axum::middleware::from_fn(
+                        middleware::token_authorization_middleware,
+                    ))
+            };
 
             #[cfg(all(not(feature = "limit"), feature = "sign"))]
-            {
-                return app.wrap(middleware::ApiSign::new(self.sign_secret_key.clone()));
-            }
+            let app_layer = {
+                tower::ServiceBuilder::new()
+                    .layer(axum::middleware::from_fn_with_state(
+                        Arc::new(self.sign_secret_key),
+                        middleware::sign_middleware,
+                    ))
+                    .layer(axum::middleware::from_fn(
+                        middleware::token_authorization_middleware,
+                    ))
+            };
 
-            #[cfg(not(any(feature = "sign", feature = "limit")))]
-            app
-        })
-        .client_request_timeout(Duration::from_secs(self.timeout as u64))
-        .tls_handshake_timeout(Duration::from_secs(self.connect_timeout as u64))
-        .keep_alive(Duration::from_secs(self.tcp_keepalive as u64))
-        .workers(self.workers);
-        match self.tls_keypair {
-            Some(keypair) => {
-                let tls_config = Self::load_rustls_config(keypair.0, keypair.1).await?;
-                serve
-                    .bind_rustls((self.host, self.port), tls_config)?
-                    .run()
-                    .await
-                    .map_err(|e| anyhow::anyhow!(e))
+            #[cfg(all(not(feature = "limit"), not(feature = "sign")))]
+            let app_layer = {
+                tower::ServiceBuilder::new().layer(axum::middleware::from_fn(
+                    middleware::token_authorization_middleware,
+                ))
+            };
+
+            let router = axum::Router::new()
+                // official dashboard api endpoint
+                .route("/dashboard/*path", any(official_proxy))
+                // official v1 api endpoint
+                .route("/v1/*path", any(official_proxy))
+                // unofficial backend api endpoint
+                .route("/backend-api/*path", any(unofficial_proxy))
+                // unofficial public api endpoint
+                .route("/public-api/*path", any(unofficial_proxy))
+                .route_layer(app_layer)
+                // ab pressure test
+                .route("/ab", get(|| async {}))
+                .route("/auth/token", post(post_access_token))
+                .route("/auth/refresh_token", post(post_refresh_token))
+                .route("/auth/revoke_token", post(post_revoke_token))
+                .route("/auth/arkose_token", get(get_arkose_token));
+
+            let router = ui::config(router).layer(global_layer);
+
+            match self.tls_keypair {
+                Some(keypair) => {
+                    let tls_config = Self::load_rustls_config(keypair.0, keypair.1)
+                        .await
+                        .unwrap();
+                    let socket = std::net::SocketAddr::new(self.host, self.port);
+                    axum_server::bind_rustls(socket, tls_config)
+                        .http_config(http_config)
+                        .serve(router.into_make_service_with_connect_info::<SocketAddr>())
+                        .await
+                        .expect("openai server failed")
+                }
+                None => {
+                    let socket = std::net::SocketAddr::new(self.host, self.port);
+                    axum_server::bind(socket)
+                        .http_config(http_config)
+                        .serve(router.into_make_service_with_connect_info::<SocketAddr>())
+                        .await
+                        .expect("openai server failed")
+                }
             }
-            None => serve
-                .bind((self.host, self.port))?
-                .run()
-                .await
-                .map_err(|e| anyhow::anyhow!(e)),
-        }
+        });
+
+        Ok(())
     }
 
     async fn load_rustls_config(
         tls_cert: PathBuf,
         tls_key: PathBuf,
-    ) -> anyhow::Result<ServerConfig> {
-        use rustls_pemfile::{certs, ec_private_keys, pkcs8_private_keys, rsa_private_keys};
-
-        // init server config builder with safe defaults
-        let config = ServerConfig::builder()
-            .with_safe_defaults()
-            .with_no_client_auth();
-
-        // load TLS key/cert files
-        let cert_file = &mut BufReader::new(File::open(tls_cert)?);
-        let key_file = &mut BufReader::new(File::open(tls_key)?);
-
-        // convert files to key/cert objects
-        let cert_chain = certs(cert_file)?.into_iter().map(Certificate).collect();
-
-        let keys_list = vec![
-            ec_private_keys(key_file)?,
-            pkcs8_private_keys(key_file)?,
-            rsa_private_keys(key_file)?,
-        ];
-
-        let keys = keys_list.into_iter().find(|k| !k.is_empty());
-
-        // exit if no keys could be parsed
-        match keys {
-            Some(keys) => Ok(config.with_single_cert(
-                cert_chain,
-                keys.into_iter()
-                    .map(PrivateKey)
-                    .collect::<Vec<PrivateKey>>()
-                    .remove(0),
-            )?),
-            None => anyhow::bail!("Could not locate EC/PKCS8/RSA private keys."),
-        }
+    ) -> anyhow::Result<axum_server::tls_rustls::RustlsConfig> {
+        let config = RustlsConfig::from_pem_file(tls_cert, tls_key)
+            .await
+            .unwrap();
+        Ok(config)
     }
 }
 
-#[post("/auth/token")]
-async fn post_access_token(account: web::Form<AuthAccount>) -> impl Responder {
-    match auth_client().do_access_token(&account.into_inner()).await {
-        Ok(token) => HttpResponse::Ok().json(token),
-        Err(err) => HttpResponse::BadRequest().json(err.to_string()),
+async fn post_access_token(
+    account: axum::Form<AuthAccount>,
+) -> Result<Json<AccessToken>, ResponseError> {
+    match auth_client().do_access_token(&account.0).await {
+        Ok(access_token) => Ok(Json(access_token)),
+        Err(err) => Err(ResponseError::BadRequest(err)),
     }
 }
 
-#[post("/auth/refresh_token")]
-async fn post_refresh_token(req: HttpRequest) -> impl Responder {
-    let refresh_token = req
-        .headers()
+async fn post_refresh_token(headers: HeaderMap) -> Result<Json<RefreshToken>, ResponseError> {
+    let refresh_token = headers
         .get(header::AUTHORIZATION)
         .map_or(EMPTY, |e| e.to_str().unwrap_or_default());
     match auth_client().do_refresh_token(refresh_token).await {
-        Ok(token) => HttpResponse::Ok().json(token),
-        Err(err) => HttpResponse::BadRequest().json(err.to_string()),
+        Ok(refresh_token) => Ok(Json(refresh_token)),
+        Err(err) => Err(ResponseError::BadRequest(err)),
     }
 }
 
-#[post("/auth/revoke_token")]
-async fn post_revoke_token(req: HttpRequest) -> impl Responder {
-    let refresh_token = req
-        .headers()
+async fn post_revoke_token(headers: HeaderMap) -> Result<axum::http::StatusCode, ResponseError> {
+    let refresh_token = headers
         .get(header::AUTHORIZATION)
         .map_or(EMPTY, |e| e.to_str().unwrap_or_default());
     match auth_client().do_revoke_token(refresh_token).await {
-        Ok(token) => HttpResponse::Ok().json(token),
-        Err(err) => HttpResponse::BadRequest().json(err.to_string()),
+        Ok(_) => Ok(axum::http::StatusCode::OK),
+        Err(err) => Err(ResponseError::BadRequest(err)),
     }
 }
 
-#[get("/auth/arkose_token")]
-async fn get_arkose_token() -> impl Responder {
+async fn get_arkose_token() -> Result<Json<ArkoseToken>, ResponseError> {
     match ArkoseToken::new("gpt4").await {
-        Ok(arkose) => HttpResponse::Ok().json(arkose),
-        Err(e) => HttpResponse::InternalServerError().json(e.to_string()),
+        Ok(arkose_token) => Ok(Json(arkose_token)),
+        Err(err) => Err(ResponseError::InternalServerError(err)),
     }
 }
 
@@ -348,18 +345,30 @@ async fn get_arkose_token() -> impl Responder {
 /// POST https://api.openai.com/v1/moderations
 /// Deprecated GET https://api.openai.com/v1/engines
 /// Deprecated GET https://api.openai.com/v1/engines/{engine_id}
-async fn official_proxy(req: HttpRequest, body: Option<Json<Value>>) -> impl Responder {
-    let url = if req.query_string().is_empty() {
-        format!("{URL_PLATFORM_API}{}", req.path())
-    } else {
-        format!("{URL_PLATFORM_API}{}?{}", req.path(), req.query_string())
+async fn official_proxy(
+    uri: Uri,
+    method: Method,
+    headers: HeaderMap,
+    jar: CookieJar,
+    body: Option<Json<Value>>,
+) -> Result<
+    Response<StreamBody<impl futures_core::Stream<Item = Result<bytes::Bytes, reqwest::Error>>>>,
+    ResponseError,
+> {
+    let url = match uri.query() {
+        None => {
+            format!("{URL_PLATFORM_API}{}", uri.path())
+        }
+        Some(query) => {
+            format!("{URL_PLATFORM_API}{}?{}", uri.path(), query)
+        }
     };
 
     let builder = api_client()
-        .request(req.method().clone(), url)
-        .headers(header_convert(&req));
+        .request(method, &url)
+        .headers(header_convert(headers, jar));
     let resp = match body {
-        Some(body) => builder.json(&body).send().await,
+        Some(body) => builder.json(&body.0).send().await,
         None => builder.send().await,
     };
     response_convert(resp)
@@ -379,48 +388,57 @@ async fn official_proxy(req: HttpRequest, body: Option<Json<Value>>) -> impl Res
 /// PATCH http://{{host}}/backend-api/conversation/{conversation_id}
 /// PATCH http://{{host}}/backend-api/conversations
 /// POST http://{{host}}/backend-api/conversation/message_feedback
-async fn unofficial_proxy(req: HttpRequest, mut body: Option<Json<Value>>) -> impl Responder {
-    gpt4_body_handle(&req, &mut body).await;
-
-    let url = if req.query_string().is_empty() {
-        format!("{URL_CHATGPT_API}{}", req.path())
+async fn unofficial_proxy(
+    uri: Uri,
+    method: Method,
+    headers: HeaderMap,
+    jar: CookieJar,
+    mut body: Option<Json<Value>>,
+) -> Result<
+    Response<StreamBody<impl futures_core::Stream<Item = Result<bytes::Bytes, reqwest::Error>>>>,
+    ResponseError,
+> {
+    let url = if let Some(query) = uri.query() {
+        format!("{URL_CHATGPT_API}{}?{}", uri.path(), query)
     } else {
-        format!("{URL_CHATGPT_API}{}?{}", req.path(), req.query_string())
+        format!("{URL_CHATGPT_API}{}", uri.path())
     };
 
+    gpt4_body_handle(&url, &method, &mut body).await;
+
     let builder = api_client()
-        .request(req.method().clone(), url)
-        .headers(header_convert(&req));
+        .request(method, url)
+        .headers(header_convert(headers, jar));
     let resp = match body {
-        Some(body) => builder.json(&body).send().await,
+        Some(body) => builder.json(&body.0).send().await,
         None => builder.send().await,
     };
     response_convert(resp)
 }
 
-fn response_convert(resp: Result<reqwest::Response, reqwest::Error>) -> HttpResponse {
+fn response_convert(
+    resp: Result<reqwest::Response, reqwest::Error>,
+) -> Result<
+    Response<StreamBody<impl futures_core::Stream<Item = Result<bytes::Bytes, reqwest::Error>>>>,
+    ResponseError,
+> {
     match resp {
         Ok(resp) => {
-            let status = resp.status();
-            let mut builder = HttpResponse::build(status);
-            resp.headers()
-                .into_iter()
-                .filter(|(k, _v)| {
-                    let name = k.as_str().to_lowercase();
-                    name.ne("__cf_bm")
-                        || name.ne("__cfduid")
-                        || name.ne("_cfuvid")
-                        || name.ne("set-cookie")
-                })
-                .for_each(|kv| {
-                    builder.insert_header(kv);
-                });
+            let mut builder = Response::builder().status(resp.status());
+            for kv in resp.headers().into_iter().filter(|(k, _v)| {
+                let name = k.as_str().to_lowercase();
+                name.ne("__cf_bm")
+                    || name.ne("__cfduid")
+                    || name.ne("_cfuvid")
+                    || name.ne("set-cookie")
+            }) {
+                builder = builder.header(kv.0, kv.1);
+            }
 
-            for c in resp
-                .cookies()
-                .into_iter()
-                .filter(|c| c.name().eq("_puid") || c.name().eq("_account"))
-            {
+            for c in resp.cookies().into_iter().filter(|c| {
+                let key = c.name();
+                key.eq("_puid") || key.eq("_account")
+            }) {
                 if let Some(expires) = c.expires() {
                     let timestamp_nanos = expires
                         .duration_since(UNIX_EPOCH)
@@ -429,27 +447,25 @@ fn response_convert(resp: Result<reqwest::Response, reqwest::Error>) -> HttpResp
                     let cookie = Cookie::build(c.name(), c.value())
                         .path("/")
                         .expires(
-                            cookie::time::OffsetDateTime::from_unix_timestamp_nanos(
-                                timestamp_nanos,
-                            )
-                            .expect("get cookie expires exception"),
+                            time::OffsetDateTime::from_unix_timestamp_nanos(timestamp_nanos)
+                                .expect("get cookie expires exception"),
                         )
                         .same_site(cookie::SameSite::Lax)
                         .secure(false)
                         .http_only(false)
                         .finish();
-                    builder.cookie(cookie);
+                    builder = builder.header(axum::http::header::SET_COOKIE, cookie.to_string());
                 }
             }
-            builder.streaming(resp.bytes_stream())
+            Ok(builder
+                .body(StreamBody::new(resp.bytes_stream()))
+                .map_err(|err| ResponseError::InternalServerError(err))?)
         }
-        Err(err) => HttpResponse::InternalServerError().json(err.to_string()),
+        Err(err) => Err(ResponseError::InternalServerError(err)),
     }
 }
 
-fn header_convert(req: &HttpRequest) -> reqwest::header::HeaderMap {
-    let headers = req.headers();
-
+fn header_convert(headers: axum::http::HeaderMap, jar: CookieJar) -> HeaderMap {
     let authorization = match headers.get(header::AUTHORIZATION) {
         Some(v) => Some(v),
         // pandora will pass X-Authorization header
@@ -488,7 +504,7 @@ fn header_convert(req: &HttpRequest) -> reqwest::header::HeaderMap {
         cookie.push_str(&format!("_puid={puid};"))
     }
 
-    if let Some(cookier) = req.cookie("_puid") {
+    if let Some(cookier) = jar.get("_puid") {
         let c = &format!("_puid={};", puid_cookie_encoded(cookier.value()));
         cookie.push_str(c);
         debug!("request cookie `puid`: {}", c);
@@ -524,8 +540,8 @@ fn puid_cookie_encoded(input: &str) -> String {
     }
 }
 
-async fn gpt4_body_handle(req: &HttpRequest, body: &mut Option<Json<Value>>) {
-    if req.uri().path().contains("/backend-api/conversation") && req.method().as_str() == "POST" {
+async fn gpt4_body_handle(url: &str, method: &Method, body: &mut Option<Json<Value>>) {
+    if url.contains("/backend-api/conversation") && method.eq("POST") {
         if let Some(body) = body.as_mut().and_then(|b| b.as_object_mut()) {
             if let Some(v) = body.get("model").and_then(|m| m.as_str()) {
                 if body.get("arkose_token").is_none() {

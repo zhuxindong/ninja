@@ -46,10 +46,8 @@ pub enum AuthStrategy {
 
 #[async_trait::async_trait]
 pub trait AuthHandle: Send + Sync {
-    async fn do_access_token(
-        &self,
-        account: &model::AuthAccount,
-    ) -> AuthResult<model::AccessTokenOption>;
+    async fn do_access_token(&self, account: &model::AuthAccount)
+        -> AuthResult<model::AccessToken>;
 }
 /// You do **not** have to wrap the `Client` in an [`Rc`] or [`Arc`] to **reuse** it,
 /// because it already uses an [`Arc`] internally.
@@ -67,7 +65,7 @@ impl AuthHandle for AuthClient {
     async fn do_access_token(
         &self,
         account: &model::AuthAccount,
-    ) -> AuthResult<model::AccessTokenOption> {
+    ) -> AuthResult<model::AccessToken> {
         if !self.email_regex.is_match(&account.username) || account.password.is_empty() {
             bail!(AuthError::InvalidEmailOrPassword)
         }
@@ -350,7 +348,7 @@ impl AuthHandle for WebAuthHandle {
     async fn do_access_token(
         &self,
         account: &model::AuthAccount,
-    ) -> AuthResult<model::AccessTokenOption> {
+    ) -> AuthResult<model::AccessToken> {
         // get csrf token
         let csrf_token = self.get_csrf_token().await?;
 
@@ -497,7 +495,7 @@ impl WebAuthHandle {
         &self,
         state: &str,
         account: &model::AuthAccount,
-    ) -> AuthResult<model::AccessTokenOption> {
+    ) -> AuthResult<model::AccessToken> {
         let data = AuthenticateDataBuilder::default()
             .action("default")
             .state(state)
@@ -560,7 +558,7 @@ impl WebAuthHandle {
         mfa_code: &str,
         location: &str,
         account: &model::AuthAccount,
-    ) -> AuthResult<model::AccessTokenOption> {
+    ) -> AuthResult<model::AccessToken> {
         let url = format!("{OPENAI_OAUTH_URL}{}", location);
         let state = AuthClient::get_callback_state(&Url::parse(&url)?);
         let data = AuthenticateMfaDataBuilder::default()
@@ -592,7 +590,7 @@ impl WebAuthHandle {
         self.get_access_token().await
     }
 
-    async fn get_access_token(&self) -> AuthResult<model::AccessTokenOption> {
+    async fn get_access_token(&self) -> AuthResult<model::AccessToken> {
         let resp = self
             .client
             .get(format!("{URL_CHATGPT_API}/api/auth/session"))
@@ -600,7 +598,7 @@ impl WebAuthHandle {
             .await
             .map_err(AuthError::FailedRequest)?;
         match resp.status() {
-            StatusCode::OK => Ok(model::AccessTokenOption::Web(
+            StatusCode::OK => Ok(model::AccessToken::Web(
                 resp.json::<model::WebAccessToken>().await?,
             )),
             StatusCode::TOO_MANY_REQUESTS => {
@@ -628,7 +626,7 @@ impl AuthHandle for AppleAuthHandle {
     async fn do_access_token(
         &self,
         account: &model::AuthAccount,
-    ) -> AuthResult<model::AccessTokenOption> {
+    ) -> AuthResult<model::AccessToken> {
         let code_verifier = AuthClient::generate_code_verifier();
         let code_challenge = AuthClient::generate_code_challenge(&code_verifier);
 
@@ -706,7 +704,7 @@ impl AppleAuthHandle {
         code_verifier: &str,
         state: &str,
         account: &model::AuthAccount,
-    ) -> AuthResult<model::AccessTokenOption> {
+    ) -> AuthResult<model::AccessToken> {
         debug!("authenticate_password state: {state}");
         let data = AuthenticateDataBuilder::default()
             .action("default")
@@ -743,7 +741,7 @@ impl AppleAuthHandle {
         code_verifier: &str,
         location: &str,
         account: &model::AuthAccount,
-    ) -> AuthResult<model::AccessTokenOption> {
+    ) -> AuthResult<model::AccessToken> {
         let resp = self
             .client
             .get(&format!("{OPENAI_OAUTH_URL}{location}"))
@@ -777,7 +775,7 @@ impl AppleAuthHandle {
         code_verifier: &str,
         location: &str,
         account: &model::AuthAccount,
-    ) -> AuthResult<model::AccessTokenOption> {
+    ) -> AuthResult<model::AccessToken> {
         let url = format!("{OPENAI_OAUTH_URL}{}", location);
         let state = AuthClient::get_callback_state(&Url::parse(&url)?);
         let data = AuthenticateMfaDataBuilder::default()
@@ -814,7 +812,7 @@ impl AppleAuthHandle {
         &self,
         code_verifier: &str,
         location: &str,
-    ) -> AuthResult<model::AccessTokenOption> {
+    ) -> AuthResult<model::AccessToken> {
         debug!("authorization_code location path: {location}");
         let code = AuthClient::get_callback_code(&Url::parse(location)?)?;
         let data = AuthorizationCodeDataBuilder::default()
@@ -833,7 +831,7 @@ impl AppleAuthHandle {
             .await
             .map_err(AuthError::FailedRequest)?;
         let access_token = AuthClient::response_handle::<model::AppleAccessToken>(resp).await?;
-        Ok(model::AccessTokenOption::Apple(access_token))
+        Ok(model::AccessToken::Apple(access_token))
     }
 
     /// It may fail at any time
