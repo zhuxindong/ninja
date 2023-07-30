@@ -156,7 +156,7 @@ pub struct WebUser {
 }
 
 #[derive(Serialize)]
-pub enum AccessTokenOption {
+pub enum AccessToken {
     Web(WebAccessToken),
     Apple(AppleAccessToken),
 }
