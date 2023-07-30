@@ -8,7 +8,6 @@ pub(super) async fn token_authorization_middleware<B>(
     request: Request<B>,
     next: Next<B>,
 ) -> Result<Response, ResponseError> {
-    println!("token_authorization_middleware");
     let ok = ["/backend-api/public/plugins/by-id"];
 
     if let Some(_) = ok.iter().find(|v| request.uri().path().contains(*v)) {
@@ -41,7 +40,6 @@ pub(super) async fn token_bucket_limit_middleware<B>(
     request: Request<B>,
     next: Next<B>,
 ) -> Result<Response, ResponseError> {
-    println!("token_bucket_limit_middleware");
     let addr = socket_addr.ip();
     match limit.acquire(addr).await {
         Ok(condition) => match condition {
@@ -61,7 +59,6 @@ pub(super) async fn sign_middleware<B>(
     req: Request<B>,
     next: Next<B>,
 ) -> Result<Response, ResponseError> {
-    println!("sign_middleware");
     match key.as_ref() {
         Some(key) => match Sign::handle_request::<B>(&req, key) {
             Ok(_) => Ok(next.run(req).await),
