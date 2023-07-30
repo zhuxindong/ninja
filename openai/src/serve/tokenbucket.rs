@@ -44,7 +44,7 @@ impl std::str::FromStr for Strategy {
     }
 }
 
-#[derive(Serialize, Deserialize, FromRedisValue, ToRedisArgs)]
+#[derive(Serialize, Deserialize, FromRedisValue, ToRedisArgs, Debug)]
 struct BucketState {
     tokens: u32,
     last_time: u64,
@@ -185,9 +185,9 @@ impl TokenBucket for RedisTokenBucket {
     }
 }
 
-pub struct TokenBucketContext(Box<dyn TokenBucket>);
+pub struct TokenBucketLimitContext(Box<dyn TokenBucket>);
 
-impl From<(Strategy, bool, u32, u32, u32, Vec<String>)> for TokenBucketContext {
+impl From<(Strategy, bool, u32, u32, u32, Vec<String>)> for TokenBucketLimitContext {
     fn from(value: (Strategy, bool, u32, u32, u32, Vec<String>)) -> Self {
         let strategy = match value.0 {
             Strategy::Mem => Self(Box::new(MemTokenBucket::new(
@@ -202,7 +202,7 @@ impl From<(Strategy, bool, u32, u32, u32, Vec<String>)> for TokenBucketContext {
 }
 
 #[async_trait::async_trait]
-impl TokenBucket for TokenBucketContext {
+impl TokenBucket for TokenBucketLimitContext {
     async fn acquire(&self, ip: IpAddr) -> anyhow::Result<bool> {
         Ok(self.0.acquire(ip).await?)
     }

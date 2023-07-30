@@ -2,15 +2,14 @@ use std::{ops::Not, path::PathBuf};
 
 use crate::{args::ServeArgs, env::fix_relative_path};
 
-#[tokio::main]
-pub(super) async fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<()> {
+pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<()> {
     if relative_path {
         fix_relative_path(&mut args);
     }
 
     if let Some(config_path) = args.config {
         log::info!("Using config file: {}", config_path.display());
-        let bytes = tokio::fs::read(config_path).await?;
+        let bytes = std::fs::read(config_path)?;
         let data = String::from_utf8(bytes)?;
         args = toml::from_str::<ServeArgs>(&data)?;
     }
@@ -24,10 +23,11 @@ pub(super) async fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::R
         .proxies(args.proxies.unwrap_or_default())
         .api_prefix(args.api_prefix)
         .tls_keypair(None)
-        .tcp_keepalive(args.tcp_keepalive.max(60))
-        .timeout(args.timeout.max(600))
-        .connect_timeout(args.connect_timeout.max(60))
-        .workers(args.workers.max(1))
+        .tcp_keepalive(args.tcp_keepalive)
+        .timeout(args.timeout)
+        .connect_timeout(args.connect_timeout)
+        .workers(args.workers)
+        .concurrent_limit(args.concurrent_limit)
         .cf_site_key(args.cf_site_key)
         .cf_secret_key(args.cf_secret_key)
         .disable_ui(args.disable_webui);
@@ -37,9 +37,9 @@ pub(super) async fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::R
         .tb_enable(args.tb_enable)
         .tb_store_strategy(args.tb_store_strategy)
         .tb_redis_url(args.tb_redis_url)
-        .tb_capacity(args.tb_capacity.max(60))
-        .tb_fill_rate(args.tb_fill_rate.max(1))
-        .tb_expired(args.tb_expired.max(86400));
+        .tb_capacity(args.tb_capacity)
+        .tb_fill_rate(args.tb_fill_rate)
+        .tb_expired(args.tb_expired);
 
     #[cfg(feature = "sign")]
     let mut builder = builder.sign_secret_key(args.sign_secret_key);
@@ -47,7 +47,7 @@ pub(super) async fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::R
     if args.tls_key.is_some() && args.tls_cert.is_some() {
         builder = builder.tls_keypair(Some((args.tls_cert.unwrap(), args.tls_key.unwrap())));
     }
-    builder.build()?.run().await
+    builder.build()?.run()
 }
 
 #[cfg(target_family = "unix")]

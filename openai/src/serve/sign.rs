@@ -1,4 +1,4 @@
-use actix_web::{dev::ServiceRequest, http::header::HeaderMap};
+use axum::http::header::HeaderMap;
 
 enum SignHeader {
     Authorization,
@@ -18,7 +18,7 @@ impl ToString for SignHeader {
 pub struct Sign;
 
 impl Sign {
-    pub fn handle_request(req: &ServiceRequest, secret_key: &str) -> Result<(), String> {
+    pub fn handle_request<B>(req: &axum::http::Request<B>, secret_key: &str) -> Result<(), String> {
         let headers = req.headers();
         // Extract the signature in the request
         let signature = headers

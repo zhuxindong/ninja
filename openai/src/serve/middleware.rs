@@ -1,270 +1,72 @@
-use std::net::IpAddr;
-use std::{
-    future::{ready, Ready},
-    rc::Rc,
-};
+use anyhow::anyhow;
+use axum::http::header;
+use axum::{http::Request, middleware::Next, response::Response};
 
-use actix_web::{
-    body::EitherBody,
-    dev::{self, Service, ServiceRequest, ServiceResponse, Transform},
-    http::header,
-    Error, HttpResponse,
-};
-use futures_core::future::LocalBoxFuture;
+use super::err::ResponseError;
 
-#[derive(serde::Serialize)]
-struct MiddlewareMessage<'a> {
-    msg: &'a str,
-}
+pub(super) async fn token_authorization_middleware<B>(
+    request: Request<B>,
+    next: Next<B>,
+) -> Result<Response, ResponseError> {
+    println!("token_authorization_middleware");
+    let ok = ["/backend-api/public/plugins/by-id"];
 
-pub struct TokenAuthorization;
+    if let Some(_) = ok.iter().find(|v| request.uri().path().contains(*v)) {
+        return Ok(next.run(request).await);
+    };
 
-impl<S, B> Transform<S, ServiceRequest> for TokenAuthorization
-where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
-    S::Future: 'static,
-    B: 'static,
-{
-    type Response = ServiceResponse<EitherBody<B>>;
-    type Error = Error;
-    type InitError = ();
-    type Transform = TokenAuthorizationMiddleware<S>;
-    type Future = Ready<Result<Self::Transform, Self::InitError>>;
+    let authorization = match request.headers().get(header::AUTHORIZATION) {
+        Some(v) => Some(v),
+        None => request.headers().get("X-Authorization"),
+    };
 
-    fn new_transform(&self, service: S) -> Self::Future {
-        ready(Ok(TokenAuthorizationMiddleware {
-            service: Rc::new(service),
-        }))
-    }
-}
-pub struct TokenAuthorizationMiddleware<S> {
-    service: Rc<S>,
-}
-
-impl<S, B> Service<ServiceRequest> for TokenAuthorizationMiddleware<S>
-where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
-    S::Future: 'static,
-    B: 'static,
-{
-    type Response = ServiceResponse<EitherBody<B>>;
-    type Error = Error;
-    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    dev::forward_ready!(service);
-
-    fn call(&self, request: ServiceRequest) -> Self::Future {
-        let ok = ["/backend-api/public/plugins/by-id"];
-
-        if let Some(_) = ok.iter().find(|v| request.uri().path().contains(*v)) {
-            let svc = self.service.call(request);
-            return Box::pin(async move {
-                // forwarded responses map to "left" body
-                svc.await.map(ServiceResponse::map_into_left_body)
-            });
-        };
-
-        let authorization = match request.headers().get(header::AUTHORIZATION) {
-            Some(v) => Some(v),
-            None => request.headers().get("X-Authorization"),
-        };
-
-        let bad_response = |msg: &str, request: ServiceRequest| -> Self::Future {
-            let (req, _pl) = request.into_parts();
-            let resp = HttpResponse::Unauthorized()
-                .json(MiddlewareMessage { msg })
-                // constructed responses map to "right" body
-                .map_into_right_body();
-            Box::pin(async { Ok(ServiceResponse::new(req, resp)) })
-        };
-
-        match authorization {
-            Some(token) => {
-                let token = token.clone();
-                let svc = Rc::clone(&self.service);
-                Box::pin(async move {
-                    match token::check_for_u8(token.as_bytes()) {
-                        Ok(_) => {
-                            // forwarded responses map to "left" body
-                            svc.call(request)
-                                .await
-                                .map(ServiceResponse::map_into_left_body)
-                        }
-                        Err(err) => bad_response(&err.to_string(), request).await,
-                    }
-                })
-            }
-            None => bad_response("access_token is required!", request),
-        }
+    match authorization {
+        Some(token) => match crate::token::check_for_u8(token.as_bytes()) {
+            Ok(_) => Ok(next.run(request).await),
+            Err(err) => Err(ResponseError::Unauthorized(err)),
+        },
+        None => Err(ResponseError::Unauthorized(anyhow!(
+            "access_token is required!"
+        ))),
     }
 }
 
-use crate::token;
+#[cfg(feature = "limit")]
+use super::tokenbucket::{TokenBucket, TokenBucketLimitContext};
+
+#[cfg(feature = "limit")]
+pub(super) async fn token_bucket_limit_middleware<B>(
+    axum::extract::State(limit): axum::extract::State<std::sync::Arc<TokenBucketLimitContext>>,
+    axum::extract::ConnectInfo(socket_addr): axum::extract::ConnectInfo<std::net::SocketAddr>,
+    request: Request<B>,
+    next: Next<B>,
+) -> Result<Response, ResponseError> {
+    println!("token_bucket_limit_middleware");
+    let addr = socket_addr.ip();
+    match limit.acquire(addr).await {
+        Ok(condition) => match condition {
+            true => Ok(next.run(request).await),
+            false => Err(ResponseError::TooManyRequests(anyhow!("Too Many Requests"))),
+        },
+        Err(err) => Err(ResponseError::InternalServerError(err)),
+    }
+}
 
 #[cfg(feature = "sign")]
 use super::sign::Sign;
-#[cfg(feature = "limit")]
-use super::tokenbucket::{TokenBucket, TokenBucketContext};
 
-#[cfg(feature = "limit")]
-pub struct TokenBucketRateLimiter(Rc<TokenBucketContext>);
-
-#[cfg(feature = "limit")]
-impl TokenBucketRateLimiter {
-    pub fn new(tb: TokenBucketContext) -> Self {
-        Self(Rc::new(tb))
-    }
-}
-
-#[cfg(feature = "limit")]
-impl<S, B> Transform<S, ServiceRequest> for TokenBucketRateLimiter
-where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
-    S::Future: 'static,
-    B: 'static,
-{
-    type Response = ServiceResponse<EitherBody<B>>;
-    type Error = Error;
-    type InitError = ();
-    type Transform = TokenBacketMiddleware<S>;
-    type Future = Ready<Result<Self::Transform, Self::InitError>>;
-
-    fn new_transform(&self, service: S) -> Self::Future {
-        ready(Ok(TokenBacketMiddleware {
-            service: Rc::new(service),
-            tb: self.0.clone(),
-        }))
-    }
-}
-
-#[cfg(feature = "limit")]
-pub struct TokenBacketMiddleware<S> {
-    service: Rc<S>,
-    tb: Rc<TokenBucketContext>,
-}
-
-impl<S, B> Service<ServiceRequest> for TokenBacketMiddleware<S>
-where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
-    S::Future: 'static,
-    B: 'static,
-{
-    type Response = ServiceResponse<EitherBody<B>>;
-    type Error = Error;
-    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    dev::forward_ready!(service);
-
-    fn call(&self, request: ServiceRequest) -> Self::Future {
-        let bad_response = |msg: &str, request: ServiceRequest| -> Self::Future {
-            let (req, _pl) = request.into_parts();
-            let resp = HttpResponse::TooManyRequests()
-                .json(MiddlewareMessage { msg })
-                // constructed responses map to "right" body
-                .map_into_right_body();
-            Box::pin(async { Ok(ServiceResponse::new(req, resp)) })
-        };
-
-        let conn_info = request.connection_info().clone();
-        let addr = if let Some(addr) = conn_info.realip_remote_addr() {
-            addr.parse::<IpAddr>()
-        } else {
-            conn_info.host().parse::<IpAddr>()
-        };
-
-        match addr {
-            Ok(addr) => {
-                let svc = self.service.clone();
-                let tb = self.tb.clone();
-                Box::pin(async move {
-                    match tb.acquire(addr).await {
-                        Ok(condition) => {
-                            match condition {
-                                true => {
-                                    // forwarded responses map to "left" body
-                                    svc.call(request)
-                                        .await
-                                        .map(ServiceResponse::map_into_left_body)
-                                }
-                                false => bad_response("Too Many Requests", request).await,
-                            }
-                        }
-                        Err(err) => bad_response(&err.to_string(), request).await,
-                    }
-                })
-            }
-            Err(err) => bad_response(&err.to_string(), request),
-        }
-    }
-}
-
-pub struct ApiSign(Rc<Option<String>>);
-
-impl ApiSign {
-    pub fn new(s: Option<String>) -> Self {
-        Self(Rc::new(s))
-    }
-}
-
-impl<S, B> Transform<S, ServiceRequest> for ApiSign
-where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
-    S::Future: 'static,
-    B: 'static,
-{
-    type Response = ServiceResponse<EitherBody<B>>;
-    type Error = Error;
-    type InitError = ();
-    type Transform = ApiSignMiddleware<S>;
-    type Future = Ready<Result<Self::Transform, Self::InitError>>;
-
-    fn new_transform(&self, service: S) -> Self::Future {
-        ready(Ok(ApiSignMiddleware {
-            service: service,
-            secret_key: self.0.clone(),
-        }))
-    }
-}
-pub struct ApiSignMiddleware<S> {
-    service: S,
-    secret_key: Rc<Option<String>>,
-}
-
-impl<S, B> Service<ServiceRequest> for ApiSignMiddleware<S>
-where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
-    S::Future: 'static,
-    B: 'static,
-{
-    type Response = ServiceResponse<EitherBody<B>>;
-    type Error = Error;
-    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    dev::forward_ready!(service);
-
-    fn call(&self, request: ServiceRequest) -> Self::Future {
-        let ok_response = |request: ServiceRequest| -> Self::Future {
-            let res = self.service.call(request);
-            Box::pin(async move {
-                // forwarded responses map to "left" body
-                res.await.map(ServiceResponse::map_into_left_body)
-            })
-        };
-        match self.secret_key.as_deref() {
-            Some(secret_key) => {
-                match Sign::handle_request(&request, secret_key) {
-                    Ok(_) => ok_response(request),
-                    Err(msg) => {
-                        let (req, _) = request.into_parts();
-                        let resp = HttpResponse::BadRequest()
-                            .json(MiddlewareMessage { msg: &msg })
-                            // constructed responses map to "right" body
-                            .map_into_right_body();
-                        Box::pin(async { Ok(ServiceResponse::new(req, resp)) })
-                    }
-                }
-            }
-            None => ok_response(request),
-        }
+#[cfg(feature = "sign")]
+pub(super) async fn sign_middleware<B>(
+    axum::extract::State(key): axum::extract::State<std::sync::Arc<Option<String>>>,
+    req: Request<B>,
+    next: Next<B>,
+) -> Result<Response, ResponseError> {
+    println!("sign_middleware");
+    match key.as_ref() {
+        Some(key) => match Sign::handle_request::<B>(&req, key) {
+            Ok(_) => Ok(next.run(req).await),
+            Err(err) => Err(ResponseError::Unauthorized(anyhow!(err))),
+        },
+        None => Ok(next.run(req).await),
     }
 }
