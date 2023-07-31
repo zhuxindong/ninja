@@ -10,6 +10,7 @@ WORKDIR /home/rust/src
 LABEL org.opencontainers.image.authors "gngpp <gngppz@gmail.com>"
 LABEL org.opencontainers.image.source https://github.com/gngpp/opengpt
 
+RUN rustup update
 RUN mkdir -p /root/.cargo/registry
 RUN mkdir -p /root/.cargo/git
 
@@ -25,4 +26,3 @@ RUN if [ "${BASE_IMAGE}" = "messense/cargo-xwin:latest" ]; then \
             apt update -y && apt install -y gcc-multilib; \
         fi \
     fi
-
