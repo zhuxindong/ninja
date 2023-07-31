@@ -2,34 +2,45 @@ use axum_server::Handle;
 use std::time::Duration;
 #[cfg(target_family = "unix")]
 use tokio::signal::unix::{signal, SignalKind};
-#[cfg(target_family = "window")]
-use tokio::signal::windows::{signal, SignalKind};
+#[cfg(target_family = "windows")]
+use tokio::signal::windows::{ctrl_break, ctrl_c, CtrlBreak, CtrlC};
 use tokio::time::sleep;
 
 use crate::info;
 
 pub(super) async fn graceful_shutdown(handle: Handle) {
-    let mut sigterm = signal(SignalKind::terminate()).expect("SIGTERM signal hanlde error");
-    let mut sigquit = signal(SignalKind::quit()).expect("SIGQUIT signal hanlde error");
-    let mut sigchld = signal(SignalKind::child()).expect("SIGCHLD signal hanlde error");
-    let mut sighup = signal(SignalKind::hangup()).expect("SIGHUP signal hanlde error");
-    tokio::select! {
-        _ = sigterm.recv() => {
-            sending_graceful_shutdown_signal(handle).await;
-        },
-        _ = sigquit.recv() => {
-            sending_graceful_shutdown_signal(handle).await;
-        },
-        _ = sigchld.recv() => {
-            sending_graceful_shutdown_signal(handle).await;
-        },
-        _ = sighup.recv() => {
-            sending_graceful_shutdown_signal(handle).await;
-        },
-        _ = tokio::signal::ctrl_c() => {
-            sending_graceful_shutdown_signal(handle).await;
-        }
-    };
+    #[cfg(target_family = "windows")]
+    {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Ctrl+C signal hanlde error");
+        sending_graceful_shutdown_signal(handle).await;
+    }
+
+    #[cfg(target_family = "unix")]
+    {
+        let mut sigterm = signal(SignalKind::terminate()).expect("SIGTERM signal hanlde error");
+        let mut sigquit = signal(SignalKind::quit()).expect("SIGQUIT signal hanlde error");
+        let mut sigchld = signal(SignalKind::child()).expect("SIGCHLD signal hanlde error");
+        let mut sighup = signal(SignalKind::hangup()).expect("SIGHUP signal hanlde error");
+        tokio::select! {
+            _ = sigterm.recv() => {
+                sending_graceful_shutdown_signal(handle).await;
+            },
+            _ = sigquit.recv() => {
+                sending_graceful_shutdown_signal(handle).await;
+            },
+            _ = sigchld.recv() => {
+                sending_graceful_shutdown_signal(handle).await;
+            },
+            _ = sighup.recv() => {
+                sending_graceful_shutdown_signal(handle).await;
+            },
+            _ = tokio::signal::ctrl_c() => {
+                sending_graceful_shutdown_signal(handle).await;
+            }
+        };
+    }
 }
 
 async fn sending_graceful_shutdown_signal(handle: Handle) {
