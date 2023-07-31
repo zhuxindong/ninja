@@ -2,8 +2,6 @@ use axum_server::Handle;
 use std::time::Duration;
 #[cfg(target_family = "unix")]
 use tokio::signal::unix::{signal, SignalKind};
-#[cfg(target_family = "windows")]
-use tokio::signal::windows::{ctrl_break, ctrl_c, CtrlBreak, CtrlC};
 use tokio::time::sleep;
 
 use crate::info;
