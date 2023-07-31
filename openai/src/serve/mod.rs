@@ -11,10 +11,13 @@ pub mod err;
 
 pub mod load_balancer;
 
+pub mod signal;
+
 use axum::body::StreamBody;
 use axum::http::Response;
 use axum::routing::{any, get, post};
 use axum::Json;
+use axum_server::Handle;
 
 use axum::http::header;
 use axum::http::method::Method;
@@ -29,7 +32,6 @@ use reqwest::Client;
 use serde_json::{json, Value};
 use std::sync::{Arc, Once};
 use std::time::{Duration, UNIX_EPOCH};
-use tokio::runtime::Builder;
 use tower_http::cors;
 
 use std::net::{IpAddr, SocketAddr};
@@ -158,12 +160,13 @@ impl Launcher {
             .http2_only(false)
             .build();
 
-        let tokio_runtime = Builder::new_multi_thread()
-            .worker_threads(self.workers)
+        let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
-            .build()?;
+            .worker_threads(self.workers)
+            .build()
+            .unwrap();
 
-        tokio_runtime.block_on(async {
+        runtime.block_on(async {
             info!(
                 "Starting HTTP(S) server at http(s)://{}:{}",
                 self.host, self.port
@@ -238,6 +241,11 @@ impl Launcher {
 
             let router = ui::config(router).layer(global_layer);
 
+            let handle = Handle::new();
+
+            // Spawn a task to gracefully shutdown server.
+            tokio::spawn(signal::graceful_shutdown(handle.clone()));
+
             match self.tls_keypair {
                 Some(keypair) => {
                     let tls_config = Self::load_rustls_config(keypair.0, keypair.1)
@@ -245,6 +253,7 @@ impl Launcher {
                         .unwrap();
                     let socket = std::net::SocketAddr::new(self.host, self.port);
                     axum_server::bind_rustls(socket, tls_config)
+                        .handle(handle)
                         .http_config(http_config)
                         .serve(router.into_make_service_with_connect_info::<SocketAddr>())
                         .await
@@ -253,6 +262,7 @@ impl Launcher {
                 None => {
                     let socket = std::net::SocketAddr::new(self.host, self.port);
                     axum_server::bind(socket)
+                        .handle(handle)
                         .http_config(http_config)
                         .serve(router.into_make_service_with_connect_info::<SocketAddr>())
                         .await
