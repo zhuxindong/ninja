@@ -1,5 +1,4 @@
 use rand::Rng;
-use ring::digest::{Context, SHA1_FOR_LEGACY_USE_ONLY};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -29,27 +28,30 @@ fn aes_encrypt(content: &str, password: &str) -> Result<EncryptionData, &'static
         .encrypt_padded_b2b_mut::<Pkcs7>(content.as_bytes(), &mut buf)
         .unwrap();
 
-    let mut md5_hash = Context::new(&SHA1_FOR_LEGACY_USE_ONLY);
+    let mut md5_hash = md5::Context::new();
     let mut salted = String::new();
     let mut dx: Vec<u8> = vec![];
 
     for _ in 0..3 {
-        md5_hash.update(&dx);
-        md5_hash.update(password.as_bytes());
-        md5_hash.update(&salt);
+        md5_hash.consume(&dx);
+        md5_hash.consume(password.as_bytes());
+        md5_hash.consume(&salt);
 
-        let digest = md5_hash.finish();
+        let digest = md5_hash.compute();
         dx = digest.as_ref().to_vec();
-        md5_hash = Context::new(&SHA1_FOR_LEGACY_USE_ONLY);
+        md5_hash = md5::Context::new();
 
-        salted += &hex::encode(&dx);
+        salted += &dx.iter().map(|b| format!("{:02x}", b)).collect::<String>();
     }
     #[allow(deprecated)]
     let cipher_text = base64::encode(&cipher_bytes);
     let enc_data = EncryptionData {
         ct: cipher_text,
         iv: salted[64..64 + 32].to_string(),
-        s: hex::encode(&salt),
+        s: salt
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<String>(),
     };
     Ok(enc_data)
 }
@@ -65,24 +67,24 @@ fn evp_kdf(
     match hash_algorithm {
         "md5" => {
             let mut block = Vec::new();
-            let mut hasher = Context::new(&SHA1_FOR_LEGACY_USE_ONLY);
+            let mut hasher = md5::Context::new();
 
             while derived_key_bytes.len() < key_size * 4 {
                 if !block.is_empty() {
-                    hasher.update(&block);
+                    hasher.consume(&block);
                 }
-                hasher.update(password);
-                hasher.update(salt);
+                hasher.consume(password);
+                hasher.consume(salt);
 
-                let digest = hasher.finish();
+                let digest = hasher.compute();
                 block = digest.as_ref().to_vec();
-                hasher = Context::new(&SHA1_FOR_LEGACY_USE_ONLY);
+                hasher = md5::Context::new();
 
                 for _ in 1..iterations {
-                    hasher.update(&block);
-                    let digest = hasher.finish();
+                    hasher.consume(&block);
+                    let digest = hasher.compute();
                     block = digest.as_ref().to_vec();
-                    hasher = Context::new(&SHA1_FOR_LEGACY_USE_ONLY);
+                    hasher = md5::Context::new();
                 }
 
                 derived_key_bytes.extend_from_slice(&block);
