@@ -9,7 +9,7 @@ map["armv7-unknown-linux-musleabihf"]="ghcr.io/gngpp/rust-musl-cross:armv7-musle
 map["arm-unknown-linux-musleabi"]="ghcr.io/gngpp/rust-musl-cross:arm-musleabi"
 map["arm-unknown-linux-musleabihf"]="ghcr.io/gngpp/rust-musl-cross:arm-musleabihf"
 map["armv5te-unknown-linux-musleabi"]="ghcr.io/gngpp/rust-musl-cross:armv5te-musleabi"
-map["x86_64-pc-windows-msvc"]="ghcr.io/messense/cargo-xwin:latest"
+map["x86_64-pc-windows-msvc"]="ghcr.io/gngpp/cargo-xwin:latest"
 
 for key in "${!map[@]}"; do
   docker buildx build --platform linux/amd64,linux/arm64 \
