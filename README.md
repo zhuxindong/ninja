@@ -78,7 +78,7 @@ services:
     restart: unless-stopped
     environment:
       - TZ=Asia/Shanghai
-      - OPENGPT_PROXY=socks5://cloudflare-warp:40000
+      - OPENGPT_PROXY=socks5://cloudflare-warp:10000
       # - OPENGPT_CONFIG=/opengpt-serve.toml
       # - OPENGPT_PORT=8080
       # - OPENGPT_HOST=0.0.0.0
@@ -99,7 +99,7 @@ services:
       # - OPENGPT_CF_SITE_KEY=
       # - OPENGPT_CF_SECRET_KEY=
     volumes:
-    #   - ${PWD}/ssl:/etc
+      # - ${PWD}/ssl:/etc
       - ${PWD}/opengpt-serve.toml:/opengpt-serve.toml
     command: serve run
     ports:
@@ -109,7 +109,6 @@ services:
 
   cloudflare-warp:
     container_name: cloudflare-warp
-    hostname: cloudflare
     image: ghcr.io/gngpp/cloudflare-warp:latest
     restart: unless-stopped
 
@@ -120,6 +119,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     command: --interval 3600 --cleanup
     restart: unless-stopped
+
 ```
 
 > #### OpenWrt
