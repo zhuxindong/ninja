@@ -230,7 +230,9 @@ jobs:
       - name: Build and push
         if: startsWith(github.ref, 'refs/tags/')
         run: |
-          tag=${{ steps.tag.outputs.tag }} bash +x build_docker.sh
+          cd docker
+          tag=${{ steps.tag.outputs.tag }} bash +x build.sh
+          cd -
 
       - name: Docker Hub Description
         if: startsWith(github.ref, 'refs/tags/')
