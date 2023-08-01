@@ -13,7 +13,7 @@ LABEL org.opencontainers.image.source https://github.com/gngpp/opengpt
 RUN mkdir -p /root/.cargo/registry
 RUN mkdir -p /root/.cargo/git
 
-RUN if [ "${BASE_IMAGE}" = "ghcr.io/messense/cargo-xwin:latest" ]; then \
+RUN if [ "${BASE_IMAGE}" = "ghcr.io/gngpp/cargo-xwin:latest" ]; then \
         apt update -y && apt install -y nasm; \
         mkdir /usr/local/cargo/git /usr/local/cargo/registry; \
         ln -s /usr/local/cargo/git /root/.cargo/git; \
