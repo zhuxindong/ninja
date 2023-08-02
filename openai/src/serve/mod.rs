@@ -239,8 +239,6 @@ impl Launcher {
                 // unofficial public api endpoint
                 .route("/public-api/*path", any(unofficial_proxy))
                 .route_layer(app_layer)
-                // ab pressure test
-                .route("/ab", get(|| async {}))
                 .route("/auth/token", post(post_access_token))
                 .route("/auth/refresh_token", post(post_refresh_token))
                 .route("/auth/revoke_token", post(post_revoke_token))
