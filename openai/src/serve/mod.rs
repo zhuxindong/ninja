@@ -175,7 +175,6 @@ impl Launcher {
             .build()?;
 
         runtime.block_on(async {
-
             check_self_ip(&api_client()).await;
 
             info!(
