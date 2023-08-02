@@ -32,7 +32,6 @@ use reqwest::Client;
 use serde_json::{json, Value};
 use std::sync::{Arc, Once};
 use std::time::{Duration, UNIX_EPOCH};
-use tower_http::cors;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -150,10 +149,10 @@ impl Launcher {
             ))
             .layer(
                 tower_http::cors::CorsLayer::new()
-                    .max_age(Duration::from_secs(3600))
-                    .allow_origin(cors::AllowOrigin::any())
-                    .allow_headers(cors::AllowHeaders::any())
-                    .allow_methods(cors::AllowMethods::any()),
+                    .allow_credentials(true)
+                    .allow_headers(tower_http::cors::AllowHeaders::mirror_request())
+                    .allow_methods(tower_http::cors::AllowMethods::mirror_request())
+                    .allow_origin(tower_http::cors::AllowOrigin::mirror_request()),
             )
             .layer(axum::error_handling::HandleErrorLayer::new(
                 |_: axum::BoxError| async { axum::http::StatusCode::REQUEST_TIMEOUT },
