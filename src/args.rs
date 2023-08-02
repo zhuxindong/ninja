@@ -68,7 +68,7 @@ pub(super) struct ServeArgs {
     #[clap(long, env = "OPENGPT_CONCUURENT_LIMIT", default_value = "65535")]
     pub(super) concurrent_limit: usize,
     /// Server proxies pool, example: protocol://user:pass@ip:port
-    #[clap(long, env = "OPENGPT_PROXY", value_parser = parse_url)]
+    #[clap(long, env = "OPENGPT_PROXY", value_parser = parse_proxies_url)]
     pub(super) proxies: Option<std::vec::Vec<String>>,
     /// Client timeout (secends)
     #[clap(long, env = "OPENGPT_TIMEOUT", default_value = "600")]
@@ -111,7 +111,7 @@ pub(super) struct ServeArgs {
         env = "OPENGPT_TB_REDIS_URL",
         default_value = "redis://127.0.0.1:6379",
         requires = "tb_enable",
-        value_parser = parse_url
+        value_parser = parse_proxies_url
     )]
     #[cfg(feature = "limit")]
     pub(super) tb_redis_url: std::vec::Vec<String>,
@@ -203,8 +203,18 @@ fn parse_host(s: &str) -> anyhow::Result<std::net::IpAddr> {
     Ok(addr)
 }
 
+fn parse_url(s: &str) -> anyhow::Result<String> {
+    let url = url::Url::parse(s)
+        .context("The Proxy Url format must be `protocol://user:pass@ip:port`")?;
+    let protocol = url.scheme().to_string();
+    match protocol.as_str() {
+        "http" | "https" | "socks5" | "redis" => Ok(s.to_string()),
+        _ => anyhow::bail!("Unsupported protocol: {}", protocol),
+    }
+}
+
 // proxy proto
-fn parse_url(s: &str) -> anyhow::Result<Vec<String>> {
+fn parse_proxies_url(s: &str) -> anyhow::Result<Vec<String>> {
     let split = s.split(",");
     let mut proxies: Vec<_> = vec![];
     for ele in split {
