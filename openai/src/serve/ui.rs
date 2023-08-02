@@ -373,6 +373,7 @@ async fn get_session(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
             .status(StatusCode::OK)
             .header(header::LOCATION, LOGIN_INDEX)
             .header(header::SET_COOKIE, cookie.to_string())
+            .header(header::CONTENT_TYPE, "application/json")
             .body(Body::from(props.to_string()))
             .map_err(|err| err::ResponseError::InternalServerError(err))?);
     }
@@ -625,13 +626,13 @@ async fn get_share_chat_info(
                     );
                     Ok(Response::builder()
                         .status(StatusCode::OK)
-                        .header(header::CONTENT_TYPE, "applications/json")
+                        .header(header::CONTENT_TYPE, "application/json")
                         .body(Body::from(serde_json::to_string(&props).unwrap()))
                         .map_err(|err| err::ResponseError::InternalServerError(err))?)
                 }
                 Err(_) => Ok(Response::builder()
                     .status(StatusCode::OK)
-                    .header(header::CONTENT_TYPE, "applications/json")
+                    .header(header::CONTENT_TYPE, "application/json")
                     .body(Body::from(
                         serde_json::to_string(&serde_json::json!({"notFound": true})).unwrap(),
                     ))
@@ -732,7 +733,7 @@ async fn get_share_chat_continue_info(
                     });
                     Ok(Response::builder()
                     .status(StatusCode::OK)
-                    .header(header::CONTENT_TYPE, "applications/json")
+                    .header(header::CONTENT_TYPE, "application/json")
                     .body(Body::from(serde_json::to_string(&props).unwrap()))
                     .map_err(|err| err::ResponseError::InternalServerError(err))?)
                 }
@@ -746,7 +747,7 @@ async fn get_share_chat_continue_info(
             Err(_) => {
                 Ok(Response::builder()
                     .status(StatusCode::TEMPORARY_REDIRECT)
-                            .header(header::CONTENT_TYPE, "applications/json")
+                            .header(header::CONTENT_TYPE, "application/json")
                                 .body(Body::from(serde_json::to_string(&serde_json::json!({
                                     "pageProps": {
                                         "__N_REDIRECT": format!("/auth/login?next=%2Fshare%2F{}%2Fcontinue", share_id.0),
