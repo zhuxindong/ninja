@@ -156,7 +156,7 @@ pub(super) fn serve_log() -> anyhow::Result<()> {
         path::Path,
     };
 
-    let path = Path::new(env::DEFAULT_STDERR_PATH); // 请用你的日志文件路径替换
+    let path = Path::new(env::DEFAULT_STDOUT_PATH); // 请用你的日志文件路径替换
     let file = File::open(&path)?;
     let reader = io::BufReader::new(file);
 
