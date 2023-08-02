@@ -166,17 +166,17 @@ impl Launcher {
             .http1_keep_alive(true)
             .http1_header_read_timeout(Duration::from_secs(self.tcp_keepalive as u64))
             .http2_keep_alive_timeout(Duration::from_secs(self.tcp_keepalive as u64))
-            .http1_only(false)
-            .http2_only(false)
+            .http2_keep_alive_interval(Some(Duration::from_secs(self.tcp_keepalive as u64)))
             .build();
 
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .worker_threads(self.workers)
-            .build()
-            .unwrap();
+            .build()?;
 
         runtime.block_on(async {
+            check_self_ip(&api_client()).await;
+
             info!(
                 "Starting HTTP(S) server at http(s)://{}:{}",
                 self.host, self.port
@@ -185,8 +185,6 @@ impl Launcher {
             info!("Starting {} workers", self.workers);
 
             info!("Concurrent limit {}", self.concurrent_limit);
-
-            check_self_ip(&api_client()).await;
 
             #[cfg(all(feature = "sign", feature = "limit"))]
             let app_layer = {
