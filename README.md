@@ -51,9 +51,7 @@ Making [Releases](https://github.com/gngpp/opengpt/releases/latest) has a precom
 
 ```shell
 wget https://github.com/gngpp/opengpt/releases/download/v0.2.8/opengpt-0.2.8-x86_64-unknown-linux-musl.deb
-
 dpkg -i opengpt-0.2.8-x86_64-unknown-linux-musl.deb
-
 opengpt serve run
 ```
 
