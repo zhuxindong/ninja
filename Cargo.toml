@@ -13,8 +13,6 @@ readme = "README.md"
 [dependencies]
 anyhow = "1.0.71"
 log = "0.4.18"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 clap = { version = "4.3.0", features = ["derive", "env"] }
 tokio = { version = "1.23.1", default-features = false, features = ["rt-multi-thread"] }
 serde = {version = "1.0.164", features = ["derive"] }

@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use args::SubCommands;
 use clap::Parser;
-use tracing_subscriber::{prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt};
 
 pub mod account;
 pub mod args;
@@ -15,13 +14,6 @@ pub mod util;
 fn main() -> anyhow::Result<()> {
     let opt = args::Opt::parse();
     std::env::set_var("RUST_LOG", opt.level);
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "RUST_LOG=warn".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
     match opt.command {
         Some(command) => match command {
             SubCommands::Account => {
@@ -63,6 +55,12 @@ async fn main_ui() -> anyhow::Result<()> {
         sync_io_tx.clone(),
     )));
     let app_ui = Arc::clone(&app);
+
+    // Set max_log_level to Trace
+    tui_logger::init_logger(log::LevelFilter::Info).unwrap();
+
+    // Set default level for unknown targets to Trace
+    tui_logger::set_default_level(log::LevelFilter::Info);
 
     // Handle IO in a specifc thread
     tokio::spawn(async move {

@@ -33,6 +33,8 @@ use serde_json::{json, Value};
 use std::sync::{Arc, Once};
 use std::time::{Duration, UNIX_EPOCH};
 use tower_http::cors;
+use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
@@ -119,6 +121,14 @@ pub struct Launcher {
 
 impl Launcher {
     pub fn run(self) -> anyhow::Result<()> {
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| "RUST_LOG=warn".into()),
+            )
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+
         INIT.call_once(|| unsafe {
             API_CLIENT = Some(
                 load_balancer::ClientLoadBalancer::<Client>::new_api_client(&self)
