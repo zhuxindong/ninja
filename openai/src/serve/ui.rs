@@ -483,8 +483,7 @@ async fn get_chat_info(jar: CookieJar) -> Result<Response<Body>, ResponseError> 
             }
         };
     }
-    // redirect_login()
-    todo!()
+    redirect_login()
 }
 
 async fn get_share_chat(
@@ -579,8 +578,7 @@ async fn get_share_chat(
         };
     }
 
-    // redirect_login()
-    todo!()
+    redirect_login()
 }
 
 async fn get_share_chat_info(
@@ -758,8 +756,7 @@ async fn get_share_chat_continue_info(
             },
         };
     }
-    // redirect_login()
-    todo!()
+    redirect_login()
 }
 
 async fn get_image(
