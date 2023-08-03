@@ -42,7 +42,7 @@ include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 const DEFAULT_INDEX: &str = "/";
 const LOGIN_INDEX: &str = "/auth/login";
 const SESSION_ID: &str = "opengpt_session";
-const BUILD_ID: &str = "XmKrBoPpskgF_4RiIX1jm";
+const BUILD_ID: &str = "QrTcOt7XatF0UtTGkJiqj";
 const TEMP_404: &str = "404.htm";
 const TEMP_AUTH: &str = "auth.htm";
 const TEMP_CHAT: &str = "chat.htm";
