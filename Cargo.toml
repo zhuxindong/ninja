@@ -2,7 +2,7 @@
 name = "opengpt"
 version = "0.3.0"
 edition = "2021"
-description = "OpenGPT - Not just a unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)\nGithub: https://github.com/gngpp/opengpt"
+description = "OpenGPT - A reverse engineered unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)\nGithub: https://github.com/gngpp/opengpt"
 license = "MIT"
 homepage = "https://github.com/gngpp/opengpt"
 repository = "https://github.com/gngpp/opengpt.git"
