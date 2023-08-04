@@ -1,6 +1,9 @@
 use std::{ops::Not, path::PathBuf};
 
-use crate::{args::ServeArgs, env::fix_relative_path};
+use crate::{
+    args::{self, ServeArgs},
+    env::fix_relative_path,
+};
 
 pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<()> {
     if relative_path {
@@ -8,11 +11,11 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
     }
 
     if let Some(config_path) = args.config {
-        log::info!("Using config file: {}", config_path.display());
         let bytes = std::fs::read(config_path)?;
         let data = String::from_utf8(bytes)?;
         args = toml::from_str::<ServeArgs>(&data)?;
     }
+
     let mut builder = openai::serve::LauncherBuilder::default();
     let builder = builder
         .host(
@@ -22,6 +25,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .port(args.port.unwrap_or(7999))
         .proxies(args.proxies.unwrap_or_default())
         .api_prefix(args.api_prefix)
+        .arkose_endpoint(args.arkose_endpoint)
         .tls_keypair(None)
         .tcp_keepalive(args.tcp_keepalive)
         .timeout(args.timeout)
@@ -183,10 +187,34 @@ pub(super) fn generate_template(cover: bool, out: Option<PathBuf>) -> anyhow::Re
         };
         out
     } else {
-        std::env::current_dir()?.join("opengpt-serve.toml")
+        std::env::current_dir()?.join("serve.toml")
     };
 
-    let template = "host=\"0.0.0.0\"\nport=7999\nworkers=1\n#proxies=[]\ntimeout=600\nconnect_timeout=60\ntcp_keepalive=60\n#tls_cert=\n#tls_key=\n#api_prefix=\ntb_enable=false\ntb_store_strategy=\"mem\"\ntb_redis_url=[\"redis://127.0.0.1:6379\"]\ntb_capacity=60\ntb_fill_rate=1\ntb_expired=86400\n#sign_secret_key=\n#cf_site_key=\n#cf_secret_key=\n";
+    let template = args::ServeArgs {
+        config: None,
+        host: Some("0.0.0.0".parse().unwrap()),
+        port: Some(7999),
+        workers: 1,
+        concurrent_limit: 65535,
+        proxies: None,
+        timeout: 600,
+        connect_timeout: 60,
+        tcp_keepalive: 60,
+        tls_cert: None,
+        tls_key: None,
+        api_prefix: None,
+        arkose_endpoint: None,
+        sign_secret_key: None,
+        tb_enable: false,
+        tb_store_strategy: openai::serve::tokenbucket::Strategy::Mem,
+        tb_redis_url: vec!["redis://127.0.0.1:6379".to_string()],
+        tb_capacity: 60,
+        tb_fill_rate: 1,
+        tb_expired: 86400,
+        cf_site_key: None,
+        cf_secret_key: None,
+        disable_webui: false,
+    };
 
     if cover {
         #[cfg(target_family = "unix")]
@@ -199,7 +227,7 @@ pub(super) fn generate_template(cover: bool, out: Option<PathBuf>) -> anyhow::Re
         #[cfg(target_family = "windows")]
         std::fs::File::create(&out)?;
 
-        Ok(std::fs::write(out, template)?)
+        Ok(std::fs::write(out, toml::to_string_pretty(&template)?)?)
     } else {
         Ok(())
     }

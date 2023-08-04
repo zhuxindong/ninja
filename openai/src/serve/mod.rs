@@ -5,7 +5,7 @@ pub mod sign;
 pub mod tokenbucket;
 
 #[cfg(feature = "template")]
-pub mod ui;
+pub mod router;
 
 pub mod err;
 
@@ -42,7 +42,6 @@ use crate::arkose::ArkoseToken;
 use crate::auth::model::{AccessToken, AuthAccount, RefreshToken};
 use crate::auth::{AuthClient, AuthHandle};
 use crate::serve::tokenbucket::TokenBucketLimitContext;
-use crate::serve::ui::TemplateData;
 use crate::{debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 
 use crate::serve::err::ResponseError;
@@ -90,6 +89,8 @@ pub struct Launcher {
     tls_keypair: Option<(PathBuf, PathBuf)>,
     /// Web UI api prefix
     api_prefix: Option<String>,
+    /// Arkose endpoint
+    arkose_endpoint: Option<String>,
     /// Enable url signature (signature secret key)
     #[cfg(feature = "sign")]
     sign_secret_key: Option<String>,
@@ -137,9 +138,6 @@ impl Launcher {
                 load_balancer::ClientLoadBalancer::<AuthClient>::new_auth_client(&self)
                     .expect("Failed to initialize the requesting oauth client"),
             );
-
-            ui::DISABLE_UI = self.disable_ui;
-            ui::TEMPLATE_DATA = Some(TemplateData::from(self.clone()));
         });
 
         let global_layer = tower::ServiceBuilder::new()
@@ -202,7 +200,7 @@ impl Launcher {
                         middleware::token_bucket_limit_middleware,
                     ))
                     .layer(axum::middleware::from_fn_with_state(
-                        Arc::new(self.sign_secret_key),
+                        Arc::new(self.sign_secret_key.clone()),
                         middleware::sign_middleware,
                     ))
                     .layer(axum::middleware::from_fn(
@@ -244,7 +242,7 @@ impl Launcher {
                 .route("/auth/revoke_token", post(post_revoke_token))
                 .route("/auth/arkose_token", get(get_arkose_token));
 
-            let router = ui::config(router).layer(global_layer);
+            let router = router::config(router, &self).layer(global_layer);
 
             let handle = Handle::new();
 

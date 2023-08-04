@@ -27,17 +27,20 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::info;
+use crate::serve::api_client;
+use crate::serve::auth_client;
+use crate::serve::err;
+use crate::serve::err::ResponseError;
+use crate::serve::response_convert;
+use crate::serve::Launcher;
+use crate::serve::EMPTY;
 use crate::{
     auth::{model::AuthAccount, AuthHandle},
     model::AuthenticateToken,
     URL_CHATGPT_API,
 };
 
-use super::err::ResponseError;
-use super::EMPTY;
-use super::{auth_client, err};
-
-include!(concat!(env!("OUT_DIR"), "/generated.rs"));
+use super::get_static_resource;
 
 const DEFAULT_INDEX: &str = "/";
 const LOGIN_INDEX: &str = "/auth/login";
@@ -52,10 +55,8 @@ const TEMP_SHARE: &str = "share.htm";
 
 static INIT: Once = Once::new();
 
-pub(super) static mut STATIC_FILES: Option<HashMap<&'static str, static_files::Resource>> = None;
-pub(super) static mut TEMPLATE: Option<tera::Tera> = None;
-pub(super) static mut TEMPLATE_DATA: Option<TemplateData> = None;
-pub(super) static mut DISABLE_UI: bool = false;
+static mut TEMPLATE: Option<tera::Tera> = None;
+static mut TEMPLATE_DATA: Option<TemplateData> = None;
 
 #[derive(Serialize, Deserialize)]
 struct Session {
@@ -111,41 +112,44 @@ impl From<AuthenticateToken> for Session {
 pub(super) struct TemplateData {
     /// WebSite api prefix
     api_prefix: Option<String>,
+    /// GPT-4 model arkose token endpoint
+    arkose_endpoint: Option<String>,
     /// Cloudflare captcha site key
     cf_site_key: Option<String>,
     /// Cloudflare captcha secret key
     cf_secret_key: Option<String>,
 }
 
-impl From<super::Launcher> for TemplateData {
-    fn from(value: super::Launcher) -> Self {
+impl From<Launcher> for TemplateData {
+    fn from(value: Launcher) -> Self {
         Self {
             api_prefix: value.api_prefix,
             cf_site_key: value.cf_site_key,
             cf_secret_key: value.cf_secret_key,
+            arkose_endpoint: value.arkose_endpoint,
         }
     }
 }
 
 // this function could be located in a different module
-pub fn config(router: Router) -> Router {
-    if !unsafe { DISABLE_UI } {
+pub(super) fn config(router: Router, args: &Launcher) -> Router {
+    if !args.disable_ui {
+        unsafe { TEMPLATE_DATA = Some(TemplateData::from(args.clone())) };
         if let Some(url) = unsafe { TEMPLATE_DATA.as_ref().unwrap().api_prefix.as_ref() } {
             info!("WebUI site use api: {url}")
         }
         let mut tera = tera::Tera::default();
         tera.add_raw_templates(vec![
-            (TEMP_404, include_str!("../../ui/404.htm")),
-            (TEMP_AUTH, include_str!("../../ui/auth.htm")),
-            (TEMP_LOGIN, include_str!("../../ui/login.htm")),
-            (TEMP_CHAT, include_str!("../../ui/chat.htm")),
-            (TEMP_DETAIL, include_str!("../../ui/detail.htm")),
-            (TEMP_SHARE, include_str!("../../ui/share.htm")),
+            (TEMP_404, include_str!("../../../ui/404.htm")),
+            (TEMP_AUTH, include_str!("../../../ui/auth.htm")),
+            (TEMP_LOGIN, include_str!("../../../ui/login.htm")),
+            (TEMP_CHAT, include_str!("../../../ui/chat.htm")),
+            (TEMP_DETAIL, include_str!("../../../ui/detail.htm")),
+            (TEMP_SHARE, include_str!("../../../ui/share.htm")),
         ])
         .expect("The static template failed to load");
 
         INIT.call_once(|| unsafe {
-            STATIC_FILES = Some(generate());
             TEMPLATE = Some(tera);
         });
 
@@ -242,7 +246,7 @@ async fn post_login(
         ctx.insert("error", &err.msg());
         return render_template(TEMP_LOGIN, &ctx);
     }
-    match super::auth_client().do_access_token(&account).await {
+    match auth_client().do_access_token(&account).await {
         Ok(access_token) => {
             let authentication_token = AuthenticateToken::try_from(access_token)
                 .map_err(|err| err::ResponseError::InternalServerError(err))?;
@@ -495,7 +499,7 @@ async fn get_share_chat(
         return match extract_session(cookie.value()) {
             Ok(session) => {
                 let url = get_url();
-                let resp = super::api_client()
+                let resp = api_client()
                     .get(format!("{url}/backend-api/share/{share_id}"))
                     .bearer_auth(session.access_token)
                     .send()
@@ -589,7 +593,7 @@ async fn get_share_chat_info(
     if let Some(cookie) = jar.get(SESSION_ID) {
         if let Ok(session) = extract_session(cookie.value()) {
             let url = get_url();
-            let resp = super::api_client()
+            let resp = api_client()
                 .get(format!("{url}/backend-api/share/{share_id}"))
                 .bearer_auth(session.access_token)
                 .send()
@@ -666,7 +670,7 @@ async fn get_share_chat_continue_info(
         return match extract_session(cookie.value()) {
             Ok(session) => {
                 let url = get_url();
-                let resp = super::api_client()
+                let resp = api_client()
                 .get(format!("{url}/backend-api/share/{}", share_id.0))
                 .bearer_auth(session.access_token)
                 .send()
@@ -768,8 +772,8 @@ async fn get_image(
     let query = params.ok_or(err::ResponseError::BadRequest(anyhow::anyhow!(
         "Missing URL parameter"
     )))?;
-    let resp = super::api_client().get(&query.url).send().await;
-    super::response_convert(resp)
+    let resp = api_client().get(&query.url).send().await;
+    response_convert(resp)
 }
 
 async fn error_404() -> Result<Response<Body>, ResponseError> {
@@ -837,6 +841,9 @@ fn settings_template_data(ctx: &mut tera::Context) {
     if let Some(api_prefix) = &data.api_prefix {
         ctx.insert("api_prefix", api_prefix);
     }
+    if let Some(arkose_endpoint) = &data.arkose_endpoint {
+        ctx.insert("arkose_endpoint", arkose_endpoint)
+    }
 }
 
 fn check_token(token: &str) -> Result<(), ResponseError> {
@@ -862,7 +869,7 @@ async fn cf_captcha_check(addr: IpAddr, cf_response: Option<&str>) -> Result<(),
                     idempotency_key: crate::uuid::uuid(),
                 };
 
-                let resp = super::api_client()
+                let resp = api_client()
                     .post("https://challenges.cloudflare.com/turnstile/v0/siteverify")
                     .form(&form)
                     .send()
@@ -879,22 +886,6 @@ async fn cf_captcha_check(addr: IpAddr, cf_response: Option<&str>) -> Result<(),
         };
     };
     Ok(())
-}
-
-async fn get_static_resource(path: Path<String>) -> Result<Response<Body>, ResponseError> {
-    let path = path.0;
-    let mut x = unsafe { STATIC_FILES.as_ref().unwrap().iter() };
-    match x.find(|(k, _v)| k.contains(&path)) {
-        Some((_, v)) => Ok(Response::builder()
-            .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, v.mime_type)
-            .body(Body::from(v.data))
-            .map_err(|err| err::ResponseError::InternalServerError(err))?),
-        None => Ok(Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(Body::empty())
-            .map_err(|err| err::ResponseError::InternalServerError(err))?),
-    }
 }
 
 fn get_url() -> &'static str {
