@@ -88,6 +88,9 @@ pub(super) struct ServeArgs {
     /// Web UI api prefix
     #[clap(long, env = "OPENGPT_UI_API_PREFIX", value_parser = parse_url)]
     pub(super) api_prefix: Option<String>,
+    /// Arkose endpoint, example: https://tcr9i.chat.openai.com or https://client-api.arkoselabs.com
+    #[clap(long, env = "OPENGPT_ARKOSE_ENDPOINT", value_parser = parse_url)]
+    pub(super) arkose_endpoint: Option<String>,
     /// Enable url signature (signature secret key)
     #[clap(short = 'S', long, env = "OPENGPT_SIGNATURE")]
     #[cfg(feature = "sign")]

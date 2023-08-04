@@ -44,6 +44,7 @@
     <script src="/_next/static/chunks/pages/share/%5B%5B...shareParams%5D%5D-46462314adee7e1d.js" defer=""></script>
     <script src="/_next/static/QrTcOt7XatF0UtTGkJiqj/_buildManifest.js" defer=""></script>
     <script src="/_next/static/QrTcOt7XatF0UtTGkJiqj/_ssgManifest.js" defer=""></script>
+    <script>{%if arkose_endpoint is defined and arkose_endpoint != "" %} window.__arkose_endpoint = "{{ arkose_endpoint | safe }}" {%else%} window.__arkose_endpoint = window.location.origin {% endif %}</script>
     <script>{%if api_prefix is defined and api_prefix != "" %} window.__api_prefix = "{{ api_prefix | safe }}" {%else%} window.__api_prefix = window.location.origin {% endif %}</script>
 </head>
 
