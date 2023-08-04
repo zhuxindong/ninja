@@ -12,9 +12,6 @@ use axum::{
     routing::any,
     Form, Router,
 };
-use serde::{Deserialize, Serialize};
-
-use super::STATIC_FILES;
 
 pub(super) fn config(router: Router, args: &Launcher) -> Router {
     if args.arkose_endpoint.is_none() {
@@ -26,25 +23,13 @@ pub(super) fn config(router: Router, args: &Launcher) -> Router {
     router
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct ReqForm {
-    bda: String,
-    public_key: String,
-    site: String,
-    userbrowser: String,
-    capi_version: String,
-    capi_mode: String,
-    style_theme: String,
-    rnd: String,
-}
-
 async fn proxy(
     uri: Uri,
     method: Method,
     mut headers: HeaderMap,
     mut body: Option<Form<HashMap<String, String>>>,
 ) -> Result<Response<Body>, ResponseError> {
-    let mut x = unsafe { STATIC_FILES.as_ref().unwrap().iter() };
+    let mut x = unsafe { super::STATIC_FILES.as_ref().unwrap().iter() };
     if let Some((_, v)) = x.find(|(k, _v)| k.contains(uri.path())) {
         return Ok(Response::builder()
             .status(StatusCode::OK)
