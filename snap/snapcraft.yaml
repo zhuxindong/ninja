@@ -1,6 +1,6 @@
 name: opengpt
-version: '2.2.2'
-summary: OpenGPT
+version: '0.3.0'
+summary: OpenGPT - A reverse engineered unofficial ChatGPT proxy
 description: |
   A reverse engineered unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)
 
@@ -12,14 +12,32 @@ base: core18
 architectures:
   - build-on: amd64
   - build-on: arm64
-  - build-on: armhf
 
 parts:
-  opengpt:
-    plugin: rust
-    source: .
+  opengpt-binary:
+    plugin: nil
+    override-build: |
+      #!/bin/bash
+
+      # 根据SNAPCRAFT的架构选择下载链接
+      case $SNAPCRAFT_ARCH_TRIPLET in
+        x86_64-linux-gnu)
+          ARCH_SUFFIX="x86_64"
+          ;;
+        aarch64-linux-gnu)
+          ARCH_SUFFIX="aarch64"
+          ;;
+        *)
+          echo "Not Support: $SNAPCRAFT_ARCH_TRIPLET"
+          exit 1
+      esac
+
+      PACKAGE="opengpt-${SNAPCRAFT_PROJECT_VERSION}-${ARCH_SUFFIX}-unknown-linux-musl.tar.gz"
+      BINARY_URL="https://github.com/gngpp/opengpt/releases/download/v${SNAPCRAFT_PROJECT_VERSION}/${PACKAGE}"
+      tar -xf ${PACKAGE}
+      mv ./opengpt $SNAPCRAFT_PART_INSTALL/bin/opengpt
 
 apps:
   opengpt:
-    command: bin/aliyundrive-webdav
+    command: bin/opengpt
     plugs: [network, network-bind]
