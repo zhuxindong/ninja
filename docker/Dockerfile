@@ -1,4 +1,4 @@
-FROM alpine:latest as builder
+FROM alpine:3.16.6 as builder
 
 ARG VERSION
 ARG TARGETPLATFORM
@@ -20,7 +20,7 @@ RUN apk update && apk add wget
 RUN wget https://github.com/gngpp/opengpt/releases/download/v${VERSION}/opengpt-${VERSION}-$(cat arch)-unknown-linux-$(cat env).tar.gz
 RUN tar -xvf opengpt-${VERSION}-$(cat arch)-unknown-linux-$(cat env).tar.gz
 
-FROM alpine:latest
+FROM alpine:3.16.6
 
 LABEL org.opencontainers.image.authors "gngpp <gngppz@gmail.com>"
 LABEL org.opencontainers.image.source https://github.com/gngpp/opengpt
