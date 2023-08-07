@@ -172,8 +172,6 @@ impl Launcher {
             .build()?;
 
         runtime.block_on(async {
-            check_self_ip(&api_client()).await;
-
             info!(
                 "Starting HTTP(S) server at http(s)://{}:{}",
                 self.host, self.port
@@ -182,6 +180,8 @@ impl Launcher {
             info!("Starting {} workers", self.workers);
 
             info!("Concurrent limit {}", self.concurrent_limit);
+
+            tokio::spawn(check_self_ip());
 
             #[cfg(all(feature = "sign", feature = "limit"))]
             let app_layer = {
@@ -567,8 +567,8 @@ async fn gpt4_body_handle(url: &str, method: &Method, body: &mut Option<Json<Val
     }
 }
 
-async fn check_self_ip(client: &Client) {
-    match client
+async fn check_self_ip() {
+    match api_client()
         .get("https://ifconfig.me")
         .timeout(Duration::from_secs(10))
         .header(header::ACCEPT, "application/json")
