@@ -1,5 +1,5 @@
 name: opengpt
-version: '0.3.1'
+version: '0.3.2'
 summary: OpenGPT - A reverse engineered unofficial ChatGPT proxy
 description: |
   A reverse engineered unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)
