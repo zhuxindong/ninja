@@ -85,6 +85,18 @@ pub(super) struct ServeArgs {
     /// TLS private key file path (EC/PKCS8/RSA)
     #[clap(long, env = "OPENGPT_TLS_KEY", requires = "tls_cert")]
     pub(super) tls_key: Option<PathBuf>,
+    /// Account Plus puid cookie value
+    #[clap(long, env = "OPENGPT_PUID")]
+    pub(super) puid: Option<String>,
+    /// Get the user mailbox of the PUID
+    #[clap(long, env = "OPENGPT_PUID_EMAIL", requires = "puid_password")]
+    pub(super) puid_email: Option<String>,
+    /// Get the user password of the PUID
+    #[clap(long, env = "OPENGPT_PUID_PASSWORD", requires = "puid_email")]
+    pub(super) puid_password: Option<String>,
+    /// Get the user mfa code of the PUID
+    #[clap(long, env = "OPENGPT_PUID_MFA", requires = "puid_email")]
+    pub(super) puid_mfa: Option<String>,
     /// Web UI api prefix
     #[clap(long, env = "OPENGPT_UI_API_PREFIX", value_parser = parse_url)]
     pub(super) api_prefix: Option<String>,

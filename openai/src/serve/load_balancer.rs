@@ -90,7 +90,7 @@ impl<T: Clone> ClientLoadBalancer<T> {
         Ok(load)
     }
 
-    pub(super) fn next(&self) -> &T {
+    pub(super) fn next(&self) -> T {
         let len = self.clients.len();
         let mut old = self.index.load(Ordering::Relaxed);
         let mut new;
@@ -104,6 +104,6 @@ impl<T: Clone> ClientLoadBalancer<T> {
                 Err(x) => old = x,
             }
         }
-        &self.clients[old]
+        self.clients[old].clone()
     }
 }

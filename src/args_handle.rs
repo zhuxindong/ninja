@@ -34,7 +34,11 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .concurrent_limit(args.concurrent_limit)
         .cf_site_key(args.cf_site_key)
         .cf_secret_key(args.cf_secret_key)
-        .disable_ui(args.disable_webui);
+        .disable_ui(args.disable_webui)
+        .puid(args.puid)
+        .puid_email(args.puid_email)
+        .puid_password(args.puid_password)
+        .puid_mfa(args.puid_mfa);
 
     #[cfg(feature = "limit")]
     let builder = builder
@@ -214,6 +218,10 @@ pub(super) fn generate_template(cover: bool, out: Option<PathBuf>) -> anyhow::Re
         cf_site_key: None,
         cf_secret_key: None,
         disable_webui: false,
+        puid_email: None,
+        puid_password: None,
+        puid_mfa: None,
+        puid: None,
     };
 
     if cover {
