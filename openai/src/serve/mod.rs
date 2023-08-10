@@ -32,6 +32,7 @@ use reqwest::Client;
 use serde_json::{json, Value};
 use std::sync::{Arc, Once};
 use std::time::{Duration, UNIX_EPOCH};
+use tokio::sync::RwLock;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -52,17 +53,18 @@ static INIT: Once = Once::new();
 
 static mut API_CLIENT: Option<load_balancer::ClientLoadBalancer<Client>> = None;
 static mut AUTH_CLIENT: Option<load_balancer::ClientLoadBalancer<AuthClient>> = None;
+static mut SHARED_PUID: Option<Arc<RwLock<String>>> = None;
 
 pub(super) fn api_client() -> Client {
     if let Some(lb) = unsafe { &API_CLIENT } {
-        return lb.next().clone();
+        return lb.next();
     }
     panic!("The requesting client must be initialized")
 }
 
 pub(super) fn auth_client() -> AuthClient {
     if let Some(lb) = unsafe { &AUTH_CLIENT } {
-        return lb.next().clone();
+        return lb.next();
     }
     panic!("The requesting oauth client must be initialized")
 }
@@ -87,6 +89,14 @@ pub struct Launcher {
     connect_timeout: usize,
     /// TLS keypair
     tls_keypair: Option<(PathBuf, PathBuf)>,
+    /// Account Plus puid cookie value
+    puid: Option<String>,
+    /// Get the user password of the PUID
+    puid_password: Option<String>,
+    /// Get the user mailbox of the PUID
+    puid_email: Option<String>,
+    /// Get the mfa code of the PUID
+    puid_mfa: Option<String>,
     /// Web UI api prefix
     api_prefix: Option<String>,
     /// Arkose endpoint
@@ -138,6 +148,10 @@ impl Launcher {
                 load_balancer::ClientLoadBalancer::<AuthClient>::new_auth_client(&self)
                     .expect("Failed to initialize the requesting oauth client"),
             );
+            if let Some(puid) = self.puid.as_ref() {
+                info!("Using PUID: {puid}");
+                SHARED_PUID = Some(Arc::new(RwLock::new(puid.to_owned())))
+            }
         });
 
         let global_layer = tower::ServiceBuilder::new()
@@ -182,6 +196,14 @@ impl Launcher {
             info!("Concurrent limit {}", self.concurrent_limit);
 
             tokio::spawn(check_self_ip());
+
+            if !self.puid_email.is_none() && !self.puid_password.is_none() {
+                tokio::spawn(initialize_puid(
+                    self.puid_email.clone().unwrap_or_default(),
+                    self.puid_password.clone().unwrap_or_default(),
+                    self.puid_mfa.clone(),
+                ));
+            }
 
             #[cfg(all(feature = "sign", feature = "limit"))]
             let app_layer = {
@@ -379,7 +401,7 @@ async fn official_proxy(
 
     let builder = api_client()
         .request(method, &url)
-        .headers(header_convert(headers, jar));
+        .headers(header_convert(headers, jar).await);
     let resp = match body {
         Some(body) => builder.json(&body.0).send().await,
         None => builder.send().await,
@@ -421,7 +443,7 @@ async fn unofficial_proxy(
 
     let builder = api_client()
         .request(method, url)
-        .headers(header_convert(headers, jar));
+        .headers(header_convert(headers, jar).await);
     let resp = match body {
         Some(body) => builder.json(&body.0).send().await,
         None => builder.send().await,
@@ -478,7 +500,7 @@ fn response_convert(
     }
 }
 
-fn header_convert(headers: axum::http::HeaderMap, jar: CookieJar) -> HeaderMap {
+async fn header_convert(headers: axum::http::HeaderMap, jar: CookieJar) -> HeaderMap {
     let authorization = match headers.get(header::AUTHORIZATION) {
         Some(v) => Some(v),
         // pandora will pass X-Authorization header
@@ -521,6 +543,12 @@ fn header_convert(headers: axum::http::HeaderMap, jar: CookieJar) -> HeaderMap {
         let c = &format!("_puid={};", puid_cookie_encoded(cookier.value()));
         cookie.push_str(c);
         debug!("request cookie `puid`: {}", c);
+    } else {
+        if let Some(v) = get_puid() {
+            let c = &format!("_puid={};", puid_cookie_encoded(v.read().await.as_str()));
+            cookie.push_str(c);
+            debug!("local `puid`: {}", c);
+        }
     }
 
     // setting cookie
@@ -587,4 +615,60 @@ async fn check_self_ip() {
             warn!("Check IP request error: {}", err)
         }
     }
+}
+
+async fn initialize_puid(email: String, password: String, mfa: Option<String>) {
+    let mut interval = tokio::time::interval(Duration::from_secs(24 * 60 * 60)); // 24 hours
+    let account = AuthAccount {
+        username: email,
+        password: password,
+        mfa,
+        option: crate::auth::AuthStrategy::Web,
+        cf_turnstile_response: None,
+    };
+    let auth_client = auth_client();
+    let api_client = api_client();
+    loop {
+        interval.tick().await;
+
+        match auth_client.do_access_token(&account).await {
+            Ok(v) => match v {
+                AccessToken::Web(access_token) => {
+                    let res = api_client
+                        .get(format!("{URL_CHATGPT_API}/backend-api/models"))
+                        .bearer_auth(access_token.access_token)
+                        .send()
+                        .await;
+                    match res {
+                        Ok(resp) => match resp.error_for_status() {
+                            Ok(v) => match v.cookies().into_iter().find(|v| v.name().eq("_puid")) {
+                                Some(cookie) => unsafe {
+                                    let puid = cookie.value().to_owned();
+                                    info!("Using PUID: {puid}");
+                                    SHARED_PUID = Some(Arc::new(RwLock::new(puid)))
+                                },
+                                None => {
+                                    warn!("Your account may not be Plus")
+                                }
+                            },
+                            Err(err) => {
+                                warn!("failed to get puid error: {}", err)
+                            }
+                        },
+                        Err(err) => {
+                            warn!("failed to get puid error: {}", err)
+                        }
+                    }
+                }
+                AccessToken::Apple(_) => {}
+            },
+            Err(err) => {
+                warn!("login error: {}", err)
+            }
+        }
+    }
+}
+
+fn get_puid() -> Option<&'static Arc<RwLock<String>>> {
+    unsafe { SHARED_PUID.as_ref() }
 }
