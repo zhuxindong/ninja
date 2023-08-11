@@ -23,7 +23,7 @@ build_macos_target() {
     cargo build --release --target $1
     sudo chmod -R 777 target
     cd target/$1/release
-    sudo upx --best --lzma opengpt
+    upx --best --lzma opengpt
     tar czvf opengpt-$tag-$1.tar.gz opengpt
     shasum -a 256 opengpt-$tag-$1.tar.gz >opengpt-$tag-$1.tar.gz.sha256
     mv opengpt-$tag-$1.tar.gz $root/uploads/
@@ -32,13 +32,13 @@ build_macos_target() {
 }
 
 build_linux_target() {
-    docker run --rm -t --privileged \
+    docker run --rm -t --user=$UID:$(id -g $USER) \
         -v $(pwd):/home/rust/src \
         -v $HOME/.cargo/registry:/root/.cargo/registry \
         -v $HOME/.cargo/git:/root/.cargo/git \
         ghcr.io/gngpp/opengpt-builder:$1 cargo build --release
     sudo chmod -R 777 target
-    sudo upx --best --lzma target/$1/release/opengpt
+    upx --best --lzma target/$1/release/opengpt
     cargo deb --target=$1 --no-build --no-strip
     cd target/$1/debian
     rename 's/.*/opengpt-'$tag'-'$1'.deb/' *.deb
@@ -53,7 +53,7 @@ build_linux_target() {
 }
 
 build_windows_target() {
-    docker run --rm -t --privileged \
+    docker run --rm -t --user=$UID:$(id -g $USER) \
         -v $(pwd):/home/rust/src \
         -v $HOME/.cargo/registry:/usr/local/cargo/registry \
         -v $HOME/.cargo/git:/usr/local/cargo/git \
