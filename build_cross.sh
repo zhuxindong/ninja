@@ -69,7 +69,7 @@ build_windows_target() {
 }
 
 if [ "$os" = "linux" ]; then
-    target_list=(x86_64-pc-windows-msvc x86_64-unknown-linux-musl aarch64-unknown-linux-musl armv7-unknown-linux-musleabi armv7-unknown-linux-musleabihf armv5te-unknown-linux-musleabi arm-unknown-linux-musleabi arm-unknown-linux-musleabihf)
+    target_list=(x86_64-unknown-linux-musl aarch64-unknown-linux-musl armv7-unknown-linux-musleabi armv7-unknown-linux-musleabihf armv5te-unknown-linux-musleabi arm-unknown-linux-musleabi arm-unknown-linux-musleabihf x86_64-pc-windows-msvc)
 
     for target in "${target_list[@]}"; do
         pull_docker_image "$target"
