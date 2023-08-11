@@ -220,7 +220,7 @@ git clone https://github.com/gngpp/opengpt.git && cd opengpt
 os=macos ./build_cross.sh # The MacOS platform is built on MacOS by default
 
 # Compile a single platform binary, take aarch64-unknown-linux-musl as an example: 
-docker run --rm -it \
+docker run --rm -it --user=$UID:$(id -g $USER) \
   -v $(pwd):/home/rust/src \
   -v $HOME/.cargo/registry:/root/.cargo/registry \
   -v $HOME/.cargo/git:/root/.cargo/git \

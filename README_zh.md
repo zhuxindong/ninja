@@ -215,7 +215,7 @@ git clone https://github.com/gngpp/opengpt.git && cd opengpt
 os=macos ./build_cross.sh # 默认在Macos上构建Macos平台
 
 # 编译单个平台二进制，以 aarch64-unknown-linux-musl 为例:
-docker run --rm -it \
+docker run --rm -it --user=$UID:$(id -g $USER) \
   -v $(pwd):/home/rust/src \
   -v $HOME/.cargo/registry:/root/.cargo/registry \
   -v $HOME/.cargo/git:/root/.cargo/git \
