@@ -586,7 +586,7 @@ async fn gpt4_body_handle(url: &str, method: &Method, body: &mut Option<Json<Val
         if let Some(body) = body.as_mut().and_then(|b| b.as_object_mut()) {
             if let Some(v) = body.get("model").and_then(|m| m.as_str()) {
                 if body.get("arkose_token").is_none() {
-                    if let Ok(arkose) = ArkoseToken::new_from_endpoint(v).await {
+                    if let Ok(arkose) = ArkoseToken::new(v).await {
                         let _ = body.insert("arkose_token".to_owned(), json!(arkose));
                     }
                 }

@@ -194,7 +194,7 @@ pub(super) fn generate_template(cover: bool, out: Option<PathBuf>) -> anyhow::Re
         std::env::current_dir()?.join("serve.toml")
     };
 
-    let template = args::ServeArgs {
+    let args = args::ServeArgs {
         config: None,
         host: Some("0.0.0.0".parse().unwrap()),
         port: Some(7999),
@@ -224,7 +224,7 @@ pub(super) fn generate_template(cover: bool, out: Option<PathBuf>) -> anyhow::Re
         puid: None,
     };
 
-    if cover {
+    let write = |out: PathBuf, args: ServeArgs| -> anyhow::Result<()> {
         #[cfg(target_family = "unix")]
         {
             use std::fs::Permissions;
@@ -235,8 +235,15 @@ pub(super) fn generate_template(cover: bool, out: Option<PathBuf>) -> anyhow::Re
         #[cfg(target_family = "windows")]
         std::fs::File::create(&out)?;
 
-        Ok(std::fs::write(out, toml::to_string_pretty(&template)?)?)
+        Ok(std::fs::write(out, toml::to_string_pretty(&args)?)?)
+    };
+
+    if cover {
+        Ok(write(out, args)?)
     } else {
+        if !out.exists() {
+            write(out, args)?;
+        }
         Ok(())
     }
 }
