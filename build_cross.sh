@@ -53,7 +53,7 @@ build_linux_target() {
 }
 
 build_windows_target() {
-    docker run --rm -t --user=$UID:$(id -g $USER) \
+    docker run --rm -t \
         -v $(pwd):/home/rust/src \
         -v $HOME/.cargo/registry:/usr/local/cargo/registry \
         -v $HOME/.cargo/git:/usr/local/cargo/git \
@@ -69,7 +69,7 @@ build_windows_target() {
 }
 
 if [ "$os" = "linux" ]; then
-    target_list=(x86_64-unknown-linux-musl aarch64-unknown-linux-musl armv7-unknown-linux-musleabi armv7-unknown-linux-musleabihf armv5te-unknown-linux-musleabi arm-unknown-linux-musleabi arm-unknown-linux-musleabihf x86_64-pc-windows-msvc)
+    target_list=(x86_64-pc-windows-msvc x86_64-unknown-linux-musl aarch64-unknown-linux-musl armv7-unknown-linux-musleabi armv7-unknown-linux-musleabihf armv5te-unknown-linux-musleabi arm-unknown-linux-musleabi arm-unknown-linux-musleabihf)
 
     for target in "${target_list[@]}"; do
         pull_docker_image "$target"
