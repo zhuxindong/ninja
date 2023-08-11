@@ -32,7 +32,7 @@ build_macos_target() {
 }
 
 build_linux_target() {
-    docker run --rm -t --privileged \
+    docker run --rm -t --user=$UID:$(id -g $USER) \
         -v $(pwd):/home/rust/src \
         -v $HOME/.cargo/registry:/root/.cargo/registry \
         -v $HOME/.cargo/git:/root/.cargo/git \
@@ -53,7 +53,7 @@ build_linux_target() {
 }
 
 build_windows_target() {
-    docker run --rm -t --privileged \
+    docker run --rm -t --user=$UID:$(id -g $USER) \
         -v $(pwd):/home/rust/src \
         -v $HOME/.cargo/registry:/usr/local/cargo/registry \
         -v $HOME/.cargo/git:/usr/local/cargo/git \
