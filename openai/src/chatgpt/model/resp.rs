@@ -89,7 +89,7 @@ pub struct Mapping {
 pub struct Message {
     pub id: String,
     pub author: Author,
-    pub create_time: f64,
+    pub create_time: Option<f64>,
     pub update_time: Option<f64>,
     pub status: String,
     pub content: Content,
@@ -140,7 +140,7 @@ pub struct GetConvosResponse {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct GetConvoResonse {
+pub struct GetConvoResponse {
     pub title: String,
     pub create_time: f64,
     pub update_time: f64,
@@ -187,8 +187,8 @@ impl ConvoResponse {
         self.message.end_turn
     }
 
-    pub fn create_time(&self) -> i64 {
-        self.message.create_time as i64
+    pub fn create_time(&self) -> Option<f64> {
+        self.message.create_time
     }
 
     pub fn role(&self) -> &Role {
