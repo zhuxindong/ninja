@@ -19,7 +19,7 @@ pub enum ContentText {
 
 #[derive(Serialize, Builder, Clone)]
 pub struct Messages<'a> {
-    id: Option<&'a str>,
+    id: String,
     author: Author,
     content: Content<'a>,
 }
@@ -105,7 +105,7 @@ impl<'a> TryFrom<PostNextConvoRequest<'a>> for PostConvoRequest<'a> {
             .action(Action::Next)
             .parent_message_id(value.parent_message_id)
             .messages(vec![MessagesBuilder::default()
-                .id(Some(value.message_id))
+                .id(value.message_id.to_owned())
                 .author(Author { role: Role::User })
                 .content(
                     ContentBuilder::default()
@@ -147,7 +147,7 @@ impl<'a> TryFrom<PostVaraintConvoRequest<'a>> for PostConvoRequest<'a> {
             .conversation_id(value.conversation_id)
             .parent_message_id(value.parent_message_id)
             .messages(vec![MessagesBuilder::default()
-                .id(Some(value.message_id))
+                .id(value.message_id.to_owned())
                 .author(Author { role: Role::User })
                 .content(
                     ContentBuilder::default()

@@ -65,7 +65,7 @@ async fn main() -> anyhow::Result<()> {
                     previous_message = message.to_string();
                 }
                 resp::PostConvoResponse::Moderation(body) => {
-                    println!("{:?}", body);
+                    println!("\n{:?}", body);
                 }
             }
         }

@@ -242,10 +242,10 @@ impl ChatGPT {
     pub async fn get_conversation<'a>(
         &self,
         req: req::GetConvoRequest<'a>,
-    ) -> ApiResult<resp::GetConvoResonse> {
+    ) -> ApiResult<resp::GetConvoResponse> {
         match req.conversation_id {
             Some(conversation_id) => {
-                self.request::<resp::GetConvoResonse>(
+                self.request::<resp::GetConvoResponse>(
                     format!("{}/conversation/{conversation_id}", self.api_prefix),
                     RequestMethod::GET,
                 )
