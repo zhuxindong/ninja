@@ -42,6 +42,7 @@ use std::path::PathBuf;
 use crate::arkose::ArkoseToken;
 use crate::auth::model::{AccessToken, AuthAccount, RefreshToken};
 use crate::auth::{AuthClient, AuthHandle};
+use crate::serve::router::chat_to_api::chat_to_api;
 use crate::serve::tokenbucket::TokenBucketLimitContext;
 use crate::{debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 
@@ -257,7 +258,7 @@ impl Launcher {
                 // unofficial backend api endpoint
                 .route("/backend-api/*path", any(unofficial_proxy))
                 // unofficial api to official api
-                .route("/conv/v1/chat/completions", post(router::chat_to_api::conv))
+                .route("/conv/v1/chat/completions", post(chat_to_api))
                 .route_layer(app_layer)
                 // unofficial public api endpoint
                 .route("/public-api/*path", any(unofficial_proxy))

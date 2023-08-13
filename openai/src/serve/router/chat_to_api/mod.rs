@@ -31,13 +31,12 @@ use crate::URL_CHATGPT_API;
 mod req;
 mod resp;
 
-pub(crate) async fn conv(
+pub(crate) async fn chat_to_api(
     headers: HeaderMap,
     jar: CookieJar,
     body: Json<req::Req>,
 ) -> Result<impl IntoResponse, ResponseError> {
     let mut messages = vec![];
-
     for body_msg in body.messages.iter() {
         let role = if body_msg.role.eq(&Role::System) {
             Role::Critic
