@@ -31,6 +31,7 @@ use crate::serve::api_client;
 use crate::serve::auth_client;
 use crate::serve::err;
 use crate::serve::err::ResponseError;
+use crate::serve::header_convert;
 use crate::serve::response_convert;
 use crate::serve::Launcher;
 use crate::serve::EMPTY;
@@ -491,6 +492,7 @@ async fn get_chat_info(jar: CookieJar) -> Result<Response<Body>, ResponseError> 
 }
 
 async fn get_share_chat(
+    headers: HeaderMap,
     jar: CookieJar,
     share_id: Path<String>,
 ) -> Result<Response<Body>, ResponseError> {
@@ -501,6 +503,7 @@ async fn get_share_chat(
                 let url = get_url();
                 let resp = api_client()
                     .get(format!("{url}/backend-api/share/{share_id}"))
+                    .headers(header_convert(headers, jar).await)
                     .bearer_auth(session.access_token)
                     .send()
                     .await
@@ -586,6 +589,7 @@ async fn get_share_chat(
 }
 
 async fn get_share_chat_info(
+    headers: HeaderMap,
     jar: CookieJar,
     share_id: Path<String>,
 ) -> Result<Response<Body>, ResponseError> {
@@ -595,6 +599,7 @@ async fn get_share_chat_info(
             let url = get_url();
             let resp = api_client()
                 .get(format!("{url}/backend-api/share/{share_id}"))
+                .headers(header_convert(headers, jar).await)
                 .bearer_auth(session.access_token)
                 .send()
                 .await
@@ -663,6 +668,7 @@ async fn get_share_chat_continue(share_id: Path<String>) -> Result<Response<Body
 }
 
 async fn get_share_chat_continue_info(
+    headers: HeaderMap,
     jar: CookieJar,
     share_id: Path<String>,
 ) -> Result<Response<Body>, ResponseError> {
@@ -672,6 +678,7 @@ async fn get_share_chat_continue_info(
                 let url = get_url();
                 let resp = api_client()
                 .get(format!("{url}/backend-api/share/{}", share_id.0))
+                .headers(header_convert(headers, jar).await)
                 .bearer_auth(session.access_token)
                 .send()
                 .await
