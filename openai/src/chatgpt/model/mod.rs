@@ -16,6 +16,8 @@ pub enum Role {
     Assistant,
     /// A message sent by the user
     User,
+    /// A system message
+    Critic,
 }
 
 impl ToString for Role {
@@ -24,6 +26,7 @@ impl ToString for Role {
             Role::System => "system".to_string(),
             Role::Assistant => "assistant".to_string(),
             Role::User => "user".to_string(),
+            Role::Critic => "critic".to_string(),
         }
     }
 }

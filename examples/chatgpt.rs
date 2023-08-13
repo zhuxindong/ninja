@@ -54,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
                         end_turn = Some(end)
                     }
 
-                    let message = &body.message()[0];
+                    let message = &body.messages()[0];
                     if message.starts_with(&previous_message) {
                         let new_chars = message.trim_start_matches(&previous_message);
                         out.write_all(new_chars.as_bytes()).await?;
@@ -114,7 +114,7 @@ async fn main() -> anyhow::Result<()> {
             if let Ok(body) = body {
                 match body {
                     resp::PostConvoResponse::Conversation(body) => {
-                        let message = &body.message()[0];
+                        let message = &body.messages()[0];
                         if message.starts_with(&previous_message) {
                             let new_chars = message.trim_start_matches(&previous_message);
                             out.write_all(new_chars.as_bytes()).await?;
