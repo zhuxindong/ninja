@@ -12,6 +12,10 @@ pub struct ResponseError {
 }
 
 impl ResponseError {
+    pub fn new(msg: String, code: StatusCode) -> Self {
+        Self { msg, code }
+    }
+
     pub fn msg(&self) -> &str {
         &self.msg
     }
