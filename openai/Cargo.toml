@@ -59,13 +59,14 @@ time = { version =  "0.3.23", optional = true }
 static-files = { version = "0.2.3", optional = true }
 tracing = { version = "0.1.37", optional = true }
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"], optional = true }
+async-stream = { version = "0.3.5", optional = true }
 
 [build-dependencies]
 static-files = "0.2.3"
 
 [features]
 default = ["serve", "limit", "sign", "opengpt", "platform", "stream", "template"]
-serve = ["dep:tracing", "dep:tracing-subscriber", "dep:tower-http", "dep:tower", "dep:bytes", "dep:time", "dep:axum-server", "dep:axum-extra", "dep:axum", "dep:static-files", "dep:futures-core", "dep:tera"]
+serve = ["dep:async-stream", "dep:tracing", "dep:tracing-subscriber", "dep:tower-http", "dep:tower", "dep:bytes", "dep:time", "dep:axum-server", "dep:axum-extra", "dep:axum", "dep:static-files", "dep:futures-core", "dep:tera"]
 opengpt = []
 platform = ["dep:tokio-util"]
 stream = ["dep:futures", "dep:tokio-stream", "dep:eventsource-stream", "dep:futures-core", "dep:pin-project-lite", "dep:nom", "dep:mime", "dep:futures-timer"]

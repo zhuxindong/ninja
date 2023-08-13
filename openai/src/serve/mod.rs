@@ -256,9 +256,11 @@ impl Launcher {
                 .route("/v1/*path", any(official_proxy))
                 // unofficial backend api endpoint
                 .route("/backend-api/*path", any(unofficial_proxy))
+                // unofficial api to official api
+                .route("/conv/v1/chat/completions", post(router::chat_to_api::conv))
+                .route_layer(app_layer)
                 // unofficial public api endpoint
                 .route("/public-api/*path", any(unofficial_proxy))
-                .route_layer(app_layer)
                 .route("/auth/token", post(post_access_token))
                 .route("/auth/refresh_token", post(post_refresh_token))
                 .route("/auth/revoke_token", post(post_revoke_token))
@@ -500,7 +502,7 @@ fn response_convert(
     }
 }
 
-async fn header_convert(headers: axum::http::HeaderMap, jar: CookieJar) -> HeaderMap {
+pub(crate) async fn header_convert(headers: axum::http::HeaderMap, jar: CookieJar) -> HeaderMap {
     let authorization = match headers.get(header::AUTHORIZATION) {
         Some(v) => Some(v),
         // pandora will pass X-Authorization header
