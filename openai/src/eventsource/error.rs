@@ -3,7 +3,6 @@ use eventsource_stream::EventStreamError;
 use nom::error::Error as NomError;
 use reqwest::header::HeaderValue;
 use reqwest::Error as ReqwestError;
-use reqwest::StatusCode;
 use std::string::FromUtf8Error;
 use thiserror::Error;
 
@@ -39,8 +38,8 @@ pub enum Error {
     #[error("Invalid header value: {0:?}")]
     InvalidContentType(HeaderValue),
     /// The status code returned by the server is invalid
-    #[error("Invalid status code: {0}")]
-    InvalidStatusCode(StatusCode),
+    #[error("Invalid status code: {}", .0.status())]
+    InvalidStatusCode(reqwest::Response),
     /// The `Last-Event-ID` cannot be formed into a Header to be submitted to the server
     #[error("Invalid `Last-Event-ID`: {0}")]
     InvalidLastEventId(String),
