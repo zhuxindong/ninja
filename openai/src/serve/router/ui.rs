@@ -46,7 +46,7 @@ use super::get_static_resource;
 const DEFAULT_INDEX: &str = "/";
 const LOGIN_INDEX: &str = "/auth/login";
 const SESSION_ID: &str = "opengpt_session";
-const BUILD_ID: &str = "QrTcOt7XatF0UtTGkJiqj";
+const BUILD_ID: &str = "oDTsXIohP85MnLZj7TlaB";
 const TEMP_404: &str = "404.htm";
 const TEMP_AUTH: &str = "auth.htm";
 const TEMP_CHAT: &str = "chat.htm";
@@ -393,12 +393,12 @@ async fn get_chat(
     if let Some(cookie) = jar.get(SESSION_ID) {
         return match extract_session(cookie.value()) {
             Ok(session) => {
-                let (template_name, path) = match conversation_id {
+                let template_name = match conversation_id {
                     Some(conversation_id) => {
-                        query.insert("chatId".to_string(), conversation_id.0);
-                        (TEMP_DETAIL, "/c/[chatId]")
+                        query.insert("default".to_string(), format!("[c, {}]", conversation_id.0));
+                        TEMP_DETAIL
                     }
-                    None => (TEMP_CHAT, DEFAULT_INDEX),
+                    None => TEMP_CHAT,
                 };
                 let props = serde_json::json!({
                     "props": {
@@ -422,7 +422,7 @@ async fn get_chat(
                         },
                         "__N_SSP": true
                     },
-                    "page": path,
+                    "page": "/[[...default]]",
                     "query": query.0,
                     "buildId": BUILD_ID,
                     "isFallback": false,
