@@ -161,10 +161,6 @@ opkg install luci-i18n-opengpt-zh-cn_1.0.2-1_all.ipk
 - API documentation
 
 - Parameter Description
-  - Platfrom API [doc](https://platform.openai.com/docs/api-reference)
-  - Backend API [doc](doc/rest.http)
-
-- Parameter Description
   - `--level`, environment variable `OPENGPT_LOG_LEVEL`, log level: default info
   - `--host`, environment variable `OPENGPT_HOST`, service listening address: default 0.0.0.0,
   - `--port`, environment variable `OPENGPT_PORT`, listening port: default 7999
