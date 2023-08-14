@@ -40,7 +40,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 
 use crate::arkose::ArkoseToken;
-use crate::auth::model::{AccessToken, AuthAccount, RefreshToken};
+use crate::auth::model::{AccessToken, AuthAccount, AuthStrategy, RefreshToken};
 use crate::auth::{AuthClient, AuthHandle};
 use crate::serve::router::chat_to_api::chat_to_api;
 use crate::serve::tokenbucket::TokenBucketLimitContext;
@@ -626,7 +626,7 @@ async fn initialize_puid(email: String, password: String, mfa: Option<String>) {
         username: email,
         password: password,
         mfa,
-        option: crate::auth::AuthStrategy::Web,
+        option: AuthStrategy::Web,
         cf_turnstile_response: None,
     };
     let auth_client = auth_client();

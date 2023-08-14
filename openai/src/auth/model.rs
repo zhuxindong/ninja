@@ -1,7 +1,19 @@
-use super::AuthStrategy;
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+#[derive(Clone, PartialEq, Eq, Hash, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthStrategy {
+    Apple,
+    Web,
+}
+
+impl Default for AuthStrategy {
+    fn default() -> Self {
+        AuthStrategy::Web
+    }
+}
 
 #[derive(Deserialize, Builder)]
 pub struct AuthAccount {
@@ -9,6 +21,7 @@ pub struct AuthAccount {
     pub password: String,
     #[builder(setter(into, strip_option), default)]
     pub mfa: Option<String>,
+    #[serde(default)]
     pub option: AuthStrategy,
     #[builder(setter(into, strip_option), default)]
     #[serde(rename = "cf-turnstile-response")]
@@ -155,8 +168,19 @@ pub struct WebUser {
     pub intercom_hash: String,
 }
 
-#[derive(Serialize)]
 pub enum AccessToken {
     Web(WebAccessToken),
     Apple(AppleAccessToken),
+}
+
+impl Serialize for AccessToken {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            AccessToken::Web(web) => serializer.serialize_some(web),
+            AccessToken::Apple(apple) => serializer.serialize_some(apple),
+        }
+    }
 }

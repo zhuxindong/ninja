@@ -13,7 +13,7 @@ use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::impersonate::Impersonate;
 use reqwest::redirect::Policy;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use base64::{engine::general_purpose, Engine as _};
 use rand::Rng;
@@ -26,6 +26,8 @@ pub mod model;
 use crate::error::AuthError;
 use crate::{debug, URL_CHATGPT_API};
 
+use self::model::AuthStrategy;
+
 const CLIENT_ID: &str = "pdlLIX2Y72MIl2rhLhTE9VV9bN905kBh";
 const OPENAI_OAUTH_URL: &str = "https://auth0.openai.com";
 const OPENAI_OAUTH_TOKEN_URL: &str = "https://auth0.openai.com/oauth/token";
@@ -36,13 +38,6 @@ const OPENAI_OAUTH_APPLE_CALLBACK_URL: &str =
 const OPENAI_API_URL: &str = "https://api.openai.com";
 
 pub type AuthResult<T, E = anyhow::Error> = anyhow::Result<T, E>;
-
-#[derive(Clone, PartialEq, Eq, Hash, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum AuthStrategy {
-    Apple,
-    Web,
-}
 
 #[async_trait::async_trait]
 pub trait AuthHandle: Send + Sync {

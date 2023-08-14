@@ -17,7 +17,6 @@ async fn main() -> anyhow::Result<()> {
             &AuthAccountBuilder::default()
                 .username(email)
                 .password(password)
-                .option(openai::auth::AuthStrategy::Web)
                 .build()?,
         )
         .await?;
