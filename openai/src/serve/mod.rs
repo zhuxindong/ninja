@@ -17,7 +17,7 @@ use axum::body::StreamBody;
 use axum::http::Response;
 use axum::routing::{any, get, post};
 use axum::Json;
-use axum_server::Handle;
+use axum_server::{AddrIncomingConfig, Handle};
 
 use axum::http::header;
 use axum::http::method::Method;
@@ -181,6 +181,12 @@ impl Launcher {
             .http2_keep_alive_interval(Some(Duration::from_secs(self.tcp_keepalive as u64)))
             .build();
 
+        let incoming_config = AddrIncomingConfig::new()
+            .tcp_sleep_on_accept_errors(true)
+            .tcp_keepalive_interval(Some(Duration::from_secs(self.tcp_keepalive as u64)))
+            .tcp_keepalive(Some(Duration::from_secs(self.tcp_keepalive as u64)))
+            .build();
+
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .worker_threads(self.workers)
@@ -282,6 +288,7 @@ impl Launcher {
                     let socket = std::net::SocketAddr::new(self.host, self.port);
                     axum_server::bind_rustls(socket, tls_config)
                         .handle(handle)
+                        .addr_incoming_config(incoming_config)
                         .http_config(http_config)
                         .serve(router.into_make_service_with_connect_info::<SocketAddr>())
                         .await
@@ -291,6 +298,7 @@ impl Launcher {
                     let socket = std::net::SocketAddr::new(self.host, self.port);
                     axum_server::bind(socket)
                         .handle(handle)
+                        .addr_incoming_config(incoming_config)
                         .http_config(http_config)
                         .serve(router.into_make_service_with_connect_info::<SocketAddr>())
                         .await
