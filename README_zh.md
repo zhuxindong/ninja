@@ -97,7 +97,7 @@ services:
       # - OPENGPT_TB_EXPIRED=
       # - OPENGPT_CF_SITE_KEY=
       # - OPENGPT_CF_SECRET_KEY=
-    volumes:
+    # volumes:
       # - ${PWD}/ssl:/etc
       # - ${PWD}/serve.toml:/serve.toml
     command: serve run
