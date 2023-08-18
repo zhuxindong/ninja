@@ -58,13 +58,13 @@ pub(crate) async fn chat_to_api(
         messages.push(message)
     }
 
-    let conv_model = conv_model(&body.model).await?;
+    let convert_model = convert_model(&body.model).await?;
     let parent_message_id = uuid();
     let req = PostConvoRequestBuilder::default()
         .action(Action::Next)
         .parent_message_id(&parent_message_id)
         .messages(messages)
-        .model(conv_model.0)
+        .model(convert_model.0)
         .history_and_training_disabled(true)
         .build()
         .map_err(|err| ResponseError::InternalServerError(err))?;
@@ -82,9 +82,9 @@ pub(crate) async fn chat_to_api(
         Ok(resp) => {
             let event_source = resp.bytes_stream().eventsource();
             if body.stream {
-                Ok(Sse::new(stream_handler(event_source, conv_model.0.to_owned())).into_response())
+                Ok(Sse::new(stream_handler(event_source, convert_model.1.to_owned())).into_response())
             } else {
-                Ok(not_stream_handler(event_source, conv_model.0.to_owned())
+                Ok(not_stream_handler(event_source, convert_model.1.to_owned())
                     .await?
                     .into_response())
             }
@@ -281,18 +281,18 @@ async fn event_convert_handler(
     Event::default().json_data(resp)
 }
 
-async fn conv_model(model: &str) -> Result<(&str, Option<ArkoseToken>), ResponseError> {
+async fn convert_model(model: &str) -> Result<(&str, &str, Option<ArkoseToken>), ResponseError> {
     match model {
-        "gpt-3.5" => Ok(("text-davinci-002-render-sha", None)),
+        "gpt-3.5" => Ok(("text-davinci-002-render-sha", "gpt-3.5-turbo", None)),
         model if model.starts_with("gpt-4") => {
             if let Some(endpoint) = unsafe { ARKOSE_TOKEN_ENDPOINT.as_ref() } {
                 if let Ok(arkose_token) = ArkoseToken::new_from_endpoint(model, endpoint).await {
-                    return Ok(("gpt-4", Some(arkose_token)));
+                    return Ok(("gpt-4", "gpt-4", Some(arkose_token)));
                 }
             }
-            Ok(("gpt-4", None))
+            Ok(("gpt-4", "gpt-4", None))
         }
-        _ => Ok(("text-davinci-002-render-sha", None)),
+        _ => Ok(("text-davinci-002-render-sha", "gpt-3.5-turbo", None)),
     }
 }
 
