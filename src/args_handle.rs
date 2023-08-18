@@ -26,6 +26,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .proxies(args.proxies.unwrap_or_default())
         .api_prefix(args.api_prefix)
         .arkose_endpoint(args.arkose_endpoint)
+        .arkose_token_endpoint(args.arkose_token_endpoint)
         .tls_keypair(None)
         .tcp_keepalive(args.tcp_keepalive)
         .timeout(args.timeout)
@@ -208,6 +209,7 @@ pub(super) fn generate_template(cover: bool, out: Option<PathBuf>) -> anyhow::Re
         tls_key: None,
         api_prefix: None,
         arkose_endpoint: None,
+        arkose_token_endpoint: None,
         sign_secret_key: None,
         tb_enable: false,
         tb_store_strategy: openai::serve::tokenbucket::Strategy::Mem,

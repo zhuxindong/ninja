@@ -1,17 +1,20 @@
 use std::collections::HashMap;
 
+use crate::arkose::ArkoseToken;
 use crate::serve::err::{self, ResponseError};
-use crate::serve::{api_client, Launcher};
+use crate::serve::{api_client, Launcher, ARKOSE_TOKEN_ENDPOINT};
 use axum::body::Body;
 use axum::http::header;
 use axum::http::method::Method;
 use axum::http::Response;
 use axum::http::StatusCode;
+use axum::response::IntoResponse;
 use axum::{
     http::{HeaderMap, Uri},
     routing::any,
     Form, Router,
 };
+use serde_json::json;
 
 pub(super) fn config(router: Router, args: &Launcher) -> Router {
     if args.arkose_endpoint.is_none() {
@@ -28,7 +31,7 @@ async fn proxy(
     method: Method,
     mut headers: HeaderMap,
     mut body: Option<Form<HashMap<String, String>>>,
-) -> Result<Response<Body>, ResponseError> {
+) -> Result<impl IntoResponse, ResponseError> {
     let mut x = unsafe { super::STATIC_FILES.as_ref().unwrap().iter() };
     if let Some((_, v)) = x.find(|(k, _v)| k.contains(uri.path())) {
         return Ok(Response::builder()
@@ -42,6 +45,39 @@ async fn proxy(
         .path()
         .eq("/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147")
     {
+        if let Some(endpoint) = unsafe { ARKOSE_TOKEN_ENDPOINT.as_ref() } {
+            if let Ok(arkose_token) = ArkoseToken::new_from_endpoint("gpt4-fuck", endpoint).await {
+                let target_json = json!({
+                    "token": arkose_token,
+                    "challenge_url":"",
+                    "challenge_url_cdn":"https://client-api.arkoselabs.com/cdn/fc/assets/ec-game-core/bootstrap/1.14.1/standard/game_core_bootstrap.js",
+                    "challenge_url_cdn_sri":null,
+                    "noscript":"Disable",
+                    "inject_script_integrity":null,
+                    "inject_script_url":null,
+                    "mbio":true,
+                    "tbio":true,
+                    "kbio":true,
+                    "styles":null,
+                    "iframe_width":null,
+                    "iframe_height":null,
+                    "disable_default_styling":false,
+                    "string_table":{
+                        "meta.api_timeout_error":"与验证服务器的连接已中断。请重新加载挑战以重试。",
+                        "meta.generic_error":"出错了。请重新加载挑战以重试。",
+                        "meta.loading_info":"进行中，请稍候...",
+                        "meta.reload_challenge":"重新加载挑战",
+                        "meta.visual_challenge_frame_title":"视觉挑战"
+                    }
+                });
+
+                return Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+                    .body(Body::from(target_json.to_string()))
+                    .map_err(|err| err::ResponseError::InternalServerError(err))?);
+            }
+        }
         if let Some(body) = &mut body {
             if let Some(v) = body.get_mut("site") {
                 if v.starts_with("http") {
