@@ -4,13 +4,10 @@ pub mod sign;
 #[cfg(feature = "limit")]
 pub mod tokenbucket;
 
+pub mod err;
+pub mod load_balancer;
 #[cfg(feature = "template")]
 pub mod router;
-
-pub mod err;
-
-pub mod load_balancer;
-
 pub mod signal;
 
 use axum::body::StreamBody;
@@ -55,6 +52,7 @@ static INIT: Once = Once::new();
 static mut API_CLIENT: Option<load_balancer::ClientLoadBalancer<Client>> = None;
 static mut AUTH_CLIENT: Option<load_balancer::ClientLoadBalancer<AuthClient>> = None;
 static mut SHARED_PUID: Option<Arc<RwLock<String>>> = None;
+pub(crate) static mut ARKOSE_TOKEN_ENDPOINT: Option<String> = None;
 
 pub(super) fn api_client() -> Client {
     if let Some(lb) = unsafe { &API_CLIENT } {
@@ -102,6 +100,8 @@ pub struct Launcher {
     api_prefix: Option<String>,
     /// Arkose endpoint
     arkose_endpoint: Option<String>,
+    /// get arkose-token endpoint
+    arkose_token_endpoint: Option<String>,
     /// Enable url signature (signature secret key)
     #[cfg(feature = "sign")]
     sign_secret_key: Option<String>,
@@ -152,6 +152,9 @@ impl Launcher {
             if let Some(puid) = self.puid.as_ref() {
                 info!("Using PUID: {puid}");
                 SHARED_PUID = Some(Arc::new(RwLock::new(puid.to_owned())))
+            }
+            if let Some(endpoint) = self.arkose_token_endpoint.as_ref() {
+                ARKOSE_TOKEN_ENDPOINT = Some(endpoint.clone())
             }
         });
 
@@ -586,7 +589,7 @@ fn puid_cookie_encoded(input: &str) -> String {
             })
             .collect::<String>();
 
-        format!("{}:{}", name, encoded_value)
+        format!("{name}:{encoded_value}")
     } else {
         input.to_string()
     }
@@ -595,10 +598,14 @@ fn puid_cookie_encoded(input: &str) -> String {
 async fn gpt4_body_handle(url: &str, method: &Method, body: &mut Option<Json<Value>>) {
     if url.contains("/backend-api/conversation") && method.eq("POST") {
         if let Some(body) = body.as_mut().and_then(|b| b.as_object_mut()) {
-            if let Some(v) = body.get("model").and_then(|m| m.as_str()) {
+            if let Some(model) = body.get("model").and_then(|m| m.as_str()) {
                 if body.get("arkose_token").is_none() {
-                    if let Ok(arkose) = ArkoseToken::new(v).await {
-                        let _ = body.insert("arkose_token".to_owned(), json!(arkose));
+                    let arkose_token_res = match unsafe { &ARKOSE_TOKEN_ENDPOINT } {
+                        Some(endpoint) => ArkoseToken::new_from_endpoint(model, &endpoint).await,
+                        None => ArkoseToken::new(model).await,
+                    };
+                    if let Ok(arkose_token) = arkose_token_res {
+                        let _ = body.insert("arkose_token".to_owned(), json!(arkose_token));
                     }
                 }
             }
@@ -609,7 +616,7 @@ async fn gpt4_body_handle(url: &str, method: &Method, body: &mut Option<Json<Val
 async fn check_self_ip() {
     match api_client()
         .get("https://ifconfig.me")
-        .timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(60))
         .header(header::ACCEPT, "application/json")
         .send()
         .await

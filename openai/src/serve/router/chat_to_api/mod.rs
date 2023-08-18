@@ -14,7 +14,7 @@ use std::convert::Infallible;
 use crate::{
     arkose::ArkoseToken,
     chatgpt::model::resp::{ConvoResponse, PostConvoResponse},
-    serve::{api_client, err::ResponseError, header_convert},
+    serve::{api_client, err::ResponseError, header_convert, ARKOSE_TOKEN_ENDPOINT},
 };
 use crate::{chatgpt::model::Role, debug};
 
@@ -284,11 +284,13 @@ async fn event_convert_handler(
 async fn conv_model(model: &str) -> Result<(&str, Option<ArkoseToken>), ResponseError> {
     match model {
         "gpt-3.5" => Ok(("text-davinci-002-render-sha", None)),
-        s if s.starts_with("gpt-4") => {
-            let arkose_token = ArkoseToken::new(s)
-                .await
-                .map_err(|err| ResponseError::InternalServerError(err))?;
-            Ok(("gpt-4", Some(arkose_token)))
+        model if model.starts_with("gpt-4") => {
+            if let Some(endpoint) = unsafe { ARKOSE_TOKEN_ENDPOINT.as_ref() } {
+                if let Ok(arkose_token) = ArkoseToken::new_from_endpoint(model, endpoint).await {
+                    return Ok(("gpt-4", Some(arkose_token)));
+                }
+            }
+            Ok(("gpt-4", None))
         }
         _ => Ok(("text-davinci-002-render-sha", None)),
     }

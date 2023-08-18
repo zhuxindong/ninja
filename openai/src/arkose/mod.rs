@@ -45,6 +45,12 @@ impl TryFrom<&str> for GPT4Model {
 #[derive(Clone, Debug)]
 pub struct ArkoseToken(String);
 
+impl ToString for ArkoseToken {
+    fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+}
+
 impl ArkoseToken {
     pub async fn new(model: &str) -> anyhow::Result<Self> {
         match GPT4Model::try_from(model) {
@@ -52,7 +58,7 @@ impl ArkoseToken {
                 INIT.call_once(|| {
                     let client = reqwest::Client::builder()
                         .user_agent(crate::HEADER_UA)
-                        .impersonate_builder(reqwest::impersonate::Impersonate::OkHttpAndroid13)
+                        .impersonate_builder(reqwest::impersonate::Impersonate::Chrome109)
                         .build()
                         .unwrap();
                     unsafe { CLIENT = Some(client) };
@@ -64,19 +70,19 @@ impl ArkoseToken {
         }
     }
 
-    pub async fn new_from_endpoint(model: &str) -> anyhow::Result<Self> {
+    pub async fn new_from_endpoint(model: &str, endpoint: &str) -> anyhow::Result<Self> {
         match GPT4Model::try_from(model) {
             Ok(_) => {
                 INIT.call_once(|| {
                     let client = reqwest::Client::builder()
                         .user_agent(crate::HEADER_UA)
-                        .impersonate_builder(reqwest::impersonate::Impersonate::OkHttpAndroid13)
+                        .impersonate_builder(reqwest::impersonate::Impersonate::Chrome109)
                         .build()
                         .unwrap();
                     unsafe { CLIENT = Some(client) };
                 });
 
-                Ok(get_endpoint_arkose_token(unsafe { CLIENT.as_ref() }).await?)
+                Ok(get_arkose_token_from_endpoint(unsafe { CLIENT.as_ref() }, endpoint).await?)
             }
             Err(_) => anyhow::bail!("Models are not supported: {}", model),
         }
@@ -98,13 +104,13 @@ struct ArkoseResponse {
 }
 
 /// Build it yourself: https://github.com/gngpp/arkose-generator
-async fn get_endpoint_arkose_token(
+async fn get_arkose_token_from_endpoint(
     client: Option<&reqwest::Client>,
+    endpoint: &str,
 ) -> anyhow::Result<ArkoseToken> {
     match client {
         Some(client) => {
-            let url = "https://ai.fakeopen.com/api/arkose/token";
-            let resp = client.get(url).send().await?;
+            let resp = client.get(endpoint).send().await?;
             let arkose = resp.json::<ArkoseResponse>().await?;
             Ok(ArkoseToken(arkose.token))
         }
