@@ -4,6 +4,7 @@ pub mod sign;
 #[cfg(feature = "limit")]
 pub mod tokenbucket;
 
+pub mod env;
 pub mod err;
 pub mod load_balancer;
 #[cfg(feature = "template")]
@@ -25,11 +26,9 @@ use axum_server::tls_rustls::RustlsConfig;
 use axum_server::HttpConfig;
 use derive_builder::Builder;
 use reqwest::header::{HeaderMap, HeaderValue};
-use reqwest::Client;
 use serde_json::{json, Value};
-use std::sync::{Arc, Once};
+use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
-use tokio::sync::RwLock;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -38,7 +37,7 @@ use std::path::PathBuf;
 
 use crate::arkose::ArkoseToken;
 use crate::auth::model::{AccessToken, AuthAccount, AuthStrategy, RefreshToken};
-use crate::auth::{AuthClient, AuthHandle};
+use crate::auth::AuthHandle;
 use crate::serve::router::chat_to_api::chat_to_api;
 use crate::serve::tokenbucket::TokenBucketLimitContext;
 use crate::{debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
@@ -46,27 +45,9 @@ use crate::{debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 use crate::serve::err::ResponseError;
 use crate::{HEADER_UA, URL_CHATGPT_API, URL_PLATFORM_API};
 
+use self::env::ENV_HOLDER;
+
 const EMPTY: &str = "";
-static INIT: Once = Once::new();
-
-static mut API_CLIENT: Option<load_balancer::ClientLoadBalancer<Client>> = None;
-static mut AUTH_CLIENT: Option<load_balancer::ClientLoadBalancer<AuthClient>> = None;
-static mut SHARED_PUID: Option<Arc<RwLock<String>>> = None;
-pub(crate) static mut ARKOSE_TOKEN_ENDPOINT: Option<String> = None;
-
-pub(super) fn api_client() -> Client {
-    if let Some(lb) = unsafe { &API_CLIENT } {
-        return lb.next();
-    }
-    panic!("The requesting client must be initialized")
-}
-
-pub(super) fn auth_client() -> AuthClient {
-    if let Some(lb) = unsafe { &AUTH_CLIENT } {
-        return lb.next();
-    }
-    panic!("The requesting oauth client must be initialized")
-}
 
 #[derive(Builder, Clone)]
 pub struct Launcher {
@@ -140,24 +121,6 @@ impl Launcher {
             .with(tracing_subscriber::fmt::layer())
             .init();
 
-        INIT.call_once(|| unsafe {
-            API_CLIENT = Some(
-                load_balancer::ClientLoadBalancer::<Client>::new_api_client(&self)
-                    .expect("Failed to initialize the requesting client"),
-            );
-            AUTH_CLIENT = Some(
-                load_balancer::ClientLoadBalancer::<AuthClient>::new_auth_client(&self)
-                    .expect("Failed to initialize the requesting oauth client"),
-            );
-            if let Some(puid) = self.puid.as_ref() {
-                info!("Using PUID: {puid}");
-                SHARED_PUID = Some(Arc::new(RwLock::new(puid.to_owned())))
-            }
-            if let Some(endpoint) = self.arkose_token_endpoint.as_ref() {
-                ARKOSE_TOKEN_ENDPOINT = Some(endpoint.clone())
-            }
-        });
-
         let global_layer = tower::ServiceBuilder::new()
             .layer(tower_http::trace::TraceLayer::new_for_http())
             .layer(tower::limit::ConcurrencyLimitLayer::new(
@@ -204,6 +167,8 @@ impl Launcher {
             info!("Starting {} workers", self.workers);
 
             info!("Concurrent limit {}", self.concurrent_limit);
+
+            env::ENV_HOLDER.init(&self);
 
             tokio::spawn(check_self_ip());
 
@@ -327,27 +292,30 @@ impl Launcher {
 async fn post_access_token(
     account: axum::Form<AuthAccount>,
 ) -> Result<Json<AccessToken>, ResponseError> {
-    match auth_client().do_access_token(&account.0).await {
+    let env = ENV_HOLDER.get_instance();
+    match env.load_auth_client().do_access_token(&account.0).await {
         Ok(access_token) => Ok(Json(access_token)),
         Err(err) => Err(ResponseError::BadRequest(err)),
     }
 }
 
 async fn post_refresh_token(headers: HeaderMap) -> Result<Json<RefreshToken>, ResponseError> {
+    let env = ENV_HOLDER.get_instance();
     let refresh_token = headers
         .get(header::AUTHORIZATION)
         .map_or(EMPTY, |e| e.to_str().unwrap_or_default());
-    match auth_client().do_refresh_token(refresh_token).await {
+    match env.load_auth_client().do_refresh_token(refresh_token).await {
         Ok(refresh_token) => Ok(Json(refresh_token)),
         Err(err) => Err(ResponseError::BadRequest(err)),
     }
 }
 
 async fn post_revoke_token(headers: HeaderMap) -> Result<axum::http::StatusCode, ResponseError> {
+    let env = ENV_HOLDER.get_instance();
     let refresh_token = headers
         .get(header::AUTHORIZATION)
         .map_or(EMPTY, |e| e.to_str().unwrap_or_default());
-    match auth_client().do_revoke_token(refresh_token).await {
+    match env.load_auth_client().do_revoke_token(refresh_token).await {
         Ok(_) => Ok(axum::http::StatusCode::OK),
         Err(err) => Err(ResponseError::BadRequest(err)),
     }
@@ -412,8 +380,9 @@ async fn official_proxy(
             format!("{URL_PLATFORM_API}{}?{}", uri.path(), query)
         }
     };
-
-    let builder = api_client()
+    let env = ENV_HOLDER.get_instance();
+    let builder = env
+        .load_api_client()
         .request(method, &url)
         .headers(header_convert(headers, jar).await);
     let resp = match body {
@@ -455,7 +424,9 @@ async fn unofficial_proxy(
 
     gpt4_body_handle(&url, &method, &mut body).await;
 
-    let builder = api_client()
+    let env = ENV_HOLDER.get_instance();
+    let builder = env
+        .load_api_client()
         .request(method, url)
         .headers(header_convert(headers, jar).await);
     let resp = match body {
@@ -558,8 +529,9 @@ pub(crate) async fn header_convert(headers: axum::http::HeaderMap, jar: CookieJa
         cookie.push_str(c);
         debug!("request cookie `puid`: {}", c);
     } else {
-        if let Some(v) = get_puid() {
-            let c = &format!("_puid={};", puid_cookie_encoded(v.read().await.as_str()));
+        let env = ENV_HOLDER.get_instance();
+        if let Some(puid) = env.get_share_puid() {
+            let c = &format!("_puid={};", puid_cookie_encoded(&puid));
             cookie.push_str(c);
             debug!("local `puid`: {}", c);
         }
@@ -600,7 +572,8 @@ async fn gpt4_body_handle(url: &str, method: &Method, body: &mut Option<Json<Val
         if let Some(body) = body.as_mut().and_then(|b| b.as_object_mut()) {
             if let Some(model) = body.get("model").and_then(|m| m.as_str()) {
                 if body.get("arkose_token").is_none() {
-                    let arkose_token_res = match unsafe { &ARKOSE_TOKEN_ENDPOINT } {
+                    let env = ENV_HOLDER.get_instance();
+                    let arkose_token_res = match env.get_arkose_token_endpoint() {
                         Some(endpoint) => ArkoseToken::new_from_endpoint(model, &endpoint).await,
                         None => ArkoseToken::new(model).await,
                     };
@@ -614,7 +587,9 @@ async fn gpt4_body_handle(url: &str, method: &Method, body: &mut Option<Json<Val
 }
 
 async fn check_self_ip() {
-    match api_client()
+    match ENV_HOLDER
+        .get_instance()
+        .load_api_client()
         .get("https://ifconfig.me")
         .timeout(Duration::from_secs(60))
         .header(header::ACCEPT, "application/json")
@@ -644,15 +619,15 @@ async fn initialize_puid(email: String, password: String, mfa: Option<String>) {
         option: AuthStrategy::Web,
         cf_turnstile_response: None,
     };
-    let auth_client = auth_client();
-    let api_client = api_client();
+    let env = ENV_HOLDER.get_instance();
     loop {
         interval.tick().await;
 
-        match auth_client.do_access_token(&account).await {
+        match env.load_auth_client().do_access_token(&account).await {
             Ok(v) => match v {
                 AccessToken::Web(access_token) => {
-                    let res = api_client
+                    let res = env
+                        .load_api_client()
                         .get(format!("{URL_CHATGPT_API}/backend-api/models"))
                         .bearer_auth(access_token.access_token)
                         .send()
@@ -660,11 +635,11 @@ async fn initialize_puid(email: String, password: String, mfa: Option<String>) {
                     match res {
                         Ok(resp) => match resp.error_for_status() {
                             Ok(v) => match v.cookies().into_iter().find(|v| v.name().eq("_puid")) {
-                                Some(cookie) => unsafe {
+                                Some(cookie) => {
                                     let puid = cookie.value().to_owned();
                                     info!("Using PUID: {puid}");
-                                    SHARED_PUID = Some(Arc::new(RwLock::new(puid)))
-                                },
+                                    env.update_share_puid(puid)
+                                }
                                 None => {
                                     warn!("Your account may not be Plus")
                                 }
@@ -685,8 +660,4 @@ async fn initialize_puid(email: String, password: String, mfa: Option<String>) {
             }
         }
     }
-}
-
-fn get_puid() -> Option<&'static Arc<RwLock<String>>> {
-    unsafe { SHARED_PUID.as_ref() }
 }

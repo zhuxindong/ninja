@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::arkose::ArkoseToken;
 use crate::serve::err::{self, ResponseError};
-use crate::serve::{api_client, Launcher, ARKOSE_TOKEN_ENDPOINT};
+use crate::serve::{env, Launcher};
 use axum::body::Body;
 use axum::http::header;
 use axum::http::method::Method;
@@ -45,7 +45,8 @@ async fn proxy(
         .path()
         .eq("/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147")
     {
-        if let Some(endpoint) = unsafe { ARKOSE_TOKEN_ENDPOINT.as_ref() } {
+        let env = env::ENV_HOLDER.get_instance();
+        if let Some(endpoint) = env.get_arkose_token_endpoint() {
             if let Ok(arkose_token) = ArkoseToken::new_from_endpoint("gpt4-fuck", endpoint).await {
                 let target_json = json!({
                     "token": arkose_token,
@@ -114,7 +115,7 @@ async fn proxy(
     headers.remove("X-Forwarded-Server");
     headers.remove("X-Real-Ip");
 
-    let client = api_client();
+    let client = env::ENV_HOLDER.get_instance().load_api_client();
 
     let url = format!("https://client-api.arkoselabs.com{}", uri.path());
     let resp = match body {

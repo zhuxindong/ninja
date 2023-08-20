@@ -14,7 +14,7 @@ use std::convert::Infallible;
 use crate::{
     arkose::ArkoseToken,
     chatgpt::model::resp::{ConvoResponse, PostConvoResponse},
-    serve::{api_client, err::ResponseError, header_convert, ARKOSE_TOKEN_ENDPOINT},
+    serve::{env, err::ResponseError, header_convert},
 };
 use crate::{chatgpt::model::Role, debug};
 
@@ -69,8 +69,9 @@ pub(crate) async fn chat_to_api(
         .build()
         .map_err(|err| ResponseError::InternalServerError(err))?;
 
-    let client = api_client();
-    let resp = client
+    let env = env::ENV_HOLDER.get_instance();
+    let resp = env
+        .load_api_client()
         .post(format!("{URL_CHATGPT_API}/backend-api/conversation"))
         .headers(header_convert(headers, jar).await)
         .json(&req)
@@ -82,7 +83,10 @@ pub(crate) async fn chat_to_api(
         Ok(resp) => {
             let event_source = resp.bytes_stream().eventsource();
             if body.stream {
-                Ok(Sse::new(stream_handler(event_source, convert_model.1.to_owned())).into_response())
+                Ok(
+                    Sse::new(stream_handler(event_source, convert_model.1.to_owned()))
+                        .into_response(),
+                )
             } else {
                 Ok(not_stream_handler(event_source, convert_model.1.to_owned())
                     .await?
@@ -285,7 +289,8 @@ async fn convert_model(model: &str) -> Result<(&str, &str, Option<ArkoseToken>),
     match model {
         "gpt-3.5" => Ok(("text-davinci-002-render-sha", "gpt-3.5-turbo", None)),
         model if model.starts_with("gpt-4") => {
-            if let Some(endpoint) = unsafe { ARKOSE_TOKEN_ENDPOINT.as_ref() } {
+            let env = env::ENV_HOLDER.get_instance();
+            if let Some(endpoint) = env.get_arkose_token_endpoint() {
                 if let Ok(arkose_token) = ArkoseToken::new_from_endpoint(model, endpoint).await {
                     return Ok(("gpt-4", "gpt-4", Some(arkose_token)));
                 }
