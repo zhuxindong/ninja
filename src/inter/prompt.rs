@@ -1,6 +1,7 @@
 use anyhow::Context;
 use inquire::*;
 
+#[allow(warnings)]
 pub(crate) fn account_prompt() -> anyhow::Result<(String, String)> {
     println!("Please enter your email and password to log in ChatGPT!");
     let email = Text::new("Email:")

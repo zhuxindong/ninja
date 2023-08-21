@@ -1,4 +1,7 @@
-use std::{ops::Not, path::PathBuf};
+use std::{env, ffi::OsString, ops::Not, path::PathBuf};
+
+use anyhow::bail;
+use inquire::ui::{Color, RenderConfig, Styled};
 
 use crate::{
     args::{self, ServeArgs},
@@ -178,7 +181,53 @@ pub(super) fn serve_log() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub(super) fn generate_template(cover: bool, out: Option<PathBuf>) -> anyhow::Result<()> {
+pub(super) fn edit_template_file(edit: Option<PathBuf>) -> anyhow::Result<()> {
+    if let Some(path) = edit {
+        if !path.is_file() {
+            bail!("{} not is file", path.display())
+        }
+
+        let extention = if let Some(extention) = path.extension() {
+            format!(".{:?}", extention)
+        } else {
+            "".to_owned()
+        };
+
+        fn get_default_editor() -> OsString {
+            if let Some(prog) = env::var_os("VISUAL") {
+                return prog;
+            }
+            if let Some(prog) = env::var_os("EDITOR") {
+                return prog;
+            }
+            if cfg!(windows) {
+                "notepad.exe".into()
+            } else {
+                "vi".into()
+            }
+        }
+
+        let file_string = std::fs::read_to_string(&path)?;
+
+        let mut edit_content = inquire::Editor::new("Edit:")
+            .with_editor_command(&get_default_editor())
+            .with_render_config(RenderConfig::default().with_canceled_prompt_indicator(
+                Styled::new("<skipped>").with_fg(Color::DarkYellow),
+            ))
+            .with_file_extension(&extention)
+            .with_predefined_text(&file_string)
+            .prompt()?;
+
+        println!("------------Edit Complete------------\n{}", edit_content);
+
+        edit_content.push('\n');
+
+        std::fs::write(path, edit_content)?
+    }
+    Ok(())
+}
+
+pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
     let out = if let Some(out) = out {
         match out.is_dir() {
             false => {
@@ -240,12 +289,8 @@ pub(super) fn generate_template(cover: bool, out: Option<PathBuf>) -> anyhow::Re
         Ok(std::fs::write(out, toml::to_string_pretty(&args)?)?)
     };
 
-    if cover {
-        Ok(write(out, args)?)
-    } else {
-        if !out.exists() {
-            write(out, args)?;
-        }
-        Ok(())
+    if !out.exists() {
+        write(out, args)?;
     }
+    Ok(())
 }

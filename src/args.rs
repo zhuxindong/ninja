@@ -41,12 +41,12 @@ pub(super) enum ServeSubcommand {
     Log,
     /// Generate config template file (toml format file)
     GT {
-        /// Overwrite existing configuration file
-        #[clap(short, long, env = "OPENGPT_SERVE_GT_COVER")]
-        cover: bool,
         /// Configuration template output to file (toml format file)
-        #[clap(short, long, env = "OPENGPT_SERVE_GT_OUT")]
+        #[clap(short, long, env = "OPENGPT_SERVE_GT_OUT", group = "gt")]
         out: Option<PathBuf>,
+        /// Edit configuration template file
+        #[clap(short, long, group = "gt")]
+        edit: Option<PathBuf>,
     },
 }
 
@@ -178,8 +178,6 @@ pub(super) enum SubCommands {
     /// Start the http server
     #[clap(subcommand)]
     Serve(ServeSubcommand),
-    /// Account configuration settings
-    Account,
     /// Configuration Settings
     Config {
         /// Working directory, refresh_token will be stored in there if specified
