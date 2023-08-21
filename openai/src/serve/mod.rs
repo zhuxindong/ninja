@@ -534,6 +534,7 @@ pub(crate) async fn header_convert(headers: axum::http::HeaderMap, jar: CookieJa
             let c = &format!("_puid={};", puid_cookie_encoded(&puid));
             cookie.push_str(c);
             debug!("local `puid`: {}", c);
+            drop(puid)
         }
     }
 
@@ -637,8 +638,8 @@ async fn initialize_puid(email: String, password: String, mfa: Option<String>) {
                             Ok(v) => match v.cookies().into_iter().find(|v| v.name().eq("_puid")) {
                                 Some(cookie) => {
                                     let puid = cookie.value().to_owned();
-                                    info!("Using PUID: {puid}");
-                                    env.update_share_puid(puid)
+                                    info!("Update PUID: {puid}");
+                                    env.set_share_puid(puid)
                                 }
                                 None => {
                                     warn!("Your account may not be Plus")
