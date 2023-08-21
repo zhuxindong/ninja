@@ -393,13 +393,13 @@ impl ChatGPT {
     }
 }
 
-pub struct OpenGPTBuilder {
+pub struct ChatGPTBuilder {
     builder: reqwest::ClientBuilder,
     api_prefix: String,
     access_token: RwLock<String>,
 }
 
-impl OpenGPTBuilder {
+impl ChatGPTBuilder {
     pub fn access_token(mut self, access_token: String) -> Self {
         self.access_token = RwLock::new(access_token);
         self
@@ -455,13 +455,13 @@ impl OpenGPTBuilder {
         }
     }
 
-    pub fn builder() -> OpenGPTBuilder {
+    pub fn builder() -> ChatGPTBuilder {
         let builder = reqwest::ClientBuilder::new()
             .user_agent(HEADER_UA)
             .impersonate_builder(Impersonate::OkHttpAndroid13)
             .cookie_store(true);
 
-        OpenGPTBuilder {
+        ChatGPTBuilder {
             builder,
             api_prefix: format!("{URL_CHATGPT_API}/backend-api"),
             access_token: RwLock::default(),

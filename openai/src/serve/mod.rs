@@ -531,7 +531,7 @@ pub(crate) async fn header_convert(headers: axum::http::HeaderMap, jar: CookieJa
     } else {
         let env = ENV_HOLDER.get_instance();
         if let Some(puid) = env.get_share_puid() {
-            let c = &format!("_puid={};", puid_cookie_encoded(&puid));
+            let c = &format!("_puid={};", puid);
             cookie.push_str(c);
             debug!("local `puid`: {}", c);
             drop(puid)
