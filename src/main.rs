@@ -18,7 +18,7 @@ pub mod args;
 pub mod args_handle;
 pub mod conf;
 pub mod env;
-pub mod prompt;
+pub mod inter;
 pub mod util;
 
 fn main() -> anyhow::Result<()> {
@@ -26,9 +26,6 @@ fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", opt.level);
     match opt.command {
         Some(command) => match command {
-            SubCommands::Account => {
-                prompt::account_prompt()?;
-            }
             SubCommands::Config {
                 workdir: _,
                 unofficial_api: _,
@@ -46,8 +43,9 @@ fn main() -> anyhow::Result<()> {
                 args::ServeSubcommand::Status => args_handle::serve_status()?,
                 #[cfg(target_family = "unix")]
                 args::ServeSubcommand::Log => args_handle::serve_log()?,
-                args::ServeSubcommand::GT { cover, out } => {
-                    args_handle::generate_template(cover, out)?;
+                args::ServeSubcommand::GT { out, edit } => {
+                    args_handle::generate_template(out)?;
+                    args_handle::edit_template_file(edit)?;
                 }
             },
         },
