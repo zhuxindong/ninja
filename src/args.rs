@@ -178,6 +178,8 @@ pub(super) enum SubCommands {
     /// Start the http server
     #[clap(subcommand)]
     Serve(ServeSubcommand),
+    /// Terminal interaction
+    Terminal,
     /// Configuration Settings
     Config {
         /// Working directory, refresh_token will be stored in there if specified

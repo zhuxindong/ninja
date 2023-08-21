@@ -1,8 +1,10 @@
+use std::fmt::{Display, Formatter};
+
 use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Clone, PartialEq, Eq, Hash, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Hash, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum AuthStrategy {
     Apple,
@@ -12,6 +14,12 @@ pub enum AuthStrategy {
 impl Default for AuthStrategy {
     fn default() -> Self {
         AuthStrategy::Web
+    }
+}
+
+impl Display for AuthStrategy {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{self:?}")
     }
 }
 

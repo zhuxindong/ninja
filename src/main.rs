@@ -48,6 +48,7 @@ fn main() -> anyhow::Result<()> {
                     args_handle::edit_template_file(edit)?;
                 }
             },
+            SubCommands::Terminal => inter::prompt()?,
         },
         None => {}
     }
