@@ -1,4 +1,4 @@
-use std::{ops::Not, path::PathBuf, ffi::OsString, env};
+use std::{env, ffi::OsString, ops::Not, path::PathBuf};
 
 use anyhow::bail;
 use inquire::ui::{Color, RenderConfig, Styled};
