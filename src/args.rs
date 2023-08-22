@@ -67,7 +67,7 @@ pub(super) struct ServeArgs {
     /// Concurrent limit (Enforces a limit on the concurrent number of requests the underlying)
     #[clap(long, env = "OPENGPT_CONCUURENT_LIMIT", default_value = "65535")]
     pub(super) concurrent_limit: usize,
-    /// Server proxies pool, example: protocol://user:pass@ip:port
+    /// Server proxies pool, Example: protocol://user:pass@ip:port
     #[clap(long, env = "OPENGPT_PROXY", value_parser = parse_proxies_url)]
     pub(super) proxies: Option<std::vec::Vec<String>>,
     /// Client timeout (secends)
@@ -85,18 +85,12 @@ pub(super) struct ServeArgs {
     /// TLS private key file path (EC/PKCS8/RSA)
     #[clap(long, env = "OPENGPT_TLS_KEY", requires = "tls_cert")]
     pub(super) tls_key: Option<PathBuf>,
-    /// Account Plus puid cookie value
+    /// PUID cookie value of Plus account
     #[clap(long, env = "OPENGPT_PUID")]
     pub(super) puid: Option<String>,
-    /// Get the user mailbox of the PUID
-    #[clap(long, env = "OPENGPT_PUID_EMAIL", requires = "puid_password")]
-    pub(super) puid_email: Option<String>,
-    /// Get the user password of the PUID
-    #[clap(long, env = "OPENGPT_PUID_PASSWORD", requires = "puid_email")]
-    pub(super) puid_password: Option<String>,
-    /// Get the user mfa code of the PUID
-    #[clap(long, env = "OPENGPT_PUID_MFA", requires = "puid_email")]
-    pub(super) puid_mfa: Option<String>,
+    /// Obtain the PUID of the Plus account user, Example: `user:pass` or `user:pass:mfa`
+    #[clap(long, env = "OPENGPT_PUID_USER", value_parser = parse_puid_user)]
+    pub(super) puid_user: Option<(String, String, Option<String>)>,
     /// Web UI api prefix
     #[clap(long, env = "OPENGPT_UI_API_PREFIX", value_parser = parse_url)]
     pub(super) api_prefix: Option<String>,
@@ -123,7 +117,7 @@ pub(super) struct ServeArgs {
     )]
     #[cfg(feature = "limit")]
     pub(super) tb_store_strategy: tokenbucket::Strategy,
-    /// Token bucket redis url(support cluster), example: redis://user:pass@ip:port
+    /// Token bucket redis url(support cluster), Example: redis://user:pass@ip:port
     #[clap(
         long,
         env = "OPENGPT_TB_REDIS_URL",
@@ -160,14 +154,12 @@ pub(super) struct ServeArgs {
     )]
     #[cfg(feature = "limit")]
     pub(super) tb_expired: u32,
-
     /// Cloudflare turnstile captcha site key
     #[clap(long, env = "OPENGPT_CF_SITE_KEY", requires = "cf_secret_key")]
     pub(super) cf_site_key: Option<String>,
     /// Cloudflare turnstile captcha secret key
     #[clap(long, env = "OPENGPT_CF_SECRET_KEY", requires = "cf_site_key")]
     pub(super) cf_secret_key: Option<String>,
-
     /// Disable WebUI
     #[clap(short = 'D', long, env = "OPENGPT_DISABLE_WEBUI")]
     pub(super) disable_webui: bool,
@@ -260,5 +252,19 @@ fn parse_config(s: &str) -> anyhow::Result<PathBuf> {
             }
             Ok(path)
         }
+    }
+}
+
+fn parse_puid_user(s: &str) -> anyhow::Result<(String, String, Option<String>)> {
+    let parts: Vec<&str> = s.split(':').collect();
+
+    match parts.len() {
+        2 => Ok((parts[0].to_string(), parts[1].to_string(), None)),
+        3 => Ok((
+            parts[0].to_string(),
+            parts[1].to_string(),
+            Some(parts[2].to_string()),
+        )),
+        _ => anyhow::bail!("Input format is invalid!"),
     }
 }

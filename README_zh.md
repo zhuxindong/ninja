@@ -189,7 +189,7 @@ Options:
       --concurrent-limit <CONCURRENT_LIMIT>
           Concurrent limit (Enforces a limit on the concurrent number of requests the underlying) [env: OPENGPT_CONCUURENT_LIMIT=] [default: 65535]
       --proxies <PROXIES>
-          Server proxies pool, example: protocol://user:pass@ip:port [env: OPENGPT_PROXY=]
+          Server proxies pool, Example: protocol://user:pass@ip:port [env: OPENGPT_PROXY=]
       --timeout <TIMEOUT>
           Client timeout (secends) [env: OPENGPT_TIMEOUT=] [default: 600]
       --connect-timeout <CONNECT_TIMEOUT>
@@ -201,13 +201,9 @@ Options:
       --tls-key <TLS_KEY>
           TLS private key file path (EC/PKCS8/RSA) [env: OPENGPT_TLS_KEY=]
       --puid <PUID>
-          Account Plus puid cookie value [env: OPENGPT_PUID=]
-      --puid-email <PUID_EMAIL>
-          Get the user mailbox of the PUID [env: OPENGPT_PUID_EMAIL=]
-      --puid-password <PUID_PASSWORD>
-          Get the user password of the PUID [env: OPENGPT_PUID_PASSWORD=]
-      --puid-mfa <PUID_MFA>
-          Get the user mfa code of the PUID [env: OPENGPT_PUID_MFA=]
+          PUID cookie value of Plus account [env: OPENGPT_PUID=]
+      --puid-user <PUID_USER>
+          Obtain the PUID of the Plus account user, Example: `user:pass` or `user:pass:mfa` [env: OPENGPT_PUID_USER=]
       --api-prefix <API_PREFIX>
           Web UI api prefix [env: OPENGPT_UI_API_PREFIX=]
       --arkose-endpoint <ARKOSE_ENDPOINT>
@@ -221,7 +217,7 @@ Options:
       --tb-store-strategy <TB_STORE_STRATEGY>
           Token bucket store strategy (mem/redis) [env: OPENGPT_TB_STORE_STRATEGY=] [default: mem]
       --tb-redis-url <TB_REDIS_URL>
-          Token bucket redis url(support cluster), example: redis://user:pass@ip:port [env: OPENGPT_TB_REDIS_URL=] [default: redis://127.0.0.1:6379]
+          Token bucket redis url(support cluster), Example: redis://user:pass@ip:port [env: OPENGPT_TB_REDIS_URL=] [default: redis://127.0.0.1:6379]
       --tb-capacity <TB_CAPACITY>
           Token bucket capacity [env: OPENGPT_TB_CAPACITY=] [default: 60]
       --tb-fill-rate <TB_FILL_RATE>

@@ -436,8 +436,8 @@ impl ChatGPTBuilder {
     }
 
     /// Sets the necessary values to mimic the specified Chrome version.
-    pub fn impersonate_builder(mut self, ver: Impersonate) -> Self {
-        self.builder = self.builder.impersonate_builder(ver);
+    pub fn impersonate(mut self, ver: Impersonate) -> Self {
+        self.builder = self.builder.impersonate(ver);
         self
     }
 
@@ -458,7 +458,7 @@ impl ChatGPTBuilder {
     pub fn builder() -> ChatGPTBuilder {
         let builder = reqwest::ClientBuilder::new()
             .user_agent(HEADER_UA)
-            .impersonate_builder(Impersonate::OkHttpAndroid13)
+            .impersonate(Impersonate::OkHttpAndroid13)
             .cookie_store(true);
 
         ChatGPTBuilder {

@@ -1069,8 +1069,8 @@ impl AuthClientBuilder {
     }
 
     /// Sets the necessary values to mimic the specified impersonate client version.
-    pub fn impersonate_builder(mut self, ver: Impersonate) -> Self {
-        self.builder = self.builder.impersonate_builder(ver);
+    pub fn impersonate(mut self, ver: Impersonate) -> Self {
+        self.builder = self.builder.impersonate(ver);
         self
     }
 
@@ -1103,7 +1103,7 @@ impl AuthClientBuilder {
 
     pub fn builder() -> AuthClientBuilder {
         let client_builder = Client::builder()
-            .impersonate_builder(Impersonate::OkHttpAndroid13)
+            .impersonate(Impersonate::OkHttpAndroid13)
             .connect_timeout(Duration::from_secs(30))
             .redirect(Policy::custom(|attempt| {
                 let url = attempt.url().to_string();
