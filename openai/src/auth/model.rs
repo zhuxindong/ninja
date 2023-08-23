@@ -9,6 +9,7 @@ use serde_json::Value;
 pub enum AuthStrategy {
     Apple,
     Web,
+    Platform,
 }
 
 impl Default for AuthStrategy {
@@ -30,6 +31,7 @@ pub struct AuthAccount {
     #[builder(setter(into, strip_option), default)]
     pub mfa: Option<String>,
     #[serde(default)]
+    #[builder(setter(into, strip_option), default)]
     pub option: AuthStrategy,
     #[builder(setter(into, strip_option), default)]
     #[serde(rename = "cf-turnstile-response")]
@@ -37,7 +39,7 @@ pub struct AuthAccount {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct AppleAccessToken {
+pub struct OAuthAccessToken {
     pub access_token: String,
     pub refresh_token: String,
     pub id_token: String,
@@ -152,7 +154,7 @@ pub struct Key {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct WebAccessToken {
+pub struct SessionAccessToken {
     pub user: WebUser,
     pub expires: String,
     #[serde(rename = "accessToken")]
@@ -177,8 +179,8 @@ pub struct WebUser {
 }
 
 pub enum AccessToken {
-    Web(WebAccessToken),
-    Apple(AppleAccessToken),
+    Session(SessionAccessToken),
+    OAuth(OAuthAccessToken),
 }
 
 impl Serialize for AccessToken {
@@ -187,8 +189,8 @@ impl Serialize for AccessToken {
         S: serde::Serializer,
     {
         match self {
-            AccessToken::Web(web) => serializer.serialize_some(web),
-            AccessToken::Apple(apple) => serializer.serialize_some(apple),
+            AccessToken::Session(web) => serializer.serialize_some(web),
+            AccessToken::OAuth(apple) => serializer.serialize_some(apple),
         }
     }
 }

@@ -627,7 +627,7 @@ async fn initialize_puid(email: String, password: String, mfa: Option<String>) {
         for _ in 0..3 {
             match env.load_auth_client().do_access_token(&account).await {
                 Ok(v) => match v {
-                    AccessToken::Web(access_token) => {
+                    AccessToken::Session(access_token) => {
                         let res = env
                             .load_api_client()
                             .get(format!("{URL_CHATGPT_API}/backend-api/models"))

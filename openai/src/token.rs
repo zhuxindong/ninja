@@ -299,7 +299,7 @@ pub fn check(token: &str) -> TokenResult<Option<TokenProfile>> {
 pub struct TokenProfile {
     #[serde(rename = "https://api.openai.com/profile")]
     pub https_api_openai_com_profile: HttpsApiOpenaiComProfile,
-    #[serde(rename = "https://api.openai.com/auth")]
+    #[serde(rename = "https://api.openai.com/auth", default)]
     pub https_api_openai_com_auth: HttpsApiOpenaiComAuth,
     pub iss: String,
     pub sub: String,
@@ -343,6 +343,6 @@ pub struct HttpsApiOpenaiComProfile {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HttpsApiOpenaiComAuth {
-    #[serde(rename = "user_id")]
+    #[serde(rename = "user_id", default)]
     pub user_id: String,
 }

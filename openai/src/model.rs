@@ -61,7 +61,7 @@ impl TryFrom<auth::model::AccessToken> for AuthenticateToken {
 
     fn try_from(value: auth::model::AccessToken) -> Result<Self, Self::Error> {
         match value {
-            auth::model::AccessToken::Web(value) => {
+            auth::model::AccessToken::Session(value) => {
                 let expires_timestamp = chrono::DateTime::parse_from_rfc3339(&value.expires)
                     .context("Failed to parse time string")?
                     .naive_utc()
@@ -76,14 +76,14 @@ impl TryFrom<auth::model::AccessToken> for AuthenticateToken {
                     access_token: value.access_token,
                     refresh_token: None,
                     expires: expires_timestamp,
-                    expires_in: expires_in,
+                    expires_in,
                     user_id: value.user.id,
                     name: value.user.name,
                     email: value.user.email,
                     picture: value.user.picture,
                 })
             }
-            auth::model::AccessToken::Apple(value) => {
+            auth::model::AccessToken::OAuth(value) => {
                 let profile = Profile::try_from(value.id_token)?;
                 let expires =
                     (chrono::Utc::now() + chrono::Duration::seconds(value.expires_in)).timestamp();
@@ -123,9 +123,9 @@ impl TryFrom<auth::model::RefreshToken> for AuthenticateToken {
 }
 
 #[allow(dead_code)]
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 struct Profile {
-    #[serde(rename = "https://api.openai.com/auth")]
+    #[serde(rename = "https://api.openai.com/auth", default)]
     https_api_openai_com_auth: HttpsApiOpenaiComAuth,
     nickname: String,
     name: String,
@@ -138,6 +138,7 @@ struct Profile {
     iat: i64,
     exp: i64,
     sub: String,
+    #[serde(default)]
     auth_time: i64,
 }
 
@@ -156,7 +157,7 @@ impl TryFrom<String> for Profile {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 struct HttpsApiOpenaiComAuth {
     groups: Vec<Value>,
     organizations: Vec<Organization>,

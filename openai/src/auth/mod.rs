@@ -28,14 +28,16 @@ use crate::{debug, URL_CHATGPT_API};
 
 use self::model::AuthStrategy;
 
-const CLIENT_ID: &str = "pdlLIX2Y72MIl2rhLhTE9VV9bN905kBh";
+const APPLE_CLIENT_ID: &str = "pdlLIX2Y72MIl2rhLhTE9VV9bN905kBh";
+const PLATFORM_CLIENT_ID: &str = "DRivsnm2Mu42T3KOpqdtwB3NYviHYzwD";
+
+const OPENAI_API_URL: &str = "https://api.openai.com";
 const OPENAI_OAUTH_URL: &str = "https://auth0.openai.com";
 const OPENAI_OAUTH_TOKEN_URL: &str = "https://auth0.openai.com/oauth/token";
 const OPENAI_OAUTH_REVOKE_URL: &str = "https://auth0.openai.com/oauth/revoke";
 const OPENAI_OAUTH_APPLE_CALLBACK_URL: &str =
     "com.openai.chat://auth0.openai.com/ios/com.openai.chat/callback";
-
-const OPENAI_API_URL: &str = "https://api.openai.com";
+const OPENAI_OAUTH_PLATFORM_CALLBACK_URL: &str = "https://platform.openai.com/auth/callback";
 
 pub type AuthResult<T, E = anyhow::Error> = anyhow::Result<T, E>;
 
@@ -43,7 +45,12 @@ pub type AuthResult<T, E = anyhow::Error> = anyhow::Result<T, E>;
 pub trait AuthHandle: Send + Sync {
     async fn do_access_token(&self, account: &model::AuthAccount)
         -> AuthResult<model::AccessToken>;
+
+    async fn do_revoke_token(&self, refresh_token: &str) -> AuthResult<()>;
+
+    async fn do_refresh_token(&self, refresh_token: &str) -> AuthResult<model::RefreshToken>;
 }
+
 /// You do **not** have to wrap the `Client` in an [`Rc`] or [`Arc`] to **reuse** it,
 /// because it already uses an [`Arc`] internally.
 ///
@@ -70,6 +77,59 @@ impl AuthHandle for AuthClient {
             .context("Logon implementation is not supported")?
             .do_access_token(account)
             .await
+    }
+
+    async fn do_revoke_token(&self, refresh_token: &str) -> AuthResult<()> {
+        let mut last_err: Option<anyhow::Error> = None;
+
+        for (strategy, handle) in self.handle_strategies.iter() {
+            match strategy {
+                AuthStrategy::Apple | AuthStrategy::Platform => {
+                    match handle.do_revoke_token(refresh_token).await {
+                        Ok(_) => {
+                            last_err = None;
+                            break;
+                        }
+                        Err(err) => last_err = Some(err),
+                    }
+                }
+                _ => continue,
+            };
+
+            if last_err.is_none() {
+                break;
+            }
+        }
+
+        if let Some(err) = last_err {
+            bail!(err)
+        }
+
+        Ok(())
+    }
+
+    async fn do_refresh_token(&self, refresh_token: &str) -> AuthResult<model::RefreshToken> {
+        let mut last_err: Option<anyhow::Error> = None;
+        let mut last_res: Option<model::RefreshToken> = None;
+        for (strategy, handle) in self.handle_strategies.iter() {
+            match strategy {
+                &AuthStrategy::Platform | &AuthStrategy::Apple => {
+                    match handle.do_refresh_token(refresh_token).await {
+                        Ok(res) => {
+                            last_res = Some(res);
+                                                        last_err = None;
+                            break;
+                        }
+                        Err(err) => last_err = Some(err),
+                    }
+                }
+                _ => continue,
+            }
+        }
+        if let Some(err) = last_err {
+            bail!(err)
+        }
+        Ok(last_res.unwrap())
     }
 }
 
@@ -160,45 +220,6 @@ impl AuthClient {
         Self::response_handle(resp).await
     }
 
-    pub async fn do_refresh_token(&self, refresh_token: &str) -> AuthResult<model::RefreshToken> {
-        let refresh_token = Self::verify_refresh_token(refresh_token)?;
-        let data = RefreshTokenDataBuilder::default()
-            .redirect_uri(OPENAI_OAUTH_APPLE_CALLBACK_URL)
-            .grant_type(GrantType::RefreshToken)
-            .client_id(CLIENT_ID)
-            .refresh_token(refresh_token)
-            .build()?;
-
-        let resp = self
-            .client
-            .post(OPENAI_OAUTH_TOKEN_URL)
-            .json(&data)
-            .send()
-            .await?;
-
-        let mut token = Self::response_handle::<model::RefreshToken>(resp).await?;
-        token.refresh_token = refresh_token.to_owned();
-        Ok(token)
-    }
-
-    pub async fn do_revoke_token(&self, refresh_token: &str) -> AuthResult<()> {
-        let refresh_token = Self::verify_refresh_token(refresh_token)?;
-        let data = RevokeTokenDataBuilder::default()
-            .client_id(CLIENT_ID)
-            .token(refresh_token)
-            .build()?;
-
-        let resp = self
-            .client
-            .post(OPENAI_OAUTH_REVOKE_URL)
-            .json(&data)
-            .send()
-            .await
-            .map_err(AuthError::FailedRequest)?;
-
-        Self::response_handle_unit(resp).await
-    }
-
     async fn response_handle<U: DeserializeOwned>(resp: reqwest::Response) -> AuthResult<U> {
         let url = resp.url().clone();
         match resp.error_for_status_ref() {
@@ -215,7 +236,6 @@ impl AuthClient {
 
     async fn response_handle_unit(resp: reqwest::Response) -> AuthResult<()> {
         let url = resp.url().clone();
-
         match resp.error_for_status_ref() {
             Ok(_) => Ok(()),
             Err(err) => {
@@ -336,32 +356,7 @@ impl WebAuthHandle {
     fn new(client: Client) -> impl AuthHandle + Send + Sync {
         Self { client }
     }
-}
 
-#[async_trait::async_trait]
-impl AuthHandle for WebAuthHandle {
-    async fn do_access_token(
-        &self,
-        account: &model::AuthAccount,
-    ) -> AuthResult<model::AccessToken> {
-        // get csrf token
-        let csrf_token = self.get_csrf_token().await?;
-
-        // authorized url
-        let authorized_url = self.get_authorized_url(csrf_token).await?;
-
-        // state code
-        let state = self.get_state(authorized_url).await?;
-
-        // check username
-        self.authenticate_username(&state, &account).await?;
-
-        // check password and username
-        self.authenticate_password(&state, &account).await
-    }
-}
-
-impl WebAuthHandle {
     async fn get_state(&self, authorized_url: String) -> AuthResult<String> {
         let resp = self
             .client
@@ -593,8 +588,8 @@ impl WebAuthHandle {
             .await
             .map_err(AuthError::FailedRequest)?;
         match resp.status() {
-            StatusCode::OK => Ok(model::AccessToken::Web(
-                resp.json::<model::WebAccessToken>().await?,
+            StatusCode::OK => Ok(model::AccessToken::Session(
+                resp.json::<model::SessionAccessToken>().await?,
             )),
             StatusCode::TOO_MANY_REQUESTS => {
                 bail!(AuthError::TooManyRequests("Too Many Requests".to_owned()))
@@ -606,6 +601,37 @@ impl WebAuthHandle {
     }
 }
 
+#[async_trait::async_trait]
+impl AuthHandle for WebAuthHandle {
+    async fn do_access_token(
+        &self,
+        account: &model::AuthAccount,
+    ) -> AuthResult<model::AccessToken> {
+        // get csrf token
+        let csrf_token = self.get_csrf_token().await?;
+
+        // authorized url
+        let authorized_url = self.get_authorized_url(csrf_token).await?;
+
+        // state code
+        let state = self.get_state(authorized_url).await?;
+
+        // check username
+        self.authenticate_username(&state, &account).await?;
+
+        // check password and username
+        self.authenticate_password(&state, &account).await
+    }
+
+    async fn do_refresh_token(&self, _refresh_token: &str) -> AuthResult<model::RefreshToken> {
+        bail!("Not yet implemented")
+    }
+
+    async fn do_revoke_token(&self, _refresh_token: &str) -> AuthResult<()> {
+        bail!("Not yet implemented")
+    }
+}
+
 struct AppleAuthHandle {
     client: Client,
 }
@@ -614,33 +640,10 @@ impl AppleAuthHandle {
     fn new(client: Client) -> impl AuthHandle + Send + Sync {
         Self { client }
     }
-}
 
-#[async_trait::async_trait]
-impl AuthHandle for AppleAuthHandle {
-    async fn do_access_token(
-        &self,
-        account: &model::AuthAccount,
-    ) -> AuthResult<model::AccessToken> {
-        let code_verifier = AuthClient::generate_code_verifier();
-        let code_challenge = AuthClient::generate_code_challenge(&code_verifier);
-
-        let url = self.get_authorized_url(&code_challenge).await?;
-        let state = AuthClient::get_callback_state(&url);
-
-        // check username
-        self.authenticate_username(&state, account).await?;
-
-        // check password and username
-        self.authenticate_password(&code_verifier, &state, account)
-            .await
-    }
-}
-
-impl AppleAuthHandle {
     async fn get_authorized_url(&self, code_challenge: &str) -> AuthResult<Url> {
         let preauth_cookie = self.unofficial_preauth_cookie().await?;
-        let url = format!("{OPENAI_OAUTH_URL}/authorize?state=4DJBNv86mezKHDv-i2wMuDBea2-rHAo5nA_ZT4zJeak&ios_app_version=1744&client_id={CLIENT_ID}&redirect_uri={OPENAI_OAUTH_APPLE_CALLBACK_URL}&code_challenge={code_challenge}&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write&prompt=login&preauth_cookie={preauth_cookie}&audience=https://api.openai.com/v1&code_challenge_method=S256&response_type=code&auth0Client=eyJ2ZXJzaW9uIjoiMi4zLjIiLCJuYW1lIjoiQXV0aDAuc3dpZnQiLCJlbnYiOnsic3dpZnQiOiI1LngiLCJpT1MiOiIxNi4yIn19");
+        let url = format!("{OPENAI_OAUTH_URL}/authorize?state=4DJBNv86mezKHDv-i2wMuDBea2-rHAo5nA_ZT4zJeak&ios_app_version=1744&client_id={APPLE_CLIENT_ID}&redirect_uri={OPENAI_OAUTH_APPLE_CALLBACK_URL}&code_challenge={code_challenge}&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write&prompt=login&preauth_cookie={preauth_cookie}&audience=https://api.openai.com/v1&code_challenge_method=S256&response_type=code&auth0Client=eyJ2ZXJzaW9uIjoiMi4zLjIiLCJuYW1lIjoiQXV0aDAuc3dpZnQiLCJlbnYiOnsic3dpZnQiOiI1LngiLCJpT1MiOiIxNi4yIn19");
         let resp = self
             .client
             .get(&url)
@@ -813,9 +816,9 @@ impl AppleAuthHandle {
         let data = AuthorizationCodeDataBuilder::default()
             .redirect_uri(OPENAI_OAUTH_APPLE_CALLBACK_URL)
             .grant_type(GrantType::AuthorizationCode)
-            .client_id(CLIENT_ID)
+            .client_id(APPLE_CLIENT_ID)
             .code(&code)
-            .code_verifier(code_verifier)
+            .code_verifier(Some(code_verifier))
             .build()?;
 
         let resp = self
@@ -825,8 +828,8 @@ impl AppleAuthHandle {
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
-        let access_token = AuthClient::response_handle::<model::AppleAccessToken>(resp).await?;
-        Ok(model::AccessToken::Apple(access_token))
+        let access_token = AuthClient::response_handle::<model::OAuthAccessToken>(resp).await?;
+        Ok(model::AccessToken::OAuth(access_token))
     }
 
     /// It may fail at any time
@@ -884,6 +887,347 @@ impl AppleAuthHandle {
         }
 
         bail!(AuthError::FailedLogin)
+    }
+}
+
+#[async_trait::async_trait]
+impl AuthHandle for AppleAuthHandle {
+    async fn do_access_token(
+        &self,
+        account: &model::AuthAccount,
+    ) -> AuthResult<model::AccessToken> {
+        let code_verifier = AuthClient::generate_code_verifier();
+        let code_challenge = AuthClient::generate_code_challenge(&code_verifier);
+
+        let url = self.get_authorized_url(&code_challenge).await?;
+        let state = AuthClient::get_callback_state(&url);
+
+        // check username
+        self.authenticate_username(&state, account).await?;
+
+        // check password and username
+        self.authenticate_password(&code_verifier, &state, account)
+            .await
+    }
+
+    async fn do_refresh_token(&self, refresh_token: &str) -> AuthResult<model::RefreshToken> {
+        let refresh_token = AuthClient::verify_refresh_token(refresh_token)?;
+        let data = RefreshTokenDataBuilder::default()
+            .redirect_uri(OPENAI_OAUTH_APPLE_CALLBACK_URL)
+            .grant_type(GrantType::RefreshToken)
+            .client_id(APPLE_CLIENT_ID)
+            .refresh_token(refresh_token)
+            .build()?;
+
+        let resp = self
+            .client
+            .post(OPENAI_OAUTH_TOKEN_URL)
+            .json(&data)
+            .send()
+            .await?;
+
+        let mut token = AuthClient::response_handle::<model::RefreshToken>(resp).await?;
+        token.refresh_token = refresh_token.to_owned();
+        Ok(token)
+    }
+
+    async fn do_revoke_token(&self, refresh_token: &str) -> AuthResult<()> {
+        let refresh_token = AuthClient::verify_refresh_token(refresh_token)?;
+        let data = RevokeTokenDataBuilder::default()
+            .client_id(APPLE_CLIENT_ID)
+            .token(refresh_token)
+            .build()?;
+
+        let resp = self
+            .client
+            .post(OPENAI_OAUTH_REVOKE_URL)
+            .json(&data)
+            .send()
+            .await
+            .map_err(AuthError::FailedRequest)?;
+
+        AuthClient::response_handle_unit(resp).await
+    }
+}
+
+struct PlatformAuthHandle {
+    client: Client,
+}
+
+#[async_trait::async_trait]
+impl AuthHandle for PlatformAuthHandle {
+    async fn do_access_token(
+        &self,
+        account: &model::AuthAccount,
+    ) -> AuthResult<model::AccessToken> {
+        // authorized url
+        let authorized_url = self.get_authorized_url().await?;
+
+        // state code
+        let state = self.get_state(authorized_url).await?;
+
+        // check username
+        self.authenticate_username(&state, account).await?;
+
+        // check password and username
+        self.authenticate_password(&state, account).await
+    }
+
+    async fn do_refresh_token(&self, refresh_token: &str) -> AuthResult<model::RefreshToken> {
+        let refresh_token = AuthClient::verify_refresh_token(refresh_token)?;
+        let data = RefreshTokenDataBuilder::default()
+            .redirect_uri(OPENAI_OAUTH_PLATFORM_CALLBACK_URL)
+            .grant_type(GrantType::RefreshToken)
+            .client_id(PLATFORM_CLIENT_ID)
+            .refresh_token(refresh_token)
+            .build()?;
+
+        let resp = self
+            .client
+            .post(OPENAI_OAUTH_TOKEN_URL)
+            .json(&data)
+            .send()
+            .await?;
+
+        let mut token = AuthClient::response_handle::<model::RefreshToken>(resp).await?;
+        token.refresh_token = refresh_token.to_owned();
+        Ok(token)
+    }
+
+    async fn do_revoke_token(&self, refresh_token: &str) -> AuthResult<()> {
+        let refresh_token = AuthClient::verify_refresh_token(refresh_token)?;
+        let data = RevokeTokenDataBuilder::default()
+            .client_id(PLATFORM_CLIENT_ID)
+            .token(refresh_token)
+            .build()?;
+
+        let resp = self
+            .client
+            .post(OPENAI_OAUTH_REVOKE_URL)
+            .json(&data)
+            .send()
+            .await
+            .map_err(AuthError::FailedRequest)?;
+
+        AuthClient::response_handle_unit(resp).await
+    }
+}
+
+impl PlatformAuthHandle {
+    fn new(client: Client) -> impl AuthHandle + Send + Sync {
+        Self { client }
+    }
+
+    async fn get_state(&self, authorized_url: Url) -> AuthResult<String> {
+        let resp = self
+            .client
+            .get(authorized_url)
+            .send()
+            .await
+            .map_err(AuthError::FailedRequest)?;
+
+        if resp.status().is_success() {
+            let html = resp.text().await?;
+            let tag_start = "<input";
+            let attribute_name = "name=\"state\"";
+            let value_start = "value=\"";
+            let mut remaining = html.as_str();
+
+            while let Some(tag_start_index) = remaining.find(tag_start) {
+                remaining = &remaining[tag_start_index..];
+
+                if let Some(attribute_index) = remaining.find(attribute_name) {
+                    remaining = &remaining[attribute_index..];
+
+                    if let Some(value_start_index) = remaining.find(value_start) {
+                        remaining = &remaining[value_start_index + value_start.len()..];
+
+                        if let Some(value_end_index) = remaining.find("\"") {
+                            let value = &remaining[..value_end_index];
+                            return Ok(value.trim().to_string());
+                        }
+                    }
+                }
+                remaining = &remaining[tag_start.len()..];
+            }
+        }
+
+        bail!(AuthError::FailedState)
+    }
+
+    async fn get_authorized_url(&self) -> AuthResult<Url> {
+        let url = format!("{OPENAI_OAUTH_URL}/authorize?client_id={PLATFORM_CLIENT_ID}&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write&audience=https://api.openai.com/v1&redirect_uri=https://platform.openai.com/auth/callback&response_type=code");
+        let resp = self
+            .client
+            .get(&url)
+            .header(
+                reqwest::header::REFERER,
+                HeaderValue::from_static(OPENAI_OAUTH_URL),
+            )
+            .send()
+            .await
+            .map_err(AuthError::FailedRequest)?;
+
+        let url = resp.url().clone();
+
+        AuthClient::response_handle_unit(resp)
+            .await
+            .map_err(|e| AuthError::InvalidLoginUrl(e.to_string()))?;
+
+        Ok(url)
+    }
+
+    async fn authenticate_username(
+        &self,
+        state: &str,
+        account: &model::AuthAccount,
+    ) -> AuthResult<()> {
+        let url = format!("{OPENAI_OAUTH_URL}/u/login/identifier?state={state}");
+        let resp = self
+            .client
+            .post(&url)
+            .json(
+                &IdentifierDataBuilder::default()
+                    .action("default")
+                    .state(state)
+                    .username(&account.username)
+                    .js_available(true)
+                    .webauthn_available(true)
+                    .is_brave(false)
+                    .webauthn_platform_available(false)
+                    .build()?,
+            )
+            .send()
+            .await?;
+
+        AuthClient::response_handle_unit(resp)
+            .await
+            .context(AuthError::InvalidEmail)
+    }
+
+    async fn authenticate_password(
+        &self,
+        state: &str,
+        account: &model::AuthAccount,
+    ) -> AuthResult<model::AccessToken> {
+        debug!("authenticate_password state: {state}");
+        let data = AuthenticateDataBuilder::default()
+            .action("default")
+            .state(state)
+            .username(&account.username)
+            .password(&account.password)
+            .build()?;
+
+        let resp = self
+            .client
+            .post(format!("{OPENAI_OAUTH_URL}/u/login/password?state={state}"))
+            .json(&data)
+            .send()
+            .await
+            .map_err(AuthError::FailedRequest)?;
+
+        let headers = resp.headers().clone();
+        AuthClient::response_handle_unit(resp)
+            .await
+            .map_err(|_| AuthError::InvalidEmailOrPassword)?;
+
+        let location = AuthClient::get_location_path(&headers)?;
+        debug!("authenticate_password location path: {location}");
+        if location.starts_with("/authorize/resume?") {
+            return self.authenticate_resume(location, account).await;
+        }
+        bail!(AuthError::FailedLogin)
+    }
+
+    async fn authenticate_resume(
+        &self,
+        location: &str,
+        account: &model::AuthAccount,
+    ) -> AuthResult<model::AccessToken> {
+        let resp = self
+            .client
+            .get(&format!("{OPENAI_OAUTH_URL}{location}"))
+            .send()
+            .await
+            .map_err(AuthError::FailedRequest)?;
+
+        let headers = resp.headers().clone();
+
+        AuthClient::response_handle_unit(resp)
+            .await
+            .map_err(|_| AuthError::InvalidLocation)?;
+
+        let location: &str = AuthClient::get_location_path(&headers)?;
+        debug!("authenticate_resume location path: {location}");
+        if location.starts_with("/u/mfa-otp-challenge?") {
+            let mfa = account.mfa.clone().ok_or(AuthError::MFARequired)?;
+            self.authenticate_mfa(&mfa, location, account).await
+        } else if !location.starts_with(OPENAI_OAUTH_PLATFORM_CALLBACK_URL) {
+            bail!(AuthError::FailedCallbackURL)
+        } else {
+            self.authorization_code(location).await
+        }
+    }
+
+    #[async_recursion]
+    async fn authenticate_mfa(
+        &self,
+        mfa_code: &str,
+        location: &str,
+        account: &model::AuthAccount,
+    ) -> AuthResult<model::AccessToken> {
+        let url = format!("{OPENAI_OAUTH_URL}{}", location);
+        let state = AuthClient::get_callback_state(&Url::parse(&url)?);
+        let data = AuthenticateMfaDataBuilder::default()
+            .action("default")
+            .state(&state)
+            .code(mfa_code)
+            .build()?;
+
+        let resp = self
+            .client
+            .post(&url)
+            .json(&data)
+            .header(reqwest::header::REFERER, HeaderValue::from_str(&url)?)
+            .header(
+                reqwest::header::ORIGIN,
+                HeaderValue::from_static(OPENAI_OAUTH_URL),
+            )
+            .send()
+            .await
+            .map_err(AuthError::FailedRequest)?;
+        let headers = resp.headers().clone();
+
+        AuthClient::response_handle_unit(resp).await?;
+
+        let location: &str = AuthClient::get_location_path(&headers)?;
+        if location.starts_with("/authorize/resume?") && account.mfa.is_none() {
+            bail!(AuthError::MFAFailed)
+        }
+        self.authenticate_resume(location, &account).await
+    }
+
+    async fn authorization_code(&self, location: &str) -> AuthResult<model::AccessToken> {
+        debug!("authorization_code location path: {location}");
+        let code = AuthClient::get_callback_code(&Url::parse(location)?)?;
+        let data = AuthorizationCodeDataBuilder::default()
+            .redirect_uri(OPENAI_OAUTH_PLATFORM_CALLBACK_URL)
+            .grant_type(GrantType::AuthorizationCode)
+            .client_id(PLATFORM_CLIENT_ID)
+            .code(&code)
+            .code_verifier(None)
+            .build()?;
+
+        let resp = self
+            .client
+            .post(OPENAI_OAUTH_TOKEN_URL)
+            .json(&data)
+            .send()
+            .await
+            .map_err(AuthError::FailedRequest)?;
+
+        let access_token = AuthClient::response_handle::<model::OAuthAccessToken>(resp).await?;
+        Ok(model::AccessToken::OAuth(access_token))
     }
 }
 
@@ -951,7 +1295,7 @@ struct AuthorizationCodeData<'a> {
     redirect_uri: &'a str,
     grant_type: GrantType,
     client_id: &'a str,
-    code_verifier: &'a str,
+    code_verifier: Option<&'a str>,
     code: &'a str,
 }
 
@@ -1092,6 +1436,10 @@ impl AuthClientBuilder {
         handle_strategies.insert(
             AuthStrategy::Apple,
             Box::new(AppleAuthHandle::new(client.clone())),
+        );
+        handle_strategies.insert(
+            AuthStrategy::Platform,
+            Box::new(PlatformAuthHandle::new(client.clone())),
         );
         AuthClient {
             client,
