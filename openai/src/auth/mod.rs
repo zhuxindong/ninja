@@ -117,7 +117,7 @@ impl AuthHandle for AuthClient {
                     match handle.do_refresh_token(refresh_token).await {
                         Ok(res) => {
                             last_res = Some(res);
-                                                        last_err = None;
+                            last_err = None;
                             break;
                         }
                         Err(err) => last_err = Some(err),
