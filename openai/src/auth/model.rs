@@ -4,7 +4,7 @@ use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Clone, PartialEq, Eq, Hash, Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Hash, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum AuthStrategy {
     Apple,
