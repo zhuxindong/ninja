@@ -58,7 +58,7 @@ impl ArkoseToken {
                 INIT.call_once(|| {
                     let client = reqwest::Client::builder()
                         .user_agent(crate::HEADER_UA)
-                        .impersonate_builder(reqwest::impersonate::Impersonate::Chrome109)
+                        .impersonate(reqwest::impersonate::Impersonate::Chrome109)
                         .build()
                         .unwrap();
                     unsafe { CLIENT = Some(client) };
@@ -76,7 +76,7 @@ impl ArkoseToken {
                 INIT.call_once(|| {
                     let client = reqwest::Client::builder()
                         .user_agent(crate::HEADER_UA)
-                        .impersonate_builder(reqwest::impersonate::Impersonate::Chrome109)
+                        .impersonate(reqwest::impersonate::Impersonate::Chrome109)
                         .build()
                         .unwrap();
                     unsafe { CLIENT = Some(client) };

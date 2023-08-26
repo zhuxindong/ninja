@@ -615,7 +615,7 @@ async fn initialize_puid(email: String, password: String, mfa: Option<String>) {
     let mut interval = tokio::time::interval(Duration::from_secs(24 * 60 * 60)); // 24 hours
     let account = AuthAccount {
         username: email,
-        password: password,
+        password,
         mfa,
         option: AuthStrategy::Web,
         cf_turnstile_response: None,
@@ -624,40 +624,45 @@ async fn initialize_puid(email: String, password: String, mfa: Option<String>) {
     loop {
         interval.tick().await;
 
-        match env.load_auth_client().do_access_token(&account).await {
-            Ok(v) => match v {
-                AccessToken::Web(access_token) => {
-                    let res = env
-                        .load_api_client()
-                        .get(format!("{URL_CHATGPT_API}/backend-api/models"))
-                        .bearer_auth(access_token.access_token)
-                        .send()
-                        .await;
-                    match res {
-                        Ok(resp) => match resp.error_for_status() {
-                            Ok(v) => match v.cookies().into_iter().find(|v| v.name().eq("_puid")) {
-                                Some(cookie) => {
-                                    let puid = cookie.value().to_owned();
-                                    info!("Update PUID: {puid}");
-                                    env.set_share_puid(puid)
+        for _ in 0..3 {
+            match env.load_auth_client().do_access_token(&account).await {
+                Ok(v) => match v {
+                    AccessToken::Session(access_token) => {
+                        let res = env
+                            .load_api_client()
+                            .get(format!("{URL_CHATGPT_API}/backend-api/models"))
+                            .bearer_auth(access_token.access_token)
+                            .send()
+                            .await;
+                        match res {
+                            Ok(resp) => match resp.error_for_status() {
+                                Ok(v) => {
+                                    match v.cookies().into_iter().find(|v| v.name().eq("_puid")) {
+                                        Some(cookie) => {
+                                            let puid = cookie.value().to_owned();
+                                            info!("Update PUID: {puid}");
+                                            env.set_share_puid(puid);
+                                            break;
+                                        }
+                                        None => {
+                                            warn!("Your account may not be Plus")
+                                        }
+                                    }
                                 }
-                                None => {
-                                    warn!("Your account may not be Plus")
+                                Err(err) => {
+                                    warn!("failed to get puid error: {}", err)
                                 }
                             },
                             Err(err) => {
-                                warn!("failed to get puid error: {}", err)
+                                warn!("Error: {err}")
                             }
-                        },
-                        Err(err) => {
-                            warn!("failed to get puid error: {}", err)
                         }
                     }
+                    _ => {}
+                },
+                Err(err) => {
+                    warn!("login error: {}", err)
                 }
-                AccessToken::Apple(_) => {}
-            },
-            Err(err) => {
-                warn!("login error: {}", err)
             }
         }
     }

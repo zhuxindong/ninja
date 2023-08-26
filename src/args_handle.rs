@@ -19,6 +19,12 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         args = toml::from_str::<ServeArgs>(&data)?;
     }
 
+    let puid_user = if let Some(puid_user) = args.puid_user {
+        (Some(puid_user.0), Some(puid_user.1), puid_user.2)
+    } else {
+        (None, None, None)
+    };
+
     let mut builder = openai::serve::LauncherBuilder::default();
     let builder = builder
         .host(
@@ -40,9 +46,9 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .cf_secret_key(args.cf_secret_key)
         .disable_ui(args.disable_webui)
         .puid(args.puid)
-        .puid_email(args.puid_email)
-        .puid_password(args.puid_password)
-        .puid_mfa(args.puid_mfa);
+        .puid_email(puid_user.0)
+        .puid_password(puid_user.1)
+        .puid_mfa(puid_user.2);
 
     #[cfg(feature = "limit")]
     let builder = builder
@@ -269,9 +275,7 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
         cf_site_key: None,
         cf_secret_key: None,
         disable_webui: false,
-        puid_email: None,
-        puid_password: None,
-        puid_mfa: None,
+        puid_user: None,
         puid: None,
     };
 

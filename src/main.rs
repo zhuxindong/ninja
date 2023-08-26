@@ -16,9 +16,10 @@ use clap::Parser;
 
 pub mod args;
 pub mod args_handle;
-pub mod conf;
 pub mod env;
+pub mod homedir;
 pub mod inter;
+pub mod store;
 pub mod util;
 
 fn main() -> anyhow::Result<()> {
@@ -26,11 +27,6 @@ fn main() -> anyhow::Result<()> {
     std::env::set_var("RUST_LOG", opt.level);
     match opt.command {
         Some(command) => match command {
-            SubCommands::Config {
-                workdir: _,
-                unofficial_api: _,
-                unofficial_proxy: _,
-            } => {}
             SubCommands::Serve(commands) => match commands {
                 args::ServeSubcommand::Run(args) => args_handle::serve(args, true)?,
                 #[cfg(target_family = "unix")]
@@ -48,6 +44,7 @@ fn main() -> anyhow::Result<()> {
                     args_handle::edit_template_file(edit)?;
                 }
             },
+            SubCommands::Terminal => inter::prompt()?,
         },
         None => {}
     }
