@@ -1,3 +1,3 @@
-pub(crate) async fn prompt() -> anyhow::Result<()> {
-    todo!()
+pub(crate) async fn api_prompt() -> anyhow::Result<()> {
+    Ok(())
 }

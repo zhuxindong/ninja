@@ -21,7 +21,12 @@ toml = "0.7.6"
 url = "2.3.1"
 openai = { path = "openai" }
 inquire = { version = "0.6.2", features = ["editor"] }
-async-trait = "0.1.68" 
+colored_json = "3.2.0"
+
+[target.'cfg(windows)'.dependencies.windows-sys]
+version = "0.48.0"
+default-features = false
+features = ["Win32_System_Com_CallObj", "Win32_Foundation", "Win32_Globalization", "Win32_UI_Shell_Common"]
 
 [target.'cfg(target_family = "unix")'.dependencies]
 daemonize = "0.5.0"

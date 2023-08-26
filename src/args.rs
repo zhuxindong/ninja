@@ -1,8 +1,8 @@
-use anyhow::Context;
+use crate::util;
 use clap::{Args, Parser, Subcommand};
 use openai::serve::tokenbucket;
 use serde::{Deserialize, Serialize};
-use std::{path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[clap(author, version, about)]
@@ -53,13 +53,13 @@ pub(super) enum ServeSubcommand {
 #[derive(Args, Debug, Default, Serialize, Deserialize)]
 pub(super) struct ServeArgs {
     /// Configuration file path (toml format file)
-    #[clap(short = 'C', long, env = "OPENGPT_CONFIG", value_parser = parse_config)]
+    #[clap(short = 'C', long, env = "OPENGPT_CONFIG", value_parser = util::parse_config)]
     pub(super) config: Option<PathBuf>,
     /// Server Listen host
-    #[clap(short = 'H', long, env = "OPENGPT_HOST", default_value = "0.0.0.0", value_parser = parse_host)]
+    #[clap(short = 'H', long, env = "OPENGPT_HOST", default_value = "0.0.0.0", value_parser = util::parse_host)]
     pub(super) host: Option<std::net::IpAddr>,
     /// Server Listen port
-    #[clap(short = 'P', long, env = "OPENGPT_PORT", default_value = "7999", value_parser = parse_port_in_range)]
+    #[clap(short = 'P', long, env = "OPENGPT_PORT", default_value = "7999", value_parser = util::parse_port_in_range)]
     pub(super) port: Option<u16>,
     /// Server worker-pool size (Recommended number of CPU cores)
     #[clap(short = 'W', long, env = "OPENGPT_WORKERS", default_value = "1")]
@@ -68,15 +68,15 @@ pub(super) struct ServeArgs {
     #[clap(long, env = "OPENGPT_CONCUURENT_LIMIT", default_value = "65535")]
     pub(super) concurrent_limit: usize,
     /// Server proxies pool, Example: protocol://user:pass@ip:port
-    #[clap(long, env = "OPENGPT_PROXY", value_parser = parse_proxies_url)]
+    #[clap(long, env = "OPENGPT_PROXY", value_parser = util::parse_proxies_url)]
     pub(super) proxies: Option<std::vec::Vec<String>>,
-    /// Client timeout (secends)
+    /// Client timeout (seconds)
     #[clap(long, env = "OPENGPT_TIMEOUT", default_value = "600")]
     pub(super) timeout: usize,
-    /// Client connect timeout (secends)
+    /// Client connect timeout (seconds)
     #[clap(long, env = "OPENGPT_CONNECT_TIMEOUT", default_value = "60")]
     pub(super) connect_timeout: usize,
-    /// TCP keepalive (secends)
+    /// TCP keepalive (seconds)
     #[clap(long, env = "OPENGPT_TCP_KEEPALIVE", default_value = "60")]
     pub(super) tcp_keepalive: usize,
     /// TLS certificate file path
@@ -89,16 +89,16 @@ pub(super) struct ServeArgs {
     #[clap(long, env = "OPENGPT_PUID")]
     pub(super) puid: Option<String>,
     /// Obtain the PUID of the Plus account user, Example: `user:pass` or `user:pass:mfa`
-    #[clap(long, env = "OPENGPT_PUID_USER", value_parser = parse_puid_user)]
+    #[clap(long, env = "OPENGPT_PUID_USER", value_parser = util::parse_puid_user)]
     pub(super) puid_user: Option<(String, String, Option<String>)>,
     /// Web UI api prefix
-    #[clap(long, env = "OPENGPT_UI_API_PREFIX", value_parser = parse_url)]
+    #[clap(long, env = "OPENGPT_UI_API_PREFIX", value_parser = util::parse_url)]
     pub(super) api_prefix: Option<String>,
     /// Arkose endpoint, Example: https://client-api.arkoselabs.com
-    #[clap(long, env = "OPENGPT_ARKOSE_ENDPOINT", value_parser = parse_url)]
+    #[clap(long, env = "OPENGPT_ARKOSE_ENDPOINT", value_parser = util::parse_url)]
     pub(super) arkose_endpoint: Option<String>,
     /// Get arkose-token endpoint
-    #[clap(short = 'A', long, env = "OPENGPT_ARKOSE_TOKEN_ENDPOINT", value_parser = parse_url)]
+    #[clap(short = 'A', long, env = "OPENGPT_ARKOSE_TOKEN_ENDPOINT", value_parser = util::parse_url)]
     pub(super) arkose_token_endpoint: Option<String>,
     /// Enable url signature (signature secret key)
     #[clap(short = 'S', long, env = "OPENGPT_SIGNATURE")]
@@ -123,7 +123,7 @@ pub(super) struct ServeArgs {
         env = "OPENGPT_TB_REDIS_URL",
         default_value = "redis://127.0.0.1:6379",
         requires = "tb_enable",
-        value_parser = parse_proxies_url
+        value_parser = util::parse_proxies_url
     )]
     #[cfg(feature = "limit")]
     pub(super) tb_redis_url: std::vec::Vec<String>,
@@ -145,7 +145,7 @@ pub(super) struct ServeArgs {
     )]
     #[cfg(feature = "limit")]
     pub(super) tb_fill_rate: u32,
-    /// Token bucket expired (second)
+    /// Token bucket expired (seconds)
     #[clap(
         long,
         env = "OPENGPT_TB_EXPIRED",
@@ -172,99 +172,4 @@ pub(super) enum SubCommands {
     Serve(ServeSubcommand),
     /// Terminal interaction
     Terminal,
-    /// Configuration Settings
-    Config {
-        /// Working directory, refresh_token will be stored in there if specified
-        #[clap(short, long, env = "OPENGPT_WORKDIR")]
-        workdir: Option<PathBuf>,
-
-        /// Unofficial API prefix. Format: https://example.com/backend-api
-        #[clap(long, env = "OPENGPT_API")]
-        unofficial_api: Option<String>,
-
-        /// Unofficial API http proxy. Format: protocol://user:pass@ip:port
-        #[clap(long, env = "OPENGPT_PROXY", value_parser = parse_url)]
-        unofficial_proxy: Option<url::Url>,
-    },
-}
-
-const PORT_RANGE: std::ops::RangeInclusive<usize> = 1024..=65535;
-
-// port range parse
-fn parse_port_in_range(s: &str) -> anyhow::Result<u16> {
-    let port: usize = s
-        .parse()
-        .map_err(|_| anyhow::anyhow!(format!("`{}` isn't a port number", s)))?;
-    if PORT_RANGE.contains(&port) {
-        return Ok(port as u16);
-    }
-    anyhow::bail!(format!(
-        "Port not in range {}-{}",
-        PORT_RANGE.start(),
-        PORT_RANGE.end()
-    ))
-}
-
-// address parse
-fn parse_host(s: &str) -> anyhow::Result<std::net::IpAddr> {
-    let addr = s
-        .parse::<std::net::IpAddr>()
-        .map_err(|_| anyhow::anyhow!(format!("`{}` isn't a ip address", s)))?;
-    Ok(addr)
-}
-
-fn parse_url(s: &str) -> anyhow::Result<String> {
-    let url = url::Url::parse(s)
-        .context("The Proxy Url format must be `protocol://user:pass@ip:port`")?;
-    let protocol = url.scheme().to_string();
-    match protocol.as_str() {
-        "http" | "https" | "socks5" | "redis" => Ok(s.to_string()),
-        _ => anyhow::bail!("Unsupported protocol: {}", protocol),
-    }
-}
-
-// proxy proto
-fn parse_proxies_url(s: &str) -> anyhow::Result<Vec<String>> {
-    let split = s.split(",");
-    let mut proxies: Vec<_> = vec![];
-    for ele in split {
-        let url = url::Url::parse(ele)
-            .context("The Proxy Url format must be `protocol://user:pass@ip:port`")?;
-        let protocol = url.scheme().to_string();
-        match protocol.as_str() {
-            "http" | "https" | "socks5" | "redis" => proxies.push(ele.to_string()),
-            _ => anyhow::bail!("Unsupported protocol: {}", protocol),
-        };
-    }
-    Ok(proxies)
-}
-
-fn parse_config(s: &str) -> anyhow::Result<PathBuf> {
-    let path =
-        PathBuf::from_str(s).map_err(|_| anyhow::anyhow!(format!("`{}` isn't a path", s)))?;
-    match path.exists() {
-        true => Ok(path),
-        false => {
-            if let Some(parent) = path.parent() {
-                parent.exists().then(|| ()).ok_or_else(|| {
-                    anyhow::anyhow!(format!("Path {} not exists", parent.display()))
-                })?;
-            }
-            Ok(path)
-        }
-    }
-}
-
-fn parse_puid_user(s: &str) -> anyhow::Result<(String, String, Option<String>)> {
-    let parts: Vec<&str> = s.split(':').collect();
-
-    match parts.len() {
-        2 => Ok((parts[0].to_string(), parts[1].to_string(), None)),
-        3 => Ok((
-            parts[0].to_string(),
-            parts[1].to_string(),
-            Some(parts[2].to_string()),
-        )),
-        _ => anyhow::bail!("Input format is invalid!"),
-    }
 }
