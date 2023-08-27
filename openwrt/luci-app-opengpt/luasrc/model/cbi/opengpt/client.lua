@@ -52,7 +52,7 @@ o:value("mem", "mem");
 o:value("redis", "redis");
 o.default = "mem"
 
-o = s:option(Value, "tb_redis_url", translate("Token bucket redis url(support cluster)"), translate("Example: redis://user:pass@ip:port"))
+o = s:option(Value, "tb_redis_url", translate("Token bucket redis url"), translate("Example: redis://user:pass@ip:port"))
 o.default = "redis://127.0.0.1:6379"
 
 o = s:option(Value, "tb_capacity", translate("Token Bucket Capacity"), translate("Token bucket capacity, the default is 60"))

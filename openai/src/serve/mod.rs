@@ -93,7 +93,7 @@ pub struct Launcher {
     #[cfg(feature = "limit")]
     tb_store_strategy: tokenbucket::Strategy,
     /// Tokenbucket redis url
-    tb_redis_url: Vec<String>,
+    tb_redis_url: String,
     /// Tokenbucket capacity
     #[cfg(feature = "limit")]
     tb_capacity: u32,

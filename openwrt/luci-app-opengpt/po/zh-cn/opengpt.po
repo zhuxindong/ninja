@@ -55,8 +55,8 @@ msgstr "启用令牌桶限流"
 msgid "Token Bucket Storage Strategy"
 msgstr "令牌桶存储策略"
 
-msgid "Token bucket redis url(support cluster)"
-msgstr "令牌桶Redis URL(支持集群)"
+msgid "Token bucket redis url"
+msgstr "令牌桶Redis URL"
 
 msgid "Token Bucket Capacity"
 msgstr "令牌桶容量"

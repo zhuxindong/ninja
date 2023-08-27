@@ -117,16 +117,16 @@ pub(super) struct ServeArgs {
     )]
     #[cfg(feature = "limit")]
     pub(super) tb_store_strategy: tokenbucket::Strategy,
-    /// Token bucket redis url(support cluster), Example: redis://user:pass@ip:port
+    /// Token bucket redis url, Example: redis://user:pass@ip:port
     #[clap(
     long,
     env = "OPENGPT_TB_REDIS_URL",
     default_value = "redis://127.0.0.1:6379",
     requires = "tb_enable",
-    value_parser = util::parse_proxies_url
+    value_parser = util::parse_url
     )]
     #[cfg(feature = "limit")]
-    pub(super) tb_redis_url: std::vec::Vec<String>,
+    pub(super) tb_redis_url: String,
     /// Token bucket capacity
     #[clap(
         long,

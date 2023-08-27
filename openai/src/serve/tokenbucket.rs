@@ -129,7 +129,7 @@ pub struct RedisTokenBucket {
     /// token bucket expired
     expired: u32,
     /// redis client
-    client: redis::cluster::ClusterClient,
+    client: redis::Client,
 }
 
 impl RedisTokenBucket {
@@ -138,10 +138,13 @@ impl RedisTokenBucket {
         capacity: u32,
         fill_rate: u32,
         expired: u32,
-        nodes: Vec<String>,
+        node: String,
     ) -> RedisResult<Self> {
         // connect to redis
-        let client = redis::cluster::ClusterClient::new(nodes)?;
+        if node.len() == 1 {
+        } else {
+        }
+        let client = redis::Client::open(node)?;
         Ok(Self {
             enable,
             capacity,
@@ -187,8 +190,8 @@ impl TokenBucket for RedisTokenBucket {
 
 pub struct TokenBucketLimitContext(Box<dyn TokenBucket>);
 
-impl From<(Strategy, bool, u32, u32, u32, Vec<String>)> for TokenBucketLimitContext {
-    fn from(value: (Strategy, bool, u32, u32, u32, Vec<String>)) -> Self {
+impl From<(Strategy, bool, u32, u32, u32, String)> for TokenBucketLimitContext {
+    fn from(value: (Strategy, bool, u32, u32, u32, String)) -> Self {
         let strategy = match value.0 {
             Strategy::Mem => Self(Box::new(MemTokenBucket::new(
                 value.1, value.2, value.3, value.4,
