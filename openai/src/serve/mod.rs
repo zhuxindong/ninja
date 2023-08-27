@@ -13,6 +13,7 @@ pub mod signal;
 
 use axum::body::StreamBody;
 use axum::http::Response;
+use axum::response::IntoResponse;
 use axum::routing::{any, get, post};
 use axum::Json;
 use axum_server::{AddrIncomingConfig, Handle};
@@ -368,10 +369,7 @@ async fn official_proxy(
     headers: HeaderMap,
     jar: CookieJar,
     body: Option<Json<Value>>,
-) -> Result<
-    Response<StreamBody<impl futures_core::Stream<Item = Result<bytes::Bytes, reqwest::Error>>>>,
-    ResponseError,
-> {
+) -> Result<impl IntoResponse, ResponseError> {
     let url = match uri.query() {
         None => {
             format!("{URL_PLATFORM_API}{}", uri.path())
@@ -412,10 +410,7 @@ async fn unofficial_proxy(
     headers: HeaderMap,
     jar: CookieJar,
     mut body: Option<Json<Value>>,
-) -> Result<
-    Response<StreamBody<impl futures_core::Stream<Item = Result<bytes::Bytes, reqwest::Error>>>>,
-    ResponseError,
-> {
+) -> Result<impl IntoResponse, ResponseError> {
     let url = if let Some(query) = uri.query() {
         format!("{URL_CHATGPT_API}{}?{}", uri.path(), query)
     } else {
@@ -438,10 +433,7 @@ async fn unofficial_proxy(
 
 fn response_convert(
     resp: Result<reqwest::Response, reqwest::Error>,
-) -> Result<
-    Response<StreamBody<impl futures_core::Stream<Item = Result<bytes::Bytes, reqwest::Error>>>>,
-    ResponseError,
-> {
+) -> Result<impl IntoResponse, ResponseError> {
     match resp {
         Ok(resp) => {
             let mut builder = Response::builder().status(resp.status());

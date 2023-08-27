@@ -12,7 +12,7 @@ pub(super) async fn graceful_shutdown(handle: Handle) {
         tokio::signal::ctrl_c()
             .await
             .expect("Ctrl+C signal hanlde error");
-        sending_graceful_shutdown_signal(handle).await;
+        sending_graceful_shutdown_signal(handle, "SIGINT").await;
     }
 
     #[cfg(target_family = "unix")]
@@ -23,26 +23,26 @@ pub(super) async fn graceful_shutdown(handle: Handle) {
         let mut sighup = signal(SignalKind::hangup()).expect("SIGHUP signal hanlde error");
         tokio::select! {
             _ = sigterm.recv() => {
-                sending_graceful_shutdown_signal(handle).await;
+                sending_graceful_shutdown_signal(handle, "SIGTERM").await;
             },
             _ = sigquit.recv() => {
-                sending_graceful_shutdown_signal(handle).await;
+                sending_graceful_shutdown_signal(handle, "SIGQUIT").await;
             },
             _ = sigchld.recv() => {
-                sending_graceful_shutdown_signal(handle).await;
+                sending_graceful_shutdown_signal(handle, "SIGCHLD").await;
             },
             _ = sighup.recv() => {
-                sending_graceful_shutdown_signal(handle).await;
+                sending_graceful_shutdown_signal(handle, "SIGHUP").await;
             },
             _ = tokio::signal::ctrl_c() => {
-                sending_graceful_shutdown_signal(handle).await;
+                sending_graceful_shutdown_signal(handle, "SIGINT").await;
             }
         };
     }
 }
 
-async fn sending_graceful_shutdown_signal(handle: Handle) {
-    info!("Sending graceful shutdown signal");
+async fn sending_graceful_shutdown_signal(handle: Handle, signal: &'static str) {
+    info!("{signal} received: starting graceful shutdown");
 
     // Signal the server to shutdown using Handle.
     handle.graceful_shutdown(Some(Duration::from_secs(30)));

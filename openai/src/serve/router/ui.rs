@@ -5,13 +5,13 @@ use std::sync::Once;
 
 use anyhow::anyhow;
 use axum::body::Body;
-use axum::body::StreamBody;
 use axum::extract::ConnectInfo;
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::http::header;
 use axum::http::HeaderMap;
 use axum::http::Response;
+use axum::response::IntoResponse;
 use axum::routing::any;
 use axum::routing::{get, post};
 use axum::Router;
@@ -784,10 +784,7 @@ async fn get_share_chat_continue_info(
 
 async fn get_image(
     params: Option<axum::extract::Query<ImageQuery>>,
-) -> Result<
-    Response<StreamBody<impl futures_core::Stream<Item = Result<bytes::Bytes, reqwest::Error>>>>,
-    ResponseError,
-> {
+) -> Result<impl IntoResponse, ResponseError> {
     let query = params.ok_or(err::ResponseError::BadRequest(anyhow::anyhow!(
         "Missing URL parameter"
     )))?;
