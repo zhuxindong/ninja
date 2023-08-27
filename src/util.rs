@@ -116,7 +116,7 @@ pub fn parse_url(s: &str) -> anyhow::Result<String> {
         .context("The Proxy Url format must be `protocol://user:pass@ip:port`")?;
     let protocol = url.scheme().to_string();
     match protocol.as_str() {
-        "http" | "https" | "socks5" | "redis" => Ok(s.to_string()),
+        "http" | "https" | "socks5" | "redis" | "rediss" => Ok(s.to_string()),
         _ => anyhow::bail!("Unsupported protocol: {}", protocol),
     }
 }
@@ -130,7 +130,7 @@ pub fn parse_proxies_url(s: &str) -> anyhow::Result<Vec<String>> {
             .context("The Proxy Url format must be `protocol://user:pass@ip:port`")?;
         let protocol = url.scheme().to_string();
         match protocol.as_str() {
-            "http" | "https" | "socks5" | "redis" => proxies.push(ele.to_string()),
+            "http" | "https" | "socks5" | "redis" | "rediss" => proxies.push(ele.to_string()),
             _ => anyhow::bail!("Unsupported protocol: {}", protocol),
         };
     }

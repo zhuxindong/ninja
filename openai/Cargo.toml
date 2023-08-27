@@ -30,7 +30,7 @@ futures-core = { version = "0.3.28", optional = true}
 tera = { version = "1.19.0", default-features = false, optional = true }
 
 # redis limit
-redis = { version = "0.23.2", features = ["tokio-comp"], optional = true }
+redis = { version = "0.23.2", features = ["tokio-comp", "tokio-rustls-comp"], optional = true }
 redis-macros = { version = "0.2.1", optional = true }
 
 # stream
