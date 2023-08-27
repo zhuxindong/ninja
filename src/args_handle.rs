@@ -268,7 +268,7 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
         sign_secret_key: None,
         tb_enable: false,
         tb_store_strategy: openai::serve::tokenbucket::Strategy::Mem,
-        tb_redis_url: vec!["redis://127.0.0.1:6379".to_string()],
+        tb_redis_url: "redis://127.0.0.1:6379".to_string(),
         tb_capacity: 60,
         tb_fill_rate: 1,
         tb_expired: 86400,
