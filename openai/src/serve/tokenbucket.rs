@@ -141,9 +141,6 @@ impl RedisTokenBucket {
         node: String,
     ) -> RedisResult<Self> {
         // connect to redis
-        if node.len() == 1 {
-        } else {
-        }
         let client = redis::Client::open(node)?;
         Ok(Self {
             enable,
