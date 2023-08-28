@@ -98,27 +98,32 @@ async fn proxy(
                     match funcaptcha::start_challenge(token).await {
                         Ok(session) => {
                             if let Some(funcaptcha) = session.funcaptcha() {
-                                let index = funcaptcha::yescaptcha::valid(
+                                let valid_res = funcaptcha::yescaptcha::valid(
                                     key,
                                     &funcaptcha.image,
                                     &funcaptcha.instructions,
                                 )
-                                .await?;
-                                debug!("answer index:{index}");
-                                if session.submit_answer(index).await.is_ok() {
-                                    if let Some(kv) = target_json.as_object_mut() {
-                                        kv.insert(
-                                            "token".to_owned(),
-                                            serde_json::Value::String(format!("{token}|sup=1")),
-                                        );
+                                .await;
+                                if let Ok(index) = valid_res {
+                                    debug!("answer index:{index}");
+                                    if session.submit_answer(index).await.is_ok() {
+                                        if let Some(kv) = target_json.as_object_mut() {
+                                            kv.insert(
+                                                "token".to_owned(),
+                                                serde_json::Value::String(format!("{token}|sup=1")),
+                                            );
+                                        }
+                                        return Ok(Response::builder()
+                                            .status(StatusCode::OK)
+                                            .header(
+                                                header::CONTENT_TYPE,
+                                                "text/plain; charset=utf-8",
+                                            )
+                                            .body(Body::from(target_json.to_string()))
+                                            .map_err(|err| {
+                                                err::ResponseError::InternalServerError(err)
+                                            })?);
                                     }
-                                    return Ok(Response::builder()
-                                        .status(StatusCode::OK)
-                                        .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
-                                        .body(Body::from(target_json.to_string()))
-                                        .map_err(|err| {
-                                            err::ResponseError::InternalServerError(err)
-                                        })?);
                                 }
                             }
                         }
