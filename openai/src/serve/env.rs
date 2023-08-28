@@ -14,6 +14,7 @@ pub(super) struct Env {
     auth_client_load: load_balancer::ClientLoadBalancer<AuthClient>,
     share_puid: RwLock<Option<String>>,
     arkose_token_endpoint: Option<String>,
+    yescaptcha_client_key: Option<String>,
 }
 
 impl Env {
@@ -33,6 +34,7 @@ impl Env {
             .expect("Failed to initialize the requesting oauth client"),
             share_puid: RwLock::new(puid),
             arkose_token_endpoint: args.arkose_token_endpoint.clone(),
+            yescaptcha_client_key: args.yescaptcha_client_key.clone(),
         }
     }
 
@@ -46,6 +48,10 @@ impl Env {
 
     pub fn get_arkose_token_endpoint(&self) -> Option<&str> {
         self.arkose_token_endpoint.as_deref()
+    }
+
+    pub fn get_arkose_yescaptcha_key(&self) -> Option<&str> {
+        self.yescaptcha_client_key.as_deref()
     }
 
     pub fn get_share_puid(&self) -> Option<String> {

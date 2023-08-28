@@ -100,6 +100,9 @@ pub(super) struct ServeArgs {
     /// Get arkose-token endpoint
     #[clap(short = 'A', long, env = "OPENGPT_ARKOSE_TOKEN_ENDPOINT", value_parser = util::parse_url)]
     pub(super) arkose_token_endpoint: Option<String>,
+    #[clap(long, env = "OPENGPT_ARKOSE_YESCAPTCHA_KEY")]
+    /// yescaptcha client key
+    pub(super) arkose_yescaptcha_key: Option<String>,
     /// Enable url signature (signature secret key)
     #[clap(short = 'S', long, env = "OPENGPT_SIGNATURE")]
     #[cfg(feature = "sign")]
