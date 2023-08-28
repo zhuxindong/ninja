@@ -48,6 +48,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .puid(args.puid)
         .puid_email(puid_user.0)
         .puid_password(puid_user.1)
+        .yescaptcha_client_key(args.arkose_yescaptcha_key)
         .puid_mfa(puid_user.2);
 
     #[cfg(feature = "limit")]
@@ -277,6 +278,7 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
         disable_webui: false,
         puid_user: None,
         puid: None,
+        arkose_yescaptcha_key: None,
     };
 
     let write = |out: PathBuf, args: ServeArgs| -> anyhow::Result<()> {

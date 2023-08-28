@@ -84,6 +84,8 @@ pub struct Launcher {
     arkose_endpoint: Option<String>,
     /// get arkose-token endpoint
     arkose_token_endpoint: Option<String>,
+    /// yescaptcha client key
+    yescaptcha_client_key: Option<String>,
     /// Enable url signature (signature secret key)
     #[cfg(feature = "sign")]
     sign_secret_key: Option<String>,
