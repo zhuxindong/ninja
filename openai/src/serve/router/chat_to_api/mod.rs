@@ -14,7 +14,7 @@ use std::convert::Infallible;
 use crate::{
     arkose::ArkoseToken,
     chatgpt::model::resp::{ConvoResponse, PostConvoResponse},
-    serve::{env, err::ResponseError, header_convert},
+    serve::{context, err::ResponseError, header_convert},
 };
 use crate::{chatgpt::model::Role, debug};
 
@@ -66,12 +66,13 @@ pub(crate) async fn chat_to_api(
         .messages(messages)
         .model(convert_model.0)
         .history_and_training_disabled(true)
+        .arkose_token(convert_model.2.as_ref())
         .build()
         .map_err(|err| ResponseError::InternalServerError(err))?;
 
-    let env = env::ENV_HOLDER.get_instance();
+    let env = context::ENV_HOLDER.get_instance();
     let resp = env
-        .load_api_client()
+        .load_client()
         .post(format!("{URL_CHATGPT_API}/backend-api/conversation"))
         .headers(header_convert(headers, jar).await)
         .json(&req)
@@ -287,17 +288,16 @@ async fn event_convert_handler(
 
 async fn convert_model(model: &str) -> Result<(&str, &str, Option<ArkoseToken>), ResponseError> {
     match model {
-        "gpt-3.5" => Ok(("text-davinci-002-render-sha", "gpt-3.5-turbo", None)),
-        model if model.starts_with("gpt-4") => {
-            let env = env::ENV_HOLDER.get_instance();
-            if let Some(endpoint) = env.get_arkose_token_endpoint() {
-                if let Ok(arkose_token) = ArkoseToken::new_from_endpoint(model, endpoint).await {
-                    return Ok(("gpt-4", "gpt-4", Some(arkose_token)));
-                }
-            }
-            Ok(("gpt-4", "gpt-4", None))
+        model if model.starts_with("gpt-3.5") => {
+            Ok(("text-davinci-002-render-sha", "gpt-3.5-turbo", None))
         }
-        _ => Ok(("text-davinci-002-render-sha", "gpt-3.5-turbo", None)),
+        model if model.starts_with("gpt-4") => {
+            let env = context::ENV_HOLDER.get_instance();
+            Ok(("gpt-4", "gpt-4", Some(env.get_arkose_token().await?)))
+        }
+        _ => Err(ResponseError::BadRequest(anyhow::anyhow!(
+            "model is required!"
+        ))),
     }
 }
 
