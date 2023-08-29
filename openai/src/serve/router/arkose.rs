@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
-use crate::arkose::{funcaptcha, ArkoseToken};
-use crate::debug;
 use crate::serve::err::{self, ResponseError};
-use crate::serve::{env, Launcher};
+use crate::serve::{context, Launcher};
 use axum::body::Body;
 use axum::http::header;
 use axum::http::method::Method;
@@ -15,7 +13,6 @@ use axum::{
     routing::any,
     Form, Router,
 };
-use serde_json::json;
 
 pub(super) fn config(router: Router, args: &Launcher) -> Router {
     if args.arkose_endpoint.is_none() {
@@ -46,10 +43,10 @@ async fn proxy(
         .path()
         .eq("/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147")
     {
-        let env = env::ENV_HOLDER.get_instance();
-
-        if env.get_arkose_token_endpoint().is_some() || env.get_arkose_yescaptcha_key().is_some() {
-            let mut target_json = json!({
+        let env = context::ENV_HOLDER.get_instance();
+        if let Ok(arkose_token) = env.get_arkose_token().await {
+            let body = serde_json::json!({
+                "token": arkose_token,
                 "challenge_url":"",
                 "challenge_url_cdn":"https://client-api.arkoselabs.com/cdn/fc/assets/ec-game-core/bootstrap/1.14.1/standard/game_core_bootstrap.js",
                 "challenge_url_cdn_sri":null,
@@ -72,67 +69,11 @@ async fn proxy(
                 }
             });
 
-            if let Some(arkose_token_endpoint) = env.get_arkose_token_endpoint() {
-                if let Ok(arkose_token) =
-                    ArkoseToken::new_from_endpoint("gpt4-fuck", arkose_token_endpoint).await
-                {
-                    if let Some(kv) = target_json.as_object_mut() {
-                        kv.insert(
-                            "token".to_owned(),
-                            serde_json::Value::String(arkose_token.value().to_owned()),
-                        );
-                    }
-                    return Ok(Response::builder()
-                        .status(StatusCode::OK)
-                        .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
-                        .body(Body::from(target_json.to_string()))
-                        .map_err(|err| err::ResponseError::InternalServerError(err))?);
-                }
-            }
-
-            if let Some(key) = env.get_arkose_yescaptcha_key() {
-                let arkose_token = ArkoseToken::new("gpt4-fuck").await?;
-                let token = arkose_token.value();
-                debug!("arkose_token: {token:?}");
-                if !arkose_token.valid() {
-                    match funcaptcha::start_challenge(token).await {
-                        Ok(session) => {
-                            if let Some(funcaptcha) = session.funcaptcha() {
-                                let valid_res = funcaptcha::yescaptcha::valid(
-                                    key,
-                                    &funcaptcha.image,
-                                    &funcaptcha.instructions,
-                                )
-                                .await;
-                                if let Ok(index) = valid_res {
-                                    debug!("answer index:{index}");
-                                    if session.submit_answer(index).await.is_ok() {
-                                        if let Some(kv) = target_json.as_object_mut() {
-                                            kv.insert(
-                                                "token".to_owned(),
-                                                serde_json::Value::String(format!("{token}|sup=1")),
-                                            );
-                                        }
-                                        return Ok(Response::builder()
-                                            .status(StatusCode::OK)
-                                            .header(
-                                                header::CONTENT_TYPE,
-                                                "text/plain; charset=utf-8",
-                                            )
-                                            .body(Body::from(target_json.to_string()))
-                                            .map_err(|err| {
-                                                err::ResponseError::InternalServerError(err)
-                                            })?);
-                                    }
-                                }
-                            }
-                        }
-                        Err(error) => {
-                            eprintln!("Error creating session: {}", error);
-                        }
-                    }
-                }
-            }
+            return Ok(Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+                .body(Body::from(body.to_string()))
+                .map_err(|err| ResponseError::InternalServerError(err))?);
         }
 
         if let Some(body) = &mut body {
@@ -144,18 +85,17 @@ async fn proxy(
         }
     }
 
-    headers.insert("Origin", "http://localhost:3000".parse().unwrap());
+    headers.insert(header::ORIGIN, "http://localhost:3000".parse().unwrap());
     headers.insert(
-        "Referer",
+        header::REFERER,
         "http://localhost:3000/v2/1.5.4/enforcement.cd12da708fe6cbe6e068918c38de2ad9.html"
             .parse()
             .unwrap(),
     );
-    headers.remove("Host");
-    headers.remove("connection");
-    headers.remove("Connection");
-    headers.remove("Content-Type");
-    headers.remove("Content-Length");
+    headers.remove(header::HOST);
+    headers.remove(header::CONNECTION);
+    headers.remove(header::CONTENT_TYPE);
+    headers.remove(header::CONTENT_LENGTH);
     headers.remove("Cf-Connecting-Ip");
     headers.remove("Cf-Ipcountry");
     headers.remove("Cf-Ray");
@@ -172,7 +112,7 @@ async fn proxy(
     headers.remove("X-Forwarded-Server");
     headers.remove("X-Real-Ip");
 
-    let client = env::ENV_HOLDER.get_instance().load_api_client();
+    let client = context::ENV_HOLDER.get_instance().load_client();
 
     let url = format!("https://client-api.arkoselabs.com{}", uri.path());
     let resp = match body {

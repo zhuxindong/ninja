@@ -14,6 +14,7 @@ const INIT_HEX: &str = "cd12da708fe6cbe6e068918c38de2ad9";
 
 #[derive(Debug)]
 pub struct Session {
+    client: reqwest::Client,
     sid: String,
     session_token: String,
     headers: header::HeaderMap,
@@ -29,7 +30,7 @@ impl Session {
         self.funcaptcha.as_ref()
     }
 
-    async fn log(
+    async fn challenge_logger(
         &self,
         game_token: &str,
         game_type: i32,
@@ -46,8 +47,8 @@ impl Session {
         challenge_logger.category = Some(category.to_string());
         challenge_logger.action = Some(action.to_string());
 
-        let resp = CLIENT_HOLDER
-            .get_instance()
+        let resp = self
+            .client
             .post("https://client-api.arkoselabs.com/fc/a/")
             .form(&challenge_logger)
             .headers(self.headers.clone())
@@ -76,10 +77,10 @@ impl Session {
         };
 
         let mut headers = self.headers.clone();
-        headers.insert("X-NewRelic-Timestamp", get_time_stamp().parse()?);
+        headers.insert("X-NewRelic-Timestamp", Self::get_time_stamp().parse()?);
 
-        let resp = CLIENT_HOLDER
-            .get_instance()
+        let resp = self
+            .client
             .post("https://client-api.arkoselabs.com/fc/gfct/")
             .form(&challenge_request)
             .headers(headers)
@@ -95,7 +96,7 @@ impl Session {
 
         let challenge = resp.json::<Challenge>().await?;
 
-        self.log(
+        self.challenge_logger(
             &challenge.challenge_id,
             challenge.game_data.game_type,
             "loaded",
@@ -138,6 +139,8 @@ impl Session {
     }
 
     pub async fn submit_answer(mut self, index: i32) -> anyhow::Result<()> {
+        debug!("answer index:{index}");
+
         let submit = SubmitChallenge {
                     session_token: &self.session_token,
                     sid: &self.sid,
@@ -152,12 +155,14 @@ impl Session {
             "X-Requested-ID",
             self.session_token.clone().parse().unwrap(),
         );
-        self.headers
-            .insert("X-NewRelic-Timestamp", get_time_stamp().parse().unwrap());
+        self.headers.insert(
+            "X-NewRelic-Timestamp",
+            Self::get_time_stamp().parse().unwrap(),
+        );
         self.headers.insert(header::DNT, "1".parse().unwrap());
 
-        let resp = CLIENT_HOLDER
-            .get_instance()
+        let resp = self
+            .client
             .post("https://client-api.arkoselabs.com/fc/ca/")
             .headers(self.headers)
             .form(&submit)
@@ -188,6 +193,32 @@ impl Session {
         }
 
         Ok(())
+    }
+
+    fn get_time_stamp() -> String {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let now = SystemTime::now();
+        let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+        format!("{}", since_the_epoch.as_millis())
+    }
+
+    async fn download_image_to_base64(&self, urls: &Vec<String>) -> anyhow::Result<Vec<String>> {
+        use base64::{engine::general_purpose, Engine as _};
+        let mut b64_imgs = Vec::new();
+        for url in urls {
+            let bytes = self
+                .client
+                .get(url)
+                .header(header::DNT, "1")
+                .send()
+                .await?
+                .bytes()
+                .await?;
+            let b64 = general_purpose::STANDARD.encode(bytes);
+            b64_imgs.push(format!("data:image/png;base64,{b64}"));
+        }
+
+        Ok(b64_imgs)
     }
 }
 
@@ -305,12 +336,13 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
         concise_challenge: None,
         funcaptcha: None,
         challenge: None,
+        client: CLIENT_HOLDER.get_instance(),
     };
 
     session.headers.insert(header::REFERER, format!("https://client-api.arkoselabs.com/fc/assets/ec-game-core/game-core/1.13.0/standard/index.html?session={}", arkose_token.replace("|", "&")).parse().unwrap());
 
     session
-        .log(
+        .challenge_logger(
             "",
             0,
             "Site URL",
@@ -321,7 +353,9 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
     session.request_challenge().await?;
 
     if let Some(concise_challenge) = &session.concise_challenge {
-        let images = download_image_to_base64(&concise_challenge.urls).await?;
+        let images = session
+            .download_image_to_base64(&concise_challenge.urls)
+            .await?;
         debug!("concise_challenge: {:#?}", concise_challenge);
         debug!("instructions: {:#?}", concise_challenge.instructions);
         debug!("images: {:#?}", concise_challenge.urls);
@@ -335,31 +369,4 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
     }
 
     Ok(session)
-}
-
-use std::time::{SystemTime, UNIX_EPOCH};
-
-fn get_time_stamp() -> String {
-    let now = SystemTime::now();
-    let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
-    format!("{}", since_the_epoch.as_millis())
-}
-
-async fn download_image_to_base64(urls: &Vec<String>) -> anyhow::Result<Vec<String>> {
-    use base64::{engine::general_purpose, Engine as _};
-    let mut b64_imgs = Vec::new();
-    let client = CLIENT_HOLDER.get_instance();
-    for url in urls {
-        let bytes = client
-            .get(url)
-            .header(header::DNT, "1")
-            .send()
-            .await?
-            .bytes()
-            .await?;
-        let b64 = general_purpose::STANDARD.encode(bytes);
-        b64_imgs.push(format!("data:image/png;base64,{b64}"));
-    }
-
-    Ok(b64_imgs)
 }

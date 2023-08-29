@@ -4,7 +4,7 @@ pub mod sign;
 #[cfg(feature = "limit")]
 pub mod tokenbucket;
 
-pub mod env;
+pub mod context;
 pub mod err;
 pub mod load_balancer;
 #[cfg(feature = "template")]
@@ -46,7 +46,7 @@ use crate::{debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 use crate::serve::err::ResponseError;
 use crate::{HEADER_UA, URL_CHATGPT_API, URL_PLATFORM_API};
 
-use self::env::ENV_HOLDER;
+use self::context::ENV_HOLDER;
 
 const EMPTY: &str = "";
 
@@ -171,7 +171,7 @@ impl Launcher {
 
             info!("Concurrent limit {}", self.concurrent_limit);
 
-            env::ENV_HOLDER.init(&self);
+            context::ENV_HOLDER.init(&self);
 
             tokio::spawn(check_self_ip());
 
@@ -382,7 +382,7 @@ async fn official_proxy(
     };
     let env = ENV_HOLDER.get_instance();
     let builder = env
-        .load_api_client()
+        .load_client()
         .request(method, &url)
         .headers(header_convert(headers, jar).await);
     let resp = match body {
@@ -423,7 +423,7 @@ async fn unofficial_proxy(
 
     let env = ENV_HOLDER.get_instance();
     let builder = env
-        .load_api_client()
+        .load_client()
         .request(method, url)
         .headers(header_convert(headers, jar).await);
     let resp = match body {
@@ -510,6 +510,7 @@ pub(crate) async fn header_convert(headers: axum::http::HeaderMap, jar: CookieJa
     res.insert("sec-fetch-site", HeaderValue::from_static("same-origin"));
     res.insert("sec-gpc", HeaderValue::from_static("1"));
     res.insert("Pragma", HeaderValue::from_static("no-cache"));
+    res.remove(header::CONNECTION);
 
     let mut cookie = String::new();
 
@@ -566,14 +567,12 @@ async fn gpt4_body_handle(url: &str, method: &Method, body: &mut Option<Json<Val
     if url.contains("/backend-api/conversation") && method.eq("POST") {
         if let Some(body) = body.as_mut().and_then(|b| b.as_object_mut()) {
             if let Some(model) = body.get("model").and_then(|m| m.as_str()) {
-                if body.get("arkose_token").is_none() {
-                    let env = ENV_HOLDER.get_instance();
-                    let arkose_token_res = match env.get_arkose_token_endpoint() {
-                        Some(endpoint) => ArkoseToken::new_from_endpoint(model, &endpoint).await,
-                        None => ArkoseToken::new(model).await,
-                    };
-                    if let Ok(arkose_token) = arkose_token_res {
-                        let _ = body.insert("arkose_token".to_owned(), json!(arkose_token));
+                if model.starts_with("gpt-4") {
+                    if body.get("arkose_token").is_none() {
+                        let env = ENV_HOLDER.get_instance();
+                        if let Ok(arkose_token) = env.get_arkose_token().await {
+                            let _ = body.insert("arkose_token".to_owned(), json!(arkose_token));
+                        }
                     }
                 }
             }
@@ -584,7 +583,7 @@ async fn gpt4_body_handle(url: &str, method: &Method, body: &mut Option<Json<Val
 async fn check_self_ip() {
     match ENV_HOLDER
         .get_instance()
-        .load_api_client()
+        .load_client()
         .get("https://ifconfig.me")
         .timeout(Duration::from_secs(60))
         .header(header::ACCEPT, "application/json")
@@ -625,7 +624,7 @@ async fn initialize_puid(email: String, password: String, mfa: Option<String>) {
                         AccessToken::OAuth(access_token) => access_token.access_token,
                     };
                     match env
-                        .load_api_client()
+                        .load_client()
                         .get(format!("{URL_CHATGPT_API}/backend-api/models"))
                         .bearer_auth(access_token)
                         .send()

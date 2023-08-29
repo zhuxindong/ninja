@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::info;
-use crate::serve::env;
+use crate::serve::context;
 use crate::serve::err;
 use crate::serve::err::ResponseError;
 use crate::serve::header_convert;
@@ -247,7 +247,7 @@ async fn post_login(
         return render_template(TEMP_LOGIN, &ctx);
     }
 
-    let env = env::ENV_HOLDER.get_instance();
+    let env = context::ENV_HOLDER.get_instance();
     match env.load_auth_client().do_access_token(&account).await {
         Ok(access_token) => {
             let authentication_token = AuthenticateToken::try_from(access_token)
@@ -287,7 +287,7 @@ async fn post_login_token(headers: HeaderMap) -> Result<Response<Body>, Response
                 "Get Profile Erorr"
             )))?;
 
-        let env = env::ENV_HOLDER.get_instance();
+        let env = context::ENV_HOLDER.get_instance();
         let session = match env
             .load_auth_client()
             .do_get_user_picture(access_token)
@@ -336,7 +336,7 @@ async fn get_logout(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
         match extract_session(c.value()) {
             Ok(session) => {
                 if let Some(refresh_token) = session.refresh_token {
-                    let env = env::ENV_HOLDER.get_instance();
+                    let env = context::ENV_HOLDER.get_instance();
                     let _a = env.load_auth_client().do_revoke_token(&refresh_token).await;
                 }
             }
@@ -507,10 +507,10 @@ async fn get_share_chat(
     if let Some(cookie) = jar.get(SESSION_ID) {
         return match extract_session(cookie.value()) {
             Ok(session) => {
-                let env = env::ENV_HOLDER.get_instance();
+                let env = context::ENV_HOLDER.get_instance();
                 let url = get_url();
                 let resp = env
-                    .load_api_client()
+                    .load_client()
                     .get(format!("{url}/backend-api/share/{share_id}"))
                     .headers(header_convert(headers, jar).await)
                     .bearer_auth(session.access_token)
@@ -605,10 +605,10 @@ async fn get_share_chat_info(
     let share_id = share_id.0.replace(".json", "");
     if let Some(cookie) = jar.get(SESSION_ID) {
         if let Ok(session) = extract_session(cookie.value()) {
-            let env = env::ENV_HOLDER.get_instance();
+            let env = context::ENV_HOLDER.get_instance();
             let url = get_url();
             let resp = env
-                .load_api_client()
+                .load_client()
                 .get(format!("{url}/backend-api/share/{share_id}"))
                 .headers(header_convert(headers, jar).await)
                 .bearer_auth(session.access_token)
@@ -686,9 +686,9 @@ async fn get_share_chat_continue_info(
     if let Some(cookie) = jar.get(SESSION_ID) {
         return match extract_session(cookie.value()) {
             Ok(session) => {
-                let env = env::ENV_HOLDER.get_instance();
+                let env = context::ENV_HOLDER.get_instance();
                 let url = get_url();
-                let resp = env.load_api_client()
+                let resp = env.load_client()
                 .get(format!("{url}/backend-api/share/{}", share_id.0))
                 .headers(header_convert(headers, jar).await)
                 .bearer_auth(session.access_token)
@@ -788,9 +788,9 @@ async fn get_image(
     let query = params.ok_or(err::ResponseError::BadRequest(anyhow::anyhow!(
         "Missing URL parameter"
     )))?;
-    let env = env::ENV_HOLDER.get_instance();
+    let env = context::ENV_HOLDER.get_instance();
 
-    let resp = env.load_api_client().get(&query.url).send().await;
+    let resp = env.load_client().get(&query.url).send().await;
     response_convert(resp)
 }
 
@@ -886,9 +886,9 @@ async fn cf_captcha_check(addr: IpAddr, cf_response: Option<&str>) -> Result<(),
                     remoteip: &addr.to_string(),
                     idempotency_key: crate::uuid::uuid(),
                 };
-                let env = env::ENV_HOLDER.get_instance();
+                let env = context::ENV_HOLDER.get_instance();
                 let resp = env
-                    .load_api_client()
+                    .load_client()
                     .post("https://challenges.cloudflare.com/turnstile/v0/siteverify")
                     .form(&form)
                     .send()

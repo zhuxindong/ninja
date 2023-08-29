@@ -22,7 +22,7 @@ pub(super) static CLIENT_HOLDER: ClientHolder = ClientHolder(Once::new());
 pub struct ClientHolder(Once);
 
 impl ClientHolder {
-    pub fn get_instance(&self) -> &reqwest::Client {
+    pub fn get_instance(&self) -> reqwest::Client {
         // Use Once to guarantee initialization only once
         self.0.call_once(|| {
             let client = reqwest::Client::builder()
@@ -36,7 +36,7 @@ impl ClientHolder {
         });
         unsafe {
             CLIENT
-                .as_ref()
+                .clone()
                 .expect("The requesting client is not initialized")
         }
     }
@@ -93,6 +93,12 @@ impl ArkoseToken {
             Ok(_) => Ok(get_arkose_token_from_endpoint(endpoint).await?),
             Err(_) => anyhow::bail!("Models are not supported: {}", model),
         }
+    }
+}
+
+impl From<String> for ArkoseToken {
+    fn from(value: String) -> Self {
+        ArkoseToken(value)
     }
 }
 
