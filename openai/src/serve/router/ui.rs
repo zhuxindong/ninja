@@ -246,8 +246,7 @@ async fn post_login(
         return render_template(TEMP_LOGIN, &ctx);
     }
 
-    match context::ENV_HOLDER
-        .get_instance()
+    match context::Context::get_instance()
         .load_auth_client()
         .do_access_token(&account)
         .await
@@ -290,8 +289,7 @@ async fn post_login_token(headers: HeaderMap) -> Result<Response<Body>, Response
                 "Get Profile Erorr"
             )))?;
 
-        let session = match context::ENV_HOLDER
-            .get_instance()
+        let session = match context::Context::get_instance()
             .load_auth_client()
             .do_get_user_picture(access_token)
             .await
@@ -339,7 +337,7 @@ async fn get_logout(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
         match extract_session(c.value()) {
             Ok(session) => {
                 if let Some(refresh_token) = session.refresh_token {
-                    let env = context::ENV_HOLDER.get_instance();
+                    let env = context::Context::get_instance();
                     let _a = env.load_auth_client().do_revoke_token(&refresh_token).await;
                 }
             }
@@ -510,7 +508,7 @@ async fn get_share_chat(
     if let Some(cookie) = jar.get(SESSION_ID) {
         return match extract_session(cookie.value()) {
             Ok(session) => {
-                let env = context::ENV_HOLDER.get_instance();
+                let env = context::Context::get_instance();
                 let url = get_url();
                 let resp = env
                     .load_client()
@@ -608,7 +606,7 @@ async fn get_share_chat_info(
     let share_id = share_id.0.replace(".json", "");
     if let Some(cookie) = jar.get(SESSION_ID) {
         if let Ok(session) = extract_session(cookie.value()) {
-            let env = context::ENV_HOLDER.get_instance();
+            let env = context::Context::get_instance();
             let url = get_url();
             let resp = env
                 .load_client()
@@ -689,7 +687,7 @@ async fn get_share_chat_continue_info(
     if let Some(cookie) = jar.get(SESSION_ID) {
         return match extract_session(cookie.value()) {
             Ok(session) => {
-                let env = context::ENV_HOLDER.get_instance();
+                let env = context::Context::get_instance();
                 let url = get_url();
                 let resp = env.load_client()
                 .get(format!("{url}/backend-api/share/{}", share_id.0))
@@ -791,8 +789,7 @@ async fn get_image(
     let query = params.ok_or(ResponseError::BadRequest(anyhow::anyhow!(
         "Missing URL parameter"
     )))?;
-    let resp = context::ENV_HOLDER
-        .get_instance()
+    let resp = context::Context::get_instance()
         .load_client()
         .get(&query.url)
         .send()
@@ -894,8 +891,7 @@ async fn cf_captcha_check(addr: IpAddr, cf_response: Option<&str>) -> Result<(),
             idempotency_key: crate::uuid::uuid(),
         };
 
-        let resp = context::ENV_HOLDER
-            .get_instance()
+        let resp = context::Context::get_instance()
             .load_client()
             .post("https://challenges.cloudflare.com/turnstile/v0/siteverify")
             .form(&form)

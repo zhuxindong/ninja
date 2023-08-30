@@ -46,7 +46,7 @@ use crate::{debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 use crate::serve::err::ResponseError;
 use crate::{HEADER_UA, URL_CHATGPT_API, URL_PLATFORM_API};
 
-use self::context::ENV_HOLDER;
+use self::context::Context;
 
 const EMPTY: &str = "";
 
@@ -171,17 +171,15 @@ impl Launcher {
 
             info!("Concurrent limit {}", self.concurrent_limit);
 
-            context::ENV_HOLDER.init(&self);
+            context::Context::init(&self);
 
             tokio::spawn(check_self_ip());
 
-            if !self.puid_email.is_none() && !self.puid_password.is_none() {
-                tokio::spawn(initialize_puid(
-                    self.puid_email.clone().unwrap_or_default(),
-                    self.puid_password.clone().unwrap_or_default(),
-                    self.puid_mfa.clone(),
-                ));
-            }
+            tokio::spawn(initialize_puid(
+                self.puid_email.clone(),
+                self.puid_password.clone(),
+                self.puid_mfa.clone(),
+            ));
 
             #[cfg(all(feature = "sign", feature = "limit"))]
             let app_layer = {
@@ -295,7 +293,7 @@ impl Launcher {
 async fn post_access_token(
     account: axum::Form<AuthAccount>,
 ) -> Result<Json<AccessToken>, ResponseError> {
-    let env = ENV_HOLDER.get_instance();
+    let env = Context::get_instance();
     match env.load_auth_client().do_access_token(&account.0).await {
         Ok(access_token) => Ok(Json(access_token)),
         Err(err) => Err(ResponseError::BadRequest(err)),
@@ -303,7 +301,7 @@ async fn post_access_token(
 }
 
 async fn post_refresh_token(headers: HeaderMap) -> Result<Json<RefreshToken>, ResponseError> {
-    let env = ENV_HOLDER.get_instance();
+    let env = Context::get_instance();
     let refresh_token = headers
         .get(header::AUTHORIZATION)
         .map_or(EMPTY, |e| e.to_str().unwrap_or_default());
@@ -314,7 +312,7 @@ async fn post_refresh_token(headers: HeaderMap) -> Result<Json<RefreshToken>, Re
 }
 
 async fn post_revoke_token(headers: HeaderMap) -> Result<axum::http::StatusCode, ResponseError> {
-    let env = ENV_HOLDER.get_instance();
+    let env = Context::get_instance();
     let refresh_token = headers
         .get(header::AUTHORIZATION)
         .map_or(EMPTY, |e| e.to_str().unwrap_or_default());
@@ -380,7 +378,7 @@ async fn official_proxy(
             format!("{URL_PLATFORM_API}{}?{}", uri.path(), query)
         }
     };
-    let env = ENV_HOLDER.get_instance();
+    let env = Context::get_instance();
     let builder = env
         .load_client()
         .request(method, &url)
@@ -421,7 +419,7 @@ async fn unofficial_proxy(
 
     gpt4_body_handle(&url, &method, &mut body).await;
 
-    let env = ENV_HOLDER.get_instance();
+    let env = Context::get_instance();
     let builder = env
         .load_client()
         .request(method, url)
@@ -524,12 +522,11 @@ pub(crate) async fn header_convert(headers: axum::http::HeaderMap, jar: CookieJa
         cookie.push_str(c);
         debug!("request cookie `puid`: {}", c);
     } else {
-        let env = ENV_HOLDER.get_instance();
+        let env = Context::get_instance();
         if let Some(puid) = env.get_share_puid() {
             let c = &format!("_puid={};", puid);
             cookie.push_str(c);
             debug!("local `puid`: {}", c);
-            drop(puid)
         }
     }
 
@@ -569,7 +566,7 @@ async fn gpt4_body_handle(url: &str, method: &Method, body: &mut Option<Json<Val
             if let Some(model) = body.get("model").and_then(|m| m.as_str()) {
                 if model.starts_with("gpt-4") {
                     if body.get("arkose_token").is_none() {
-                        let env = ENV_HOLDER.get_instance();
+                        let env = Context::get_instance();
                         if let Ok(arkose_token) = env.get_arkose_token().await {
                             let _ = body.insert("arkose_token".to_owned(), json!(arkose_token));
                         }
@@ -581,8 +578,7 @@ async fn gpt4_body_handle(url: &str, method: &Method, body: &mut Option<Json<Val
 }
 
 async fn check_self_ip() {
-    match ENV_HOLDER
-        .get_instance()
+    match Context::get_instance()
         .load_client()
         .get("https://ifconfig.me")
         .timeout(Duration::from_secs(60))
@@ -604,16 +600,19 @@ async fn check_self_ip() {
     }
 }
 
-async fn initialize_puid(email: String, password: String, mfa: Option<String>) {
+async fn initialize_puid(username: Option<String>, password: Option<String>, mfa: Option<String>) {
+    if username.is_none() || password.is_none() {
+        return;
+    }
     let mut interval = tokio::time::interval(Duration::from_secs(24 * 60 * 60)); // 24 hours
     let mut account = AuthAccount {
-        username: email,
-        password,
+        username: username.unwrap(),
+        password: password.unwrap(),
         mfa,
         option: AuthStrategy::Apple,
         cf_turnstile_response: None,
     };
-    let env = ENV_HOLDER.get_instance();
+    let env = Context::get_instance();
     loop {
         interval.tick().await;
         for _ in 0..2 {

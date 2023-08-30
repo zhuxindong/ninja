@@ -6,23 +6,22 @@ use crate::{
     debug, info,
 };
 use reqwest::Client;
-use std::sync::RwLock;
 
 use super::{err::ResponseError, load_balancer, Launcher};
 
 static mut ENV: Option<Env> = None;
-pub(super) static ENV_HOLDER: EnvWrapper = EnvWrapper(Once::new());
+static INIT: Once = Once::new();
 
 pub(super) struct Env {
     client_load: load_balancer::ClientLoadBalancer<Client>,
     auth_client_load: load_balancer::ClientLoadBalancer<AuthClient>,
-    share_puid: RwLock<Option<String>>,
+    share_puid: Option<String>,
     arkose_token_endpoint: Option<String>,
     yescaptcha_client_key: Option<String>,
 }
 
 impl Env {
-    fn new(args: &super::Launcher) -> Self {
+    fn new(args: &Launcher) -> Self {
         let puid = if let Some(puid) = args.puid.as_ref() {
             info!("Using PUID: {puid}");
             Some(puid.to_owned())
@@ -36,7 +35,7 @@ impl Env {
                 args,
             )
             .expect("Failed to initialize the requesting oauth client"),
-            share_puid: RwLock::new(puid),
+            share_puid: puid,
             arkose_token_endpoint: args.arkose_token_endpoint.clone(),
             yescaptcha_client_key: args.yescaptcha_client_key.clone(),
         }
@@ -50,14 +49,12 @@ impl Env {
         self.auth_client_load.next()
     }
 
-    pub fn get_share_puid(&self) -> Option<String> {
-        let lock = self.share_puid.read().unwrap();
-        lock.clone()
+    pub fn get_share_puid(&self) -> Option<&str> {
+        self.share_puid.as_deref()
     }
 
-    pub fn set_share_puid(&self, puid: Option<String>) {
-        let mut lock = self.share_puid.write().unwrap();
-        *lock = puid;
+    pub fn set_share_puid(&mut self, puid: Option<String>) {
+        self.share_puid = puid;
     }
 
     pub async fn get_arkose_token(&self) -> anyhow::Result<ArkoseToken, ResponseError> {
@@ -112,17 +109,17 @@ impl Env {
     }
 }
 
-pub(super) struct EnvWrapper(Once);
+pub(super) struct Context;
 
-impl EnvWrapper {
-    pub fn init(&self, args: &Launcher) {
+impl Context {
+    pub fn init(args: &Launcher) {
         // Use Once to guarantee initialization only once
-        self.0.call_once(|| unsafe { ENV = Some(Env::new(args)) });
+        INIT.call_once(|| unsafe { ENV = Some(Env::new(args)) });
     }
 
-    pub fn get_instance(&self) -> &Env {
+    pub fn get_instance() -> &'static mut Env {
         unsafe {
-            ENV.as_ref()
+            ENV.as_mut()
                 .expect("Runtime Env component is not initialized")
         }
     }

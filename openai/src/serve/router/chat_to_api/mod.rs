@@ -70,7 +70,7 @@ pub(crate) async fn chat_to_api(
         .build()
         .map_err(|err| ResponseError::InternalServerError(err))?;
 
-    let env = context::ENV_HOLDER.get_instance();
+    let env = context::Context::get_instance();
     let resp = env
         .load_client()
         .post(format!("{URL_CHATGPT_API}/backend-api/conversation"))
@@ -292,7 +292,7 @@ async fn convert_model(model: &str) -> Result<(&str, &str, Option<ArkoseToken>),
             Ok(("text-davinci-002-render-sha", "gpt-3.5-turbo", None))
         }
         model if model.starts_with("gpt-4") => {
-            let env = context::ENV_HOLDER.get_instance();
+            let env = context::Context::get_instance();
             Ok(("gpt-4", "gpt-4", Some(env.get_arkose_token().await?)))
         }
         _ => Err(ResponseError::BadRequest(anyhow::anyhow!(

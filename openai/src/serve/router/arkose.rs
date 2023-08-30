@@ -43,7 +43,7 @@ async fn proxy(
         .path()
         .eq("/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147")
     {
-        let env = context::ENV_HOLDER.get_instance();
+        let env = context::Context::get_instance();
         if let Ok(arkose_token) = env.get_arkose_token().await {
             let body = serde_json::json!({
                 "token": arkose_token,
@@ -112,7 +112,7 @@ async fn proxy(
     headers.remove("X-Forwarded-Server");
     headers.remove("X-Real-Ip");
 
-    let client = context::ENV_HOLDER.get_instance().load_client();
+    let client = context::Context::get_instance().load_client();
 
     let url = format!("https://client-api.arkoselabs.com{}", uri.path());
     let resp = match body {
