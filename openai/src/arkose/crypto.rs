@@ -21,7 +21,7 @@ fn aes_encrypt(content: &str, password: &str) -> Result<EncryptionData, &'static
     use aes::cipher::{block_padding::Pkcs7, BlockEncryptMut, KeyIvInit};
     type Aes256CbcEnc = cbc::Encryptor<aes::Aes256>;
 
-    let mut buf = [0u8; 4096];
+    let mut buf = [0u8; 8192];
 
     let cipher_bytes = Aes256CbcEnc::new_from_slices(&key, &iv)
         .unwrap()

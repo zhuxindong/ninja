@@ -363,7 +363,7 @@ async fn get_logout(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
 async fn get_session(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
     if let Some(cookie) = jar.get(SESSION_ID) {
         let session = extract_session(cookie.value())?;
-        let dt = DateTime::<Utc>::from_utc(
+        let dt = DateTime::<Utc>::from_naive_utc_and_offset(
             NaiveDateTime::from_timestamp_opt(session.expires, 0).unwrap(),
             Utc,
         );
