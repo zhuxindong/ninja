@@ -6,6 +6,7 @@ use tokio::time::Instant;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let key = std::env::var("KEY").unwrap();
     // start time
     let start_time = Instant::now();
 
@@ -16,8 +17,8 @@ async fn main() -> anyhow::Result<()> {
         match start_challenge(token).await {
             Ok(session) => {
                 if let Some(funcaptcha) = session.funcaptcha() {
-                    let index = funcaptcha::yescaptcha::valid(
-                        "408c8a7ab07af4edda344bd9fc439350d2b24a4126299",
+                    let index = funcaptcha::yescaptcha::submit_task(
+                        &key,
                         &funcaptcha.image,
                         &funcaptcha.instructions,
                     )

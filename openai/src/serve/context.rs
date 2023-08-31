@@ -85,7 +85,7 @@ impl Env {
                                 "valid funcaptcha error"
                             )))?;
 
-                    let answer_index = funcaptcha::yescaptcha::valid(
+                    let answer = funcaptcha::yescaptcha::submit_task(
                         key,
                         &funcaptcha.image,
                         &funcaptcha.instructions,
@@ -93,7 +93,7 @@ impl Env {
                     .await
                     .map_err(|error| ResponseError::InternalServerError(error))?;
 
-                    return match session.submit_answer(answer_index).await {
+                    return match session.submit_answer(answer).await {
                         Ok(_) => Ok(ArkoseToken::from(format!("{arkose_token_value}|sup=1"))),
                         Err(err) => {
                             debug!("submit funcaptcha answer error: {err}");

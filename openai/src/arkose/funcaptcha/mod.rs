@@ -144,22 +144,24 @@ impl Session {
         let submit = SubmitChallenge {
                     session_token: &self.session_token,
                     sid: &self.sid,
-                    game_token: &self.challenge.unwrap_or_default().challenge_id,
-                    guess: &crypto::encrypt(&format!("[{{\"index\":{index}}}]"), &self.session_token),
+                    game_token: &self.challenge.context("no challenge")?.challenge_id,
+                    guess: &crypto::encrypt(&format!(r#"[{{"index":{index}}}]"#), &self.session_token),
                     render_type: "canvas",
                     analytics_tier: 40,
                     bio: "eyJtYmlvIjoiMTUwLDAsMTE3LDIzOTszMDAsMCwxMjEsMjIxOzMxNywwLDEyNCwyMTY7NTUwLDAsMTI5LDIxMDs1NjcsMCwxMzQsMjA3OzYxNywwLDE0NCwyMDU7NjUwLDAsMTU1LDIwNTs2NjcsMCwxNjUsMjA1OzY4NCwwLDE3MywyMDc7NzAwLDAsMTc4LDIxMjs4MzQsMCwyMjEsMjI4OzI2MDY3LDAsMTkzLDM1MTsyNjEwMSwwLDE4NSwzNTM7MjYxMDEsMCwxODAsMzU3OzI2MTM0LDAsMTcyLDM2MTsyNjE4NCwwLDE2NywzNjM7MjYyMTcsMCwxNjEsMzY1OzI2MzM0LDAsMTU2LDM2NDsyNjM1MSwwLDE1MiwzNTQ7MjYzNjcsMCwxNTIsMzQzOzI2Mzg0LDAsMTUyLDMzMTsyNjQ2NywwLDE1MSwzMjU7MjY0NjcsMCwxNTEsMzE3OzI2NTAxLDAsMTQ5LDMxMTsyNjY4NCwxLDE0NywzMDc7MjY3NTEsMiwxNDcsMzA3OzMwNDUxLDAsMzcsNDM3OzMwNDY4LDAsNTcsNDI0OzMwNDg0LDAsNjYsNDE0OzMwNTAxLDAsODgsMzkwOzMwNTAxLDAsMTA0LDM2OTszMDUxOCwwLDEyMSwzNDk7MzA1MzQsMCwxNDEsMzI0OzMwNTUxLDAsMTQ5LDMxNDszMDU4NCwwLDE1MywzMDQ7MzA2MTgsMCwxNTUsMjk2OzMwNzUxLDAsMTU5LDI4OTszMDc2OCwwLDE2NywyODA7MzA3ODQsMCwxNzcsMjc0OzMwODE4LDAsMTgzLDI3MDszMDg1MSwwLDE5MSwyNzA7MzA4ODQsMCwyMDEsMjY4OzMwOTE4LDAsMjA4LDI2ODszMTIzNCwwLDIwNCwyNjM7MzEyNTEsMCwyMDAsMjU3OzMxMzg0LDAsMTk1LDI1MTszMTQxOCwwLDE4OSwyNDk7MzE1NTEsMSwxODksMjQ5OzMxNjM0LDIsMTg5LDI0OTszMTcxOCwxLDE4OSwyNDk7MzE3ODQsMiwxODksMjQ5OzMxODg0LDEsMTg5LDI0OTszMTk2OCwyLDE4OSwyNDk7MzIyODQsMCwyMDIsMjQ5OzMyMzE4LDAsMjE2LDI0NzszMjMxOCwwLDIzNCwyNDU7MzIzMzQsMCwyNjksMjQ1OzMyMzUxLDAsMzAwLDI0NTszMjM2OCwwLDMzOSwyNDE7MzIzODQsMCwzODgsMjM5OzMyNjE4LDAsMzkwLDI0NzszMjYzNCwwLDM3NCwyNTM7MzI2NTEsMCwzNjUsMjU1OzMyNjY4LDAsMzUzLDI1NzszMjk1MSwxLDM0OCwyNTc7MzMwMDEsMiwzNDgsMjU3OzMzNTY4LDAsMzI4LDI3MjszMzU4NCwwLDMxOSwyNzg7MzM2MDEsMCwzMDcsMjg2OzMzNjUxLDAsMjk1LDI5NjszMzY1MSwwLDI5MSwzMDA7MzM2ODQsMCwyODEsMzA5OzMzNjg0LDAsMjcyLDMxNTszMzcxOCwwLDI2NiwzMTc7MzM3MzQsMCwyNTgsMzIzOzMzNzUxLDAsMjUyLDMyNzszMzc1MSwwLDI0NiwzMzM7MzM3NjgsMCwyNDAsMzM3OzMzNzg0LDAsMjM2LDM0MTszMzgxOCwwLDIyNywzNDc7MzM4MzQsMCwyMjEsMzUzOzM0MDUxLDAsMjE2LDM1NDszNDA2OCwwLDIxMCwzNDg7MzQwODQsMCwyMDQsMzQ0OzM0MTAxLDAsMTk4LDM0MDszNDEzNCwwLDE5NCwzMzY7MzQ1ODQsMSwxOTIsMzM0OzM0NjUxLDIsMTkyLDMzNDsiLCJ0YmlvIjoiIiwia2JpbyI6IiJ9",
                 };
 
-        self.headers.insert(
-            "X-Requested-ID",
-            self.session_token.clone().parse().unwrap(),
-        );
+        let pwd = format!("REQUESTED{}ID", self.session_token);
+
+        let request_id = crypto::encrypt("{{\"sc\":[147,307]}}", &pwd);
+
+        self.headers
+            .insert("X-Requested-ID", request_id.parse().unwrap());
+
         self.headers.insert(
             "X-NewRelic-Timestamp",
             Self::get_time_stamp().parse().unwrap(),
         );
-        self.headers.insert(header::DNT, "1".parse().unwrap());
 
         let resp = self
             .client
@@ -179,27 +181,33 @@ impl Session {
             error: Option<String>,
         }
 
-        let resp = resp.json::<Response>().await?;
+        match resp.error_for_status() {
+            Ok(resp) => {
+                let resp = resp.json::<Response>().await?;
 
-        if let Some(error) = resp.error {
-            anyhow::bail!("funcaptcha submit error {error}")
+                if let Some(error) = resp.error {
+                    anyhow::bail!("funcaptcha submit error {error}")
+                }
+
+                if !resp.solved {
+                    anyhow::bail!(
+                        "incorrect guess {}",
+                        resp.incorrect_guess.unwrap_or_default()
+                    )
+                }
+                Ok(())
+            }
+            Err(err) => {
+                anyhow::bail!(err)
+            }
         }
-
-        if !resp.solved {
-            anyhow::bail!(
-                "incorrect guess {}",
-                resp.incorrect_guess.unwrap_or_default()
-            )
-        }
-
-        Ok(())
     }
 
     fn get_time_stamp() -> String {
         use std::time::{SystemTime, UNIX_EPOCH};
         let now = SystemTime::now();
         let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
-        format!("{}", since_the_epoch.as_millis())
+        since_the_epoch.as_millis().to_string()
     }
 
     async fn download_image_to_base64(&self, urls: &Vec<String>) -> anyhow::Result<Vec<String>> {
@@ -209,7 +217,7 @@ impl Session {
             let bytes = self
                 .client
                 .get(url)
-                .header(header::DNT, "1")
+                .headers(self.headers.clone())
                 .send()
                 .await?
                 .bytes()
@@ -317,14 +325,14 @@ struct SubmitChallenge<'a> {
 pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
     let fields: Vec<&str> = arkose_token.split('|').collect();
     let session_token = fields[0].to_string();
-    let sid = fields[1].split('=').nth(1).unwrap_or("").to_string();
+    let sid = fields[1].split('=').nth(1).unwrap_or_default();
 
     let mut session = Session {
-        sid: sid.clone(),
+        sid: sid.to_owned(),
         session_token: session_token.clone(),
         headers: header::HeaderMap::new(),
         challenge_logger: ChallengeLogger {
-            sid: sid.clone(),
+            sid: sid.to_owned(),
             session_token: session_token.clone(),
             analytics_tier: 40,
             render_type: "canvas".to_string(),
@@ -340,6 +348,9 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
     };
 
     session.headers.insert(header::REFERER, format!("https://client-api.arkoselabs.com/fc/assets/ec-game-core/game-core/1.13.0/standard/index.html?session={}", arkose_token.replace("|", "&")).parse().unwrap());
+    session
+        .headers
+        .insert(header::DNT, header::HeaderValue::from_static("1"));
 
     session
         .challenge_logger(
