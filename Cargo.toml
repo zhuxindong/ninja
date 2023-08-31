@@ -40,6 +40,7 @@ reqwest = { git = "https://github.com/gngpp/reqwest.git", branch ="main", defaul
     "boring-tls", "impersonate","json", "cookies", "stream", "multipart", "socks", "blocking"
 ] }
 base64 = "0.21.3"
+viuer = "0.6"
 
 [features]
 default = ["limit", "sign"]
