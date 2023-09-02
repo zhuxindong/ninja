@@ -27,9 +27,21 @@ A reverse engineered unofficial `ChatGPT` proxy (bypass Cloudflare 403 Access De
 
 > Limitations: This cannot bypass OpenAI's outright IP ban
 
+### ArkoseLabs
+
+Sending a `GPT4` conversation requires `Arkose Token` to be sent as a parameter, and there are only three supported solutions for the time being
+
+1) The endpoint obtained by `Arkose Token`, no matter what method you use, use `--arkose-token-endpoint` to specify the endpoint to obtain the token. The supported `JSON` format is generally in accordance with the format of the community: `{"token": "xxxxxx"}`
+
+2) The `ChatGPT` official website sends a `GPT4` session message, and the browser `F12` downloads `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` interface The HAR logging file, and then use the startup parameter `--arkose-har-path` to specify the HAR file path using
+
+3) Use the [YesCaptcha](https://yescaptcha.atlassian.net/wiki/spaces/YESCAPTCHA/overview?homepageId=33020) platform for AI coding, the price is affordable, `10RMB` is calculated by point submission, `10000/ 3 ~= 3333 commits`
+
+If the above three solutions are used, the priority is: `HAR` > `Arkose Token endpoint` > `YesCaptcha`
+
 ### Platform Support
 
-- Linux musl current supports
+- Linux supports
   - `x86_64-unknown-linux-musl`
   - `aarch64-unknown-linux-musl`
   - `armv7-unknown-linux-musleabi`
@@ -37,9 +49,9 @@ A reverse engineered unofficial `ChatGPT` proxy (bypass Cloudflare 403 Access De
   - `arm-unknown-linux-musleabi`
   - `arm-unknown-linux-musleabihf`
   - `armv5te-unknown-linux-musleabi`
-- Windows current supports
+- Windows supports
   - `x86_64-pc-windows-msvc`
-- MacOS current supports
+- MacOS supports
   - `x86_64-apple-darwin`
   - `aarch64-apple-darwin`
 
