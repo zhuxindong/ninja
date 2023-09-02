@@ -41,7 +41,7 @@ If the above three solutions are used, the priority is: `HAR` > `Arkose Token en
 
 ### Platform Support
 
-- Linux supports
+- Linux
   - `x86_64-unknown-linux-musl`
   - `aarch64-unknown-linux-musl`
   - `armv7-unknown-linux-musleabi`
@@ -49,9 +49,9 @@ If the above three solutions are used, the priority is: `HAR` > `Arkose Token en
   - `arm-unknown-linux-musleabi`
   - `arm-unknown-linux-musleabihf`
   - `armv5te-unknown-linux-musleabi`
-- Windows supports
+- Windows
   - `x86_64-pc-windows-msvc`
-- MacOS supports
+- MacOS
   - `x86_64-apple-darwin`
   - `aarch64-apple-darwin`
 

@@ -38,11 +38,11 @@
 
 3) 使用[YesCaptcha](https://yescaptcha.atlassian.net/wiki/spaces/YESCAPTCHA/overview?homepageId=33020)平台进行AI打码，价格实惠，`10RMB`按积分提交来计算，`10000/3 ~= 3333 次提交`
 
-以上三种方案都使用的话，优先级是：`HAR` > `Arkose Token 端点` > `YesCaptcha`
+三种方案都使用的话，优先级是：`HAR` > `Arkose Token 端点` > `YesCaptcha`
 
 ### 平台支持
 
-- Linux 支持
+- Linux
   - `x86_64-unknown-linux-musl`
   - `aarch64-unknown-linux-musl`
   - `armv7-unknown-linux-musleabi`
@@ -50,9 +50,9 @@
   - `arm-unknown-linux-musleabi`
   - `arm-unknown-linux-musleabihf`
   - `armv5te-unknown-linux-musleabi`
-- Windows 支持
+- Windows
   - `x86_64-pc-windows-msvc`
-- MacOS 支持
+- MacOS
   - `x86_64-apple-darwin`
   - `aarch64-apple-darwin`
 
