@@ -4,17 +4,17 @@ use std::{
     time::Duration,
 };
 
-use crate::auth::AuthClient;
 use crate::{auth, info, HEADER_UA};
+use crate::{auth::AuthClient, context};
 
-pub(super) struct ClientLoadBalancer<T: Clone> {
+pub struct ClientLoadBalancer<T: Clone> {
     clients: Vec<T>,
     index: AtomicUsize,
 }
 
 impl<T: Clone> ClientLoadBalancer<T> {
     pub(super) fn new_auth_client(
-        args: &super::Launcher,
+        args: &context::Args,
     ) -> anyhow::Result<ClientLoadBalancer<AuthClient>> {
         let build = |proxy_url: Option<String>| -> AuthClient {
             if let Some(ref url) = proxy_url {
@@ -26,7 +26,6 @@ impl<T: Clone> ClientLoadBalancer<T> {
                 .impersonate(Impersonate::OkHttpAndroid13)
                 .timeout(Duration::from_secs((args.timeout + 1) as u64))
                 .connect_timeout(Duration::from_secs((args.connect_timeout + 1) as u64))
-                .pool_max_idle_per_host(args.workers)
                 .cookie_store(true)
                 .proxy(proxy_url)
                 .build();
@@ -50,7 +49,7 @@ impl<T: Clone> ClientLoadBalancer<T> {
     }
 
     pub(super) fn new_api_client(
-        args: &super::Launcher,
+        args: &context::Args,
     ) -> anyhow::Result<ClientLoadBalancer<Client>> {
         let build = |proxy_url: Option<String>| -> reqwest::Client {
             let mut client_builder = reqwest::Client::builder();
@@ -67,7 +66,6 @@ impl<T: Clone> ClientLoadBalancer<T> {
                 .tcp_keepalive(Some(Duration::from_secs((args.tcp_keepalive + 1) as u64)))
                 .timeout(Duration::from_secs((args.timeout + 1) as u64))
                 .connect_timeout(Duration::from_secs((args.connect_timeout + 1) as u64))
-                .pool_max_idle_per_host(args.workers)
                 .cookie_store(true)
                 .build()
                 .expect("Failed to build API client");

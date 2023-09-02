@@ -10,7 +10,7 @@ async fn main() -> anyhow::Result<()> {
     // start time
     let start_time = Instant::now();
 
-    let arkose_token = ArkoseToken::new("gpt4-fuck").await?;
+    let arkose_token = ArkoseToken::new().await.unwrap();
     let token = arkose_token.value();
     println!("arkose_token: {token:?}");
     if !arkose_token.valid() {

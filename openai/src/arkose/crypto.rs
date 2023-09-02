@@ -1,32 +1,36 @@
+use nom::AsBytes;
 use rand::Rng;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct EncryptionData {
     ct: String,
     iv: String,
     s: String,
 }
 
-pub fn encrypt(data: &str, key: &str) -> String {
-    let enc_data = aes_encrypt(data, key).expect("encryption failed");
-    let enc_data_json = serde_json::to_string(&enc_data).expect("JSON serialization failed");
-    enc_data_json
+pub fn encrypt(data: &str, key: &str) -> anyhow::Result<String> {
+    let enc_data = aes_encrypt(data, key)?;
+    Ok(serde_json::to_string(&enc_data)?)
 }
 
-fn aes_encrypt(content: &str, password: &str) -> Result<EncryptionData, &'static str> {
+pub fn decrypt(data: Vec<u8>, key: &str) -> anyhow::Result<String> {
+    let dec_data = ase_decrypt(data, key)?;
+    Ok(String::from_utf8(dec_data)?)
+}
+
+fn aes_encrypt(content: &str, password: &str) -> anyhow::Result<EncryptionData> {
     let salt: Vec<u8> = rand::thread_rng().gen::<[u8; 8]>().to_vec();
-    let (key, iv) = default_evp_kdf(password.as_bytes(), &salt)?;
+    let (key, iv) = default_evp_kdf(password.as_bytes(), &salt).map_err(|s| anyhow::anyhow!(s))?;
 
     use aes::cipher::{block_padding::Pkcs7, BlockEncryptMut, KeyIvInit};
     type Aes256CbcEnc = cbc::Encryptor<aes::Aes256>;
 
     let mut buf = [0u8; 8192];
 
-    let cipher_bytes = Aes256CbcEnc::new_from_slices(&key, &iv)
-        .unwrap()
+    let cipher_bytes = Aes256CbcEnc::new_from_slices(&key, &iv)?
         .encrypt_padded_b2b_mut::<Pkcs7>(content.as_bytes(), &mut buf)
-        .unwrap();
+        .map_err(|err| anyhow::anyhow!(err))?;
 
     let mut md5_hash = md5::Context::new();
     let mut salted = String::new();
@@ -54,6 +58,32 @@ fn aes_encrypt(content: &str, password: &str) -> Result<EncryptionData, &'static
             .collect::<String>(),
     };
     Ok(enc_data)
+}
+
+fn ase_decrypt(content: Vec<u8>, password: &str) -> anyhow::Result<Vec<u8>> {
+    let encode_data = serde_json::from_slice::<EncryptionData>(&content)?;
+
+    #[allow(deprecated)]
+    let decode_ct = base64::decode(&encode_data.ct)?;
+
+    let salt: Result<Vec<u8>, _> = (0..encode_data.s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&encode_data.s[i..i + 2], 16))
+        .collect();
+
+    let (key, iv) =
+        default_evp_kdf(password.as_bytes(), salt?.as_bytes()).map_err(|s| anyhow::anyhow!(s))?;
+
+    use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
+    type Aes256CbcDec = cbc::Decryptor<aes::Aes256>;
+
+    let mut buf = [0u8; 8192];
+
+    let decode_bytes = Aes256CbcDec::new_from_slices(&key, &iv)?
+        .decrypt_padded_b2b_mut::<Pkcs7>(&decode_ct, &mut buf)
+        .map_err(|err| anyhow::anyhow!(err))?;
+
+    Ok(decode_bytes.to_vec())
 }
 
 fn evp_kdf(

@@ -1,61 +1,141 @@
-#[allow(dead_code)]
+use crate::arkose::crypto;
 use serde::Deserialize;
+use std::{path::Path, sync::Mutex};
 
-#[derive(Debug, Deserialize)]
-pub struct Har {
-    pub entries: Vec<Entries>,
-}
+static LOCK: Mutex<()> = Mutex::new(());
+static mut CACHE_REQUEST_ENTRY: Option<RequestEntry> = None;
 
-#[derive(Debug, Deserialize)]
-pub struct Entries {
-    #[serde(rename = "request")]
-    pub request: Request,
-    #[serde(rename = "startedDateTime")]
-    pub started_date_time: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Request {
-    pub method: String,
+#[derive(Clone)]
+pub struct RequestEntry {
     pub url: String,
-    #[serde(rename = "httpVersion")]
-    pub http_version: String,
+    pub method: String,
     pub headers: Vec<Header>,
-    #[serde(rename = "queryString")]
-    pub query_string: Vec<QueryString>,
-    pub cookies: Vec<Cookie>,
-    #[serde(rename = "headersSize")]
-    pub headers_size: i32,
-    #[serde(rename = "bodySize")]
-    pub body_size: i32,
-    #[serde(rename = "postData")]
-    pub post_data: Option<PostData>,
+    pub body: String,
+    pub bx: String,
+    pub bv: String,
+}
+
+pub fn parse<P: AsRef<Path>>(path: P) -> anyhow::Result<RequestEntry> {
+    if let Some(entry) = unsafe { CACHE_REQUEST_ENTRY.clone() } {
+        return Ok(entry);
+    }
+
+    let bytes = std::fs::read(path)?;
+    let har = serde_json::from_slice::<Har>(&bytes)?;
+    drop(bytes);
+
+    if let Some(entry) = har
+        .log
+        .entries
+        .into_iter()
+        .find(|e| e.request.url.contains("fc/gt2/public_key"))
+    {
+        if entry.started_date_time.is_empty() {
+            anyhow::bail!("Invalid HAR file");
+        }
+
+        let bt = chrono::DateTime::parse_from_rfc3339(&entry.started_date_time)?.timestamp();
+        let bw = bt - (bt % 21600);
+        let mut bv = String::new();
+
+        if let Some(data) = entry.request.post_data {
+            let headers = entry.request.headers;
+
+            if let Some(h) = headers
+                .iter()
+                .find(|h| h.name.eq_ignore_ascii_case("user-agent"))
+            {
+                bv.push_str(&h.value);
+            }
+
+            if let Some(bda_param) = data
+                .params
+                .iter()
+                .find(|p| p.name.eq_ignore_ascii_case("bda"))
+            {
+                #[allow(deprecated)]
+                let entry = RequestEntry {
+                    url: entry.request.url,
+                    method: entry.request.method,
+                    headers: headers
+                        .into_iter()
+                        .filter(|h| {
+                            let name = &h.name;
+                            !name.starts_with(":")
+                                && !name.eq_ignore_ascii_case("content-length")
+                                && !name.eq_ignore_ascii_case("connection")
+                        })
+                        .collect::<Vec<Header>>(),
+                    body: data
+                        .text
+                        .split("&")
+                        .into_iter()
+                        .filter(|s| !s.contains("bda") && !s.contains("rnd"))
+                        .collect::<Vec<&str>>()
+                        .join("&"),
+                    bx: crypto::decrypt(base64::decode(&bda_param.value)?, &format!("{bv}{bw}"))?,
+                    bv,
+                };
+
+                let lock = LOCK.lock().unwrap();
+                unsafe {
+                    CACHE_REQUEST_ENTRY = Some(entry);
+                    drop(lock);
+                    return Ok(CACHE_REQUEST_ENTRY.clone().unwrap());
+                }
+            }
+        }
+    }
+
+    anyhow::bail!("Unable to find har related request entry")
+}
+
+pub fn clear_cache() {
+    let lock = LOCK.lock().unwrap();
+    unsafe { CACHE_REQUEST_ENTRY = None }
+    drop(lock)
 }
 
 #[derive(Debug, Deserialize)]
+struct Har {
+    log: Log,
+}
+
+#[derive(Debug, Deserialize)]
+struct Log {
+    entries: Vec<Entry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Entry {
+    #[serde(rename = "request")]
+    request: Request,
+    #[serde(rename = "startedDateTime")]
+    started_date_time: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct Request {
+    method: String,
+    url: String,
+    headers: Vec<Header>,
+    #[serde(rename = "postData")]
+    post_data: Option<PostData>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct Header {
     pub name: String,
     pub value: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
-pub struct QueryString {
-    pub name: String,
-    pub value: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Cookie {
-    pub name: String,
-    pub value: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct PostData {
+struct PostData {
     #[serde(rename = "mimeType")]
-    pub mime_type: String,
-    pub text: String,
-    pub params: Vec<Param>,
+    mime_type: String,
+    text: String,
+    params: Vec<Param>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -35,6 +35,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .proxies(args.proxies.unwrap_or_default())
         .api_prefix(args.api_prefix)
         .arkose_endpoint(args.arkose_endpoint)
+        .arkose_har_path(args.arkose_har_path)
         .arkose_token_endpoint(args.arkose_token_endpoint)
         .tls_keypair(None)
         .tcp_keepalive(args.tcp_keepalive)
@@ -279,6 +280,7 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
         puid_user: None,
         puid: None,
         arkose_yescaptcha_key: None,
+        arkose_har_path: None,
     };
 
     let write = |out: PathBuf, args: ServeArgs| -> anyhow::Result<()> {

@@ -4,9 +4,8 @@ pub mod sign;
 #[cfg(feature = "limit")]
 pub mod tokenbucket;
 
-pub mod context;
 pub mod err;
-pub mod load_balancer;
+
 #[cfg(feature = "template")]
 pub mod router;
 pub mod signal;
@@ -14,7 +13,7 @@ pub mod signal;
 use axum::body::StreamBody;
 use axum::http::Response;
 use axum::response::IntoResponse;
-use axum::routing::{any, get, post};
+use axum::routing::{any, post};
 use axum::Json;
 use axum_server::{AddrIncomingConfig, Handle};
 
@@ -36,17 +35,15 @@ use tracing_subscriber::util::SubscriberInitExt;
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 
-use crate::arkose::ArkoseToken;
 use crate::auth::model::{AccessToken, AuthAccount, AuthStrategy, RefreshToken};
 use crate::auth::AuthHandle;
+use crate::context::{ArgsBuilder, Context};
 use crate::serve::router::chat_to_api::chat_to_api;
 use crate::serve::tokenbucket::TokenBucketLimitContext;
-use crate::{debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
+use crate::{arkose, debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 
 use crate::serve::err::ResponseError;
 use crate::{HEADER_UA, URL_CHATGPT_API, URL_PLATFORM_API};
-
-use self::context::Context;
 
 const EMPTY: &str = "";
 
@@ -82,8 +79,10 @@ pub struct Launcher {
     api_prefix: Option<String>,
     /// Arkose endpoint
     arkose_endpoint: Option<String>,
-    /// get arkose-token endpoint
+    /// Get arkose token endpoint
     arkose_token_endpoint: Option<String>,
+    /// Arkoselabs HAR record file path
+    arkose_har_path: Option<PathBuf>,
     /// yescaptcha client key
     yescaptcha_client_key: Option<String>,
     /// Enable url signature (signature secret key)
@@ -116,6 +115,22 @@ pub struct Launcher {
 
 impl Launcher {
     pub fn run(self) -> anyhow::Result<()> {
+        let args = ArgsBuilder::default()
+            .api_prefix(self.api_prefix.clone())
+            .arkose_endpoint(self.arkose_endpoint.clone())
+            .arkose_har_path(self.arkose_har_path.clone())
+            .arkose_token_endpoint(self.arkose_token_endpoint.clone())
+            .yescaptcha_client_key(self.yescaptcha_client_key.clone())
+            .puid(self.puid.clone())
+            .proxies(self.proxies.clone())
+            .timeout(self.timeout.clone())
+            .connect_timeout(self.connect_timeout)
+            .tcp_keepalive(self.tcp_keepalive)
+            .build()
+            .expect("Failed to initialize configuration parameters");
+
+        Context::init(args);
+
         tracing_subscriber::registry()
             .with(
                 tracing_subscriber::EnvFilter::try_from_default_env()
@@ -170,8 +185,6 @@ impl Launcher {
             info!("Starting {} workers", self.workers);
 
             info!("Concurrent limit {}", self.concurrent_limit);
-
-            context::Context::init(&self);
 
             tokio::spawn(check_self_ip());
 
@@ -239,8 +252,7 @@ impl Launcher {
                 .route("/public-api/*path", any(unofficial_proxy))
                 .route("/auth/token", post(post_access_token))
                 .route("/auth/refresh_token", post(post_refresh_token))
-                .route("/auth/revoke_token", post(post_revoke_token))
-                .route("/auth/arkose_token", get(get_arkose_token));
+                .route("/auth/revoke_token", post(post_revoke_token));
 
             let router = router::config(router, &self).layer(global_layer);
 
@@ -319,13 +331,6 @@ async fn post_revoke_token(headers: HeaderMap) -> Result<axum::http::StatusCode,
     match env.load_auth_client().do_revoke_token(refresh_token).await {
         Ok(_) => Ok(axum::http::StatusCode::OK),
         Err(err) => Err(ResponseError::BadRequest(err)),
-    }
-}
-
-async fn get_arkose_token() -> Result<Json<ArkoseToken>, ResponseError> {
-    match ArkoseToken::new("gpt4").await {
-        Ok(arkose_token) => Ok(Json(arkose_token)),
-        Err(err) => Err(ResponseError::InternalServerError(err)),
     }
 }
 
@@ -417,7 +422,7 @@ async fn unofficial_proxy(
         format!("{URL_CHATGPT_API}{}", uri.path())
     };
 
-    gpt4_body_handle(&url, &method, &mut body).await;
+    handle_body(&url, &method, &mut body).await;
 
     let env = Context::get_instance();
     let builder = env
@@ -560,20 +565,31 @@ fn puid_cookie_encoded(input: &str) -> String {
     }
 }
 
-async fn gpt4_body_handle(url: &str, method: &Method, body: &mut Option<Json<Value>>) {
-    if url.contains("/backend-api/conversation") && method.eq("POST") {
-        if let Some(body) = body.as_mut().and_then(|b| b.as_object_mut()) {
-            if let Some(model) = body.get("model").and_then(|m| m.as_str()) {
-                if model.starts_with("gpt-4") {
-                    if body.get("arkose_token").is_none() {
-                        let env = Context::get_instance();
-                        if let Ok(arkose_token) = env.get_arkose_token().await {
-                            let _ = body.insert("arkose_token".to_owned(), json!(arkose_token));
-                        }
-                    }
-                }
-            }
-        }
+async fn handle_body(url: &str, method: &Method, body: &mut Option<Json<Value>>) {
+    if !url.contains("/backend-api/conversation") || !method.eq("POST") {
+        return;
+    }
+
+    let body = match body.as_mut().and_then(|b| b.as_object_mut()) {
+        Some(body) => body,
+        None => return,
+    };
+
+    let model = match body.get("model").and_then(|m| m.as_str()) {
+        Some(model) => model,
+        None => return,
+    };
+
+    if arkose::GPT4Model::try_from(model).is_err() {
+        return;
+    }
+
+    if body.get("arkose_token").is_some() {
+        return;
+    }
+
+    if let Ok(arkose_token) = arkose::ArkoseToken::new_from_context().await {
+        let _ = body.insert("arkose_token".to_owned(), json!(arkose_token));
     }
 }
 

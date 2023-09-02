@@ -68,7 +68,7 @@ pub async fn submit_task(
         let task = resp.json::<TaskResp>().await?;
         debug!("yescaptcha task: {task:#?}");
         if let Some(error_description) = task.error_description {
-            anyhow::bail!(format!("yescaptcha task error:{error_description}"))
+            anyhow::bail!(format!("yescaptcha task error: {error_description}"))
         }
         let target = task.solution.objects;
         return match target.is_empty() {
