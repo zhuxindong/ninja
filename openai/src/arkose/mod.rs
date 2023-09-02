@@ -3,6 +3,7 @@ pub mod funcaptcha;
 pub mod har;
 pub mod murmur;
 
+use std::path::Path;
 use std::sync::Once;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
@@ -11,17 +12,20 @@ use rand::Rng;
 use reqwest::header;
 use reqwest::impersonate::Impersonate;
 use reqwest::redirect::Policy;
+use reqwest::Method;
 use serde::Deserialize;
 use serde::Serialize;
 use serde::Serializer;
 
 use crate::arkose::crypto::encrypt;
+use crate::context::Context;
+use crate::debug;
 
 const HEADER: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36";
 
 static mut CLIENT: Option<reqwest::Client> = None;
 
-pub(super) static CLIENT_HOLDER: ClientHolder = ClientHolder(Once::new());
+static CLIENT_HOLDER: ClientHolder = ClientHolder(Once::new());
 
 pub struct ClientHolder(Once);
 
@@ -47,7 +51,7 @@ impl ClientHolder {
 }
 
 #[derive(PartialEq, Eq)]
-enum GPT4Model {
+pub enum GPT4Model {
     Gpt4model,
     Gpt4browsingModel,
     Gpt4pluginsModel,
@@ -73,36 +77,40 @@ impl TryFrom<&str> for GPT4Model {
 }
 
 /// curl 'https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147' --data-raw 'public_key=35536E1E-65B4-4D96-9D97-6ADB7EFF8147'
-#[derive(Clone, Debug)]
-pub struct ArkoseToken(String);
+#[derive(Deserialize, Debug)]
+pub struct ArkoseToken {
+    token: String,
+}
 
 impl ArkoseToken {
     pub fn value(&self) -> &str {
-        &self.0
+        &self.token
     }
 
     pub fn valid(&self) -> bool {
-        self.0.contains("sup=1|rid=")
+        self.token.contains("sup=1|rid=")
     }
 
-    pub async fn new(model: &str) -> anyhow::Result<Self> {
-        match GPT4Model::try_from(model) {
-            Ok(_) => Ok(get_arkose_token().await?),
-            Err(_) => anyhow::bail!("Models are not supported: {}", model),
-        }
+    pub async fn new_from_context() -> anyhow::Result<Self> {
+        get_arkose_token_from_context().await
     }
 
-    pub async fn new_from_endpoint(model: &str, endpoint: &str) -> anyhow::Result<Self> {
-        match GPT4Model::try_from(model) {
-            Ok(_) => Ok(get_arkose_token_from_endpoint(endpoint).await?),
-            Err(_) => anyhow::bail!("Models are not supported: {}", model),
-        }
+    pub async fn new_from_endpoint(endpoint: &str) -> anyhow::Result<Self> {
+        get_arkose_token_from_endpoint(endpoint).await
+    }
+
+    pub async fn new() -> anyhow::Result<Self> {
+        get_arkose_token().await
+    }
+
+    pub async fn new_form_har<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
+        get_arkose_token_from_har(path).await
     }
 }
 
 impl From<String> for ArkoseToken {
     fn from(value: String) -> Self {
-        ArkoseToken(value)
+        ArkoseToken { token: value }
     }
 }
 
@@ -111,20 +119,8 @@ impl Serialize for ArkoseToken {
     where
         S: Serializer,
     {
-        serializer.serialize_str(&self.0)
+        serializer.serialize_str(&self.token)
     }
-}
-
-#[derive(Deserialize)]
-struct ArkoseResponse {
-    token: String,
-}
-
-/// Build it yourself: https://github.com/gngpp/arkose-generator
-async fn get_arkose_token_from_endpoint(endpoint: &str) -> anyhow::Result<ArkoseToken> {
-    let resp = CLIENT_HOLDER.get_instance().get(endpoint).send().await?;
-    let arkose = resp.json::<ArkoseResponse>().await?;
-    Ok(ArkoseToken(arkose.token))
 }
 
 async fn get_arkose_token() -> anyhow::Result<ArkoseToken> {
@@ -134,28 +130,29 @@ async fn get_arkose_token() -> anyhow::Result<ArkoseToken> {
     let bt = SystemTime::now().duration_since(UNIX_EPOCH)?.as_micros() / 1000000;
     let bw = (bt - (bt % 21600)).to_string();
 
-    let bda = encrypt(&bx.to_string(), &format!("{bv}{bw}"));
+    let bda = encrypt(&bx.to_string(), &format!("{bv}{bw}"))?;
     #[allow(deprecated)]
     let bda_encoded = base64::encode(&bda);
 
     let form: [(&str, &str); 8] = [
-        ("bda", &bda_encoded),
         ("public_key", "35536E1E-65B4-4D96-9D97-6ADB7EFF8147"),
         ("site", "https://chat.openai.com"),
         ("userbrowser", bv),
         ("capi_version", "1.5.2"),
         ("capi_mode", "lightbox"),
         ("style_theme", "default"),
+        ("bda", &bda_encoded),
         ("rnd", &(&rand::thread_rng().gen::<f64>().to_string())),
     ];
 
     let resp = CLIENT_HOLDER.get_instance()
-            .post("https://client-api.arkoselabs.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147")
+            .post("https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147")
+            .header(header::USER_AGENT, HEADER)
             .header(header::ACCEPT, "*/*")
             .header(header::ACCEPT_ENCODING, "gzip, deflate, br")
             .header(header::ACCEPT_LANGUAGE, "zh-CN,zh-Hans;q=0.9")
-            .header(header::ORIGIN, "https://client-api.arkoselabs.com")
-            .header(header::REFERER, "https://client-api.arkoselabs.com/v2/1.5.4/enforcement.cd12da708fe6cbe6e068918c38de2ad9.html")
+            .header(header::ORIGIN, "https://tcr9i.chat.openai.com")
+            .header(header::REFERER, "https://tcr9i.chat.openai.com/v2/1.5.4/enforcement.cd12da708fe6cbe6e068918c38de2ad9.html")
             .header("Sec-Fetch-Dest", "empty")
             .header("Sec-Fetch-Mode", "cors")
             .header("Sec-Fetch-Sitet", "same-origin")
@@ -166,6 +163,146 @@ async fn get_arkose_token() -> anyhow::Result<ArkoseToken> {
         anyhow::bail!(format!("get arkose token status code {}", resp.status()));
     }
 
-    let arkose = resp.json::<ArkoseResponse>().await?;
-    Ok(ArkoseToken(arkose.token))
+    Ok(resp.json::<ArkoseToken>().await?)
+}
+
+/// Build it yourself: https://github.com/gngpp/arkose-generator
+async fn get_arkose_token_from_endpoint(endpoint: &str) -> anyhow::Result<ArkoseToken> {
+    let resp = CLIENT_HOLDER
+        .get_instance()
+        .get(endpoint)
+        .timeout(std::time::Duration::from_secs(20))
+        .send()
+        .await?;
+    Ok(resp.json::<ArkoseToken>().await?)
+}
+
+async fn get_arkose_token_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<ArkoseToken> {
+    let mut entry = har::parse(path)?;
+
+    let bt = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let bw = bt - (bt % 21600);
+    let bv = &entry.bv;
+    let bx = &entry.bx;
+
+    let bda = crypto::encrypt(bx, &format!("{bv}{bw}"))?;
+    let rnd = format!("{}", rand::Rng::gen::<f64>(&mut rand::thread_rng()));
+
+    #[allow(deprecated)]
+    entry
+        .body
+        .push_str(&format!("&bda={}", base64::encode(bda)));
+    entry.body.push_str(&format!("&rnd={rnd}"));
+
+    let client = CLIENT_HOLDER.get_instance();
+
+    let method = Method::from_bytes(entry.method.as_bytes())?;
+
+    let mut builder = client.request(method, entry.url);
+
+    builder = builder.body(entry.body);
+
+    for h in entry.headers.into_iter() {
+        if h.name.eq_ignore_ascii_case("cookie") {
+            let value = format!(
+                "{};{}={}",
+                h.value,
+                generate_random_string(),
+                generate_random_string()
+            );
+            builder = builder.header(h.name, value);
+            continue;
+        }
+        builder = builder.header(h.name, h.value)
+    }
+
+    let res = builder.send().await?;
+    match res.error_for_status() {
+        Ok(resp) => Ok(resp.json::<ArkoseToken>().await?),
+        Err(err) => Err(anyhow::anyhow!(err)),
+    }
+}
+
+async fn get_arkose_token_from_context() -> anyhow::Result<ArkoseToken> {
+    let ctx = Context::get_instance();
+
+    if let Some(path) = ctx.arkose_har_file_path() {
+        let token =
+            get_arkose_token_and_submit_if_invalid(|| get_arkose_token_from_har(&path)).await?;
+        return Ok(token);
+    }
+
+    if let Some(ref arkose_token_endpoint) = ctx.arkose_token_endpoint() {
+        let token = get_arkose_token_and_submit_if_invalid(|| {
+            get_arkose_token_from_endpoint(arkose_token_endpoint)
+        })
+        .await?;
+        return Ok(token);
+    }
+
+    if let Some(_) = ctx.yescaptcha_client_key() {
+        let token = get_arkose_token_and_submit_if_invalid(get_arkose_token).await?;
+        return Ok(token);
+    }
+
+    anyhow::bail!("There is no way to get arkose token")
+}
+
+async fn get_arkose_token_and_submit_if_invalid<F, Fut>(get_token: F) -> anyhow::Result<ArkoseToken>
+where
+    F: FnOnce() -> Fut,
+    Fut: futures_core::Future<Output = anyhow::Result<ArkoseToken>>,
+{
+    let ctx = Context::get_instance();
+    let arkose_token = get_token().await?;
+    if arkose_token.valid() {
+        Ok(arkose_token)
+    } else if let Some(ref key) = ctx.yescaptcha_client_key() {
+        submit_captcha(key, arkose_token).await
+    } else {
+        anyhow::bail!("No yescaptcha_client_key to submit captcha")
+    }
+}
+
+async fn submit_captcha(key: &str, arkose_token: ArkoseToken) -> anyhow::Result<ArkoseToken> {
+    let session = funcaptcha::start_challenge(arkose_token.value())
+        .await
+        .map_err(|error| anyhow::anyhow!(format!("Error creating session: {}", error)))?;
+
+    let funcaptcha = anyhow::Context::context(session.funcaptcha(), "valid funcaptcha error")?;
+
+    let answer =
+        funcaptcha::yescaptcha::submit_task(key, &funcaptcha.image, &funcaptcha.instructions)
+            .await?;
+
+    return match session.submit_answer(answer).await {
+        Ok(_) => {
+            let mut rng = rand::thread_rng();
+            let rid = rng.gen_range(1..100);
+            Ok(ArkoseToken::from(format!(
+                "{}|sup=1|rid={rid}",
+                arkose_token.value()
+            )))
+        }
+        Err(err) => {
+            debug!("submit funcaptcha answer error: {err}");
+            Ok(arkose_token)
+        }
+    };
+}
+
+pub fn generate_random_string() -> String {
+    const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+    let mut rng = rand::thread_rng();
+    let length = rng.gen_range(5..=15);
+
+    let result: String = (0..length)
+        .map(|_| {
+            let index = rng.gen_range(0..CHARSET.len());
+            CHARSET[index] as char
+        })
+        .collect();
+
+    result
 }

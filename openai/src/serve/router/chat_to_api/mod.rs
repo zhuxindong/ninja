@@ -14,7 +14,8 @@ use std::convert::Infallible;
 use crate::{
     arkose::ArkoseToken,
     chatgpt::model::resp::{ConvoResponse, PostConvoResponse},
-    serve::{context, err::ResponseError, header_convert},
+    context,
+    serve::{err::ResponseError, header_convert},
 };
 use crate::{chatgpt::model::Role, debug};
 
@@ -291,10 +292,11 @@ async fn convert_model(model: &str) -> Result<(&str, &str, Option<ArkoseToken>),
         model if model.starts_with("gpt-3.5") => {
             Ok(("text-davinci-002-render-sha", "gpt-3.5-turbo", None))
         }
-        model if model.starts_with("gpt-4") => {
-            let env = context::Context::get_instance();
-            Ok(("gpt-4", "gpt-4", Some(env.get_arkose_token().await?)))
-        }
+        model if model.starts_with("gpt-4") => Ok((
+            "gpt-4",
+            "gpt-4",
+            Some(ArkoseToken::new_from_context().await?),
+        )),
         _ => Err(ResponseError::BadRequest(anyhow::anyhow!(
             "model is required!"
         ))),

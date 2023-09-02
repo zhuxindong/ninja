@@ -15,8 +15,8 @@ use args::SubCommands;
 use clap::Parser;
 
 pub mod args;
-pub mod args_handle;
 pub mod env;
+pub mod handle;
 pub mod homedir;
 pub mod inter;
 pub mod store;
@@ -28,20 +28,20 @@ fn main() -> anyhow::Result<()> {
     match opt.command {
         Some(command) => match command {
             SubCommands::Serve(commands) => match commands {
-                args::ServeSubcommand::Run(args) => args_handle::serve(args, true)?,
+                args::ServeSubcommand::Run(args) => handle::serve(args, true)?,
                 #[cfg(target_family = "unix")]
-                args::ServeSubcommand::Stop => args_handle::serve_stop()?,
+                args::ServeSubcommand::Stop => handle::serve_stop()?,
                 #[cfg(target_family = "unix")]
-                args::ServeSubcommand::Start(args) => args_handle::serve_start(args)?,
+                args::ServeSubcommand::Start(args) => handle::serve_start(args)?,
                 #[cfg(target_family = "unix")]
-                args::ServeSubcommand::Restart(args) => args_handle::serve_restart(args)?,
+                args::ServeSubcommand::Restart(args) => handle::serve_restart(args)?,
                 #[cfg(target_family = "unix")]
-                args::ServeSubcommand::Status => args_handle::serve_status()?,
+                args::ServeSubcommand::Status => handle::serve_status()?,
                 #[cfg(target_family = "unix")]
-                args::ServeSubcommand::Log => args_handle::serve_log()?,
+                args::ServeSubcommand::Log => handle::serve_log()?,
                 args::ServeSubcommand::GT { out, edit } => {
-                    args_handle::generate_template(out)?;
-                    args_handle::edit_template_file(edit)?;
+                    handle::generate_template(out)?;
+                    handle::edit_template_file(edit)?;
                 }
             },
             SubCommands::Terminal => inter::prompt()?,

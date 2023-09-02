@@ -137,21 +137,20 @@ pub fn parse_proxies_url(s: &str) -> anyhow::Result<Vec<String>> {
     Ok(proxies)
 }
 
-// config path parse
-pub fn parse_config(s: &str) -> anyhow::Result<PathBuf> {
+// file path parse
+pub fn parse_file_path(s: &str) -> anyhow::Result<PathBuf> {
     let path =
         PathBuf::from_str(s).map_err(|_| anyhow::anyhow!(format!("`{}` isn't a path", s)))?;
-    match path.exists() {
-        true => Ok(path),
-        false => {
-            if let Some(parent) = path.parent() {
-                parent.exists().then(|| ()).ok_or_else(|| {
-                    anyhow::anyhow!(format!("Path {} not exists", parent.display()))
-                })?;
-            }
-            Ok(path)
-        }
+
+    if !path.exists() {
+        anyhow::bail!(format!("Path {} not exists", path.display()))
     }
+
+    if !path.is_file() {
+        anyhow::bail!(format!("{} not a file", path.display()))
+    }
+
+    Ok(path)
 }
 
 // parse account，support split: ':', '-', '--', '---'....
