@@ -114,3 +114,12 @@ msgstr "支持 EC/PKCS8/RSA 类型格式"
 
 msgid "Certificate in DER format"
 msgstr "DER 格式证书"
+
+msgid "About the browser HAR file path requested by ArkoseLabs"
+msgstr "关于ArkoseLabs请求的浏览器HAR文件路径"
+
+msgid "About the YesCaptcha platform client key solved by ArkoseLabs"
+msgstr "关于ArkoseLabs破解的YesCaptcha平台客户端密钥"
+
+msgid "Get arkose token endpoint"
+msgstr "获取arkose token的端点"

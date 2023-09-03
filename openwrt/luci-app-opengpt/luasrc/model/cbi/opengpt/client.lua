@@ -38,6 +38,12 @@ o.default = "60"
 o = s:option(Value, "tcp_keepalive", translate("TCP Keep-Alive"), translate("Default 60 seconds"))
 o.default = "60"
 
+o = s:option(Value, "arkose_har_path", translate("About the browser HAR file path requested by ArkoseLabs"))
+
+o = s:option(Value, "arkose_yescaptcha_key", translate("About the YesCaptcha platform client key solved by ArkoseLabs"))
+
+o = s:option(Value, "arkose_token_endpoint", translate("Get arkose token endpoint"))
+
 o = s:option(Value, "tls_cert", translate("TLS certificate file path"), translate("Certificate in DER format"))
 
 o = s:option(Value, "tls_key", translate("TLS private key file path"), translate("Supports EC/PKCS8/RSA type formats"))
