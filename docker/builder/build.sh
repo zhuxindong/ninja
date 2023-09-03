@@ -12,6 +12,7 @@ map["armv5te-unknown-linux-musleabi"]="ghcr.io/gngpp/rust-musl-cross:armv5te-mus
 map["x86_64-pc-windows-msvc"]="ghcr.io/gngpp/cargo-xwin:latest"
 
 for key in "${!map[@]}"; do
+  docker pull "${map[$key]}"
   docker buildx build --platform linux/amd64,linux/arm64 \
     --tag gngpp/opengpt-builder:"$key" \
     --tag ghcr.io/gngpp/opengpt-builder:"$key" \
