@@ -123,3 +123,12 @@ msgstr "关于ArkoseLabs破解的YesCaptcha平台客户端密钥"
 
 msgid "Get arkose token endpoint"
 msgstr "获取arkose token的端点"
+
+msgid "HAR file path"
+msgstr "HAR 文件路径"
+
+msgid "YesCaptcha Client Key"
+msgstr "YesCaptcha 客户端Key"
+
+msgid "Arkose token endpoint"
+msgstr "Arkose 令牌端点"
