@@ -17,6 +17,9 @@ get_config() {
 	config_get tcp_keepalive $1 tcp_keepalive "5"
 	config_get tls_cert $1 tls_cert ''
 	config_get tls_key $1 tls_key ''
+	config_get arkose_har_path $1 arkose_har_path ''
+	config_get arkose_yescaptcha_key $1 arkose_yescaptcha_key ''
+	config_get arkose_token_endpoint $1 arkose_token_endpoint ''
 	config_get sign_secret_key $1 sign_secret_key ''
 	config_get tb_store_strategy $1 tb_store_strategy "mem"
 	config_get tb_redis_url $1 tb_redis_url 'redis://127.0.0.1:6379'
@@ -62,6 +65,18 @@ start_service() {
 
 	if [ -n "$tcp_keepalive" ]; then
 		args="$args --tcp-keepalive $tcp_keepalive"
+	fi
+
+	if [ -n "$arkose_har_path" ]; then
+		args="$args --arkose-har-path $arkose_har_path"
+	fi
+	
+	if [ -n "$arkose_yescaptcha_key" ]; then
+		args="$args --arkose-yescaptcha-key $arkose_yescaptcha_key"
+	fi
+
+	if [ -n "$arkose_token_endpoint" ]; then
+		args="$args --arkose-token-endpoint $arkose_token_endpoint"
 	fi
 
 	if [ -n "$tls_cert" ]; then
