@@ -75,7 +75,7 @@ pub(crate) async fn chat_to_api(
     let resp = env
         .load_client()
         .post(format!("{URL_CHATGPT_API}/backend-api/conversation"))
-        .headers(header_convert(headers, jar).await)
+        .headers(header_convert(headers, jar).await?)
         .json(&req)
         .send()
         .await
