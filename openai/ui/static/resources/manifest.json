@@ -1,6 +1,7 @@
 {
+  "name": "OpenGPT",
   "short_name": "OpenGPT",
-  "name": "OpenGPT app powered by gngpp",
+  "description": "OpenGPT app powered by gngpp",
   "icons": [
     {
       "src": "/resources/apple-touch-icon.png",
@@ -11,6 +12,7 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "orientation":"portrait",
   "background_color": "#343540",
   "theme_color": "#343540"
 }

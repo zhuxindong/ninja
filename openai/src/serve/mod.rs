@@ -304,13 +304,32 @@ impl Launcher {
 }
 
 async fn post_access_token(
-    account: axum::Form<AuthAccount>,
+    mut account: axum::Form<AuthAccount>,
 ) -> Result<Json<AccessToken>, ResponseError> {
     let env = Context::get_instance();
-    match env.load_auth_client().do_access_token(&account.0).await {
-        Ok(access_token) => Ok(Json(access_token)),
-        Err(err) => Err(ResponseError::BadRequest(err)),
+    let mut result: Result<Json<AccessToken>, ResponseError> = Err(
+        ResponseError::InternalServerError(anyhow!("There was an error logging in to the Body")),
+    );
+
+    for _ in 0..2 {
+        match env.load_auth_client().do_access_token(&account.0).await {
+            Ok(access_token) => {
+                result = Ok(Json(access_token));
+                break;
+            }
+            Err(err) => {
+                debug!("login error: {err}");
+                account.0.option = match account.0.option {
+                    AuthStrategy::Web => AuthStrategy::Apple,
+                    AuthStrategy::Apple => AuthStrategy::Web,
+                    _ => break,
+                };
+                result = Err(ResponseError::BadRequest(err));
+            }
+        }
     }
+
+    result
 }
 
 async fn post_refresh_token(headers: HeaderMap) -> Result<Json<RefreshToken>, ResponseError> {

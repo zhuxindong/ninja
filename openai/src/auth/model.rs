@@ -33,8 +33,8 @@ pub struct AuthAccount {
     #[serde(default)]
     #[builder(setter(into, strip_option), default)]
     pub option: AuthStrategy,
-    #[builder(setter(into, strip_option), default)]
     #[serde(rename = "cf-turnstile-response")]
+    #[builder(setter(into, strip_option), default)]
     pub cf_turnstile_response: Option<String>,
 }
 
