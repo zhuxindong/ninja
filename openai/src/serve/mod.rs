@@ -10,6 +10,7 @@ pub mod err;
 pub mod router;
 pub mod signal;
 
+use anyhow::anyhow;
 use axum::body::StreamBody;
 use axum::http::Response;
 use axum::response::IntoResponse;
@@ -186,7 +187,7 @@ impl Launcher {
 
             info!("Concurrent limit {}", self.concurrent_limit);
 
-            tokio::spawn(check_self_ip());
+            tokio::spawn(check_wan_address());
 
             tokio::spawn(initialize_puid(
                 self.puid_email.clone(),
@@ -387,7 +388,7 @@ async fn official_proxy(
     let builder = env
         .load_client()
         .request(method, &url)
-        .headers(header_convert(headers, jar).await);
+        .headers(header_convert(headers, jar).await?);
     let resp = match body {
         Some(body) => builder.json(&body.0).send().await,
         None => builder.send().await,
@@ -412,7 +413,7 @@ async fn official_proxy(
 async fn unofficial_proxy(
     uri: Uri,
     method: Method,
-    headers: HeaderMap,
+    mut headers: HeaderMap,
     jar: CookieJar,
     mut body: Option<Json<Value>>,
 ) -> Result<impl IntoResponse, ResponseError> {
@@ -422,18 +423,90 @@ async fn unofficial_proxy(
         format!("{URL_CHATGPT_API}{}", uri.path())
     };
 
-    handle_body(&url, &method, &mut body).await;
+    handle_body(&url, &method, &mut headers, &mut body).await?;
 
     let env = Context::get_instance();
     let builder = env
         .load_client()
         .request(method, url)
-        .headers(header_convert(headers, jar).await);
+        .headers(header_convert(headers, jar).await?);
     let resp = match body {
         Some(body) => builder.json(&body.0).send().await,
         None => builder.send().await,
     };
     response_convert(resp)
+}
+pub(super) async fn header_convert(
+    headers: HeaderMap,
+    jar: CookieJar,
+) -> Result<HeaderMap, ResponseError> {
+    let authorization = match headers.get(header::AUTHORIZATION) {
+        Some(v) => Some(v),
+        // pandora will pass X-Authorization header
+        None => headers.get("X-Authorization"),
+    };
+
+    let authorization = authorization.ok_or(ResponseError::Unauthorized(anyhow!(
+        "AccessToken required!"
+    )))?;
+
+    let mut headers = HeaderMap::new();
+    headers.insert(header::AUTHORIZATION, authorization.clone());
+    headers.insert(header::HOST, HeaderValue::from_static(HOST_CHATGPT));
+    headers.insert(header::ORIGIN, HeaderValue::from_static(ORIGIN_CHATGPT));
+    headers.insert(header::USER_AGENT, HeaderValue::from_static(HEADER_UA));
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
+    );
+    headers.insert(
+        "sec-ch-ua",
+        HeaderValue::from_static(
+            r#""Chromium";v="110", "Not A(Brand";v="24", "Google Chrome";v="110"#,
+        ),
+    );
+    headers.insert("sec-ch-ua-mobile", HeaderValue::from_static("?0"));
+    headers.insert("sec-ch-ua-platform", HeaderValue::from_static("Linux"));
+    headers.insert("sec-fetch-dest", HeaderValue::from_static("empty"));
+    headers.insert("sec-fetch-mode", HeaderValue::from_static("cors"));
+    headers.insert("sec-fetch-site", HeaderValue::from_static("same-origin"));
+    headers.insert("sec-gpc", HeaderValue::from_static("1"));
+    headers.insert("Pragma", HeaderValue::from_static("no-cache"));
+    headers.remove(header::CONNECTION);
+
+    let mut cookie = String::new();
+
+    if let Some(puid) = headers.get("PUID") {
+        let puid = puid.to_str().unwrap();
+        cookie.push_str(&format!("_puid={puid};"))
+    }
+
+    match jar.get("_puid") {
+        Some(cookier) => {
+            let c = &format!("_puid={};", puid_cookie_encoded(cookier.value()));
+            cookie.push_str(c);
+            debug!("request cookie `puid`: {}", c);
+        }
+        None => {
+            if !has_puid(&headers)? {
+                let ctx = Context::get_instance();
+                if let Some(puid) = ctx.get_share_puid() {
+                    let c = &format!("_puid={};", puid);
+                    cookie.push_str(c);
+                    debug!("local `puid`: {}", c);
+                }
+            }
+        }
+    }
+
+    // setting cookie
+    if !cookie.is_empty() {
+        headers.insert(
+            header::COOKIE,
+            HeaderValue::from_str(cookie.as_str()).expect("setting cookie error"),
+        );
+    }
+    Ok(headers)
 }
 
 fn response_convert(
@@ -482,67 +555,71 @@ fn response_convert(
     }
 }
 
-pub(crate) async fn header_convert(headers: axum::http::HeaderMap, jar: CookieJar) -> HeaderMap {
+async fn handle_body(
+    url: &str,
+    method: &Method,
+    headers: &mut HeaderMap,
+    body: &mut Option<Json<Value>>,
+) -> Result<(), ResponseError> {
+    if !url.contains("/backend-api/conversation") || !method.eq("POST") {
+        return Ok(());
+    }
+
+    let body = match body.as_mut().and_then(|b| b.as_object_mut()) {
+        Some(body) => body,
+        None => return Ok(()),
+    };
+
+    let model = match body.get("model").and_then(|m| m.as_str()) {
+        Some(model) => model,
+        None => return Ok(()),
+    };
+
+    if arkose::GPT4Model::try_from(model).is_err() {
+        return Ok(());
+    }
+
+    if body.get("arkose_token").is_some() {
+        return Ok(());
+    }
+
     let authorization = match headers.get(header::AUTHORIZATION) {
         Some(v) => Some(v),
         // pandora will pass X-Authorization header
         None => headers.get("X-Authorization"),
     };
 
-    let mut res = HeaderMap::new();
-    if let Some(h) = authorization {
-        res.insert(header::AUTHORIZATION, h.clone());
-    }
-    res.insert(header::HOST, HeaderValue::from_static(HOST_CHATGPT));
-    res.insert(header::ORIGIN, HeaderValue::from_static(ORIGIN_CHATGPT));
-    res.insert(header::USER_AGENT, HeaderValue::from_static(HEADER_UA));
-    res.insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static("application/json"),
-    );
-    res.insert(
-        "sec-ch-ua",
-        HeaderValue::from_static(
-            r#""Chromium";v="110", "Not A(Brand";v="24", "Google Chrome";v="110"#,
-        ),
-    );
-    res.insert("sec-ch-ua-mobile", HeaderValue::from_static("?0"));
-    res.insert("sec-ch-ua-platform", HeaderValue::from_static("Linux"));
-    res.insert("sec-fetch-dest", HeaderValue::from_static("empty"));
-    res.insert("sec-fetch-mode", HeaderValue::from_static("cors"));
-    res.insert("sec-fetch-site", HeaderValue::from_static("same-origin"));
-    res.insert("sec-gpc", HeaderValue::from_static("1"));
-    res.insert("Pragma", HeaderValue::from_static("no-cache"));
-    res.remove(header::CONNECTION);
+    let authorization = authorization.ok_or(ResponseError::Unauthorized(anyhow!(
+        "AccessToken required!"
+    )))?;
 
-    let mut cookie = String::new();
-
-    if let Some(puid) = headers.get("PUID") {
-        let puid = puid.to_str().unwrap();
-        cookie.push_str(&format!("_puid={puid};"))
-    }
-
-    if let Some(cookier) = jar.get("_puid") {
-        let c = &format!("_puid={};", puid_cookie_encoded(cookier.value()));
-        cookie.push_str(c);
-        debug!("request cookie `puid`: {}", c);
-    } else {
-        let env = Context::get_instance();
-        if let Some(puid) = env.get_share_puid() {
-            let c = &format!("_puid={};", puid);
-            cookie.push_str(c);
-            debug!("local `puid`: {}", c);
+    if !has_puid(headers)? {
+        let resp = Context::get_instance()
+            .load_client()
+            .get(format!("{URL_CHATGPT_API}/backend-api/models"))
+            .header(header::AUTHORIZATION, authorization)
+            .send()
+            .await
+            .map_err(|err| ResponseError::InternalServerError(err))?;
+        match resp.error_for_status() {
+            Ok(resp) => {
+                if let Some(puid_cookie) = resp.cookies().into_iter().find(|s| s.name().eq("_puid"))
+                {
+                    headers.insert(
+                        header::COOKIE,
+                        HeaderValue::from_str(&format!("_puid={};", puid_cookie.value())).unwrap(),
+                    );
+                }
+            }
+            Err(err) => return Err(ResponseError::InternalServerError(err)),
         }
     }
 
-    // setting cookie
-    if !cookie.is_empty() {
-        res.insert(
-            header::COOKIE,
-            HeaderValue::from_str(cookie.as_str()).expect("setting cookie error"),
-        );
+    if let Ok(arkose_token) = arkose::ArkoseToken::new_from_context().await {
+        let _ = body.insert("arkose_token".to_owned(), json!(arkose_token));
     }
-    res
+
+    Ok(())
 }
 
 fn puid_cookie_encoded(input: &str) -> String {
@@ -565,39 +642,22 @@ fn puid_cookie_encoded(input: &str) -> String {
     }
 }
 
-async fn handle_body(url: &str, method: &Method, body: &mut Option<Json<Value>>) {
-    if !url.contains("/backend-api/conversation") || !method.eq("POST") {
-        return;
-    }
-
-    let body = match body.as_mut().and_then(|b| b.as_object_mut()) {
-        Some(body) => body,
-        None => return,
+fn has_puid(headers: &HeaderMap) -> Result<bool, ResponseError> {
+    let res = match headers.get(header::COOKIE) {
+        Some(hv) => hv
+            .to_str()
+            .map_err(|err| ResponseError::BadRequest(err))?
+            .contains("_puid"),
+        None => false,
     };
-
-    let model = match body.get("model").and_then(|m| m.as_str()) {
-        Some(model) => model,
-        None => return,
-    };
-
-    if arkose::GPT4Model::try_from(model).is_err() {
-        return;
-    }
-
-    if body.get("arkose_token").is_some() {
-        return;
-    }
-
-    if let Ok(arkose_token) = arkose::ArkoseToken::new_from_context().await {
-        let _ = body.insert("arkose_token".to_owned(), json!(arkose_token));
-    }
+    Ok(res)
 }
 
-async fn check_self_ip() {
+async fn check_wan_address() {
     match Context::get_instance()
         .load_client()
         .get("https://ifconfig.me")
-        .timeout(Duration::from_secs(60))
+        .timeout(Duration::from_secs(70))
         .header(header::ACCEPT, "application/json")
         .send()
         .await

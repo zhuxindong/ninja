@@ -513,7 +513,7 @@ async fn get_share_chat(
                 let resp = env
                     .load_client()
                     .get(format!("{url}/backend-api/share/{share_id}"))
-                    .headers(header_convert(headers, jar).await)
+                    .headers(header_convert(headers, jar).await?)
                     .bearer_auth(session.access_token)
                     .send()
                     .await
@@ -611,7 +611,7 @@ async fn get_share_chat_info(
             let resp = env
                 .load_client()
                 .get(format!("{url}/backend-api/share/{share_id}"))
-                .headers(header_convert(headers, jar).await)
+                .headers(header_convert(headers, jar).await?)
                 .bearer_auth(session.access_token)
                 .send()
                 .await
@@ -691,7 +691,7 @@ async fn get_share_chat_continue_info(
                 let url = get_url();
                 let resp = env.load_client()
                 .get(format!("{url}/backend-api/share/{}", share_id.0))
-                .headers(header_convert(headers, jar).await)
+                .headers(header_convert(headers, jar).await?)
                 .bearer_auth(session.access_token)
                 .send()
                 .await
