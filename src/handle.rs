@@ -120,7 +120,7 @@ pub(super) fn serve_start(mut args: ServeArgs) -> anyhow::Result<()> {
 
     match daemonize.start() {
         Ok(_) => println!("Success, daemonized"),
-        Err(e) => eprintln!("Error, {}", e),
+        Err(e) => println!("Error, {}", e),
     }
 
     serve(args, false)
@@ -138,7 +138,6 @@ pub(super) fn serve_stop() -> anyhow::Result<()> {
         let pid = pid.parse::<i32>()?;
         for _ in 0..360 {
             if let Err(_) = nix::sys::signal::kill(Pid::from_raw(pid), signal::SIGINT) {
-                println!("OpenGPT is not running");
                 break;
             }
             std::thread::sleep(std::time::Duration::from_secs(1))
@@ -164,10 +163,9 @@ pub(super) fn serve_restart(args: ServeArgs) -> anyhow::Result<()> {
 #[cfg(target_family = "unix")]
 pub(super) fn serve_status() -> anyhow::Result<()> {
     use crate::env::get_pid;
-    if let Some(pid) = get_pid() {
-        println!("OpenGPT is running with pid: {}", pid);
-    } else {
-        println!("OpenGPT is not running")
+    match get_pid() {
+        Some(pid) => println!("OpenGPT is running with pid: {}", pid),
+        None => println!("OpenGPT is not running"),
     }
     Ok(())
 }
