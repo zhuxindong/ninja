@@ -143,9 +143,7 @@ pub(super) fn serve_stop() -> anyhow::Result<()> {
             std::thread::sleep(std::time::Duration::from_secs(1))
         }
         let _ = std::fs::remove_file(env::PID_PATH);
-    } else {
-        println!("OpenGPT is not running")
-    };
+    }
 
     Ok(())
 }
