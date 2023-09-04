@@ -18,6 +18,7 @@ get_config() {
 	config_get tls_cert $1 tls_cert ''
 	config_get tls_key $1 tls_key ''
 	config_get arkose_har_path $1 arkose_har_path ''
+	config_get arkose_har_upload_key $1 arkose_har_upload_key ''
 	config_get arkose_yescaptcha_key $1 arkose_yescaptcha_key ''
 	config_get arkose_token_endpoint $1 arkose_token_endpoint ''
 	config_get sign_secret_key $1 sign_secret_key ''
@@ -69,6 +70,10 @@ start_service() {
 
 	if [ -n "$arkose_har_path" ]; then
 		args="$args --arkose-har-path $arkose_har_path"
+	fi
+	
+	if [ -n "$arkose_har_upload_key" ]; then
+		args="$args --arkose-har-upload-key $arkose_har_upload_key"
 	fi
 	
 	if [ -n "$arkose_yescaptcha_key" ]; then
