@@ -12,10 +12,12 @@ pub mod signal;
 
 use anyhow::anyhow;
 use axum::body::StreamBody;
+use axum::headers::authorization::Bearer;
+use axum::headers::Authorization;
 use axum::http::Response;
 use axum::response::IntoResponse;
 use axum::routing::{any, post};
-use axum::Json;
+use axum::{Json, TypedHeader};
 use axum_server::{AddrIncomingConfig, Handle};
 
 use axum::http::header;
@@ -38,8 +40,8 @@ use std::path::PathBuf;
 
 use crate::auth::model::{AccessToken, AuthAccount, AuthStrategy, RefreshToken};
 use crate::auth::AuthHandle;
-use crate::context::{ArgsBuilder, Context};
-use crate::serve::router::chat_to_api::chat_to_api;
+use crate::context::{Context, ContextArgsBuilder};
+use crate::serve::router::toapi::chat_to_api;
 use crate::serve::tokenbucket::TokenBucketLimitContext;
 use crate::{arkose, debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 
@@ -84,6 +86,8 @@ pub struct Launcher {
     arkose_token_endpoint: Option<String>,
     /// Arkoselabs HAR record file path
     arkose_har_path: Option<PathBuf>,
+    /// HAR file upload authenticate key
+    arkose_har_upload_key: Option<String>,
     /// yescaptcha client key
     yescaptcha_client_key: Option<String>,
     /// Enable url signature (signature secret key)
@@ -116,10 +120,11 @@ pub struct Launcher {
 
 impl Launcher {
     pub fn run(self) -> anyhow::Result<()> {
-        let args = ArgsBuilder::default()
+        let args = ContextArgsBuilder::default()
             .api_prefix(self.api_prefix.clone())
             .arkose_endpoint(self.arkose_endpoint.clone())
             .arkose_har_path(self.arkose_har_path.clone())
+            .arkose_har_upload_key(self.arkose_har_upload_key.clone())
             .arkose_token_endpoint(self.arkose_token_endpoint.clone())
             .yescaptcha_client_key(self.yescaptcha_client_key.clone())
             .puid(self.puid.clone())
@@ -159,6 +164,50 @@ impl Launcher {
                 self.timeout as u64,
             )));
 
+        #[cfg(all(feature = "sign", feature = "limit"))]
+        let app_layer = {
+            let limit_context = TokenBucketLimitContext::from((
+                self.tb_store_strategy.clone(),
+                self.tb_enable,
+                self.tb_capacity,
+                self.tb_fill_rate,
+                self.tb_expired,
+                self.tb_redis_url.clone(),
+            ));
+
+            tower::ServiceBuilder::new()
+                .layer(axum::middleware::from_fn(
+                    middleware::token_authorization_middleware,
+                ))
+                .layer(axum::middleware::from_fn_with_state(
+                    Arc::new(self.sign_secret_key.clone()),
+                    middleware::sign_middleware,
+                ))
+                .layer(axum::middleware::from_fn_with_state(
+                    Arc::new(limit_context),
+                    middleware::token_bucket_limit_middleware,
+                ))
+        };
+
+        #[cfg(all(not(feature = "limit"), feature = "sign"))]
+        let app_layer = {
+            tower::ServiceBuilder::new()
+                .layer(axum::middleware::from_fn(
+                    middleware::token_authorization_middleware,
+                ))
+                .layer(axum::middleware::from_fn_with_state(
+                    Arc::new(self.sign_secret_key),
+                    middleware::sign_middleware,
+                ))
+        };
+
+        #[cfg(all(not(feature = "limit"), not(feature = "sign")))]
+        let app_layer = {
+            tower::ServiceBuilder::new().layer(axum::middleware::from_fn(
+                middleware::token_authorization_middleware,
+            ))
+        };
+
         let http_config = HttpConfig::new()
             .http1_keep_alive(true)
             .http1_header_read_timeout(Duration::from_secs(self.tcp_keepalive as u64))
@@ -182,62 +231,15 @@ impl Launcher {
                 "Starting HTTP(S) server at http(s)://{}:{}",
                 self.host, self.port
             );
-
             info!("Starting {} workers", self.workers);
-
             info!("Concurrent limit {}", self.concurrent_limit);
 
             tokio::spawn(check_wan_address());
-
             tokio::spawn(initialize_puid(
                 self.puid_email.clone(),
                 self.puid_password.clone(),
                 self.puid_mfa.clone(),
             ));
-
-            #[cfg(all(feature = "sign", feature = "limit"))]
-            let app_layer = {
-                let limit_context = TokenBucketLimitContext::from((
-                    self.tb_store_strategy.clone(),
-                    self.tb_enable,
-                    self.tb_capacity,
-                    self.tb_fill_rate,
-                    self.tb_expired,
-                    self.tb_redis_url.clone(),
-                ));
-
-                tower::ServiceBuilder::new()
-                    .layer(axum::middleware::from_fn_with_state(
-                        Arc::new(limit_context),
-                        middleware::token_bucket_limit_middleware,
-                    ))
-                    .layer(axum::middleware::from_fn_with_state(
-                        Arc::new(self.sign_secret_key.clone()),
-                        middleware::sign_middleware,
-                    ))
-                    .layer(axum::middleware::from_fn(
-                        middleware::token_authorization_middleware,
-                    ))
-            };
-
-            #[cfg(all(not(feature = "limit"), feature = "sign"))]
-            let app_layer = {
-                tower::ServiceBuilder::new()
-                    .layer(axum::middleware::from_fn_with_state(
-                        Arc::new(self.sign_secret_key),
-                        middleware::sign_middleware,
-                    ))
-                    .layer(axum::middleware::from_fn(
-                        middleware::token_authorization_middleware,
-                    ))
-            };
-
-            #[cfg(all(not(feature = "limit"), not(feature = "sign")))]
-            let app_layer = {
-                tower::ServiceBuilder::new().layer(axum::middleware::from_fn(
-                    middleware::token_authorization_middleware,
-                ))
-            };
 
             let router = axum::Router::new()
                 // official dashboard api endpoint
@@ -332,23 +334,25 @@ async fn post_access_token(
     result
 }
 
-async fn post_refresh_token(headers: HeaderMap) -> Result<Json<RefreshToken>, ResponseError> {
+async fn post_refresh_token(
+    TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
+) -> Result<Json<RefreshToken>, ResponseError> {
     let env = Context::get_instance();
-    let refresh_token = headers
-        .get(header::AUTHORIZATION)
-        .map_or(EMPTY, |e| e.to_str().unwrap_or_default());
-    match env.load_auth_client().do_refresh_token(refresh_token).await {
+    match env
+        .load_auth_client()
+        .do_refresh_token(bearer.token())
+        .await
+    {
         Ok(refresh_token) => Ok(Json(refresh_token)),
         Err(err) => Err(ResponseError::BadRequest(err)),
     }
 }
 
-async fn post_revoke_token(headers: HeaderMap) -> Result<axum::http::StatusCode, ResponseError> {
+async fn post_revoke_token(
+    TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
+) -> Result<axum::http::StatusCode, ResponseError> {
     let env = Context::get_instance();
-    let refresh_token = headers
-        .get(header::AUTHORIZATION)
-        .map_or(EMPTY, |e| e.to_str().unwrap_or_default());
-    match env.load_auth_client().do_revoke_token(refresh_token).await {
+    match env.load_auth_client().do_revoke_token(bearer.token()).await {
         Ok(_) => Ok(axum::http::StatusCode::OK),
         Err(err) => Err(ResponseError::BadRequest(err)),
     }
@@ -459,15 +463,11 @@ pub(super) async fn header_convert(
     headers: HeaderMap,
     jar: CookieJar,
 ) -> Result<HeaderMap, ResponseError> {
-    let authorization = match headers.get(header::AUTHORIZATION) {
-        Some(v) => Some(v),
-        // pandora will pass X-Authorization header
-        None => headers.get("X-Authorization"),
-    };
-
-    let authorization = authorization.ok_or(ResponseError::Unauthorized(anyhow!(
-        "AccessToken required!"
-    )))?;
+    let authorization = headers
+        .get(header::AUTHORIZATION)
+        .ok_or(ResponseError::Unauthorized(anyhow!(
+            "AccessToken required!"
+        )))?;
 
     let mut headers = HeaderMap::new();
     headers.insert(header::AUTHORIZATION, authorization.clone());
@@ -602,15 +602,11 @@ async fn handle_body(
         return Ok(());
     }
 
-    let authorization = match headers.get(header::AUTHORIZATION) {
-        Some(v) => Some(v),
-        // pandora will pass X-Authorization header
-        None => headers.get("X-Authorization"),
-    };
-
-    let authorization = authorization.ok_or(ResponseError::Unauthorized(anyhow!(
-        "AccessToken required!"
-    )))?;
+    let authorization = headers
+        .get(header::AUTHORIZATION)
+        .ok_or(ResponseError::Unauthorized(anyhow!(
+            "AccessToken required!"
+        )))?;
 
     if !has_puid(headers)? {
         let resp = Context::get_instance()

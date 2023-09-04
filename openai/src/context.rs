@@ -7,7 +7,7 @@ use reqwest::Client;
 use hotwatch::{Event, EventKind, Hotwatch};
 
 #[derive(Builder, Clone, Default)]
-pub struct Args {
+pub struct ContextArgs {
     /// Server proxies
     #[builder(setter(into), default)]
     pub proxies: Vec<String>,
@@ -29,6 +29,9 @@ pub struct Args {
     /// Arkoselabs HAR record file path
     #[builder(setter(into), default)]
     pub arkose_har_path: Option<PathBuf>,
+    /// HAR file upload authenticate key
+    #[builder(setter(into), default)]
+    pub arkose_har_upload_key: Option<String>,
     /// get arkose-token endpoint
     #[builder(setter(into), default)]
     pub arkose_token_endpoint: Option<String>,
@@ -50,20 +53,21 @@ pub struct Context {
     share_puid: Option<String>,
     arkose_token_endpoint: Option<String>,
     arkose_har_file_path: Option<PathBuf>,
+    arkose_har_upload_key: Option<String>,
     yescaptcha_client_key: Option<String>,
     hotwatch: Option<hotwatch::Hotwatch>,
 }
 
 impl Context {
     /// Use Once to guarantee initialization only once
-    pub fn init(args: Args) {
+    pub fn init(args: ContextArgs) {
         INIT.call_once(|| unsafe { CONTEXT_ENV = Some(Context::new(args)) });
     }
 
     pub fn get_instance() -> &'static mut Context {
         unsafe {
             if CONTEXT_ENV.is_none() {
-                Self::init(Args::default())
+                Self::init(ContextArgs::default())
             }
             CONTEXT_ENV
                 .as_mut()
@@ -71,7 +75,7 @@ impl Context {
         }
     }
 
-    fn new(args: Args) -> Self {
+    fn new(args: ContextArgs) -> Self {
         let hotwatch = args.arkose_har_path.clone().map(|path| {
             let mut hotwatch = Hotwatch::new().expect("hotwatch failed to initialize!");
             hotwatch
@@ -103,6 +107,7 @@ impl Context {
             arkose_token_endpoint: args.arkose_token_endpoint,
             yescaptcha_client_key: args.yescaptcha_client_key,
             arkose_har_file_path: args.arkose_har_path,
+            arkose_har_upload_key: args.arkose_har_upload_key,
             hotwatch,
         }
     }
@@ -139,6 +144,10 @@ impl Context {
 
     pub fn yescaptcha_client_key(&self) -> Option<&String> {
         self.yescaptcha_client_key.as_ref()
+    }
+
+    pub fn arkose_har_upload_key(&self) -> Option<&String> {
+        self.arkose_har_upload_key.as_ref()
     }
 }
 

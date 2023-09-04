@@ -8,6 +8,8 @@ use axum::body::Body;
 use axum::extract::ConnectInfo;
 use axum::extract::Path;
 use axum::extract::Query;
+use axum::headers::authorization::Bearer;
+use axum::headers::Authorization;
 use axum::http::header;
 use axum::http::HeaderMap;
 use axum::http::Response;
@@ -15,6 +17,7 @@ use axum::response::IntoResponse;
 use axum::routing::any;
 use axum::routing::{get, post};
 use axum::Router;
+use axum::TypedHeader;
 use axum_extra::extract::cookie;
 use axum_extra::extract::CookieJar;
 
@@ -280,56 +283,60 @@ async fn post_login(
     }
 }
 
-async fn post_login_token(headers: HeaderMap) -> Result<Response<Body>, ResponseError> {
-    if let Some(token) = headers.get(header::AUTHORIZATION) {
-        let access_token = token.to_str().unwrap_or_default();
-        let profile = crate::token::check(access_token)
-            .map_err(|err| ResponseError::Unauthorized(err))?
-            .ok_or(ResponseError::InternalServerError(anyhow!(
-                "Get Profile Erorr"
-            )))?;
+async fn post_login_token(
+    TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
+) -> Result<Response<Body>, ResponseError> {
+    let access_token = bearer.token();
 
-        let session = match context::Context::get_instance()
-            .load_auth_client()
-            .do_get_user_picture(access_token)
-            .await
-        {
-            Ok(picture) => Session {
-                refresh_token: None,
-                access_token: access_token.to_owned(),
-                user_id: profile.user_id().to_owned(),
-                email: profile.email().to_owned(),
-                picture: picture,
-                expires_in: profile.expires_in(),
-                expires: profile.expires(),
-            },
-            Err(_) => Session {
-                user_id: profile.user_id().to_owned(),
-                email: profile.email().to_owned(),
-                picture: None,
-                access_token: access_token.to_owned(),
-                expires_in: profile.expires_in(),
-                expires: profile.expires(),
-                refresh_token: None,
-            },
-        };
-
-        let cookie = cookie::Cookie::build(SESSION_ID, session.to_string())
-            .path(DEFAULT_INDEX)
-            .same_site(cookie::SameSite::Lax)
-            .max_age(time::Duration::seconds(session.expires_in))
-            .secure(false)
-            .http_only(false)
-            .finish();
-
-        return Ok(Response::builder()
-            .status(StatusCode::OK)
-            .header(header::LOCATION, DEFAULT_INDEX)
-            .header(header::SET_COOKIE, cookie.to_string())
-            .body(Body::empty())
-            .map_err(|err| ResponseError::InternalServerError(err))?);
+    if access_token.is_empty() {
+        return redirect_login();
     }
-    redirect_login()
+
+    let profile = crate::token::check(bearer.token())
+        .map_err(|err| ResponseError::Unauthorized(err))?
+        .ok_or(ResponseError::InternalServerError(anyhow!(
+            "Get Profile Erorr"
+        )))?;
+
+    let session = match context::Context::get_instance()
+        .load_auth_client()
+        .do_get_user_picture(access_token)
+        .await
+    {
+        Ok(picture) => Session {
+            refresh_token: None,
+            access_token: access_token.to_owned(),
+            user_id: profile.user_id().to_owned(),
+            email: profile.email().to_owned(),
+            picture: picture,
+            expires_in: profile.expires_in(),
+            expires: profile.expires(),
+        },
+        Err(_) => Session {
+            user_id: profile.user_id().to_owned(),
+            email: profile.email().to_owned(),
+            picture: None,
+            access_token: access_token.to_owned(),
+            expires_in: profile.expires_in(),
+            expires: profile.expires(),
+            refresh_token: None,
+        },
+    };
+
+    let cookie = cookie::Cookie::build(SESSION_ID, session.to_string())
+        .path(DEFAULT_INDEX)
+        .same_site(cookie::SameSite::Lax)
+        .max_age(time::Duration::seconds(session.expires_in))
+        .secure(false)
+        .http_only(false)
+        .finish();
+
+    return Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header(header::LOCATION, DEFAULT_INDEX)
+        .header(header::SET_COOKIE, cookie.to_string())
+        .body(Body::empty())
+        .map_err(|err| ResponseError::InternalServerError(err))?);
 }
 
 async fn get_logout(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
