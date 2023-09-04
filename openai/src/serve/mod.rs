@@ -41,7 +41,7 @@ use std::path::PathBuf;
 use crate::auth::model::{AccessToken, AuthAccount, AuthStrategy, RefreshToken};
 use crate::auth::AuthHandle;
 use crate::context::{Context, ContextArgsBuilder};
-use crate::serve::router::chat_to_api::chat_to_api;
+use crate::serve::router::toapi::chat_to_api;
 use crate::serve::tokenbucket::TokenBucketLimitContext;
 use crate::{arkose, debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 

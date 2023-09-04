@@ -10,8 +10,8 @@ use super::{
 };
 
 mod arkose;
-pub(super) mod chat_to_api;
 mod har;
+pub(super) mod toapi;
 mod ui;
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
