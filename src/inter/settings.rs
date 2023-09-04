@@ -14,7 +14,7 @@ use super::{
 use colored_json::prelude::*;
 
 pub(super) async fn config_prompt() -> anyhow::Result<()> {
-    let valid = |s: &str| {
+    let valid_url = |s: &str| {
         if !s.is_empty() {
             if let Some(err) = util::parse_url(s).err() {
                 Ok(Validation::Invalid(
@@ -32,7 +32,7 @@ pub(super) async fn config_prompt() -> anyhow::Result<()> {
     let mut official_api = Text::new("Official API prefix ›")
         .with_render_config(render_config())
         .with_help_message("Example: https://example.com")
-        .with_validator(valid);
+        .with_validator(valid_url);
     if let Some(content) = conf.official_api.as_deref() {
         if !content.is_empty() {
             official_api = official_api.with_initial_value(content)
@@ -42,7 +42,7 @@ pub(super) async fn config_prompt() -> anyhow::Result<()> {
     let mut unofficial_api = Text::new("Unofficial API prefix ›")
         .with_render_config(render_config())
         .with_help_message("Example: https://example.com")
-        .with_validator(valid);
+        .with_validator(valid_url);
     if let Some(content) = conf.unofficial_api.as_deref() {
         if !content.is_empty() {
             unofficial_api = unofficial_api.with_initial_value(content)
@@ -52,25 +52,41 @@ pub(super) async fn config_prompt() -> anyhow::Result<()> {
     let mut proxy = Text::new("Client proxy ›")
         .with_render_config(render_config())
         .with_help_message("Example: https://example.com")
-        .with_validator(valid);
+        .with_validator(valid_url);
     if let Some(content) = conf.proxy.as_deref() {
         if !content.is_empty() {
             proxy = proxy.with_initial_value(content)
         }
     };
 
-    let mut arkose_token_endpoint = Text::new("Arkose Token endpoint ›")
+    let mut arkose_token_endpoint = Text::new("Arkose token endpoint ›")
         .with_render_config(render_config())
         .with_help_message("Example: https://example.com")
-        .with_validator(valid);
+        .with_validator(valid_url);
     if let Some(content) = conf.arkose_token_endpoint.as_deref() {
         arkose_token_endpoint = arkose_token_endpoint.with_initial_value(content)
+    };
+
+    let mut arkose_har_path = Text::new("Arkose HAR path ›")
+        .with_render_config(render_config())
+        .with_help_message("About the browser HAR file path requested by ArkoseLabs");
+    if let Some(content) = conf.arkose_har_path.as_deref() {
+        arkose_har_path = arkose_har_path.with_initial_value(content)
+    };
+
+    let mut arkose_yescaptcha_key = Text::new("Arkose YesCaptcha key ›")
+        .with_render_config(render_config())
+        .with_help_message("About the YesCaptcha platform client key solved by ArkoseLabs");
+    if let Some(content) = conf.arkose_yescaptcha_key.as_deref() {
+        arkose_yescaptcha_key = arkose_yescaptcha_key.with_initial_value(content)
     };
 
     conf.official_api = official_api.prompt_skippable()?;
     conf.unofficial_api = unofficial_api.prompt_skippable()?;
     conf.proxy = proxy.prompt_skippable()?;
     conf.arkose_token_endpoint = arkose_token_endpoint.prompt_skippable()?;
+    conf.arkose_har_path = arkose_har_path.prompt_skippable()?;
+    conf.arkose_yescaptcha_key = arkose_yescaptcha_key.prompt_skippable()?;
 
     let timeout = CustomType::<usize>::new("Client timeout (seconds) ›")
         .with_render_config(render_config())

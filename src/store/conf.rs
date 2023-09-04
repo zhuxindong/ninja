@@ -20,6 +20,10 @@ pub struct Conf {
     pub proxy: Option<String>,
     /// Get arkose-token endpoint
     pub arkose_token_endpoint: Option<String>,
+    /// About the YesCaptcha platform client key solved by ArkoseLabs
+    pub arkose_yescaptcha_key: Option<String>,
+    /// About the browser HAR file path requested by ArkoseLabs
+    pub arkose_har_path: Option<String>,
     /// Client timeout (seconds)
     pub timeout: usize,
     /// Client connect timeout (seconds)
@@ -45,6 +49,8 @@ impl Default for Conf {
             connect_timeout: 600,
             tcp_keepalive: 75,
             id: DEFAULT_ID.to_owned(),
+            arkose_yescaptcha_key: None,
+            arkose_har_path: None,
         }
     }
 }
@@ -57,6 +63,8 @@ pub struct ConfBuilder {
     timeout: usize,
     connect_timeout: usize,
     tcp_keepalive: usize,
+    arkose_yescaptcha_key: Option<String>,
+    arkose_har_path: Option<String>,
 }
 
 impl ConfBuilder {
@@ -69,6 +77,8 @@ impl ConfBuilder {
             timeout: 60,
             connect_timeout: 600,
             tcp_keepalive: 75,
+            arkose_har_path: None,
+            arkose_yescaptcha_key: None,
         }
     }
 
@@ -117,6 +127,8 @@ impl ConfBuilder {
             timeout: self.timeout,
             connect_timeout: self.connect_timeout,
             tcp_keepalive: self.tcp_keepalive,
+            arkose_yescaptcha_key: self.arkose_yescaptcha_key,
+            arkose_har_path: self.arkose_har_path,
         }
     }
 }
