@@ -85,8 +85,8 @@ impl TryFrom<&str> for Session {
     fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
         let data = base64::engine::general_purpose::URL_SAFE
             .decode(value)
-            .map_err(|err| ResponseError::Unauthorized(err))?;
-        serde_json::from_slice(&data).map_err(|err| ResponseError::Unauthorized(err))
+            .map_err(ResponseError::Unauthorized)?;
+        serde_json::from_slice(&data).map_err(ResponseError::Unauthorized)
     }
 }
 
@@ -256,7 +256,7 @@ async fn post_login(
     {
         Ok(access_token) => {
             let authentication_token = AuthenticateToken::try_from(access_token)
-                .map_err(|err| ResponseError::InternalServerError(err))?;
+                .map_err(ResponseError::InternalServerError)?;
             let session = Session::from(authentication_token);
 
             let cookie = cookie::Cookie::build(SESSION_ID, session.to_string())
@@ -272,7 +272,7 @@ async fn post_login(
                 .header(header::LOCATION, DEFAULT_INDEX)
                 .header(header::SET_COOKIE, cookie.to_string())
                 .body(Body::empty())
-                .map_err(|err| ResponseError::InternalServerError(err))?)
+                .map_err(ResponseError::InternalServerError)?)
         }
         Err(e) => {
             let mut ctx = tera::Context::new();
@@ -293,7 +293,7 @@ async fn post_login_token(
     }
 
     let profile = crate::token::check(bearer.token())
-        .map_err(|err| ResponseError::Unauthorized(err))?
+        .map_err(ResponseError::Unauthorized)?
         .ok_or(ResponseError::InternalServerError(anyhow!(
             "Get Profile Erorr"
         )))?;
@@ -336,7 +336,7 @@ async fn post_login_token(
         .header(header::LOCATION, DEFAULT_INDEX)
         .header(header::SET_COOKIE, cookie.to_string())
         .body(Body::empty())
-        .map_err(|err| ResponseError::InternalServerError(err))?);
+        .map_err(ResponseError::InternalServerError)?);
 }
 
 async fn get_logout(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
@@ -364,7 +364,7 @@ async fn get_logout(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
         .header(header::LOCATION, LOGIN_INDEX)
         .header(header::SET_COOKIE, cookie.to_string())
         .body(Body::empty())
-        .map_err(|err| ResponseError::InternalServerError(err))?)
+        .map_err(ResponseError::InternalServerError)?)
 }
 
 async fn get_session(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
@@ -395,7 +395,7 @@ async fn get_session(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
             .header(header::SET_COOKIE, cookie.to_string())
             .header(header::CONTENT_TYPE, "application/json")
             .body(Body::from(props.to_string()))
-            .map_err(|err| ResponseError::InternalServerError(err))?);
+            .map_err(ResponseError::InternalServerError)?);
     }
     redirect_login()
 }
@@ -447,8 +447,7 @@ async fn get_chat(
                 let mut ctx = tera::Context::new();
                 ctx.insert(
                     "props",
-                    &serde_json::to_string(&props)
-                        .map_err(|err| ResponseError::InternalServerError(err))?,
+                    &serde_json::to_string(&props).map_err(ResponseError::InternalServerError)?,
                 );
                 settings_template_data(&mut ctx);
                 return render_template(template_name, &ctx);
@@ -489,7 +488,7 @@ async fn get_chat_info(jar: CookieJar) -> Result<Response<Body>, ResponseError> 
                     .status(StatusCode::OK)
                     .header(header::CONTENT_TYPE, "application/json")
                     .body(Body::from(body.to_string()))
-                    .map_err(|err| ResponseError::InternalServerError(err))?)
+                    .map_err(ResponseError::InternalServerError)?)
             }
             Err(_) => {
                 let body = serde_json::json!(
@@ -499,7 +498,7 @@ async fn get_chat_info(jar: CookieJar) -> Result<Response<Body>, ResponseError> 
                     .status(StatusCode::OK)
                     .header(header::CONTENT_TYPE, "application/json")
                     .body(Body::from(body.to_string()))
-                    .map_err(|err| ResponseError::InternalServerError(err))?)
+                    .map_err(ResponseError::InternalServerError)?)
             }
         };
     }
@@ -520,11 +519,11 @@ async fn get_share_chat(
                 let resp = env
                     .load_client()
                     .get(format!("{url}/backend-api/share/{share_id}"))
-                    .headers(header_convert(headers, jar).await?)
+                    .headers(header_convert(&headers, &jar).await?)
                     .bearer_auth(session.access_token)
                     .send()
                     .await
-                    .map_err(|err| ResponseError::InternalServerError(err))?;
+                    .map_err(ResponseError::InternalServerError)?;
 
                 match resp.json::<Value>().await {
                     Ok(mut share_data) => {
@@ -598,7 +597,7 @@ async fn get_share_chat(
                     format!("/auth/login?next=%2Fshare%2F{share_id}"),
                 )
                 .body(Body::empty())
-                .map_err(|err| ResponseError::InternalServerError(err))?),
+                .map_err(ResponseError::InternalServerError)?),
         };
     }
 
@@ -618,11 +617,11 @@ async fn get_share_chat_info(
             let resp = env
                 .load_client()
                 .get(format!("{url}/backend-api/share/{share_id}"))
-                .headers(header_convert(headers, jar).await?)
+                .headers(header_convert(&headers, &jar).await?)
                 .bearer_auth(session.access_token)
                 .send()
                 .await
-                .map_err(|err| ResponseError::InternalServerError(err))?;
+                .map_err(ResponseError::InternalServerError)?;
 
             return match resp.json::<Value>().await {
                 Ok(mut share_data) => {
@@ -654,7 +653,7 @@ async fn get_share_chat_info(
                         .status(StatusCode::OK)
                         .header(header::CONTENT_TYPE, "application/json")
                         .body(Body::from(serde_json::to_string(&props).unwrap()))
-                        .map_err(|err| ResponseError::InternalServerError(err))?)
+                        .map_err(ResponseError::InternalServerError)?)
                 }
                 Err(_) => Ok(Response::builder()
                     .status(StatusCode::OK)
@@ -662,7 +661,7 @@ async fn get_share_chat_info(
                     .body(Body::from(
                         serde_json::to_string(&serde_json::json!({"notFound": true})).unwrap(),
                     ))
-                    .map_err(|err| ResponseError::InternalServerError(err))?),
+                    .map_err(ResponseError::InternalServerError)?),
             };
         }
 
@@ -673,7 +672,7 @@ async fn get_share_chat_info(
                 format!("/auth/login?next=%2Fshare%2F{share_id}"),
             )
             .body(Body::empty())
-            .map_err(|err| ResponseError::InternalServerError(err))?);
+            .map_err(ResponseError::InternalServerError)?);
     }
     redirect_login()
 }
@@ -683,7 +682,7 @@ async fn get_share_chat_continue(share_id: Path<String>) -> Result<Response<Body
         .status(StatusCode::PERMANENT_REDIRECT)
         .header(header::LOCATION, format!("/share/{}", share_id.0))
         .body(Body::empty())
-        .map_err(|err| ResponseError::InternalServerError(err))?)
+        .map_err(ResponseError::InternalServerError)?)
 }
 
 async fn get_share_chat_continue_info(
@@ -698,11 +697,11 @@ async fn get_share_chat_continue_info(
                 let url = get_url();
                 let resp = env.load_client()
                 .get(format!("{url}/backend-api/share/{}", share_id.0))
-                .headers(header_convert(headers, jar).await?)
+                .headers(header_convert(&headers, &jar).await?)
                 .bearer_auth(session.access_token)
                 .send()
                 .await
-                .map_err(|err| ResponseError::InternalServerError (err))?;
+                .map_err(ResponseError::InternalServerError)?;
             match resp.json::<Value>().await {
                 Ok(mut share_data) => {
                     if let Some(replace) = share_data
@@ -764,13 +763,13 @@ async fn get_share_chat_continue_info(
                     .status(StatusCode::OK)
                     .header(header::CONTENT_TYPE, "application/json")
                     .body(Body::from(serde_json::to_string(&props).unwrap()))
-                    .map_err(|err| ResponseError::InternalServerError(err))?)
+                    .map_err(ResponseError::InternalServerError)?)
                 }
                 Err(_) => Ok(Response::builder()
                     .status(StatusCode::OK)
                     .header(header::CONTENT_TYPE, "same-origin")
                     .body(Body::from(serde_json::to_string(&serde_json::json!({"notFound": true})).unwrap()))
-                    .map_err(|err| ResponseError::InternalServerError(err))?),
+                    .map_err(ResponseError::InternalServerError)?),
             }
             },
             Err(_) => {
@@ -783,7 +782,7 @@ async fn get_share_chat_continue_info(
                                         "__N_REDIRECT_STATUS": 307
                                     },
                                     "__N_SSP": true
-                                })).unwrap())).map_err(|err| ResponseError::InternalServerError(err))?)
+                                })).unwrap())).map_err(ResponseError::InternalServerError)?)
             },
         };
     }
@@ -822,7 +821,7 @@ async fn error_404() -> Result<Response<Body>, ResponseError> {
     );
     ctx.insert(
         "props",
-        &serde_json::to_string(&props).map_err(|err| ResponseError::InternalServerError(err))?,
+        &serde_json::to_string(&props).map_err(ResponseError::InternalServerError)?,
     );
     render_template(TEMP_404, &ctx)
 }
@@ -841,7 +840,7 @@ fn redirect_login() -> Result<Response<Body>, ResponseError> {
         .status(StatusCode::FOUND)
         .header(header::LOCATION, LOGIN_INDEX)
         .body(Body::empty())
-        .map_err(|err| ResponseError::InternalServerError(err))?)
+        .map_err(ResponseError::InternalServerError)?)
 }
 
 fn render_template(name: &str, context: &tera::Context) -> Result<Response<Body>, ResponseError> {
@@ -850,14 +849,14 @@ fn render_template(name: &str, context: &tera::Context) -> Result<Response<Body>
             .as_ref()
             .unwrap()
             .render(name, context)
-            .map_err(|err| ResponseError::InternalServerError(err))
+            .map_err(ResponseError::InternalServerError)
     }?;
 
     Ok(Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
         .body(Body::from(tm))
-        .map_err(|err| ResponseError::InternalServerError(err))?)
+        .map_err(ResponseError::InternalServerError)?)
 }
 
 fn settings_template_data(ctx: &mut tera::Context) {
@@ -874,7 +873,7 @@ fn settings_template_data(ctx: &mut tera::Context) {
 }
 
 fn check_token(token: &str) -> Result<(), ResponseError> {
-    let _ = crate::token::check(token).map_err(|err| ResponseError::Unauthorized(err))?;
+    let _ = crate::token::check(token).map_err(ResponseError::Unauthorized)?;
     Ok(())
 }
 
@@ -904,11 +903,11 @@ async fn cf_captcha_check(addr: IpAddr, cf_response: Option<&str>) -> Result<(),
             .form(&form)
             .send()
             .await
-            .map_err(|err| ResponseError::InternalServerError(err))?;
+            .map_err(ResponseError::InternalServerError)?;
 
         let _ = resp
             .error_for_status()
-            .map_err(|err| ResponseError::Unauthorized(err))?;
+            .map_err(ResponseError::Unauthorized)?;
 
         return Ok(());
     };

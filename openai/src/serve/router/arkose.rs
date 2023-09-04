@@ -76,7 +76,7 @@ async fn proxy(
                     .status(StatusCode::OK)
                     .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
                     .body(Body::from(body.to_string()))
-                    .map_err(|err| ResponseError::InternalServerError(err))?);
+                    .map_err(ResponseError::InternalServerError)?);
             }
         }
         headers.remove(header::COOKIE);

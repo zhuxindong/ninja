@@ -411,7 +411,7 @@ async fn official_proxy(
     let builder = env
         .load_client()
         .request(method, &url)
-        .headers(header_convert(headers, jar).await?);
+        .headers(header_convert(&headers, &jar).await?);
     let resp = match body {
         Some(body) => builder.json(&body.0).send().await,
         None => builder.send().await,
@@ -452,7 +452,7 @@ async fn unofficial_proxy(
     let builder = env
         .load_client()
         .request(method, url)
-        .headers(header_convert(headers, jar).await?);
+        .headers(header_convert(&headers, &jar).await?);
     let resp = match body {
         Some(body) => builder.json(&body.0).send().await,
         None => builder.send().await,
@@ -460,8 +460,8 @@ async fn unofficial_proxy(
     response_convert(resp)
 }
 pub(super) async fn header_convert(
-    headers: HeaderMap,
-    jar: CookieJar,
+    headers: &HeaderMap,
+    jar: &CookieJar,
 ) -> Result<HeaderMap, ResponseError> {
     let authorization = headers
         .get(header::AUTHORIZATION)
@@ -568,7 +568,7 @@ fn response_convert(
             }
             Ok(builder
                 .body(StreamBody::new(resp.bytes_stream()))
-                .map_err(|err| ResponseError::InternalServerError(err))?)
+                .map_err(ResponseError::InternalServerError)?)
         }
         Err(err) => Err(ResponseError::InternalServerError(err)),
     }
@@ -615,7 +615,7 @@ async fn handle_body(
             .header(header::AUTHORIZATION, authorization)
             .send()
             .await
-            .map_err(|err| ResponseError::InternalServerError(err))?;
+            .map_err(ResponseError::InternalServerError)?;
         match resp.error_for_status() {
             Ok(resp) => {
                 if let Some(puid_cookie) = resp.cookies().into_iter().find(|s| s.name().eq("_puid"))
@@ -657,11 +657,11 @@ fn puid_cookie_encoded(input: &str) -> String {
     }
 }
 
-fn has_puid(headers: &HeaderMap) -> Result<bool, ResponseError> {
+pub(super) fn has_puid(headers: &HeaderMap) -> Result<bool, ResponseError> {
     let res = match headers.get(header::COOKIE) {
         Some(hv) => hv
             .to_str()
-            .map_err(|err| ResponseError::BadRequest(err))?
+            .map_err(ResponseError::BadRequest)?
             .contains("_puid"),
         None => false,
     };
