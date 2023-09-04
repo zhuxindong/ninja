@@ -12,10 +12,10 @@ use serde_json::Value;
 use std::convert::Infallible;
 
 use crate::{
-    arkose::ArkoseToken,
+    arkose::{ArkoseToken, GPT4Model},
     chatgpt::model::resp::{ConvoResponse, PostConvoResponse},
-    context,
-    serve::{err::ResponseError, header_convert},
+    context::Context,
+    serve::{err::ResponseError, has_puid, header_convert},
 };
 use crate::{chatgpt::model::Role, debug};
 
@@ -52,45 +52,61 @@ pub(crate) async fn chat_to_api(
                     .content_type(ContentText::Text)
                     .parts(vec![&body_msg.content])
                     .build()
-                    .map_err(|err| ResponseError::InternalServerError(err))?,
+                    .map_err(ResponseError::InternalServerError)?,
             )
             .build()
-            .map_err(|err| ResponseError::InternalServerError(err))?;
+            .map_err(ResponseError::InternalServerError)?;
         messages.push(message)
     }
 
-    let convert_model = convert_model(&body.model).await?;
+    let model_mapper = model_mapper(&body.model).await?;
     let parent_message_id = uuid();
     let req = PostConvoRequestBuilder::default()
         .action(Action::Next)
         .parent_message_id(&parent_message_id)
         .messages(messages)
-        .model(convert_model.0)
+        .model(model_mapper.0)
         .history_and_training_disabled(true)
-        .arkose_token(convert_model.2.as_ref())
+        .arkose_token(model_mapper.2.as_ref())
         .build()
-        .map_err(|err| ResponseError::InternalServerError(err))?;
+        .map_err(ResponseError::InternalServerError)?;
 
-    let env = context::Context::get_instance();
-    let resp = env
-        .load_client()
+    let client = Context::get_instance().load_client();
+
+    if let Ok(_) = GPT4Model::try_from(model_mapper.0) {
+        if !has_puid(&headers)? {
+            let result = client
+                .get(format!("{URL_CHATGPT_API}/backend-api/models"))
+                .headers(header_convert(&headers, &jar).await?)
+                .send()
+                .await;
+
+            let response = result.map_err(ResponseError::InternalServerError)?;
+
+            if let Err(err) = response.error_for_status() {
+                return Err(ResponseError::InternalServerError(err));
+            }
+        }
+    }
+
+    let resp = client
         .post(format!("{URL_CHATGPT_API}/backend-api/conversation"))
-        .headers(header_convert(headers, jar).await?)
+        .headers(header_convert(&headers, &jar).await?)
         .json(&req)
         .send()
         .await
-        .map_err(|err| ResponseError::InternalServerError(err))?;
+        .map_err(ResponseError::InternalServerError)?;
 
     match resp.error_for_status() {
         Ok(resp) => {
             let event_source = resp.bytes_stream().eventsource();
             if body.stream {
                 Ok(
-                    Sse::new(stream_handler(event_source, convert_model.1.to_owned()))
+                    Sse::new(stream_handler(event_source, model_mapper.1.to_owned()))
                         .into_response(),
                 )
             } else {
-                Ok(not_stream_handler(event_source, convert_model.1.to_owned())
+                Ok(not_stream_handler(event_source, model_mapper.1.to_owned())
                     .await?
                     .into_response())
             }
@@ -190,8 +206,7 @@ async fn not_stream_handler(
         ))
         .build()
         .unwrap();
-    let value =
-        serde_json::to_value(&resp).map_err(|err| ResponseError::InternalServerError(err))?;
+    let value = serde_json::to_value(&resp).map_err(ResponseError::InternalServerError)?;
     Ok(Json(value))
 }
 
@@ -287,7 +302,7 @@ async fn event_convert_handler(
     Event::default().json_data(resp)
 }
 
-async fn convert_model(model: &str) -> Result<(&str, &str, Option<ArkoseToken>), ResponseError> {
+async fn model_mapper(model: &str) -> Result<(&str, &str, Option<ArkoseToken>), ResponseError> {
     match model {
         model if model.starts_with("gpt-3.5") => {
             Ok(("text-davinci-002-render-sha", "gpt-3.5-turbo", None))
