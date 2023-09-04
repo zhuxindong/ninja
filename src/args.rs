@@ -120,6 +120,10 @@ pub(super) struct ServeArgs {
     #[clap(short, long, value_parser = util::parse_file_path)]
     pub(super) arkose_har_path: Option<PathBuf>,
 
+    /// HAR file upload authenticate key
+    #[clap(short = 'K', long, requires = "arkose_har_path")]
+    pub(super) arkose_har_upload_key: Option<String>,
+
     /// About the YesCaptcha platform client key solved by ArkoseLabs
     #[clap(short = 'Y', long)]
     pub(super) arkose_yescaptcha_key: Option<String>,

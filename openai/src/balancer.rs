@@ -14,7 +14,7 @@ pub struct ClientLoadBalancer<T: Clone> {
 
 impl<T: Clone> ClientLoadBalancer<T> {
     pub(super) fn new_auth_client(
-        args: &context::Args,
+        args: &context::ContextArgs,
     ) -> anyhow::Result<ClientLoadBalancer<AuthClient>> {
         let build = |proxy_url: Option<String>| -> AuthClient {
             if let Some(ref url) = proxy_url {
@@ -49,7 +49,7 @@ impl<T: Clone> ClientLoadBalancer<T> {
     }
 
     pub(super) fn new_api_client(
-        args: &context::Args,
+        args: &context::ContextArgs,
     ) -> anyhow::Result<ClientLoadBalancer<Client>> {
         let build = |proxy_url: Option<String>| -> reqwest::Client {
             let mut client_builder = reqwest::Client::builder();

@@ -11,6 +11,7 @@ use super::{
 
 mod arkose;
 pub(super) mod chat_to_api;
+mod har;
 mod ui;
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
@@ -22,6 +23,7 @@ pub(super) fn config(router: Router, args: &Launcher) -> Router {
     init_static_files();
     let router = ui::config(router, args);
     let router = arkose::config(router, args);
+    let router = har::config(router, args);
     router
 }
 
