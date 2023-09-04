@@ -701,7 +701,7 @@ async fn get_share_chat_continue_info(
                 .bearer_auth(session.access_token)
                 .send()
                 .await
-                .map_err(|err| ResponseError::InternalServerError (err))?;
+                .map_err(ResponseError::InternalServerError)?;
             match resp.json::<Value>().await {
                 Ok(mut share_data) => {
                     if let Some(replace) = share_data
