@@ -136,8 +136,12 @@ pub(super) fn serve_stop() -> anyhow::Result<()> {
 
     if let Some(pid) = get_pid() {
         let pid = pid.parse::<i32>()?;
-        if let Err(_) = nix::sys::signal::kill(Pid::from_raw(pid), signal::SIGINT) {
-            println!("OpenGPT is not running");
+        for _ in 0..360 {
+            if let Err(_) = nix::sys::signal::kill(Pid::from_raw(pid), signal::SIGINT) {
+                println!("OpenGPT is not running");
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1))
         }
         let _ = std::fs::remove_file(env::PID_PATH);
     } else {
