@@ -132,3 +132,9 @@ msgstr "YesCaptcha 客户端Key"
 
 msgid "Arkose token endpoint"
 msgstr "Arkose 令牌端点"
+
+msgid "HAR Auth Key"
+msgstr "HAR 认证Key"
+
+msgid "HAR file upload authenticate key"
+msgstr "HAR文件上传验证Key"

@@ -40,6 +40,8 @@ o.default = "60"
 
 o = s:option(Value, "arkose_har_path", translate("HAR file path"), translate("About the browser HAR file path requested by ArkoseLabs"))
 
+o = s:option(Value, "arkose_har_upload_key", translate("HAR Auth Key"), translate("HAR file upload authenticate key"))
+
 o = s:option(Value, "arkose_yescaptcha_key", translate("YesCaptcha Client Key"), translate("About the YesCaptcha platform client key solved by ArkoseLabs"))
 
 o = s:option(Value, "arkose_token_endpoint", translate("Arkose token endpoint"), translate("Get arkose token endpoint"))
