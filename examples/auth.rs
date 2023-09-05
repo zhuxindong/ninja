@@ -20,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
             &AuthAccountBuilder::default()
                 .username(email)
                 .password(password)
-                .option(AuthStrategy::Apple)
+                .option(AuthStrategy::Platform)
                 .build()?,
         )
         .await?;

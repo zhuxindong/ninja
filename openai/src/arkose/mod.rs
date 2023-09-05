@@ -224,7 +224,7 @@ async fn get_arkose_token_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<Ar
 }
 
 async fn get_arkose_token_from_context() -> anyhow::Result<ArkoseToken> {
-    let ctx = Context::get_instance();
+    let ctx = Context::get_instance().await;
 
     if let Some(path) = ctx.arkose_har_file_path() {
         let token =
@@ -253,7 +253,7 @@ where
     F: FnOnce() -> Fut,
     Fut: futures_core::Future<Output = anyhow::Result<ArkoseToken>>,
 {
-    let ctx = Context::get_instance();
+    let ctx = Context::get_instance().await;
     let arkose_token = get_token().await?;
     if arkose_token.valid() {
         Ok(arkose_token)

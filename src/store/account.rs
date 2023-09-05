@@ -1,6 +1,5 @@
 use std::{collections::HashMap, ops::Not, path::PathBuf};
 
-use anyhow::Context;
 use openai::{auth::model::AuthStrategy, model::AuthenticateToken};
 
 use crate::homedir::home_dir;
@@ -10,23 +9,22 @@ use super::{Store, StoreId, StoreResult};
 pub struct AccountFileStore(PathBuf);
 
 impl AccountFileStore {
-    pub fn new(path: Option<PathBuf>) -> StoreResult<Self> {
-        let path = path.unwrap_or({
-            match home_dir() {
-                Some(home_dir) => home_dir.join(".opengpt-accounts"),
-                None => PathBuf::from(".opengpt-accounts"),
-            }
-        });
+    pub fn new() -> Self {
+        let path = match home_dir() {
+            Some(home_dir) => home_dir.join(".opengpt-accounts"),
+            None => PathBuf::from(".opengpt-accounts"),
+        };
         if let Some(parent) = path.parent() {
             if path.exists().not() {
                 std::fs::create_dir_all(parent)
-                    .context("Unable to create default file Account storage file")?
+                    .expect("Unable to create default file Account storage file")
             }
         }
         if path.exists().not() {
-            std::fs::File::create(&path)?;
+            std::fs::File::create(&path)
+                .expect(&format!("Unable to create file: {}", path.display()));
         }
-        Ok(AccountFileStore(path))
+        AccountFileStore(path)
     }
 }
 

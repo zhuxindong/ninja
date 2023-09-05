@@ -1,8 +1,9 @@
-use std::{path::PathBuf, sync::Once};
+use std::path::PathBuf;
 
-use crate::{arkose, auth::AuthClient, balancer::ClientLoadBalancer, info, warn};
+use crate::{arkose, auth::AuthClient, balancer::ClientLoadBalancer, error, info, warn};
 use derive_builder::Builder;
 use reqwest::Client;
+use tokio::sync::{OnceCell, RwLock};
 
 use hotwatch::{Event, EventKind, Hotwatch};
 
@@ -44,13 +45,12 @@ pub struct ContextArgs {
 }
 
 // Program context
-static mut CONTEXT_ENV: Option<Context> = None;
-static INIT: Once = Once::new();
+static CTX: OnceCell<Context> = OnceCell::const_new();
 
 pub struct Context {
     client_load: Option<ClientLoadBalancer<Client>>,
     auth_client_load: Option<ClientLoadBalancer<AuthClient>>,
-    share_puid: Option<String>,
+    share_puid: RwLock<String>,
     arkose_token_endpoint: Option<String>,
     arkose_har_file_path: Option<PathBuf>,
     arkose_har_upload_key: Option<String>,
@@ -61,18 +61,14 @@ pub struct Context {
 impl Context {
     /// Use Once to guarantee initialization only once
     pub fn init(args: ContextArgs) {
-        INIT.call_once(|| unsafe { CONTEXT_ENV = Some(Context::new(args)) });
+        if let Some(err) = CTX.set(Context::new(args)).err() {
+            error!("Error: {err}")
+        }
     }
 
-    pub fn get_instance() -> &'static mut Context {
-        unsafe {
-            if CONTEXT_ENV.is_none() {
-                Self::init(ContextArgs::default())
-            }
-            CONTEXT_ENV
-                .as_mut()
-                .expect("Runtime Env component is not initialized")
-        }
+    pub async fn get_instance() -> &'static Context {
+        CTX.get_or_init(|| async { Context::new(ContextArgs::default()) })
+            .await
     }
 
     fn new(args: ContextArgs) -> Self {
@@ -89,11 +85,6 @@ impl Context {
             hotwatch
         });
 
-        let share_puid = args.puid.as_ref().map(|puid| {
-            info!("Using PUID: {puid}");
-            puid
-        });
-
         Context {
             client_load: Some(
                 ClientLoadBalancer::<Client>::new_api_client(&args)
@@ -103,11 +94,11 @@ impl Context {
                 ClientLoadBalancer::<AuthClient>::new_auth_client(&args)
                     .expect("Failed to initialize the requesting oauth client"),
             ),
-            share_puid: share_puid.cloned(),
             arkose_token_endpoint: args.arkose_token_endpoint,
             yescaptcha_client_key: args.yescaptcha_client_key,
             arkose_har_file_path: args.arkose_har_path,
             arkose_har_upload_key: args.arkose_har_upload_key,
+            share_puid: RwLock::new(args.puid.unwrap_or_default()),
             hotwatch,
         }
     }
@@ -126,12 +117,15 @@ impl Context {
             .next()
     }
 
-    pub fn get_share_puid(&self) -> Option<&str> {
-        self.share_puid.as_deref()
+    pub async fn get_share_puid(&self) -> tokio::sync::RwLockReadGuard<'_, String> {
+        self.share_puid.read().await
     }
 
-    pub fn set_share_puid(&mut self, puid: Option<String>) {
-        self.share_puid = puid;
+    pub async fn set_share_puid(&self, puid: &str) {
+        let mut lock = self.share_puid.write().await;
+        lock.clear();
+        lock.push_str(puid);
+        drop(lock)
     }
 
     pub fn arkose_har_file_path(&self) -> Option<&PathBuf> {

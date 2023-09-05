@@ -21,6 +21,15 @@ pub(super) struct Opt {
 }
 
 #[derive(Subcommand)]
+pub(super) enum SubCommands {
+    /// Start the http server
+    #[clap(subcommand)]
+    Serve(ServeSubcommand),
+    /// Terminal interaction
+    Terminal,
+}
+
+#[derive(Subcommand)]
 pub(super) enum ServeSubcommand {
     /// Run the HTTP server
     Run(ServeArgs),
@@ -174,13 +183,4 @@ pub(super) struct ServeArgs {
     /// Disable WebUI
     #[clap(short = 'D', long, env = "OPENGPT_DISABLE_WEBUI")]
     pub(super) disable_webui: bool,
-}
-
-#[derive(Subcommand)]
-pub(super) enum SubCommands {
-    /// Start the http server
-    #[clap(subcommand)]
-    Serve(ServeSubcommand),
-    /// Terminal interaction
-    Terminal,
 }

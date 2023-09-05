@@ -1,7 +1,5 @@
 use std::{collections::HashMap, ops::Not, path::PathBuf};
 
-use anyhow::Context;
-
 use crate::homedir::home_dir;
 
 use super::{Store, StoreId, StoreResult};
@@ -136,23 +134,22 @@ impl ConfBuilder {
 pub struct ConfFileStore(PathBuf);
 
 impl ConfFileStore {
-    pub fn new(path: Option<PathBuf>) -> StoreResult<Self> {
-        let path = path.unwrap_or({
-            match home_dir() {
-                Some(home_dir) => home_dir.join(".opengpt-conf"),
-                None => PathBuf::from(".opengpt-conf"),
-            }
-        });
+    pub fn new() -> Self {
+        let path = match home_dir() {
+            Some(home_dir) => home_dir.join(".opengpt-conf"),
+            None => PathBuf::from(".opengpt-conf"),
+        };
         if let Some(parent) = path.parent() {
             if path.exists().not() {
                 std::fs::create_dir_all(parent)
-                    .context("Unable to create default file Account storage file")?
+                    .expect("Unable to create default file Account storage directory")
             }
         }
         if path.exists().not() {
-            std::fs::File::create(&path)?;
+            std::fs::File::create(&path)
+                .expect(&format!("Unable to create file: {}", path.display()));
         }
-        Ok(ConfFileStore(path))
+        ConfFileStore(path)
     }
 }
 

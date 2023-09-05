@@ -1,7 +1,10 @@
-pub mod context;
+mod configure;
+mod context;
 mod conversation;
-pub mod enums;
-pub mod settings;
+mod dash;
+mod enums;
+mod oauth;
+mod valid;
 
 use crate::inter::conversation::{api, chatgpt};
 use enums::Usage;
@@ -17,7 +20,7 @@ pub async fn prompt() -> anyhow::Result<()> {
     print_boot_message();
 
     loop {
-        let choice = Select::new("Usage Wizard ›", enums::Usage::USAGE_VARS.to_vec())
+        let choice = Select::new("Usage Wizard ›", Usage::USAGE_VARS.to_vec())
             .with_render_config(render_config())
             .with_formatter(&|i| format!("${i:.2}"))
             .prompt()?;
@@ -25,9 +28,9 @@ pub async fn prompt() -> anyhow::Result<()> {
         match choice {
             Usage::API => api::api_prompt().await?,
             Usage::ChatGPT => chatgpt::chatgpt_prompt().await?,
-            Usage::Dashboard => settings::dashboard_prompt().await?,
-            Usage::OAuth => settings::oauth_prompt().await?,
-            Usage::Configuration => settings::config_prompt().await?,
+            Usage::Dashboard => dash::dashboard_prompt().await?,
+            Usage::OAuth => oauth::oauth_prompt().await?,
+            Usage::Configuration => configure::config_prompt().await?,
             Usage::Quit => return Ok(()),
         }
     }

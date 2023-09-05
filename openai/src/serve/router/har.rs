@@ -31,7 +31,7 @@ async fn upload_form(
     TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
     mut multipart: Multipart,
 ) -> Result<Html<String>, ResponseError> {
-    let ctx = Context::get_instance();
+    let ctx = Context::get_instance().await;
 
     while let Some(field) = multipart
         .next_field()
