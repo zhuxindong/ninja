@@ -196,24 +196,21 @@ pub(super) fn edit_template_file(edit: Option<PathBuf>) -> anyhow::Result<()> {
             bail!("{} not is file", path.display())
         }
 
-        let extention = if let Some(extention) = path.extension() {
-            format!(".{:?}", extention)
-        } else {
-            "".to_owned()
-        };
+        let extension = path
+            .extension()
+            .map(|e| format!(".{:?}", e))
+            .unwrap_or_else(|| "".to_owned());
 
         fn get_default_editor() -> OsString {
-            if let Some(prog) = env::var_os("VISUAL") {
-                return prog;
-            }
-            if let Some(prog) = env::var_os("EDITOR") {
-                return prog;
-            }
-            if cfg!(windows) {
-                "notepad.exe".into()
-            } else {
-                "vi".into()
-            }
+            env::var_os("VISUAL")
+                .or_else(|| env::var_os("EDITOR"))
+                .unwrap_or_else(|| {
+                    if cfg!(windows) {
+                        "notepad.exe".into()
+                    } else {
+                        "vi".into()
+                    }
+                })
         }
 
         let file_string = std::fs::read_to_string(&path)?;
@@ -223,7 +220,7 @@ pub(super) fn edit_template_file(edit: Option<PathBuf>) -> anyhow::Result<()> {
             .with_render_config(RenderConfig::default().with_canceled_prompt_indicator(
                 Styled::new("<skipped>").with_fg(Color::DarkYellow),
             ))
-            .with_file_extension(&extention)
+            .with_file_extension(&extension)
             .with_predefined_text(&file_string)
             .prompt()?;
 
