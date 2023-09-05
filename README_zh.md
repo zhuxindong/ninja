@@ -142,7 +142,7 @@ services:
 > - public-api, <https://host:port/public-api/*>
 > - platform-api, <https://host:port/v1/*>
 > - dashboard-api, <https://host:port/dashboard/*>
-> - chatgpt-to-api, <https://host:port/conv/v1/chat/completions>
+> - chatgpt-to-api, <https://host:port/to/v1/chat/completions>
 >
 > 详细API文档
 >

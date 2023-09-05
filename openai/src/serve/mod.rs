@@ -249,7 +249,7 @@ impl Launcher {
                 // unofficial backend api endpoint
                 .route("/backend-api/*path", any(unofficial_proxy))
                 // unofficial api to official api
-                .route("/conv/v1/chat/completions", post(chat_to_api))
+                .route("/to/v1/chat/completions", post(chat_to_api))
                 .route_layer(app_layer)
                 // unofficial public api endpoint
                 .route("/public-api/*path", any(unofficial_proxy))
