@@ -120,6 +120,14 @@ pub struct Launcher {
 
 impl Launcher {
     pub fn run(self) -> anyhow::Result<()> {
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| "RUST_LOG=warn".into()),
+            )
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+
         let args = ContextArgsBuilder::default()
             .api_prefix(self.api_prefix.clone())
             .arkose_endpoint(self.arkose_endpoint.clone())
@@ -136,14 +144,6 @@ impl Launcher {
             .expect("Failed to initialize configuration parameters");
 
         Context::init(args);
-
-        tracing_subscriber::registry()
-            .with(
-                tracing_subscriber::EnvFilter::try_from_default_env()
-                    .unwrap_or_else(|_| "RUST_LOG=warn".into()),
-            )
-            .with(tracing_subscriber::fmt::layer())
-            .init();
 
         let global_layer = tower::ServiceBuilder::new()
             .layer(tower_http::trace::TraceLayer::new_for_http())
@@ -249,7 +249,7 @@ impl Launcher {
                 // unofficial backend api endpoint
                 .route("/backend-api/*path", any(unofficial_proxy))
                 // unofficial api to official api
-                .route("/conv/v1/chat/completions", post(chat_to_api))
+                .route("/to/v1/chat/completions", post(chat_to_api))
                 .route_layer(app_layer)
                 // unofficial public api endpoint
                 .route("/public-api/*path", any(unofficial_proxy))
@@ -308,19 +308,19 @@ impl Launcher {
 async fn post_access_token(
     mut account: axum::Form<AuthAccount>,
 ) -> Result<Json<AccessToken>, ResponseError> {
-    let env = Context::get_instance();
+    let ctx = Context::get_instance().await;
     let mut result: Result<Json<AccessToken>, ResponseError> = Err(
         ResponseError::InternalServerError(anyhow!("There was an error logging in to the Body")),
     );
 
     for _ in 0..2 {
-        match env.load_auth_client().do_access_token(&account.0).await {
+        match ctx.load_auth_client().do_access_token(&account.0).await {
             Ok(access_token) => {
                 result = Ok(Json(access_token));
                 break;
             }
             Err(err) => {
-                debug!("login error: {err}");
+                debug!("Error: {err}");
                 account.0.option = match account.0.option {
                     AuthStrategy::Web => AuthStrategy::Apple,
                     AuthStrategy::Apple => AuthStrategy::Web,
@@ -337,8 +337,8 @@ async fn post_access_token(
 async fn post_refresh_token(
     TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
 ) -> Result<Json<RefreshToken>, ResponseError> {
-    let env = Context::get_instance();
-    match env
+    let ctx = Context::get_instance().await;
+    match ctx
         .load_auth_client()
         .do_refresh_token(bearer.token())
         .await
@@ -351,8 +351,8 @@ async fn post_refresh_token(
 async fn post_revoke_token(
     TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
 ) -> Result<axum::http::StatusCode, ResponseError> {
-    let env = Context::get_instance();
-    match env.load_auth_client().do_revoke_token(bearer.token()).await {
+    let ctx = Context::get_instance().await;
+    match ctx.load_auth_client().do_revoke_token(bearer.token()).await {
         Ok(_) => Ok(axum::http::StatusCode::OK),
         Err(err) => Err(ResponseError::BadRequest(err)),
     }
@@ -407,8 +407,8 @@ async fn official_proxy(
             format!("{URL_PLATFORM_API}{}?{}", uri.path(), query)
         }
     };
-    let env = Context::get_instance();
-    let builder = env
+    let ctx = Context::get_instance().await;
+    let builder = ctx
         .load_client()
         .request(method, &url)
         .headers(header_convert(&headers, &jar).await?);
@@ -448,8 +448,8 @@ async fn unofficial_proxy(
 
     handle_body(&url, &method, &mut headers, &mut body).await?;
 
-    let env = Context::get_instance();
-    let builder = env
+    let ctx = Context::get_instance().await;
+    let builder = ctx
         .load_client()
         .request(method, url)
         .headers(header_convert(&headers, &jar).await?);
@@ -508,11 +508,12 @@ pub(super) async fn header_convert(
         }
         None => {
             if !has_puid(&headers)? {
-                let ctx = Context::get_instance();
-                if let Some(puid) = ctx.get_share_puid() {
+                let ctx = Context::get_instance().await;
+                let puid = ctx.get_share_puid().await;
+                if !puid.is_empty() {
                     let c = &format!("_puid={};", puid);
                     cookie.push_str(c);
-                    debug!("local `puid`: {}", c);
+                    debug!("Local `puid`: {}", c);
                 }
             }
         }
@@ -610,6 +611,7 @@ async fn handle_body(
 
     if !has_puid(headers)? {
         let resp = Context::get_instance()
+            .await
             .load_client()
             .get(format!("{URL_CHATGPT_API}/backend-api/models"))
             .header(header::AUTHORIZATION, authorization)
@@ -670,6 +672,7 @@ pub(super) fn has_puid(headers: &HeaderMap) -> Result<bool, ResponseError> {
 
 async fn check_wan_address() {
     match Context::get_instance()
+        .await
         .load_client()
         .get("https://ifconfig.me")
         .timeout(Duration::from_secs(70))
@@ -703,17 +706,17 @@ async fn initialize_puid(username: Option<String>, password: Option<String>, mfa
         option: AuthStrategy::Apple,
         cf_turnstile_response: None,
     };
-    let env = Context::get_instance();
+    let ctx = Context::get_instance().await;
     loop {
         interval.tick().await;
         for _ in 0..2 {
-            match env.load_auth_client().do_access_token(&account).await {
+            match ctx.load_auth_client().do_access_token(&account).await {
                 Ok(v) => {
                     let access_token = match v {
                         AccessToken::Session(access_token) => access_token.access_token,
                         AccessToken::OAuth(access_token) => access_token.access_token,
                     };
-                    match env
+                    match ctx
                         .load_client()
                         .get(format!("{URL_CHATGPT_API}/backend-api/models"))
                         .bearer_auth(access_token)
@@ -723,9 +726,9 @@ async fn initialize_puid(username: Option<String>, password: Option<String>, mfa
                         Ok(resp) => match resp.error_for_status() {
                             Ok(v) => match v.cookies().into_iter().find(|v| v.name().eq("_puid")) {
                                 Some(cookie) => {
-                                    let puid = cookie.value().to_owned();
+                                    let puid = cookie.value();
                                     info!("Update PUID: {puid}");
-                                    env.set_share_puid(Some(puid));
+                                    ctx.set_share_puid(puid).await;
                                     break;
                                 }
                                 None => {
@@ -738,7 +741,6 @@ async fn initialize_puid(username: Option<String>, password: Option<String>, mfa
                         },
                         Err(err) => {
                             warn!("[{}] Error: {err}", account.option);
-                            env.set_share_puid(None)
                         }
                     }
                 }

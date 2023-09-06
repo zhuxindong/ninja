@@ -1,7 +1,4 @@
-use std::{env, ffi::OsString, ops::Not, path::PathBuf};
-
-use anyhow::bail;
-use inquire::ui::{Color, RenderConfig, Styled};
+use std::{ops::Not, path::PathBuf};
 
 use crate::{
     args::{self, ServeArgs},
@@ -137,7 +134,7 @@ pub(super) fn serve_stop() -> anyhow::Result<()> {
     if let Some(pid) = get_pid() {
         let pid = pid.parse::<i32>()?;
         for _ in 0..360 {
-            if let Err(_) = nix::sys::signal::kill(Pid::from_raw(pid), signal::SIGINT) {
+            if nix::sys::signal::kill(Pid::from_raw(pid), signal::SIGINT).is_err() {
                 break;
             }
             std::thread::sleep(std::time::Duration::from_secs(1))
@@ -178,7 +175,7 @@ pub(super) fn serve_log() -> anyhow::Result<()> {
     };
 
     let path = Path::new(env::DEFAULT_STDOUT_PATH);
-    let file = File::open(&path)?;
+    let file = File::open(path)?;
     let reader = io::BufReader::new(file);
 
     for line in reader.lines() {
@@ -186,49 +183,6 @@ pub(super) fn serve_log() -> anyhow::Result<()> {
             Ok(content) => println!("{}", content),
             Err(err) => eprintln!("Error reading line: {}", err),
         }
-    }
-    Ok(())
-}
-
-pub(super) fn edit_template_file(edit: Option<PathBuf>) -> anyhow::Result<()> {
-    if let Some(path) = edit {
-        if !path.is_file() {
-            bail!("{} not is file", path.display())
-        }
-
-        let extension = path
-            .extension()
-            .map(|e| format!(".{:?}", e))
-            .unwrap_or_else(|| "".to_owned());
-
-        fn get_default_editor() -> OsString {
-            env::var_os("VISUAL")
-                .or_else(|| env::var_os("EDITOR"))
-                .unwrap_or_else(|| {
-                    if cfg!(windows) {
-                        "notepad.exe".into()
-                    } else {
-                        "vi".into()
-                    }
-                })
-        }
-
-        let file_string = std::fs::read_to_string(&path)?;
-
-        let mut edit_content = inquire::Editor::new("Edit:")
-            .with_editor_command(&get_default_editor())
-            .with_render_config(RenderConfig::default().with_canceled_prompt_indicator(
-                Styled::new("<skipped>").with_fg(Color::DarkYellow),
-            ))
-            .with_file_extension(&extension)
-            .with_predefined_text(&file_string)
-            .prompt()?;
-
-        println!("------------Edit Complete------------\n{}", edit_content);
-
-        edit_content.push('\n');
-
-        std::fs::write(path, edit_content)?
     }
     Ok(())
 }

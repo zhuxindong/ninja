@@ -36,7 +36,7 @@ mod home_dir_windows {
 mod home_dir_ne_windows {
     use std::{env::var_os, path::PathBuf};
 
-    const HOME: &'static str = "HOME";
+    const HOME: &str = "HOME";
 
     /// Return the user's home directory.
     ///

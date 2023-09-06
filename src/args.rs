@@ -14,10 +14,20 @@ pub(super) struct Opt {
         short = 'L',
         long,
         global = true,
-        env = "OPENGPT_LOG_LEVEL",
+        env = "OPENGPT_LOG",
         default_value = "info"
     )]
     pub(super) level: String,
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Subcommand)]
+pub(super) enum SubCommands {
+    /// Start the http server
+    #[clap(subcommand)]
+    Serve(ServeSubcommand),
+    /// Terminal interaction
+    Terminal,
 }
 
 #[derive(Subcommand)]
@@ -42,11 +52,8 @@ pub(super) enum ServeSubcommand {
     /// Generate config template file (toml format file)
     GT {
         /// Configuration template output to file (toml format file)
-        #[clap(short, long, env = "OPENGPT_SERVE_GT_OUT", group = "gt")]
-        out: Option<PathBuf>,
-        /// Edit configuration template file
         #[clap(short, long, group = "gt")]
-        edit: Option<PathBuf>,
+        out: Option<PathBuf>,
     },
 }
 
@@ -174,13 +181,4 @@ pub(super) struct ServeArgs {
     /// Disable WebUI
     #[clap(short = 'D', long, env = "OPENGPT_DISABLE_WEBUI")]
     pub(super) disable_webui: bool,
-}
-
-#[derive(Subcommand)]
-pub(super) enum SubCommands {
-    /// Start the http server
-    #[clap(subcommand)]
-    Serve(ServeSubcommand),
-    /// Terminal interaction
-    Terminal,
 }

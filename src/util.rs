@@ -1,89 +1,6 @@
 use anyhow::Context;
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::time::Duration;
-
-use tokio::io::AsyncWriteExt;
-
-use std::sync::{Arc, RwLock};
-use std::thread;
-
-pub struct ProgressBar<'a> {
-    message: &'a str,
-    active: Arc<RwLock<bool>>,
-    join: Option<tokio::task::JoinHandle<()>>,
-}
-
-impl ProgressBar<'_> {
-    pub fn new<'a>(msg: &'a str) -> ProgressBar<'_> {
-        ProgressBar {
-            active: Arc::new(RwLock::new(false)),
-            message: msg,
-            join: None,
-        }
-    }
-
-    pub fn start(&mut self) {
-        let mut write = self.active.write().unwrap();
-        if *write {
-            return;
-        }
-
-        *write = true;
-
-        let active_clone = self.active.clone();
-        let msg = self.message.to_owned();
-        self.join = Some(tokio::spawn(async move {
-            let progress_chars = &["▹▹▹▹▹", "▸▹▹▹▹", "▹▸▹▹▹", "▹▹▸▹▹", "▹▹▹▸▹", "▹▹▹▹▸"];
-            let mut out = tokio::io::stdout();
-            loop {
-                if *active_clone.read().unwrap() {
-                    for chars in progress_chars {
-                        out.write_all(format!("\r\x1B[34m{chars}\x1B[0m {msg}").as_bytes())
-                            .await
-                            .unwrap();
-                        out.flush().await.unwrap();
-                        if *active_clone.read().unwrap() {
-                            thread::sleep(Duration::from_millis(100));
-                        } else {
-                            return;
-                        }
-                    }
-                } else {
-                    break;
-                }
-            }
-        }));
-    }
-
-    pub async fn finish_and_clear(&self) {
-        let mut write = self.active.write().unwrap();
-        *write = false;
-        if let Some(join) = &self.join {
-            join.abort();
-            print!("\r\x1B[K");
-        }
-    }
-}
-
-pub async fn print_stream(
-    out: &mut tokio::io::Stdout,
-    previous_message: String,
-    message: String,
-) -> anyhow::Result<String> {
-    if message.starts_with(&*previous_message) {
-        let new_chars: String = message.chars().skip(previous_message.len()).collect();
-        out.write_all(new_chars.as_bytes()).await?;
-    } else {
-        out.write_all(message.as_bytes()).await?;
-    }
-    out.flush().await?;
-    Ok(message)
-}
-
-pub fn long_spinner_progress_bar<'a>(message: &'a str) -> ProgressBar<'a> {
-    ProgressBar::new(message)
-}
 
 const PORT_RANGE: std::ops::RangeInclusive<usize> = 1024..=65535;
 
@@ -123,7 +40,7 @@ pub fn parse_url(s: &str) -> anyhow::Result<String> {
 
 // proxy proto
 pub fn parse_proxies_url(s: &str) -> anyhow::Result<Vec<String>> {
-    let split = s.split(",");
+    let split = s.split(',');
     let mut proxies: Vec<_> = vec![];
     for ele in split {
         let url = url::Url::parse(ele)
@@ -165,9 +82,9 @@ pub fn parse_puid_user(s: &str) -> anyhow::Result<(String, String, Option<String
         }
     }
 
-    if s.contains(":") {
+    if s.contains(':') {
         let parts = s
-            .split(":")
+            .split(':')
             .map(|part| part.to_string())
             .collect::<Vec<_>>();
         return handle_parts(parts);
@@ -179,7 +96,7 @@ pub fn parse_puid_user(s: &str) -> anyhow::Result<(String, String, Option<String
                 .split(&targets)
                 .map(|part| part.to_string())
                 .collect::<Vec<_>>();
-            return handle_parts(parts);
+            handle_parts(parts)
         }
         Err(_) => anyhow::bail!("Input format is invalid!"),
     }

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::arkose::ArkoseToken;
-use crate::context;
+use crate::context::Context;
 use crate::serve::err::{self, ResponseError};
 use crate::serve::Launcher;
 use axum::body::Body;
@@ -86,7 +86,7 @@ async fn proxy(
     headers.remove(header::CONTENT_TYPE);
     headers.remove(header::CONTENT_LENGTH);
 
-    let client = context::Context::get_instance().load_client();
+    let client = Context::get_instance().await.load_client();
 
     let url = format!("https://client-api.arkoselabs.com{}", uri.path());
     let resp = match body {

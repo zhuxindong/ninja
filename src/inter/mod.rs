@@ -1,7 +1,10 @@
-pub mod context;
+mod configure;
+mod context;
 mod conversation;
-pub mod enums;
-pub mod settings;
+mod dash;
+mod enums;
+mod oauth;
+mod valid;
 
 use crate::inter::conversation::{api, chatgpt};
 use enums::Usage;
@@ -11,26 +14,33 @@ use inquire::{
     },
     Select,
 };
+use std::cell::RefCell;
+use std::thread;
+use std::time::Duration;
+use tokio::{io::AsyncWriteExt, task};
 
-#[tokio::main(flavor = "current_thread")]
 pub async fn prompt() -> anyhow::Result<()> {
     print_boot_message();
 
     loop {
-        let choice = Select::new("Usage Wizard ›", enums::Usage::USAGE_VARS.to_vec())
-            .with_render_config(render_config())
-            .with_formatter(&|i| format!("${i:.2}"))
-            .prompt()?;
+        let choice = task::spawn_blocking(move || {
+            Select::new("Usage Wizard ›", Usage::USAGE_VARS.to_vec())
+                .with_render_config(render_config())
+                .with_formatter(&|i| format!("${i:.2}"))
+                .prompt()
+        })
+        .await??;
 
         match choice {
-            Usage::API => api::api_prompt().await?,
+            Usage::Api => api::api_prompt().await?,
             Usage::ChatGPT => chatgpt::chatgpt_prompt().await?,
-            Usage::Dashboard => settings::dashboard_prompt().await?,
-            Usage::OAuth => settings::oauth_prompt().await?,
-            Usage::Configuration => settings::config_prompt().await?,
-            Usage::Quit => return Ok(()),
+            Usage::Dashboard => dash::dashboard_prompt().await?,
+            Usage::OAuth => oauth::oauth_prompt().await?,
+            Usage::Configuration => configure::config_prompt().await?,
+            Usage::Quit => break,
         }
     }
+    Ok(())
 }
 
 fn print_boot_message() {
@@ -77,6 +87,46 @@ pub(super) fn render_config() -> RenderConfig {
         option_index_prefix: IndexPrefix::None,
         option: StyleSheet::new().with_fg(Color::LightYellow),
         selected_option: Some(StyleSheet::new().with_fg(Color::LightCyan)),
-        editor_prompt: StyleSheet::new().with_fg(Color::DarkCyan),
+    }
+}
+
+pub struct ProgressBar<'a> {
+    message: &'a str,
+    task: RefCell<Option<tokio::task::JoinHandle<()>>>,
+}
+
+impl ProgressBar<'_> {
+    pub fn new(msg: &str) -> ProgressBar<'_> {
+        ProgressBar {
+            message: msg,
+            task: RefCell::new(None),
+        }
+    }
+
+    pub fn start(&self) {
+        let msg = self.message.to_owned();
+        let mut task = self.task.borrow_mut();
+        *task = Some(tokio::spawn(async move {
+            let progress_chars = &["▹▹▹▹▹", "▸▹▹▹▹", "▹▸▹▹▹", "▹▹▸▹▹", "▹▹▹▸▹", "▹▹▹▹▸"];
+            let mut out = tokio::io::stdout();
+            loop {
+                for chars in progress_chars {
+                    out.write_all(format!("\r\x1B[34m{chars}\x1B[0m {msg}").as_bytes())
+                        .await
+                        .unwrap();
+                    out.flush().await.unwrap();
+                    thread::sleep(Duration::from_millis(100));
+                }
+            }
+        }));
+    }
+
+    pub async fn finish(self) {
+        if let Some(join) = self.task.into_inner() {
+            join.abort();
+            let mut out = tokio::io::stdout();
+            out.write_all(b"\r").await.unwrap();
+            out.flush().await.unwrap();
+        }
     }
 }

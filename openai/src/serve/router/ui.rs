@@ -250,6 +250,7 @@ async fn post_login(
     }
 
     match context::Context::get_instance()
+        .await
         .load_auth_client()
         .do_access_token(&account)
         .await
@@ -299,6 +300,7 @@ async fn post_login_token(
         )))?;
 
     let session = match context::Context::get_instance()
+        .await
         .load_auth_client()
         .do_get_user_picture(access_token)
         .await
@@ -344,8 +346,8 @@ async fn get_logout(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
         match extract_session(c.value()) {
             Ok(session) => {
                 if let Some(refresh_token) = session.refresh_token {
-                    let env = context::Context::get_instance();
-                    let _a = env.load_auth_client().do_revoke_token(&refresh_token).await;
+                    let ctx = context::Context::get_instance().await;
+                    let _a = ctx.load_auth_client().do_revoke_token(&refresh_token).await;
                 }
             }
             Err(_) => {}
@@ -514,9 +516,9 @@ async fn get_share_chat(
     if let Some(cookie) = jar.get(SESSION_ID) {
         return match extract_session(cookie.value()) {
             Ok(session) => {
-                let env = context::Context::get_instance();
+                let ctx = context::Context::get_instance().await;
                 let url = get_url();
-                let resp = env
+                let resp = ctx
                     .load_client()
                     .get(format!("{url}/backend-api/share/{share_id}"))
                     .headers(header_convert(&headers, &jar).await?)
@@ -612,9 +614,9 @@ async fn get_share_chat_info(
     let share_id = share_id.0.replace(".json", "");
     if let Some(cookie) = jar.get(SESSION_ID) {
         if let Ok(session) = extract_session(cookie.value()) {
-            let env = context::Context::get_instance();
+            let ctx = context::Context::get_instance().await;
             let url = get_url();
-            let resp = env
+            let resp = ctx
                 .load_client()
                 .get(format!("{url}/backend-api/share/{share_id}"))
                 .headers(header_convert(&headers, &jar).await?)
@@ -693,9 +695,9 @@ async fn get_share_chat_continue_info(
     if let Some(cookie) = jar.get(SESSION_ID) {
         return match extract_session(cookie.value()) {
             Ok(session) => {
-                let env = context::Context::get_instance();
+                let ctx = context::Context::get_instance().await;
                 let url = get_url();
-                let resp = env.load_client()
+                let resp = ctx.load_client()
                 .get(format!("{url}/backend-api/share/{}", share_id.0))
                 .headers(header_convert(&headers, &jar).await?)
                 .bearer_auth(session.access_token)
@@ -796,6 +798,7 @@ async fn get_image(
         "Missing URL parameter"
     )))?;
     let resp = context::Context::get_instance()
+        .await
         .load_client()
         .get(&query.url)
         .send()
@@ -898,6 +901,7 @@ async fn cf_captcha_check(addr: IpAddr, cf_response: Option<&str>) -> Result<(),
         };
 
         let resp = context::Context::get_instance()
+            .await
             .load_client()
             .post("https://challenges.cloudflare.com/turnstile/v0/siteverify")
             .form(&form)
