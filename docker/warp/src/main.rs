@@ -66,7 +66,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
-    // 现在你可以使用listen_addr和target_addr了
     println!("Listening on: {}", listen_addr);
     println!("Forwarding to: {}", target_addr);
 
