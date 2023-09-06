@@ -7,38 +7,24 @@ services:
     restart: unless-stopped
     environment:
       - TZ=Asia/Shanghai
-      - OPENGPT_PROXY=socks5://cloudflare-warp:10000
-      # - OPENGPT_CONFIG=/opengpt-serve.toml
+      - OPENGPT_PROXIES=socks5://warp:10000
+      # - OPENGPT_CONFIG=/serve.toml
       # - OPENGPT_PORT=8080
       # - OPENGPT_HOST=0.0.0.0
-      # - OPENGPT_WORKERS=10
-      # - OPENGPT_TIMEOUT=360
-      # - OPENGPT_CONNECT_TIMEOUT=60
-      # - OPENGPT_TCP_KEEPALIVE=60
       # - OPENGPT_TLS_CERT=
       # - OPENGPT_TLS_KEY=
-      # - OPENGPT_UI_API_PREFIX=
-      # - OPENGPT_SIGNATURE=
-      # - OPENGPT_TB_ENABLE=
-      # - OPENGPT_TB_STORE_STRATEGY
-      # - OPENGPT_TB_REDIS_URL=
-      # - OPENGPT_TB_CAPACITY=
-      # - OPENGPT_TB_FILL_RATE=
-      # - OPENGPT_TB_EXPIRED=
-      # - OPENGPT_CF_SITE_KEY=
-      # - OPENGPT_CF_SECRET_KEY=
-    volumes:
+    # volumes:
       # - ${PWD}/ssl:/etc
-      - ${PWD}/opengpt-serve.toml:/opengpt-serve.toml
+      # - ${PWD}/serve.toml:/serve.toml
     command: serve run
     ports:
-      - "8080:7999"
+      - "8081:7999"
     depends_on:
-      - cloudflare-warp
+      - warp
 
-  cloudflare-warp:
-    container_name: cloudflare-warp
-    image: ghcr.io/gngpp/cloudflare-warp:latest
+  warp:
+    container_name: warp
+    image: ghcr.io/gngpp/warp:latest
     restart: unless-stopped
 
   watchtower:
