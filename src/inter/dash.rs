@@ -14,9 +14,8 @@ pub(super) async fn dashboard_prompt() -> anyhow::Result<()> {
                     .with_help_message("You need to log in to your account to continue")
                     .prompt();
 
-                match ans {
-                    Ok(true) => login_store_prompt(AuthStrategy::Platform).await,
-                    _ => {}
+                if let Ok(true) = ans {
+                    login_store_prompt(AuthStrategy::Platform).await
                 }
             } else {
                 for account in account_list {

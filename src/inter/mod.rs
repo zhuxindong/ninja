@@ -32,7 +32,7 @@ pub async fn prompt() -> anyhow::Result<()> {
         .await??;
 
         match choice {
-            Usage::API => api::api_prompt().await?,
+            Usage::Api => api::api_prompt().await?,
             Usage::ChatGPT => chatgpt::chatgpt_prompt().await?,
             Usage::Dashboard => dash::dashboard_prompt().await?,
             Usage::OAuth => oauth::oauth_prompt().await?,
@@ -96,7 +96,7 @@ pub struct ProgressBar<'a> {
 }
 
 impl ProgressBar<'_> {
-    pub fn new<'a>(msg: &'a str) -> ProgressBar<'_> {
+    pub fn new(msg: &str) -> ProgressBar<'_> {
         ProgressBar {
             message: msg,
             task: RefCell::new(None),
@@ -125,7 +125,7 @@ impl ProgressBar<'_> {
         if let Some(join) = self.task.into_inner() {
             join.abort();
             let mut out = tokio::io::stdout();
-            out.write(b"\r").await.unwrap();
+            out.write_all(b"\r").await.unwrap();
             out.flush().await.unwrap();
         }
     }

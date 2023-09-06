@@ -26,8 +26,9 @@ pub mod util;
 fn main() -> anyhow::Result<()> {
     let opt = args::Opt::parse();
     std::env::set_var("RUST_LOG", opt.level);
-    match opt.command {
-        Some(command) => match command {
+
+    if let Some(command) = opt.command {
+        match command {
             SubCommands::Serve(commands) => match commands {
                 args::ServeSubcommand::Run(args) => handle::serve(args, true)?,
                 #[cfg(target_family = "unix")]
@@ -51,8 +52,8 @@ fn main() -> anyhow::Result<()> {
 
                 runtime.block_on(inter::prompt())?;
             }
-        },
-        None => {}
+        }
     }
+
     Ok(())
 }

@@ -40,7 +40,7 @@ pub fn parse_url(s: &str) -> anyhow::Result<String> {
 
 // proxy proto
 pub fn parse_proxies_url(s: &str) -> anyhow::Result<Vec<String>> {
-    let split = s.split(",");
+    let split = s.split(',');
     let mut proxies: Vec<_> = vec![];
     for ele in split {
         let url = url::Url::parse(ele)
@@ -82,9 +82,9 @@ pub fn parse_puid_user(s: &str) -> anyhow::Result<(String, String, Option<String
         }
     }
 
-    if s.contains(":") {
+    if s.contains(':') {
         let parts = s
-            .split(":")
+            .split(':')
             .map(|part| part.to_string())
             .collect::<Vec<_>>();
         return handle_parts(parts);
@@ -96,7 +96,7 @@ pub fn parse_puid_user(s: &str) -> anyhow::Result<(String, String, Option<String
                 .split(&targets)
                 .map(|part| part.to_string())
                 .collect::<Vec<_>>();
-            return handle_parts(parts);
+            handle_parts(parts)
         }
         Err(_) => anyhow::bail!("Input format is invalid!"),
     }

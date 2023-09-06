@@ -1,7 +1,7 @@
-use serde::de::DeserializeOwned;
-
 pub mod account;
 pub mod conf;
+
+use serde::de::DeserializeOwned;
 
 pub type StoreResult<T, E = anyhow::Error> = anyhow::Result<T, E>;
 

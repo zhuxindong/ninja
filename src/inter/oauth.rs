@@ -87,14 +87,10 @@ async fn do_revoke_token() -> anyhow::Result<()> {
     if let Some(refresh_token) = refresh_token {
         let pb = ProgressBar::new("Waiting...");
         pb.start();
-        match Context::get_auth_client()
+        let _ = Context::get_auth_client()
             .await
             .do_revoke_token(&refresh_token)
-            .await
-        {
-            Ok(_) => {}
-            Err(_) => {}
-        }
+            .await;
         pb.finish().await;
     }
     Ok(())
@@ -147,7 +143,7 @@ pub async fn login_prompt(auth_strategy: Option<AuthStrategy>) -> anyhow::Result
         username,
         password,
         mfa: mfa_code,
-        option: auth_strategy.into(),
+        option: auth_strategy,
         cf_turnstile_response: None,
     };
 

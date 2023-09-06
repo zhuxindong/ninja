@@ -1,9 +1,7 @@
-use std::{collections::HashMap, ops::Not, path::PathBuf};
-
-use crate::homedir::home_dir;
-
 use super::{Store, StoreId, StoreResult};
+use crate::homedir::home_dir;
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, ops::Not, path::PathBuf};
 
 const DEFAULT_ID: &str = "999999999999999999";
 
@@ -147,9 +145,15 @@ impl ConfFileStore {
         }
         if path.exists().not() {
             std::fs::File::create(&path)
-                .expect(&format!("Unable to create file: {}", path.display()));
+                .unwrap_or_else(|_| panic!("Unable to create file: {}", path.display()));
         }
         ConfFileStore(path)
+    }
+}
+
+impl Default for ConfFileStore {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

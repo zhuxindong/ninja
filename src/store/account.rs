@@ -1,10 +1,7 @@
-use std::{collections::HashMap, ops::Not, path::PathBuf};
-
-use openai::{auth::model::AuthStrategy, model::AuthenticateToken};
-
-use crate::homedir::home_dir;
-
 use super::{Store, StoreId, StoreResult};
+use crate::homedir::home_dir;
+use openai::{auth::model::AuthStrategy, model::AuthenticateToken};
+use std::{collections::HashMap, ops::Not, path::PathBuf};
 
 pub struct AccountStore(PathBuf);
 
@@ -22,9 +19,15 @@ impl AccountStore {
         }
         if path.exists().not() {
             std::fs::File::create(&path)
-                .expect(&format!("Unable to create file: {}", path.display()));
+                .unwrap_or_else(|_| panic!("Unable to create file: {}", path.display()));
         }
         AccountStore(path)
+    }
+}
+
+impl Default for AccountStore {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -20,6 +20,7 @@ pub(super) struct Opt {
     pub(super) level: String,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Subcommand)]
 pub(super) enum SubCommands {
     /// Start the http server
