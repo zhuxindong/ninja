@@ -88,7 +88,6 @@ impl AuthHandle for AuthClient {
                     match handle.do_revoke_token(refresh_token).await {
                         Ok(_) => {
                             last_err = None;
-                            break;
                         }
                         Err(err) => last_err = Some(err),
                     }
