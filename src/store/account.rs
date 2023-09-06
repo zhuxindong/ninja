@@ -6,9 +6,9 @@ use crate::homedir::home_dir;
 
 use super::{Store, StoreId, StoreResult};
 
-pub struct AccountFileStore(PathBuf);
+pub struct AccountStore(PathBuf);
 
-impl AccountFileStore {
+impl AccountStore {
     pub fn new() -> Self {
         let path = match home_dir() {
             Some(home_dir) => home_dir.join(".opengpt-accounts"),
@@ -24,11 +24,11 @@ impl AccountFileStore {
             std::fs::File::create(&path)
                 .expect(&format!("Unable to create file: {}", path.display()));
         }
-        AccountFileStore(path)
+        AccountStore(path)
     }
 }
 
-impl Store<Account> for AccountFileStore {
+impl Store<Account> for AccountStore {
     fn add(&self, account: Account) -> StoreResult<Option<Account>> {
         let bytes = std::fs::read(&self.0)?;
         let mut data: HashMap<String, Account> = if bytes.is_empty() {

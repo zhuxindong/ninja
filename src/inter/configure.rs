@@ -1,15 +1,15 @@
+use crate::store::{conf::Conf, Store};
 use inquire::{CustomType, Text};
 
-use crate::store::{conf::Conf, Store};
-
 use super::{
-    context::CONF_STORE,
+    context::Context,
     render_config,
     valid::{valid_file_path, valid_url},
 };
 
 pub(super) async fn config_prompt() -> anyhow::Result<()> {
-    let mut conf = CONF_STORE.get(Conf::default())?.unwrap_or(Conf::default());
+    let store = Context::get_conf_store().await;
+    let mut conf = store.get(Conf::default())?.unwrap_or(Conf::default());
     let mut official_api = Text::new("Official API prefix ›")
         .with_render_config(render_config())
         .with_help_message("Example: https://example.com")
@@ -109,7 +109,7 @@ pub(super) async fn config_prompt() -> anyhow::Result<()> {
         conf.tcp_keepalive = tcp_keepalive;
     }
 
-    CONF_STORE.add(conf)?;
+    store.add(conf)?;
 
     Ok(())
 }

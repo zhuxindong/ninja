@@ -15,9 +15,9 @@ impl Usage {
     pub const USAGE_VARS: &'static [Usage] = &[
         Self::API,
         Self::ChatGPT,
+        Self::OAuth,
         Self::Dashboard,
         Self::Configuration,
-        Self::OAuth,
         Self::Quit,
     ];
 }

@@ -120,6 +120,14 @@ pub struct Launcher {
 
 impl Launcher {
     pub fn run(self) -> anyhow::Result<()> {
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| "RUST_LOG=warn".into()),
+            )
+            .with(tracing_subscriber::fmt::layer())
+            .init();
+
         let args = ContextArgsBuilder::default()
             .api_prefix(self.api_prefix.clone())
             .arkose_endpoint(self.arkose_endpoint.clone())
@@ -136,14 +144,6 @@ impl Launcher {
             .expect("Failed to initialize configuration parameters");
 
         Context::init(args);
-
-        tracing_subscriber::registry()
-            .with(
-                tracing_subscriber::EnvFilter::try_from_default_env()
-                    .unwrap_or_else(|_| "RUST_LOG=warn".into()),
-            )
-            .with(tracing_subscriber::fmt::layer())
-            .init();
 
         let global_layer = tower::ServiceBuilder::new()
             .layer(tower_http::trace::TraceLayer::new_for_http())

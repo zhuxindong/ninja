@@ -13,6 +13,7 @@ static GLOBAL: Jemalloc = Jemalloc;
 
 use args::SubCommands;
 use clap::Parser;
+use tokio::runtime;
 
 pub mod args;
 pub mod env;
@@ -39,12 +40,17 @@ fn main() -> anyhow::Result<()> {
                 args::ServeSubcommand::Status => handle::serve_status()?,
                 #[cfg(target_family = "unix")]
                 args::ServeSubcommand::Log => handle::serve_log()?,
-                args::ServeSubcommand::GT { out, edit } => {
-                    handle::generate_template(out)?;
-                    handle::edit_template_file(edit)?;
-                }
+                args::ServeSubcommand::GT { out } => handle::generate_template(out)?,
             },
-            SubCommands::Terminal => inter::prompt()?,
+            SubCommands::Terminal => {
+                let runtime = runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .worker_threads(1)
+                    .max_blocking_threads(1)
+                    .build()?;
+
+                runtime.block_on(inter::prompt())?;
+            }
         },
         None => {}
     }

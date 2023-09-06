@@ -14,7 +14,7 @@ pub(super) struct Opt {
         short = 'L',
         long,
         global = true,
-        env = "OPENGPT_LOG_LEVEL",
+        env = "OPENGPT_LOG",
         default_value = "info"
     )]
     pub(super) level: String,
@@ -51,11 +51,8 @@ pub(super) enum ServeSubcommand {
     /// Generate config template file (toml format file)
     GT {
         /// Configuration template output to file (toml format file)
-        #[clap(short, long, env = "OPENGPT_SERVE_GT_OUT", group = "gt")]
-        out: Option<PathBuf>,
-        /// Edit configuration template file
         #[clap(short, long, group = "gt")]
-        edit: Option<PathBuf>,
+        out: Option<PathBuf>,
     },
 }
 

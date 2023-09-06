@@ -1,15 +1,11 @@
+use crate::store::Store;
 use inquire::Confirm;
 use openai::auth::model::AuthStrategy;
 
-use crate::store::Store;
-
-use super::{
-    context::{self, ACCOUNT_STORE},
-    render_config,
-};
+use super::{context::Context, oauth::login_store_prompt, render_config};
 
 pub(super) async fn dashboard_prompt() -> anyhow::Result<()> {
-    match ACCOUNT_STORE.list() {
+    match Context::get_account_store().await.list() {
         Ok(account_list) => {
             if account_list.is_empty() {
                 let ans = Confirm::new("Do you need to login to continue?")
@@ -19,7 +15,7 @@ pub(super) async fn dashboard_prompt() -> anyhow::Result<()> {
                     .prompt();
 
                 match ans {
-                    Ok(true) => context::login_store_prompt(AuthStrategy::Platform).await,
+                    Ok(true) => login_store_prompt(AuthStrategy::Platform).await,
                     _ => {}
                 }
             } else {
