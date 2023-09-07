@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::arkose::ArkoseToken;
 use crate::context::Context;
-use crate::serve::err::{self, ResponseError};
+use crate::serve::err::ResponseError;
 use crate::serve::Launcher;
 use axum::body::Body;
 use axum::http::header;
@@ -39,7 +39,7 @@ async fn proxy(
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, v.mime_type)
             .body(Body::from(v.data))
-            .map_err(|err| err::ResponseError::InternalServerError(err))?);
+            .map_err(ResponseError::InternalServerError)?);
     }
 
     if uri
@@ -99,26 +99,20 @@ async fn proxy(
                 .await
         }
         None => client.request(method, url).headers(headers).send().await,
-    };
-
-    match resp {
-        Ok(resp) => {
-            let mut builder = Response::builder();
-            for ele in resp.headers() {
-                builder = builder.header(ele.0, ele.1);
-            }
-            let bytes = resp
-                .bytes()
-                .await
-                .map_err(|err| err::ResponseError::InternalServerError(err))?;
-            Ok(builder
-                .status(StatusCode::OK)
-                .body(Body::from(bytes))
-                .map_err(|err| err::ResponseError::InternalServerError(err))?)
-        }
-        Err(err) => Ok(Response::builder()
-            .status(err.status().unwrap())
-            .body(Body::empty())
-            .map_err(|err| err::ResponseError::InternalServerError(err))?),
     }
+    .map_err(ResponseError::InternalServerError)?;
+
+    let mut builder = Response::builder().status(resp.status());
+    for ele in resp.headers() {
+        builder = builder.header(ele.0, ele.1);
+    }
+
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(ResponseError::InternalServerError)?;
+
+    Ok(builder
+        .body(Body::from(bytes))
+        .map_err(ResponseError::InternalServerError)?)
 }

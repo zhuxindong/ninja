@@ -1,5 +1,5 @@
 use crate::store::{conf::Conf, Store};
-use inquire::{CustomType, Text};
+use inquire::{Confirm, CustomType, Text};
 
 use super::{
     context::Context,
@@ -40,7 +40,7 @@ pub(super) async fn config_prompt() -> anyhow::Result<()> {
         }
     };
 
-    let mut arkose_har_path = Text::new("Arkose HAR path ›")
+    let mut arkose_har_path = Text::new("Arkose HAR file ›")
         .with_render_config(render_config())
         .with_help_message("About the browser HAR file path requested by ArkoseLabs")
         .with_validator(valid_file_path);
@@ -63,18 +63,35 @@ pub(super) async fn config_prompt() -> anyhow::Result<()> {
         arkose_token_endpoint = arkose_token_endpoint.with_initial_value(content)
     };
 
-    conf.official_api = official_api.prompt_skippable()?.filter(|s| !s.is_empty());
-    conf.unofficial_api = unofficial_api.prompt_skippable()?.filter(|s| !s.is_empty());
-    conf.proxy = proxy.prompt_skippable()?.filter(|s| !s.is_empty());
+    conf.official_api = official_api
+        .prompt_skippable()?
+        .map(|ok| if ok.is_empty() { None } else { Some(ok) })
+        .unwrap_or(conf.official_api);
+
+    conf.unofficial_api = unofficial_api
+        .prompt_skippable()?
+        .map(|ok| if ok.is_empty() { None } else { Some(ok) })
+        .unwrap_or(conf.unofficial_api);
+
+    conf.proxy = proxy
+        .prompt_skippable()?
+        .map(|ok| if ok.is_empty() { None } else { Some(ok) })
+        .unwrap_or(conf.proxy);
+
     conf.arkose_har_path = arkose_har_path
         .prompt_skippable()?
-        .filter(|s| !s.is_empty());
+        .map(|ok| if ok.is_empty() { None } else { Some(ok) })
+        .unwrap_or(conf.arkose_har_path);
+
     conf.arkose_yescaptcha_key = arkose_yescaptcha_key
         .prompt_skippable()?
-        .filter(|s| !s.is_empty());
+        .map(|ok| if ok.is_empty() { None } else { Some(ok) })
+        .unwrap_or(conf.arkose_yescaptcha_key);
+
     conf.arkose_token_endpoint = arkose_token_endpoint
         .prompt_skippable()?
-        .filter(|s| !s.is_empty());
+        .map(|ok| if ok.is_empty() { None } else { Some(ok) })
+        .unwrap_or(conf.arkose_token_endpoint);
 
     let timeout = CustomType::<usize>::new("Client timeout (seconds) ›")
         .with_render_config(render_config())
@@ -109,7 +126,13 @@ pub(super) async fn config_prompt() -> anyhow::Result<()> {
         conf.tcp_keepalive = tcp_keepalive;
     }
 
-    store.add(conf)?;
+    let ans = Confirm::new("Are you sure you want to change the configuration?")
+        .with_default(false)
+        .prompt()?;
+
+    if ans {
+        store.add(conf)?;
+    }
 
     Ok(())
 }

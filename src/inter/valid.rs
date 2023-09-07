@@ -26,7 +26,7 @@ pub fn valid_file_path(
         match PathBuf::from(s).is_file() {
             true => Ok(Validation::Valid),
             false => Ok(Validation::Invalid(
-                inquire::validator::ErrorMessage::Custom(format!("file path: {s} not exists")),
+                inquire::validator::ErrorMessage::Custom(format!("file: {s} not exists")),
             )),
         }
     } else {

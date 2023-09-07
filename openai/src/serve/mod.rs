@@ -530,49 +530,42 @@ pub(super) async fn header_convert(
 }
 
 fn response_convert(
-    resp: Result<reqwest::Response, reqwest::Error>,
+    res: Result<reqwest::Response, reqwest::Error>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    match resp {
-        Ok(resp) => {
-            let mut builder = Response::builder().status(resp.status());
-            for kv in resp.headers().into_iter().filter(|(k, _v)| {
-                let name = k.as_str().to_lowercase();
-                name.ne("__cf_bm")
-                    || name.ne("__cfduid")
-                    || name.ne("_cfuvid")
-                    || name.ne("set-cookie")
-            }) {
-                builder = builder.header(kv.0, kv.1);
-            }
-
-            for c in resp.cookies().into_iter().filter(|c| {
-                let key = c.name();
-                key.eq("_puid") || key.eq("_account")
-            }) {
-                if let Some(expires) = c.expires() {
-                    let timestamp_nanos = expires
-                        .duration_since(UNIX_EPOCH)
-                        .expect("Failed to get timestamp")
-                        .as_nanos() as i128;
-                    let cookie = Cookie::build(c.name(), c.value())
-                        .path("/")
-                        .expires(
-                            time::OffsetDateTime::from_unix_timestamp_nanos(timestamp_nanos)
-                                .expect("get cookie expires exception"),
-                        )
-                        .same_site(cookie::SameSite::Lax)
-                        .secure(false)
-                        .http_only(false)
-                        .finish();
-                    builder = builder.header(axum::http::header::SET_COOKIE, cookie.to_string());
-                }
-            }
-            Ok(builder
-                .body(StreamBody::new(resp.bytes_stream()))
-                .map_err(ResponseError::InternalServerError)?)
-        }
-        Err(err) => Err(ResponseError::InternalServerError(err)),
+    let resp = res.map_err(ResponseError::InternalServerError)?;
+    let mut builder = Response::builder().status(resp.status());
+    for kv in resp.headers().into_iter().filter(|(k, _v)| {
+        let name = k.as_str().to_lowercase();
+        name.ne("__cf_bm") || name.ne("__cfduid") || name.ne("_cfuvid") || name.ne("set-cookie")
+    }) {
+        builder = builder.header(kv.0, kv.1);
     }
+
+    for c in resp.cookies().into_iter().filter(|c| {
+        let key = c.name();
+        key.eq("_puid") || key.eq("_account")
+    }) {
+        if let Some(expires) = c.expires() {
+            let timestamp_nanos = expires
+                .duration_since(UNIX_EPOCH)
+                .expect("Failed to get timestamp")
+                .as_nanos() as i128;
+            let cookie = Cookie::build(c.name(), c.value())
+                .path("/")
+                .expires(
+                    time::OffsetDateTime::from_unix_timestamp_nanos(timestamp_nanos)
+                        .expect("get cookie expires exception"),
+                )
+                .same_site(cookie::SameSite::Lax)
+                .secure(false)
+                .http_only(false)
+                .finish();
+            builder = builder.header(axum::http::header::SET_COOKIE, cookie.to_string());
+        }
+    }
+    Ok(builder
+        .body(StreamBody::new(resp.bytes_stream()))
+        .map_err(ResponseError::InternalServerError)?)
 }
 
 async fn handle_body(
