@@ -4,10 +4,7 @@ use axum::http::header;
 use axum::http::StatusCode;
 use axum::{body::Body, extract::Path, http::Response, Router};
 
-use super::{
-    err::{self, ResponseError},
-    Launcher,
-};
+use super::{err::ResponseError, Launcher};
 
 mod arkose;
 mod har;
@@ -44,10 +41,10 @@ async fn get_static_resource(path: Path<String>) -> Result<Response<Body>, Respo
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, v.mime_type)
             .body(Body::from(v.data))
-            .map_err(|err| err::ResponseError::InternalServerError(err))?),
+            .map_err(ResponseError::InternalServerError)?),
         None => Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)
             .body(Body::empty())
-            .map_err(|err| err::ResponseError::InternalServerError(err))?),
+            .map_err(ResponseError::InternalServerError)?),
     }
 }
