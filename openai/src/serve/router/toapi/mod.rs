@@ -99,15 +99,14 @@ pub(crate) async fn chat_to_api(
     match resp.error_for_status() {
         Ok(resp) => {
             let event_source = resp.bytes_stream().eventsource();
-            if body.stream {
-                Ok(
+            match body.stream {
+                true => Ok(
                     Sse::new(stream_handler(event_source, model_mapper.1.to_owned()))
                         .into_response(),
-                )
-            } else {
-                Ok(not_stream_handler(event_source, model_mapper.1.to_owned())
+                ),
+                false => Ok(not_stream_handler(event_source, model_mapper.1.to_owned())
                     .await?
-                    .into_response())
+                    .into_response()),
             }
         }
         Err(err) => match err.status() {
@@ -163,11 +162,8 @@ async fn not_stream_handler(
                 }
                 if let Ok(res) = serde_json::from_str::<PostConvoResponse>(&message.data) {
                     if let PostConvoResponse::Conversation(convo) = res {
-                        if let Some(true) = convo.end_turn().filter(|&end| end) {
-                            previous_message = convo.messages()[0].to_string();
-                            finish_reason = Some(convo.metadata_finish_details_type());
-                            break;
-                        }
+                        finish_reason = Some(convo.metadata_finish_details_type());
+                        previous_message = convo.messages().first().cloned().unwrap_or_default();
                     }
                 }
             }

@@ -218,14 +218,8 @@ impl ConvoResponse {
         self.message
             .content
             .parts
-            .clone()
             .iter()
-            .map(|c| {
-                if let Some(c) = crate::unescape::unescape(&c) {
-                    return c;
-                }
-                c.to_string()
-            })
+            .map(|c| crate::unescape::unescape(&c).unwrap_or_else(|| c.to_string()))
             .collect()
     }
 
