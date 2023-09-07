@@ -112,9 +112,8 @@ pub(super) fn serve_start(mut args: ServeArgs) -> anyhow::Result<()> {
 
     fix_relative_path(&mut args);
 
-    match daemonize.start() {
-        Ok(_) => println!("Success, daemonized"),
-        Err(e) => println!("Error, {}", e),
+    if let Some(err) = daemonize.start().err() {
+        eprintln!("Error: {err}")
     }
 
     serve(args, false)
@@ -145,9 +144,7 @@ pub(super) fn serve_stop() -> anyhow::Result<()> {
 #[cfg(target_family = "unix")]
 pub(super) fn serve_restart(args: ServeArgs) -> anyhow::Result<()> {
     use crate::env::check_root;
-
     check_root();
-    println!("Restarting OpenGPT...");
     serve_stop()?;
     serve_start(args)
 }
@@ -171,16 +168,38 @@ pub(super) fn serve_log() -> anyhow::Result<()> {
         path::Path,
     };
 
-    let path = Path::new(env::DEFAULT_STDOUT_PATH);
-    let file = File::open(path)?;
-    let reader = io::BufReader::new(file);
-
-    for line in reader.lines() {
-        match line {
-            Ok(content) => println!("{}", content),
-            Err(err) => eprintln!("Error reading line: {}", err),
+    fn read_and_print_file(file_path: &Path, placeholder: &str) -> anyhow::Result<()> {
+        // Check if the file is empty before opening it
+        let metadata = std::fs::metadata(file_path)?;
+        if metadata.len() == 0 {
+            return Ok(());
         }
+
+        let file = File::open(file_path)?;
+        let reader = io::BufReader::new(file);
+        let mut start = true;
+
+        for line in reader.lines() {
+            if let Ok(content) = line {
+                if start {
+                    start = false;
+                    println!("{placeholder}");
+                }
+                println!("{}", content);
+            } else if let Err(err) = line {
+                eprintln!("Error reading line: {}", err);
+            }
+        }
+
+        Ok(())
     }
+
+    let stdout_path = Path::new(env::DEFAULT_STDOUT_PATH);
+    read_and_print_file(stdout_path, "STDOUT>")?;
+
+    let stderr_path = Path::new(env::DEFAULT_STDERR_PATH);
+    read_and_print_file(stderr_path, "STDERR>")?;
+
     Ok(())
 }
 
