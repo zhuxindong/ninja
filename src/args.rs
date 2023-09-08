@@ -10,13 +10,7 @@ pub(super) struct Opt {
     #[clap(subcommand)]
     pub(super) command: Option<SubCommands>,
     /// Log level (info/debug/warn/trace/error)
-    #[clap(
-        short = 'L',
-        long,
-        global = true,
-        env = "LOG",
-        default_value = "info"
-    )]
+    #[clap(short = 'L', long, global = true, env = "LOG", default_value = "info")]
     pub(super) level: String,
 }
 
