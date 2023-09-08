@@ -85,8 +85,8 @@ opkg install luci-i18n-opengpt-zh-cn_1.0.6-1_all.ipk
 
 ```shell
 docker run --rm -it -p 7999:7999 --name=opengpt \
-  -e OPENGPT_WORKERS=1 \
-  -e OPENGPT_LOG=info \
+  -e WORKERS=1 \
+  -e LOG=info \
   gngpp/opengpt:latest serve run
 ```
 
@@ -102,12 +102,12 @@ services:
     restart: unless-stopped
     environment:
       - TZ=Asia/Shanghai
-      - OPENGPT_PROXIES=socks5://warp:10000
-      # - OPENGPT_CONFIG=/serve.toml
-      # - OPENGPT_PORT=8080
-      # - OPENGPT_HOST=0.0.0.0
-      # - OPENGPT_TLS_CERT=
-      # - OPENGPT_TLS_KEY=
+      - PROXIES=socks5://warp:10000
+      # - CONFIG=/serve.toml
+      # - PORT=8080
+      # - HOST=0.0.0.0
+      # - TLS_CERT=
+      # - TLS_KEY=
     # volumes:
       # - ${PWD}/ssl:/etc
       # - ${PWD}/serve.toml:/serve.toml
@@ -157,11 +157,11 @@ services:
 - 可接入IP代理池，提高并发
 
 - 参数说明
-  - `--level`，环境变量 `OPENGPT_LOG`，日志级别: 默认info
-  - `--host`，环境变量 `OPENGPT_HOST`， 服务监听地址: 默认0.0.0.0，
-  - `--port`，环境变量 `OPENGPT_PORT`， 监听端口: 默认7999
-  - `--tls-cert`，环境变量 `OPENGPT_TLS_CERT`，TLS证书公钥，支持格式: EC/PKCS8/RSA
-  - `--tls-key`，环境变量 `OPENGPT_TLS_KEY`，TLS证书私钥
+  - `--level`，环境变量 `LOG`，日志级别: 默认info
+  - `--host`，环境变量 `HOST`， 服务监听地址: 默认0.0.0.0，
+  - `--port`，环境变量 `PORT`， 监听端口: 默认7999
+  - `--tls-cert`，环境变量 `TLS_CERT`，TLS证书公钥，支持格式: EC/PKCS8/RSA
+  - `--tls-key`，环境变量 `TLS_KEY`，TLS证书私钥
   - `--proxies`，代理，支持代理池，格式: protocol://user:pass@ip:port
   - `--workers`， 工作线程: 默认1
 
@@ -175,19 +175,19 @@ Usage: opengpt serve run [OPTIONS]
 
 Options:
   -C, --config <CONFIG>
-          Configuration file path (toml format file)
+          Configuration file path (toml format file) [env: CONFIG=]
   -H, --host <HOST>
-          Server Listen host [env: OPENGPT_HOST=] [default: 0.0.0.0]
+          Server Listen host [env: HOST=] [default: 0.0.0.0]
   -L, --level <LEVEL>
-          Log level (info/debug/warn/trace/error) [env: OPENGPT_LOG=] [default: info]
+          Log level (info/debug/warn/trace/error) [env: LOG=] [default: info]
   -P, --port <PORT>
-          Server Listen port [env: OPENGPT_PORT=] [default: 7999]
+          Server Listen port [env: PORT=] [default: 7999]
   -W, --workers <WORKERS>
           Server worker-pool size (Recommended number of CPU cores) [default: 1]
       --concurrent-limit <CONCURRENT_LIMIT>
           Enforces a limit on the concurrent number of requests the underlying [default: 65535]
       --proxies <PROXIES>
-          Server proxies pool, Example: protocol://user:pass@ip:port [env: OPENGPT_PROXIES=]
+          Server proxies pool, Example: protocol://user:pass@ip:port [env: PROXIES=]
       --timeout <TIMEOUT>
           Client timeout (seconds) [default: 600]
       --connect-timeout <CONNECT_TIMEOUT>
@@ -195,15 +195,15 @@ Options:
       --tcp-keepalive <TCP_KEEPALIVE>
           TCP keepalive (seconds) [default: 60]
       --tls-cert <TLS_CERT>
-          TLS certificate file path [env: OPENGPT_TLS_CERT=]
+          TLS certificate file path [env: TLS_CERT=]
       --tls-key <TLS_KEY>
-          TLS private key file path (EC/PKCS8/RSA) [env: OPENGPT_TLS_KEY=]
+          TLS private key file path (EC/PKCS8/RSA) [env: TLS_KEY=]
       --puid <PUID>
-          PUID cookie value of Plus account [env: OPENGPT_PUID=]
+          PUID cookie value of Plus account [env: PUID=]
       --puid-user <PUID_USER>
           Obtain the PUID of the Plus account user, Example: `user:pass` or `user:pass:mfa`
       --api-prefix <API_PREFIX>
-          Web UI api prefix [env: OPENGPT_UI_API_PREFIX=]
+          Web UI api prefix [env: UI_API_PREFIX=]
       --arkose-endpoint <ARKOSE_ENDPOINT>
           Arkose endpoint, Example: https://client-api.arkoselabs.com
   -A, --arkose-token-endpoint <ARKOSE_TOKEN_ENDPOINT>
@@ -229,11 +229,11 @@ Options:
       --tb-expired <TB_EXPIRED>
           Token bucket expired (seconds) [default: 86400]
       --cf-site-key <CF_SITE_KEY>
-          Cloudflare turnstile captcha site key
+          Cloudflare turnstile captcha site key [env: CF_SECRET_KEY=]
       --cf-secret-key <CF_SECRET_KEY>
-          Cloudflare turnstile captcha secret key
+          Cloudflare turnstile captcha secret key [env: CF_SITE_KEY=]
   -D, --disable-webui
-          Disable WebUI [env: OPENGPT_DISABLE_WEBUI=]
+          Disable WebUI [env: DISABLE_WEBUI=]
   -h, --help
           Print help
 ```

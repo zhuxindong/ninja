@@ -7,15 +7,15 @@ services:
     restart: unless-stopped
     environment:
       - TZ=Asia/Shanghai
-      - OPENGPT_PROXIES=socks5://warp:10000
-      # - OPENGPT_CONFIG=/serve.toml
-      # - OPENGPT_PORT=8080
-      # - OPENGPT_HOST=0.0.0.0
-      # - OPENGPT_TLS_CERT=
-      # - OPENGPT_TLS_KEY=
+      - PROXIES=socks5://warp:10000
+      - CONFIG=/serve.toml
+      # - PORT=8080
+      # - HOST=0.0.0.0
+      # - TLS_CERT=
+      # - TLS_KEY=
     # volumes:
-      # - ${PWD}/ssl:/etc
-      # - ${PWD}/serve.toml:/serve.toml
+      - ${PWD}/.acme.sh/couturegpt.top_ecc:/root
+      - ${PWD}/serve.toml:/serve.toml
     command: serve run
     ports:
       - "8081:7999"
