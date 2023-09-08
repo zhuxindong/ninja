@@ -1,12 +1,12 @@
+use crate::context::Context;
+use crate::serve::{err::ResponseError, Launcher};
+use crate::{arkose, debug};
 use anyhow::anyhow;
 use axum::extract::Multipart;
 use axum::headers::authorization::Bearer;
 use axum::headers::Authorization;
 use axum::TypedHeader;
 use axum::{response::Html, routing::get, Router};
-
-use crate::context::Context;
-use crate::serve::{err::ResponseError, Launcher};
 
 const FIELD_FILE: &'static str = "file";
 
@@ -23,17 +23,22 @@ pub(super) fn config(router: Router, _: &Launcher) -> Router {
     )
 }
 
-async fn upload() -> Html<&'static str> {
-    Html::from(UPLOAD_PAGE)
+async fn upload() -> Html<String> {
+    let ctx = Context::get_instance().await;
+    let tm = UPLOAD_PAGE.replace(
+        "{{.key}}",
+        &ctx.arkose_har_upload_key().is_some().to_string(),
+    );
+    return Html::from(tm);
 }
 
 async fn upload_form(
-    TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
+    bearer: Option<TypedHeader<Authorization<Bearer>>>,
     mut multipart: Multipart,
 ) -> Result<Html<String>, ResponseError> {
     let ctx = Context::get_instance().await;
 
-    while let Some(field) = multipart
+    if let Some(field) = multipart
         .next_field()
         .await
         .map_err(ResponseError::InternalServerError)?
@@ -52,9 +57,21 @@ async fn upload_form(
             .map_err(ResponseError::InternalServerError)?;
 
         if let Some(key) = ctx.arkose_har_upload_key() {
-            if key != bearer.token() {
-                return error_html("Authentication key is required");
+            match bearer {
+                Some(h) => {
+                    if key != h.token() {
+                        return error_html("Authorization key error");
+                    }
+                }
+                None => return error_html("Authorization key is required"),
             }
+        }
+
+        if let Some(err) = arkose::har::parse_from_slice(&data).err() {
+            debug!("Error {err}");
+            return error_html(
+                "The content and format of the Har file do not meet the requirements",
+            );
         }
 
         match ctx.arkose_har_file_path() {

@@ -1,13 +1,90 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Upload file</title><style>body{font-family:Arial,sans-serif;margin:0;padding:20px;background-color:#f7f7f7}.container{max-width:400px;margin:0 auto;background-color:#fff;padding:20px;border-radius:5px;box-shadow:0 2px 4px rgba(0,0,0,.1)}.upload-btn-wrapper{position:relative;overflow:hidden;display:inline-block}.btn{border:2px solid #007bff;color:#007bff;background-color:#fff;padding:8px 20px;border-radius:8px;font-size:16px;font-weight:700;transition:all .3s ease}.btn:hover{background-color:#007bff;color:#fff}.upload-btn-wrapper input[type=file]{font-size:100px;position:absolute;left:0;top:0;opacity:0}.file-info{margin-top:10px;font-size:14px;color:#888}</style></head><body><div class="container"><h2>Upload a .har file extension</h2><form id="uploadForm" method="POST" enctype="multipart/form-data"><div class="upload-btn-wrapper"><button class="btn">Select</button> <input type="file" name="file" id="harFileInput" accept=".har"></div><p class="file-info">Only files in .har format are allowed to be uploaded.</p></form></div><script>document.getElementById('harFileInput').addEventListener('change', function (e) {
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Upload file</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f7f7f7
+    }
+
+    .container {
+      max-width: 400px;
+      margin: 0 auto;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 5px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, .1)
+    }
+
+    .upload-btn-wrapper {
+      position: relative;
+      overflow: hidden;
+      display: inline-block
+    }
+
+    .btn {
+      border: 2px solid #007bff;
+      color: #007bff;
+      background-color: #fff;
+      padding: 8px 20px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 700;
+      transition: all .3s ease
+    }
+
+    .btn:hover {
+      background-color: #007bff;
+      color: #fff
+    }
+
+    .upload-btn-wrapper input[type=file] {
+      font-size: 100px;
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: 0
+    }
+
+    .file-info {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #888
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h2>Upload a .har file extension</h2>
+    <form id="uploadForm" method="POST" enctype="multipart/form-data">
+      <div class="upload-btn-wrapper"><button class="btn">Select</button> <input type="file" name="file"
+          id="harFileInput" accept=".har"></div>
+      <p class="file-info">Only files in .har format are allowed to be uploaded.</p>
+    </form>
+  </div>
+  <script>document.getElementById('harFileInput').addEventListener('change', function (e) {
       if (!this.files.length) {
         alert('Please select a file to upload');
         return;
       }
 
-      var key = prompt('Please enter your identity key');
-      if (!key) {
-        alert('No identity key entered');
-        return;
+      var headers = {}
+      if ({{.key}}) {
+        var key = prompt('Please enter your identity key');
+        if (!key) {
+          alert('No identity key entered');
+          return;
+        }
+        headers = {
+          'Authorization': 'Bearer ' + key
+        }
       }
 
       var formData = new FormData();
@@ -16,9 +93,7 @@
       fetch('/har/upload', {
         method: 'POST',
         body: formData,
-        headers: {
-          'Authorization': 'Bearer ' + key
-        }
+        headers: headers
       }).then(function (response) {
         return response.text();
       }).then(html => {
@@ -29,4 +104,7 @@
         alert('Upload failed: ' + error.message);
         window.location.reload();
       });
-    });</script></body></html>
+    });</script>
+</body>
+
+</html>

@@ -15,15 +15,10 @@ pub struct RequestEntry {
     pub bv: String,
 }
 
-pub fn parse<P: AsRef<Path>>(path: P) -> anyhow::Result<RequestEntry> {
+fn parse(har: Har) -> anyhow::Result<RequestEntry> {
     if let Some(entry) = unsafe { CACHE_REQUEST_ENTRY.clone() } {
         return Ok(entry);
     }
-
-    let bytes = std::fs::read(path)?;
-    let har = serde_json::from_slice::<Har>(&bytes)?;
-    drop(bytes);
-
     if let Some(entry) = har
         .log
         .entries
@@ -88,6 +83,18 @@ pub fn parse<P: AsRef<Path>>(path: P) -> anyhow::Result<RequestEntry> {
     }
 
     anyhow::bail!("Unable to find har related request entry")
+}
+
+pub fn parse_from_slice(s: &[u8]) -> anyhow::Result<RequestEntry> {
+    let har = serde_json::from_slice::<Har>(&s)?;
+    parse(har)
+}
+
+pub fn parse_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<RequestEntry> {
+    let bytes = std::fs::read(path)?;
+    let har = serde_json::from_slice::<Har>(&bytes)?;
+    drop(bytes);
+    parse(har)
 }
 
 pub fn clear_cache() {
