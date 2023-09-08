@@ -1,6 +1,6 @@
 [package]
 name = "opengpt"
-version = "0.4.7"
+version = "0.4.8"
 edition = "2021"
 description = "OpenGPT - A reverse engineered unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)\nGithub: https://github.com/gngpp/opengpt"
 license = "MIT"
