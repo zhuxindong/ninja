@@ -4,14 +4,11 @@ pub mod har;
 pub mod murmur;
 
 use std::path::Path;
-use std::sync::Once;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
 use rand::Rng;
 use reqwest::header;
-use reqwest::impersonate::Impersonate;
-use reqwest::redirect::Policy;
 use reqwest::Method;
 use serde::Deserialize;
 use serde::Serialize;
@@ -22,33 +19,6 @@ use crate::context::Context;
 use crate::debug;
 
 const HEADER: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36";
-
-static mut CLIENT: Option<reqwest::Client> = None;
-
-static CLIENT_HOLDER: ClientHolder = ClientHolder(Once::new());
-
-pub struct ClientHolder(Once);
-
-impl ClientHolder {
-    pub fn get_instance(&self) -> reqwest::Client {
-        // Use Once to guarantee initialization only once
-        self.0.call_once(|| {
-            let client = reqwest::Client::builder()
-                .user_agent(HEADER)
-                .impersonate(Impersonate::Chrome114)
-                .redirect(Policy::none())
-                .cookie_store(true)
-                .build()
-                .unwrap();
-            unsafe { CLIENT = Some(client) };
-        });
-        unsafe {
-            CLIENT
-                .clone()
-                .expect("The requesting client is not initialized")
-        }
-    }
-}
 
 #[derive(PartialEq, Eq)]
 pub enum GPT4Model {
@@ -145,7 +115,8 @@ async fn get_arkose_token() -> anyhow::Result<ArkoseToken> {
         ("rnd", &(&rand::thread_rng().gen::<f64>().to_string())),
     ];
 
-    let resp = CLIENT_HOLDER.get_instance()
+    let client = Context::get_instance().await;
+    let resp = client.load_client()
             .post("https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147")
             .header(header::USER_AGENT, HEADER)
             .header(header::ACCEPT, "*/*")
@@ -168,10 +139,11 @@ async fn get_arkose_token() -> anyhow::Result<ArkoseToken> {
 
 /// Build it yourself: https://github.com/gngpp/arkose-generator
 async fn get_arkose_token_from_endpoint(endpoint: &str) -> anyhow::Result<ArkoseToken> {
-    let resp = CLIENT_HOLDER
-        .get_instance()
+    let client = Context::get_instance().await;
+    let resp = client
+        .load_client()
         .get(endpoint)
-        .timeout(std::time::Duration::from_secs(20))
+        .timeout(std::time::Duration::from_secs(10))
         .send()
         .await?;
     Ok(resp.json::<ArkoseToken>().await?)
@@ -194,11 +166,16 @@ async fn get_arkose_token_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<Ar
         .push_str(&format!("&bda={}", base64::encode(bda)));
     entry.body.push_str(&format!("&rnd={rnd}"));
 
-    let client = CLIENT_HOLDER.get_instance();
+    let client = Context::get_instance().await.load_client();
 
     let method = Method::from_bytes(entry.method.as_bytes())?;
 
-    let mut builder = client.request(method, entry.url);
+    let mut builder = client
+        .request(
+            method,
+            "https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147",
+        )
+        .timeout(std::time::Duration::from_secs(10));
 
     builder = builder.body(entry.body);
 
@@ -269,20 +246,18 @@ async fn submit_captcha(key: &str, arkose_token: ArkoseToken) -> anyhow::Result<
         .await
         .map_err(|error| anyhow::anyhow!(format!("Error creating session: {}", error)))?;
 
-    let funcaptcha = anyhow::Context::context(session.funcaptcha(), "valid funcaptcha error")?;
+    let funs = anyhow::Context::context(session.funcaptcha(), "valid funcaptcha error")?;
+    let mut answer_list = vec![];
+    for fun in funs {
+        let answer =
+            funcaptcha::yescaptcha::submit_task(key, &fun.image, &fun.instructions).await?;
+        answer_list.push(answer);
+    }
 
-    let answer =
-        funcaptcha::yescaptcha::submit_task(key, &funcaptcha.image, &funcaptcha.instructions)
-            .await?;
-
-    return match session.submit_answer(answer).await {
+    return match session.submit_answer(answer_list).await {
         Ok(_) => {
-            let mut rng = rand::thread_rng();
-            let rid = rng.gen_range(1..100);
-            Ok(ArkoseToken::from(format!(
-                "{}|sup=1|rid={rid}",
-                arkose_token.value()
-            )))
+            let new_token = arkose_token.value().replace("at=40", "at=40|sup=1");
+            Ok(ArkoseToken::from(new_token))
         }
         Err(err) => {
             debug!("submit funcaptcha answer error: {err}");

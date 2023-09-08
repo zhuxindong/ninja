@@ -67,8 +67,14 @@ impl Context {
     }
 
     pub async fn get_instance() -> &'static Context {
-        CTX.get_or_init(|| async { Context::new(ContextArgs::default()) })
-            .await
+        CTX.get_or_init(|| async {
+            Context::new(
+                ContextArgsBuilder::default()
+                    .build()
+                    .expect("Context arguments initialization build failed"),
+            )
+        })
+        .await
     }
 
     fn new(args: ContextArgs) -> Self {
@@ -87,7 +93,7 @@ impl Context {
 
         Context {
             client_load: Some(
-                ClientLoadBalancer::<Client>::new_api_client(&args)
+                ClientLoadBalancer::<Client>::new_client(&args)
                     .expect("Failed to initialize the requesting client"),
             ),
             auth_client_load: Some(
