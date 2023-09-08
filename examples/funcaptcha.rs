@@ -16,15 +16,19 @@ async fn main() -> anyhow::Result<()> {
     if !arkose_token.valid() {
         match start_challenge(token).await {
             Ok(session) => {
-                if let Some(funcaptcha) = session.funcaptcha() {
-                    let index = funcaptcha::yescaptcha::submit_task(
-                        &key,
-                        &funcaptcha.image,
-                        &funcaptcha.instructions,
-                    )
-                    .await?;
-                    println!("index:{index}");
-                    session.submit_answer(index).await?;
+                if let Some(funs) = session.funcaptcha() {
+                    let mut answer_list = vec![];
+                    for fun in funs {
+                        let answer = funcaptcha::yescaptcha::submit_task(
+                            &key,
+                            &fun.image,
+                            &fun.instructions,
+                        )
+                        .await?;
+                        answer_list.push(answer);
+                    }
+                    println!("answer: {answer_list:?}");
+                    session.submit_answer(answer_list).await?;
                 }
             }
             Err(error) => {
