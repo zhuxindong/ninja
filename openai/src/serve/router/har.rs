@@ -67,7 +67,7 @@ async fn upload_form(
             }
         }
 
-        if let Some(err) = arkose::har::parse_from_slice(&data).err() {
+        if let Some(err) = arkose::har::check_from_slice(&data).err() {
             debug!("Error {err}");
             return error_html(
                 "The content and format of the Har file do not meet the requirements",
