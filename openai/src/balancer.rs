@@ -23,7 +23,7 @@ impl<T: Clone> ClientLoadBalancer<T> {
             // auth client
             let auth_client = auth::AuthClientBuilder::builder()
                 .user_agent(HEADER_UA)
-                .impersonate(Impersonate::OkHttpAndroid13)
+                .impersonate(Impersonate::Chrome114)
                 .timeout(Duration::from_secs((args.timeout + 1) as u64))
                 .connect_timeout(Duration::from_secs((args.connect_timeout + 1) as u64))
                 .cookie_store(true)
@@ -48,7 +48,7 @@ impl<T: Clone> ClientLoadBalancer<T> {
         })
     }
 
-    pub(super) fn new_api_client(
+    pub(super) fn new_client(
         args: &context::ContextArgs,
     ) -> anyhow::Result<ClientLoadBalancer<Client>> {
         let build = |proxy_url: Option<String>| -> reqwest::Client {
@@ -62,7 +62,7 @@ impl<T: Clone> ClientLoadBalancer<T> {
             // api client
             let client = client_builder
                 .user_agent(HEADER_UA)
-                .impersonate(Impersonate::OkHttpAndroid13)
+                .impersonate(Impersonate::Chrome114)
                 .tcp_keepalive(Some(Duration::from_secs((args.tcp_keepalive + 1) as u64)))
                 .timeout(Duration::from_secs((args.timeout + 1) as u64))
                 .connect_timeout(Duration::from_secs((args.connect_timeout + 1) as u64))

@@ -42,6 +42,7 @@ fn parse(har: Har) -> anyhow::Result<RequestEntry> {
 
             if let Some(bda_param) = data
                 .params
+                .unwrap_or_default()
                 .iter()
                 .find(|p| p.name.eq_ignore_ascii_case("bda"))
             {
@@ -60,6 +61,7 @@ fn parse(har: Har) -> anyhow::Result<RequestEntry> {
                         .collect::<Vec<Header>>(),
                     body: data
                         .text
+                        .unwrap_or_default()
                         .split("&")
                         .into_iter()
                         .filter(|s| !s.contains("bda") && !s.contains("rnd"))
@@ -153,9 +155,9 @@ pub struct Header {
 #[derive(Debug, Deserialize)]
 struct PostData {
     #[serde(rename = "mimeType")]
-    mime_type: String,
-    text: String,
-    params: Vec<Param>,
+    mime_type: Option<String>,
+    text: Option<String>,
+    params: Option<Vec<Param>>,
 }
 
 #[derive(Debug, Deserialize)]

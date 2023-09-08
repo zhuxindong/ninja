@@ -1,7 +1,6 @@
-use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
-use crate::{arkose::CLIENT_HOLDER, debug};
+use crate::{context::Context, debug};
 
 #[derive(Deserialize, Default, Debug)]
 #[serde(default)]
@@ -57,8 +56,9 @@ pub async fn submit_task(
         soft_id: "26299",
     };
 
-    let client = CLIENT_HOLDER.get_instance();
+    let client = Context::get_instance().await;
     let resp = client
+        .load_client()
         .post("https://api.yescaptcha.com/createTask")
         .json(&body)
         .send()
@@ -73,7 +73,7 @@ pub async fn submit_task(
         let target = task.solution.objects;
         return match target.is_empty() {
             true => Ok(0),
-            false => Ok(target.get(0).context("funcaptcha valid error")?.clone()),
+            false => Ok(anyhow::Context::context(target.get(0), "funcaptcha valid error")?.clone()),
         };
     }
     anyhow::bail!("funcaptcha valid error")
