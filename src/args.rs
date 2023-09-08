@@ -14,7 +14,7 @@ pub(super) struct Opt {
         short = 'L',
         long,
         global = true,
-        env = "OPENGPT_LOG",
+        env = "LOG",
         default_value = "info"
     )]
     pub(super) level: String,
@@ -60,15 +60,15 @@ pub(super) enum ServeSubcommand {
 #[derive(Args, Debug, Default, Serialize, Deserialize)]
 pub(super) struct ServeArgs {
     /// Configuration file path (toml format file)
-    #[clap(short = 'C', long, value_parser = util::parse_file_path)]
+    #[clap(short = 'C', long, env = "CONFIG", value_parser = util::parse_file_path)]
     pub(super) config: Option<PathBuf>,
 
     /// Server Listen host
-    #[clap(short = 'H', long, env = "OPENGPT_HOST", default_value = "0.0.0.0", value_parser = util::parse_host)]
+    #[clap(short = 'H', long, env = "HOST", default_value = "0.0.0.0", value_parser = util::parse_host)]
     pub(super) host: Option<std::net::IpAddr>,
 
     /// Server Listen port
-    #[clap(short = 'P', long, env = "OPENGPT_PORT", default_value = "7999", value_parser = util::parse_port_in_range)]
+    #[clap(short = 'P', long, env = "PORT", default_value = "7999", value_parser = util::parse_port_in_range)]
     pub(super) port: Option<u16>,
 
     /// Server worker-pool size (Recommended number of CPU cores)
@@ -80,7 +80,7 @@ pub(super) struct ServeArgs {
     pub(super) concurrent_limit: usize,
 
     /// Server proxies pool, Example: protocol://user:pass@ip:port
-    #[clap(long, env = "OPENGPT_PROXIES", value_parser = util::parse_proxies_url)]
+    #[clap(long, env = "PROXIES", value_parser = util::parse_proxies_url)]
     pub(super) proxies: Option<std::vec::Vec<String>>,
 
     /// Client timeout (seconds)
@@ -96,15 +96,15 @@ pub(super) struct ServeArgs {
     pub(super) tcp_keepalive: usize,
 
     /// TLS certificate file path
-    #[clap(long, env = "OPENGPT_TLS_CERT", requires = "tls_key")]
+    #[clap(long, env = "TLS_CERT", requires = "tls_key")]
     pub(super) tls_cert: Option<PathBuf>,
 
     /// TLS private key file path (EC/PKCS8/RSA)
-    #[clap(long, env = "OPENGPT_TLS_KEY", requires = "tls_cert")]
+    #[clap(long, env = "TLS_KEY", requires = "tls_cert")]
     pub(super) tls_key: Option<PathBuf>,
 
     /// PUID cookie value of Plus account
-    #[clap(long, env = "OPENGPT_PUID")]
+    #[clap(long, env = "PUID")]
     pub(super) puid: Option<String>,
 
     /// Obtain the PUID of the Plus account user, Example: `user:pass` or `user:pass:mfa`
@@ -112,7 +112,7 @@ pub(super) struct ServeArgs {
     pub(super) puid_user: Option<(String, String, Option<String>)>,
 
     /// Web UI api prefix
-    #[clap(long, env = "OPENGPT_UI_API_PREFIX", value_parser = util::parse_url)]
+    #[clap(long, env = "UI_API_PREFIX", value_parser = util::parse_url)]
     pub(super) api_prefix: Option<String>,
 
     /// Arkose endpoint, Example: https://client-api.arkoselabs.com
@@ -171,14 +171,14 @@ pub(super) struct ServeArgs {
     pub(super) tb_expired: u32,
 
     /// Cloudflare turnstile captcha site key
-    #[clap(long, requires = "cf_secret_key")]
+    #[clap(long, env = "CF_SECRET_KEY", requires = "cf_secret_key")]
     pub(super) cf_site_key: Option<String>,
 
     /// Cloudflare turnstile captcha secret key
-    #[clap(long, requires = "cf_site_key")]
+    #[clap(long, env = "CF_SITE_KEY", requires = "cf_site_key")]
     pub(super) cf_secret_key: Option<String>,
 
     /// Disable WebUI
-    #[clap(short = 'D', long, env = "OPENGPT_DISABLE_WEBUI")]
+    #[clap(short = 'D', long, env = "DISABLE_WEBUI")]
     pub(super) disable_webui: bool,
 }
