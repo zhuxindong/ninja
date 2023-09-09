@@ -23,7 +23,7 @@ impl<T: Clone> ClientLoadBalancer<T> {
             // auth client
             let auth_client = auth::AuthClientBuilder::builder()
                 .user_agent(HEADER_UA)
-                .impersonate(Impersonate::Chrome114)
+                .impersonate(Impersonate::OkHttpAndroid13)
                 .timeout(Duration::from_secs((args.timeout + 1) as u64))
                 .connect_timeout(Duration::from_secs((args.connect_timeout + 1) as u64))
                 .cookie_store(true)
@@ -62,7 +62,7 @@ impl<T: Clone> ClientLoadBalancer<T> {
             // api client
             let client = client_builder
                 .user_agent(HEADER_UA)
-                .impersonate(Impersonate::Chrome114)
+                .impersonate(Impersonate::OkHttpAndroid13)
                 .tcp_keepalive(Some(Duration::from_secs((args.tcp_keepalive + 1) as u64)))
                 .timeout(Duration::from_secs((args.timeout + 1) as u64))
                 .connect_timeout(Duration::from_secs((args.connect_timeout + 1) as u64))
