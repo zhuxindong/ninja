@@ -24,10 +24,10 @@ warp-cli --accept-tos enable-always-on
 sleep 3
 
 # This I guess is because they don't want warp-cli to be used for a sharing proxy
-tcpfw -l 0.0.0.0:10000 -t 127.0.0.1:40000 &
+socat TCP-LISTEN:10000,fork TCP:127.0.0.1:40000 &
 
-IP=$(curl -s --retry 20 --retry-delay 5 --proxy socks5://127.0.0.1:10000 ifconfig.me)
-echo "Cloudflare-Warp IP: $IP"
+OUT=$(curl -s --retry 10 --retry-delay 3 --proxy socks5://127.0.0.1:10000 ifconfig.me)
+echo "Cloudflare-Warp IP: $OUT"
 
 if [ -z "$TEAMS_ENROLL_TOKEN" ]; then
     while true; do
