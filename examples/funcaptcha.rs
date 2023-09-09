@@ -1,7 +1,8 @@
 use openai::arkose::{
-    funcaptcha::{self, start_challenge},
+    funcaptcha::{self, start_challenge, yescaptcha::SubmitTaskBuilder},
     ArkoseToken,
 };
+use std::sync::Arc;
 use tokio::time::Instant;
 
 #[tokio::main]
@@ -10,25 +11,45 @@ async fn main() -> anyhow::Result<()> {
     // start time
     let start_time = Instant::now();
 
-    let arkose_token = ArkoseToken::new().await.unwrap();
+    let arkose_token = Arc::new(ArkoseToken::new().await.unwrap());
     let token = arkose_token.value();
-    println!("arkose_token: {token:?}");
+    println!("arkose_token: {:?}", token);
     if !arkose_token.valid() {
         match start_challenge(token).await {
             Ok(session) => {
                 if let Some(funs) = session.funcaptcha() {
-                    let mut answer_list = vec![];
-                    for fun in funs {
-                        let answer = funcaptcha::yescaptcha::submit_task(
-                            &key,
-                            &fun.image,
-                            &fun.instructions,
-                        )
-                        .await?;
-                        answer_list.push(answer);
+                    let max_cap = funs.len();
+                    let (tx, mut rx) = tokio::sync::mpsc::channel(max_cap);
+                    for (i, fun) in funs.into_iter().enumerate() {
+                        let sender = tx.clone();
+                        let submit_task = SubmitTaskBuilder::default()
+                            .client_key(key.clone())
+                            .question(fun.instructions)
+                            .image_as_base64(fun.image)
+                            .build()
+                            .unwrap();
+                        tokio::spawn(async move {
+                            let res = funcaptcha::yescaptcha::submit_task(submit_task).await;
+                            sender.send((i, res)).await.expect("Send failed")
+                        });
                     }
-                    println!("answer: {answer_list:?}");
-                    session.submit_answer(answer_list).await?;
+
+                    // Wait for all tasks to complete
+                    let mut r = Vec::with_capacity(max_cap);
+                    for _ in 0..max_cap {
+                        if let Some((i, res)) = rx.recv().await {
+                            r.push((i, res?));
+                        }
+                    }
+
+                    r.sort_by_key(|&(i, _)| i);
+
+                    let answers = r
+                        .into_iter()
+                        .map(|(_, answer)| answer)
+                        .collect::<Vec<i32>>();
+
+                    session.submit_answer(answers).await?;
                 }
             }
             Err(error) => {

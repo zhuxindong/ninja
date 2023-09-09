@@ -8,6 +8,69 @@ use std::collections::HashMap;
 
 const INIT_HEX: &str = "cd12da708fe6cbe6e068918c38de2ad9";
 
+pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
+    let fields: Vec<&str> = arkose_token.split('|').collect();
+    let session_token = fields[0].to_string();
+    let sid = fields[1].split('=').nth(1).unwrap_or_default();
+    let ctx = context::Context::get_instance().await;
+    let mut session = Session {
+        sid: sid.to_owned(),
+        session_token: session_token.clone(),
+        headers: header::HeaderMap::new(),
+        challenge_logger: ChallengeLogger {
+            sid: sid.to_owned(),
+            session_token: session_token.clone(),
+            analytics_tier: 40,
+            render_type: "canvas".to_string(),
+            game_token: None,
+            game_type: None,
+            category: None,
+            action: None,
+        },
+        concise_challenge: None,
+        funcaptcha: None,
+        challenge: None,
+        client: ctx.load_client(),
+    };
+
+    session.headers.insert(header::REFERER, format!("https://client-api.arkoselabs.com/fc/assets/ec-game-core/game-core/1.13.0/standard/index.html?session={}", arkose_token.replace("|", "&")).parse().unwrap());
+    session
+        .headers
+        .insert(header::DNT, header::HeaderValue::from_static("1"));
+
+    session
+        .challenge_logger(
+            "",
+            0,
+            "Site URL",
+            format!("https://client-api.arkoselabs.com/v2/1.5.2/enforcement.{INIT_HEX}.html",),
+        )
+        .await?;
+
+    session.request_challenge().await?;
+
+    if let Some(concise_challenge) = &session.concise_challenge {
+        let images = session
+            .download_image_to_base64(&concise_challenge.urls)
+            .await?;
+        debug!("concise_challenge: {:#?}", concise_challenge);
+        debug!("instructions: {:#?}", concise_challenge.instructions);
+        debug!("images: {:#?}", concise_challenge.urls);
+
+        let funcaptcha_list = images
+            .into_iter()
+            .map(|i| FunCaptcha {
+                image: i,
+                instructions: concise_challenge.instructions.clone(),
+            })
+            .collect::<Vec<FunCaptcha>>();
+
+        session.funcaptcha = Some(funcaptcha_list);
+    }
+
+    Ok(session)
+}
+
 #[derive(Debug)]
 pub struct Session {
     client: reqwest::Client,
@@ -22,8 +85,8 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn funcaptcha(&self) -> Option<&Vec<FunCaptcha>> {
-        self.funcaptcha.as_ref()
+    pub fn funcaptcha(&self) -> Option<Vec<FunCaptcha>> {
+        self.funcaptcha.clone()
     }
 
     async fn challenge_logger(
@@ -305,7 +368,7 @@ struct ChallengeLogger {
     action: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunCaptcha {
     pub image: String,
     pub instructions: String,
@@ -320,67 +383,4 @@ struct SubmitChallenge<'a> {
     render_type: &'static str,
     analytics_tier: i32,
     bio: &'static str,
-}
-
-pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
-    let fields: Vec<&str> = arkose_token.split('|').collect();
-    let session_token = fields[0].to_string();
-    let sid = fields[1].split('=').nth(1).unwrap_or_default();
-    let ctx = context::Context::get_instance().await;
-    let mut session = Session {
-        sid: sid.to_owned(),
-        session_token: session_token.clone(),
-        headers: header::HeaderMap::new(),
-        challenge_logger: ChallengeLogger {
-            sid: sid.to_owned(),
-            session_token: session_token.clone(),
-            analytics_tier: 40,
-            render_type: "canvas".to_string(),
-            game_token: None,
-            game_type: None,
-            category: None,
-            action: None,
-        },
-        concise_challenge: None,
-        funcaptcha: None,
-        challenge: None,
-        client: ctx.load_client(),
-    };
-
-    session.headers.insert(header::REFERER, format!("https://client-api.arkoselabs.com/fc/assets/ec-game-core/game-core/1.13.0/standard/index.html?session={}", arkose_token.replace("|", "&")).parse().unwrap());
-    session
-        .headers
-        .insert(header::DNT, header::HeaderValue::from_static("1"));
-
-    session
-        .challenge_logger(
-            "",
-            0,
-            "Site URL",
-            format!("https://client-api.arkoselabs.com/v2/1.5.2/enforcement.{INIT_HEX}.html",),
-        )
-        .await?;
-
-    session.request_challenge().await?;
-
-    if let Some(concise_challenge) = &session.concise_challenge {
-        let images = session
-            .download_image_to_base64(&concise_challenge.urls)
-            .await?;
-        debug!("concise_challenge: {:#?}", concise_challenge);
-        debug!("instructions: {:#?}", concise_challenge.instructions);
-        debug!("images: {:#?}", concise_challenge.urls);
-
-        let funcaptcha_list = images
-            .into_iter()
-            .map(|i| FunCaptcha {
-                image: i,
-                instructions: concise_challenge.instructions.clone(),
-            })
-            .collect::<Vec<FunCaptcha>>();
-
-        session.funcaptcha = Some(funcaptcha_list);
-    }
-
-    Ok(session)
 }

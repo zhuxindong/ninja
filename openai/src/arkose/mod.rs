@@ -18,6 +18,8 @@ use crate::arkose::crypto::encrypt;
 use crate::context::Context;
 use crate::debug;
 
+use self::funcaptcha::yescaptcha::SubmitTaskBuilder;
+
 const HEADER: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36";
 
 #[derive(PartialEq, Eq)]
@@ -61,16 +63,16 @@ impl ArkoseToken {
         self.token.contains("sup=1|rid=")
     }
 
+    pub async fn new() -> anyhow::Result<Self> {
+        get_arkose_token().await
+    }
+
     pub async fn new_from_context() -> anyhow::Result<Self> {
         get_arkose_token_from_context().await
     }
 
     pub async fn new_from_endpoint(endpoint: &str) -> anyhow::Result<Self> {
         get_arkose_token_from_endpoint(endpoint).await
-    }
-
-    pub async fn new() -> anyhow::Result<Self> {
-        get_arkose_token().await
     }
 
     pub async fn new_form_har<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
@@ -247,14 +249,38 @@ async fn submit_captcha(key: &str, arkose_token: ArkoseToken) -> anyhow::Result<
         .map_err(|error| anyhow::anyhow!(format!("Error creating session: {}", error)))?;
 
     let funs = anyhow::Context::context(session.funcaptcha(), "valid funcaptcha error")?;
-    let mut answer_list = vec![];
-    for fun in funs {
-        let answer =
-            funcaptcha::yescaptcha::submit_task(key, &fun.image, &fun.instructions).await?;
-        answer_list.push(answer);
+    let max_cap = funs.len();
+    let (tx, mut rx) = tokio::sync::mpsc::channel(max_cap);
+    for (i, fun) in funs.into_iter().enumerate() {
+        let sender = tx.clone();
+        let submit_task = SubmitTaskBuilder::default()
+            .client_key(key.to_string())
+            .question(fun.instructions)
+            .image_as_base64(fun.image)
+            .build()
+            .unwrap();
+        tokio::spawn(async move {
+            let res = funcaptcha::yescaptcha::submit_task(submit_task).await;
+            sender.send((i, res)).await.expect("Send failed")
+        });
     }
 
-    return match session.submit_answer(answer_list).await {
+    // Wait for all tasks to complete
+    let mut r = Vec::with_capacity(max_cap);
+    for _ in 0..max_cap {
+        if let Some((i, res)) = rx.recv().await {
+            r.push((i, res?));
+        }
+    }
+
+    r.sort_by_key(|&(i, _)| i);
+
+    let answers = r
+        .into_iter()
+        .map(|(_, answer)| answer)
+        .collect::<Vec<i32>>();
+
+    return match session.submit_answer(answers).await {
         Ok(_) => {
             let new_token = arkose_token.value().replace("at=40", "at=40|sup=1");
             Ok(ArkoseToken::from(new_token))

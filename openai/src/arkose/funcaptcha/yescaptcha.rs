@@ -41,17 +41,20 @@ struct ReqTask<'a> {
     question: &'a str,
 }
 
-pub async fn submit_task(
-    client_key: &str,
-    image_as_base64: &str,
-    question: &str,
-) -> anyhow::Result<i32> {
+#[derive(derive_builder::Builder)]
+pub struct SubmitTask {
+    client_key: String,
+    image_as_base64: String,
+    question: String,
+}
+
+pub async fn submit_task(submit_task: SubmitTask) -> anyhow::Result<i32> {
     let body = ReqBody {
-        client_key,
+        client_key: &submit_task.client_key,
         task: ReqTask {
             type_field: "FunCaptchaClassification",
-            image: &image_as_base64,
-            question: &question,
+            image: &submit_task.image_as_base64,
+            question: &submit_task.question,
         },
         soft_id: "26299",
     };
@@ -64,17 +67,23 @@ pub async fn submit_task(
         .send()
         .await?;
 
-    if resp.status().is_success() {
-        let task = resp.json::<TaskResp>().await?;
-        debug!("yescaptcha task: {task:#?}");
-        if let Some(error_description) = task.error_description {
-            anyhow::bail!(format!("yescaptcha task error: {error_description}"))
+    match resp.error_for_status() {
+        Ok(resp) => {
+            let task = resp.json::<TaskResp>().await?;
+            debug!("yescaptcha task: {task:#?}");
+            if let Some(error_description) = task.error_description {
+                anyhow::bail!(format!("yescaptcha task error: {error_description}"))
+            }
+            let target = task.solution.objects;
+            return match target.is_empty() {
+                true => Ok(0),
+                false => {
+                    Ok(anyhow::Context::context(target.get(0), "funcaptcha valid error")?.clone())
+                }
+            };
         }
-        let target = task.solution.objects;
-        return match target.is_empty() {
-            true => Ok(0),
-            false => Ok(anyhow::Context::context(target.get(0), "funcaptcha valid error")?.clone()),
-        };
+        Err(err) => {
+            anyhow::bail!("Error: {err}")
+        }
     }
-    anyhow::bail!("funcaptcha valid error")
 }
