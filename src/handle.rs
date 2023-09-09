@@ -1,5 +1,7 @@
 use std::{ops::Not, path::PathBuf};
 
+use clap::CommandFactory;
+
 use crate::{
     args::{self, ServeArgs},
     env::fix_relative_path,
@@ -22,6 +24,18 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         (None, None, None)
     };
 
+    // disable_direct and proxies are mutually exclusive
+    if args.disable_direct {
+        if args.proxies.is_none() || args.proxies.clone().is_some_and(|x| x.is_empty()) {
+            let mut cmd = args::Opt::command();
+            cmd.error(
+                clap::error::ErrorKind::ArgumentConflict,
+                "Cannot disable direct connection and not set proxies",
+            )
+            .exit();
+        }
+    }
+
     let mut builder = openai::serve::LauncherBuilder::default();
     let builder = builder
         .host(
@@ -30,6 +44,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         )
         .port(args.port.unwrap_or(7999))
         .proxies(args.proxies.unwrap_or_default())
+        .disable_direct(args.disable_direct)
         .api_prefix(args.api_prefix)
         .arkose_endpoint(args.arkose_endpoint)
         .arkose_har_path(args.arkose_har_path)
@@ -250,6 +265,7 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
         arkose_yescaptcha_key: None,
         arkose_har_path: None,
         arkose_har_upload_key: None,
+        disable_direct: false,
     };
 
     let write = |out: PathBuf, args: ServeArgs| -> anyhow::Result<()> {

@@ -62,6 +62,8 @@ pub struct Launcher {
     concurrent_limit: usize,
     /// Server proxies
     proxies: Vec<String>,
+    /// Disable direct connection
+    disable_direct: bool,
     /// TCP keepalive (second)
     tcp_keepalive: usize,
     /// Client timeout
@@ -137,6 +139,7 @@ impl Launcher {
             .yescaptcha_client_key(self.yescaptcha_client_key.clone())
             .puid(self.puid.clone())
             .proxies(self.proxies.clone())
+            .disable_direct(self.disable_direct)
             .timeout(self.timeout.clone())
             .connect_timeout(self.connect_timeout)
             .tcp_keepalive(self.tcp_keepalive)

@@ -18,7 +18,7 @@ impl<T: Clone> ClientLoadBalancer<T> {
     ) -> anyhow::Result<ClientLoadBalancer<AuthClient>> {
         let build = |proxy_url: Option<String>| -> AuthClient {
             if let Some(ref url) = proxy_url {
-                info!("Add {url} to the Auth load balancing client proxy pool");
+                info!("[AuthClient] Add {url} to the Auth load balancing client proxy pool");
             }
             // auth client
             let auth_client = auth::AuthClientBuilder::builder()
@@ -37,6 +37,11 @@ impl<T: Clone> ClientLoadBalancer<T> {
         if args.proxies.is_empty() {
             clients.push(build(None));
         } else {
+            if args.disable_direct {
+                info!("[AuthClient] Disable direct connection");
+            } else {
+                clients.push(build(None));
+            }
             for proxy in args.proxies.clone() {
                 clients.push(build(Some(proxy)));
             }
@@ -54,7 +59,7 @@ impl<T: Clone> ClientLoadBalancer<T> {
         let build = |proxy_url: Option<String>| -> reqwest::Client {
             let mut client_builder = reqwest::Client::builder();
             if let Some(url) = proxy_url {
-                info!("Add {url} to the API load balancing client proxy pool");
+                info!("[Client] Add {url} to the API load balancing client proxy pool");
                 let proxy = reqwest::Proxy::all(url).unwrap();
                 client_builder = client_builder.proxy(proxy)
             }
@@ -77,6 +82,11 @@ impl<T: Clone> ClientLoadBalancer<T> {
         if args.proxies.is_empty() {
             clients.push(build(None));
         } else {
+            if args.disable_direct {
+                info!("[Client] Disable direct connection");
+            } else {
+                clients.push(build(None));
+            }
             for proxy in args.proxies.clone() {
                 clients.push(build(Some(proxy)));
             }
