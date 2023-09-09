@@ -12,6 +12,9 @@ pub struct ContextArgs {
     /// Server proxies
     #[builder(setter(into), default)]
     pub proxies: Vec<String>,
+    /// Disable direct connection
+    #[builder(default = "false")]
+    pub disable_direct: bool,
     /// TCP keepalive (second)
     #[builder(setter(into), default = "75")]
     pub tcp_keepalive: usize,

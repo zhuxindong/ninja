@@ -20,9 +20,10 @@
 ### 功能
 
 - API密钥获取
-- 电子邮件/密码帐户认证 (由于作者没有账号，暂不支持Google/微软第三方登录)
+- 电子邮件/密码帐户认证 (暂时不支持Google/Microsoft第三方登录)
 - `Unofficial`/`Official`/`ChatGPT-to-API` Http API 代理 (供第三方客户端接入)
-- 原汁原味的ChatGPT WebUI
+- 支持代理池
+- 附带的ChatGPT WebUI
 - 极少的内存占用
 
 > 局限性: 无法绕过 OpenAI 的彻底 IP 禁令

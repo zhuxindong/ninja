@@ -20,9 +20,10 @@ A reverse engineered unofficial `ChatGPT` proxy (bypass Cloudflare 403 Access De
 ###  Features
 
 - API key acquisition
-- Email/password account authentication (Google/Microsoft third-party login is not supported for now because the author does not have an account)
+- Email/password account authentication (Google/Microsoft third-party login is temporarily not supported)
 - `Unofficial`/`Official`/`ChatGPT-to-API` Http API proxy (for third-party client access)
-- The original ChatGPT WebUI
+- Support proxy pool
+- Comes with ChatGPT WebUI
 - Minimal memory usage
 
 > Limitations: This cannot bypass OpenAI's outright IP ban

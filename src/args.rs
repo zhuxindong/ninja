@@ -74,8 +74,12 @@ pub(super) struct ServeArgs {
     pub(super) concurrent_limit: usize,
 
     /// Server proxies pool, Example: protocol://user:pass@ip:port
-    #[clap(long, env = "PROXIES", value_parser = util::parse_proxies_url)]
+    #[clap(short = 'x',long, env = "PROXIES", value_parser = util::parse_proxies_url)]
     pub(super) proxies: Option<std::vec::Vec<String>>,
+
+    /// Disable direct connection
+    #[clap(long, env = "DISABLE_DIRECT")]
+    pub(super) disable_direct: bool,
 
     /// Client timeout (seconds)
     #[clap(long, default_value = "600")]
