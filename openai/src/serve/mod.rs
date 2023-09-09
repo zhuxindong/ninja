@@ -266,9 +266,9 @@ impl Launcher {
 
             match self.tls_keypair {
                 Some(keypair) => {
-                    let tls_config = Self::load_rustls_config(keypair.0, keypair.1)
+                    let tls_config = RustlsConfig::from_pem_file(keypair.0, keypair.1)
                         .await
-                        .unwrap();
+                        .expect("Failed to load TLS keypair");
                     let socket = std::net::SocketAddr::new(self.host, self.port);
                     axum_server::bind_rustls(socket, tls_config)
                         .handle(handle)
@@ -292,16 +292,6 @@ impl Launcher {
         });
 
         Ok(())
-    }
-
-    async fn load_rustls_config(
-        tls_cert: PathBuf,
-        tls_key: PathBuf,
-    ) -> anyhow::Result<axum_server::tls_rustls::RustlsConfig> {
-        let config = RustlsConfig::from_pem_file(tls_cert, tls_key)
-            .await
-            .unwrap();
-        Ok(config)
     }
 }
 
