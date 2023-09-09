@@ -56,9 +56,44 @@
   - `x86_64-apple-darwin`
   - `aarch64-apple-darwin`
 
+### Command Line(dev)
+
+### Http 服务
+
+> 公开接口, `*` 表示任意`URL`后缀
+>
+> - backend-api, <https://host:port/backend-api/*>
+> - public-api, <https://host:port/public-api/*>
+> - platform-api, <https://host:port/v1/*>
+> - dashboard-api, <https://host:port/dashboard/*>
+> - chatgpt-to-api, <https://host:port/to/v1/chat/completions>
+>
+> 详细API文档
+>
+> - Platfrom API [doc](https://platform.openai.com/docs/api-reference)
+> - Backend API [doc](doc/rest.http)
+
+- 原汁原味ChatGPT WebUI
+- 公开`非官方`/`官方API`代理
+- `API`前缀与官方一致
+- `ChatGPT` 转 `API`
+- 可接入第三方客户端
+- 可接入IP代理池，提高并发
+
+- 参数说明
+  - `--level`，环境变量 `LOG`，日志级别: 默认info
+  - `--host`，环境变量 `HOST`， 服务监听地址: 默认0.0.0.0，
+  - `--port`，环境变量 `PORT`， 监听端口: 默认7999
+  - `--tls-cert`，环境变量 `TLS_CERT`，TLS证书公钥，支持格式: EC/PKCS8/RSA
+  - `--tls-key`，环境变量 `TLS_KEY`，TLS证书私钥
+  - `--proxies`，代理，支持代理池，多个代理使用`,`隔开，格式: protocol://user:pass@ip:port, 如果IP被Ban，使用代理池时建议关闭直连IP使用，`--disable-direct`关闭直连
+  - `--workers`， 工作线程: 默认1
+
+...
+
 ### 安装
 
-  > #### Ubuntu(Other Linux)
+- #### Ubuntu(Other Linux)
 
   GitHub [Releases](https://github.com/gngpp/opengpt/releases/latest) 中有预编译的 deb包，二进制文件，以Ubuntu为例：
 
@@ -68,7 +103,7 @@ dpkg -i opengpt-0.4.9-x86_64-unknown-linux-musl.deb
 opengpt serve run
 ```
 
- > #### OpenWrt
+- #### OpenWrt
 
 GitHub [Releases](https://github.com/gngpp/opengpt/releases/latest) 中有预编译的 ipk 文件， 目前提供了 aarch64/x86_64 等架构的版本，下载后使用 opkg 安装，以 nanopi r4s 为例：
 
@@ -82,7 +117,7 @@ opkg install luci-app-opengpt_1.0.6-1_all.ipk
 opkg install luci-i18n-opengpt-zh-cn_1.0.6-1_all.ipk
 ```
 
-  > #### Docker
+- #### Docker
 
 ```shell
 docker run --rm -it -p 7999:7999 --name=opengpt \
@@ -91,7 +126,7 @@ docker run --rm -it -p 7999:7999 --name=opengpt \
   gngpp/opengpt:latest serve run
 ```
 
-> docker-compose
+- Docker Compose
 
 ```yaml
 version: '3'
@@ -133,40 +168,7 @@ services:
 
 ```
 
-### Command Line(dev)
-
-### Http 服务
-
-> 公开接口, `*` 表示任意`URL`后缀
->
-> - backend-api, <https://host:port/backend-api/*>
-> - public-api, <https://host:port/public-api/*>
-> - platform-api, <https://host:port/v1/*>
-> - dashboard-api, <https://host:port/dashboard/*>
-> - chatgpt-to-api, <https://host:port/to/v1/chat/completions>
->
-> 详细API文档
->
-> - Platfrom API [doc](https://platform.openai.com/docs/api-reference)
-> - Backend API [doc](doc/rest.http)
-
-- 原汁原味ChatGPT WebUI
-- 公开`非官方`/`官方API`代理
-- `API`前缀与官方一致
-- `ChatGPT` 转 `API`
-- 可接入第三方客户端
-- 可接入IP代理池，提高并发
-
-- 参数说明
-  - `--level`，环境变量 `LOG`，日志级别: 默认info
-  - `--host`，环境变量 `HOST`， 服务监听地址: 默认0.0.0.0，
-  - `--port`，环境变量 `PORT`， 监听端口: 默认7999
-  - `--tls-cert`，环境变量 `TLS_CERT`，TLS证书公钥，支持格式: EC/PKCS8/RSA
-  - `--tls-key`，环境变量 `TLS_KEY`，TLS证书私钥
-  - `--proxies`，代理，支持代理池，格式: protocol://user:pass@ip:port
-  - `--workers`， 工作线程: 默认1
-
-...
+### 命令手册
 
 ```shell
 $ opengpt serve --help
@@ -187,8 +189,10 @@ Options:
           Server worker-pool size (Recommended number of CPU cores) [default: 1]
       --concurrent-limit <CONCURRENT_LIMIT>
           Enforces a limit on the concurrent number of requests the underlying [default: 65535]
-      --proxies <PROXIES>
+  -x, --proxies <PROXIES>
           Server proxies pool, Example: protocol://user:pass@ip:port [env: PROXIES=]
+      --disable-direct
+          Disable direct connection [env: DISABLE_DIRECT=]
       --timeout <TIMEOUT>
           Client timeout (seconds) [default: 600]
       --connect-timeout <CONNECT_TIMEOUT>
