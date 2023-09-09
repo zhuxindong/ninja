@@ -87,7 +87,7 @@ All three schemes are used, and the priority is: `HAR` > `Arkose Token endpoint`
   - `--port`, environment variable `PORT`, listening port: default 7999
   - `--tls-cert`, environment variable `TLS_CERT`', TLS certificate public key. Supported format: EC/PKCS8/RSA
   - `--tls-key`, environment variable `TLS_KEY`, TLS certificate private key
-  - `--proxies`, Proxy, supports proxy pool, multiple proxies are separated by `,`, format: protocol://user:pass@ip:port, if the IP is Banned, it is recommended to turn off the use of direct IP when using the proxy pool, `--disable -direct`turn off direct connection
+  - `--proxies`, Proxy, supports proxy pool, multiple proxies are separated by `,`, format: protocol://user:pass@ip:port, if the IP is Banned, it is recommended to turn off the use of direct IP when using the proxy pool, `--disable-direct`turn off direct connection
   - `--workers`, worker threads: default 1
 
 ...
