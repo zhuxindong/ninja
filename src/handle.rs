@@ -97,7 +97,7 @@ pub(super) fn serve_start(mut args: ServeArgs) -> anyhow::Result<()> {
     check_root();
 
     if let Some(pid) = get_pid() {
-        println!("OpenGPT is already running with pid: {}", pid);
+        println!("Ninja is already running with pid: {}", pid);
         return Ok(());
     }
 
@@ -170,8 +170,8 @@ pub(super) fn serve_restart(args: ServeArgs) -> anyhow::Result<()> {
 pub(super) fn serve_status() -> anyhow::Result<()> {
     use crate::env::get_pid;
     match get_pid() {
-        Some(pid) => println!("OpenGPT is running with pid: {}", pid),
-        None => println!("OpenGPT is not running"),
+        Some(pid) => println!("Ninja is running with pid: {}", pid),
+        None => println!("Ninja is not running"),
     }
     Ok(())
 }

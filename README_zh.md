@@ -1,19 +1,19 @@
 <br>简体中文 | [English](README.md)
 
-[![CI](https://github.com/gngpp/opengpt/actions/workflows/CI.yml/badge.svg)](https://github.com/gngpp/opengpt/actions/workflows/CI.yml)
-[![CI](https://github.com/gngpp/opengpt/actions/workflows/Release.yml/badge.svg)](https://github.com/gngpp/opengpt/actions/workflows/Release.yml)
+[![CI](https://github.com/gngpp/ninja/actions/workflows/CI.yml/badge.svg)](https://github.com/gngpp/ninja/actions/workflows/CI.yml)
+[![CI](https://github.com/gngpp/ninja/actions/workflows/Release.yml/badge.svg)](https://github.com/gngpp/ninja/actions/workflows/Release.yml)
 	<a target="_blank" href="https://github.com/gngpp/vdns/blob/main/LICENSE">
 		<img src="https://img.shields.io/badge/license-MIT-blue.svg"/>
 	</a>
-  <a href="https://github.com/gngpp/opengpt/releases">
-    <img src="https://img.shields.io/github/release/gngpp/opengpt.svg?style=flat">
-  </a><a href="https://github.com/gngpp/opengpt/releases">
-    <img src="https://img.shields.io/github/downloads/gngpp/opengpt/total?style=flat">
+  <a href="https://github.com/gngpp/ninja/releases">
+    <img src="https://img.shields.io/github/release/gngpp/ninja.svg?style=flat">
+  </a><a href="https://github.com/gngpp/ninja/releases">
+    <img src="https://img.shields.io/github/downloads/gngpp/ninja/total?style=flat">
   </a>
-  [![](https://img.shields.io/docker/image-size/gngpp/opengpt)](https://registry.hub.docker.com/r/gngpp/opengpt)
-  [![Docker Image](https://img.shields.io/docker/pulls/gngpp/opengpt.svg)](https://hub.docker.com/r/gngpp/opengpt/)
+  [![](https://img.shields.io/docker/image-size/gngpp/ninja)](https://registry.hub.docker.com/r/gngpp/ninja)
+  [![Docker Image](https://img.shields.io/docker/pulls/gngpp/ninja.svg)](https://hub.docker.com/r/gngpp/ninja/)
 
-# opengpt
+# ninja
 
 一个逆向工程的非官方的 `ChatGPT` 代理（绕过 Cloudflare 403 Access Denied）
 
@@ -96,35 +96,35 @@
 
 - #### Ubuntu(Other Linux)
 
-  GitHub [Releases](https://github.com/gngpp/opengpt/releases/latest) 中有预编译的 deb包，二进制文件，以Ubuntu为例：
+  GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 deb包，二进制文件，以Ubuntu为例：
 
 ```shell
-wget https://github.com/gngpp/opengpt/releases/download/v0.5.1/opengpt-0.5.1-x86_64-unknown-linux-musl.deb
-dpkg -i opengpt-0.5.1-x86_64-unknown-linux-musl.deb
-opengpt serve run
+wget https://github.com/gngpp/ninja/releases/download/v0.5.1/ninja-0.5.1-x86_64-unknown-linux-musl.deb
+dpkg -i ninja-0.5.1-x86_64-unknown-linux-musl.deb
+ninja serve run
 ```
 
 - #### OpenWrt
 
-GitHub [Releases](https://github.com/gngpp/opengpt/releases/latest) 中有预编译的 ipk 文件， 目前提供了 aarch64/x86_64 等架构的版本，下载后使用 opkg 安装，以 nanopi r4s 为例：
+GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 ipk 文件， 目前提供了 aarch64/x86_64 等架构的版本，下载后使用 opkg 安装，以 nanopi r4s 为例：
 
 ```shell
-wget https://github.com/gngpp/opengpt/releases/download/v0.5.1/opengpt_0.5.1_aarch64_generic.ipk
-wget https://github.com/gngpp/opengpt/releases/download/v0.5.1/luci-app-opengpt_1.0.6-1_all.ipk
-wget https://github.com/gngpp/opengpt/releases/download/v0.5.1/luci-i18n-opengpt-zh-cn_1.0.6-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.5.1/ninja_0.5.1_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.5.1/luci-app-ninja_1.0.6-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.5.1/luci-i18n-ninja-zh-cn_1.0.6-1_all.ipk
 
-opkg install opengpt_0.5.1_aarch64_generic.ipk
-opkg install luci-app-opengpt_1.0.6-1_all.ipk
-opkg install luci-i18n-opengpt-zh-cn_1.0.6-1_all.ipk
+opkg install ninja_0.5.1_aarch64_generic.ipk
+opkg install luci-app-ninja_1.0.6-1_all.ipk
+opkg install luci-i18n-ninja-zh-cn_1.0.6-1_all.ipk
 ```
 
 - #### Docker
 
 ```shell
-docker run --rm -it -p 7999:7999 --name=opengpt \
+docker run --rm -it -p 7999:7999 --name=ninja \
   -e WORKERS=1 \
   -e LOG=info \
-  gngpp/opengpt:latest serve run
+  gngpp/ninja:latest serve run
 ```
 
 - Docker Compose
@@ -133,9 +133,9 @@ docker run --rm -it -p 7999:7999 --name=opengpt \
 version: '3'
 
 services:
-  opengpt:
-    image: ghcr.io/gngpp/opengpt:latest
-    container_name: opengpt
+  ninja:
+    image: ghcr.io/gngpp/ninja:latest
+    container_name: ninja
     restart: unless-stopped
     environment:
       - TZ=Asia/Shanghai
@@ -172,10 +172,10 @@ services:
 ### 命令手册
 
 ```shell
-$ opengpt serve --help
+$ ninja serve --help
 Start the http server
 
-Usage: opengpt serve run [OPTIONS]
+Usage: ninja serve run [OPTIONS]
 
 Options:
   -C, --config <CONFIG>
@@ -252,7 +252,7 @@ Options:
 
 ```shell
 # 本机编译
-git clone https://github.com/gngpp/opengpt.git && cd opengpt
+git clone https://github.com/gngpp/ninja.git && cd ninja
 ./build.sh
 
 # 跨平台编译，依赖于docker(如果您可以自己解决跨平台编译依赖)，默认使用docker构建linux/windows平台
@@ -266,7 +266,7 @@ docker run --rm -it --user=$UID:$(id -g $USER) \
   -v $(pwd):/home/rust/src \
   -v $HOME/.cargo/registry:/root/.cargo/registry \
   -v $HOME/.cargo/git:/root/.cargo/git \
-  ghcr.io/gngpp/opengpt-builder:x86_64-unknown-linux-musl \
+  ghcr.io/gngpp/ninja-builder:x86_64-unknown-linux-musl \
   cargo build --release
 ```
 
@@ -274,9 +274,9 @@ docker run --rm -it --user=$UID:$(id -g $USER) \
 
 ```shell
 cd package
-svn co https://github.com/gngpp/opengpt/trunk/openwrt
+svn co https://github.com/gngpp/ninja/trunk/openwrt
 cd -
-make menuconfig # choose LUCI->Applications->luci-app-opengpt  
+make menuconfig # choose LUCI->Applications->luci-app-ninja  
 make V=s
 ```
 

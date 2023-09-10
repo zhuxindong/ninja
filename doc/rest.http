@@ -37,7 +37,7 @@ Content-Type: application/json
 
 {
     "action":"create",
-    "name":"opengpt"
+    "name":"ninja"
 }
 
 ### 

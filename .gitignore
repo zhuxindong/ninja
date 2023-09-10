@@ -19,12 +19,12 @@ Cargo.lock
 
 /target
 
-.opengpt-access_tokens
+.ninja-access_tokens
 .vscode
 thunder-tests
 .env
 ./arkose
-./opengpt
+./ninja
 uploads
 ./vendor
 chat.openai.com.har

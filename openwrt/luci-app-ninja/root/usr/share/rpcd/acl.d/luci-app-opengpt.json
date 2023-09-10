@@ -1,0 +1,11 @@
+{
+	"luci-app-ninja": {
+		"description": "Grant UCI access for luci-app-ninja",
+		"read": {
+			"uci": [ "ninja" ]
+		},
+		"write": {
+			"uci": [ "ninja" ]
+		}
+	}
+}

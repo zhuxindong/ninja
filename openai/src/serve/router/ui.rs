@@ -46,7 +46,7 @@ use super::get_static_resource;
 
 const DEFAULT_INDEX: &str = "/";
 const LOGIN_INDEX: &str = "/auth/login";
-const SESSION_ID: &str = "opengpt_session";
+const SESSION_ID: &str = "ninja_session";
 const BUILD_ID: &str = "oDTsXIohP85MnLZj7TlaB";
 const TEMP_404: &str = "404.htm";
 const TEMP_AUTH: &str = "auth.htm";

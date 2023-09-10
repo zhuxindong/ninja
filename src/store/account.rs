@@ -8,8 +8,8 @@ pub struct AccountStore(PathBuf);
 impl AccountStore {
     pub fn new() -> Self {
         let path = match home_dir() {
-            Some(home_dir) => home_dir.join(".opengpt-accounts"),
-            None => PathBuf::from(".opengpt-accounts"),
+            Some(home_dir) => home_dir.join(".ninja-accounts"),
+            None => PathBuf::from(".ninja-accounts"),
         };
         if let Some(parent) = path.parent() {
             if path.exists().not() {

@@ -1,9 +1,9 @@
 FROM ubuntu:focal
 
 LABEL org.opencontainers.image.authors "gngpp <gngppz@gmail.com>"
-LABEL org.opencontainers.image.source https://github.com/gngpp/opengpt
-LABEL name opengpt
-LABEL url https://github.com/gngpp/opengpt
+LABEL org.opencontainers.image.source https://github.com/gngpp/ninja
+LABEL name ninja
+LABEL url https://github.com/gngpp/ninja
 
 RUN DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC
 RUN apt update && apt install -y curl gpg systemd tzdata socat

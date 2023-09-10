@@ -66,9 +66,9 @@ async-stream = { version = "0.3.5", optional = true }
 static-files = "0.2.3"
 
 [features]
-default = ["serve", "limit", "sign", "opengpt", "platform", "stream", "template"]
+default = ["serve", "limit", "sign", "ninja", "platform", "stream", "template"]
 serve = ["dep:async-stream", "dep:tracing", "dep:tracing-subscriber", "dep:tower-http", "dep:tower", "dep:bytes", "dep:time", "dep:axum-server", "dep:axum-extra", "dep:axum", "dep:static-files", "dep:futures-core", "dep:tera"]
-opengpt = []
+ninja = []
 platform = ["dep:tokio-util"]
 stream = ["dep:futures", "dep:tokio-stream", "dep:eventsource-stream", "dep:futures-core", "dep:pin-project-lite", "dep:nom", "dep:mime", "dep:futures-timer"]
 remote-token = []

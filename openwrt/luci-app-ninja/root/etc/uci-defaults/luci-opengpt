@@ -1,0 +1,11 @@
+#!/bin/sh
+
+uci -q batch <<-EOF >/dev/null
+	delete ucitrack.@ninja[-1]
+	add ucitrack ninja
+	set ucitrack.@ninja[-1].init=ninja
+	commit ucitrack
+EOF
+
+rm -rf /tmp/luci-*
+exit 0

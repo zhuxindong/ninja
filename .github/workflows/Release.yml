@@ -144,9 +144,9 @@ jobs:
       - name: Build Package
         run: |
           set -e
-          echo "src-link opengpt $GITHUB_WORKSPACE/openwrt" > openwrt-sdk/feeds.conf
-          echo 'CONFIG_PACKAGE_opengpt=y
-          CONFIG_PACKAGE_luci-app-opengpt=y
+          echo "src-link ninja $GITHUB_WORKSPACE/openwrt" > openwrt-sdk/feeds.conf
+          echo 'CONFIG_PACKAGE_ninja=y
+          CONFIG_PACKAGE_luci-app-ninja=y
           ' >> openwrt-sdk/.config
           cd openwrt-sdk
           cat feeds.conf.default >> feeds.conf
@@ -156,21 +156,21 @@ jobs:
           make defconfig
 
           ./scripts/feeds install -d y -f -a
-          make package/opengpt/compile V=s
-          make package/luci-app-opengpt/compile V=s
+          make package/ninja/compile V=s
+          make package/luci-app-ninja/compile V=s
           tree bin/packages/
       - name: Archive package
         uses: actions/upload-artifact@v3
         with:
-          name: opengpt-${{ matrix.target.arch }}
-          path: openwrt-sdk/bin/packages/${{ matrix.target.arch }}/opengpt/opengpt*.ipk
+          name: ninja-${{ matrix.target.arch }}
+          path: openwrt-sdk/bin/packages/${{ matrix.target.arch }}/ninja/ninja*.ipk
           if-no-files-found: error
       - name: Archive luci packages
         if: ${{ matrix.target.arch == 'x86_64' }}
         uses: actions/upload-artifact@v3
         with:
-          name: opengpt-luci-${{ matrix.target.arch }}
-          path: openwrt-sdk/bin/packages/${{ matrix.target.arch }}/opengpt/luci-*.ipk
+          name: ninja-luci-${{ matrix.target.arch }}
+          path: openwrt-sdk/bin/packages/${{ matrix.target.arch }}/ninja/luci-*.ipk
           if-no-files-found: error
       - name: Upload package to GitHub Release
         uses: softprops/action-gh-release@v1
@@ -178,7 +178,7 @@ jobs:
         with:
           token: ${{ secrets.TOKEN }}
           files: |
-            openwrt-sdk/bin/packages/${{ matrix.target.arch }}/opengpt/opengpt*.ipk
+            openwrt-sdk/bin/packages/${{ matrix.target.arch }}/ninja/ninja*.ipk
           generate_release_notes: true
       - name: Upload luci packages to GitHub Release
         uses: softprops/action-gh-release@v1
@@ -186,7 +186,7 @@ jobs:
         with:
           token: ${{ secrets.TOKEN }}
           files: |
-            openwrt-sdk/bin/packages/${{ matrix.target.arch }}/opengpt/luci-*.ipk
+            openwrt-sdk/bin/packages/${{ matrix.target.arch }}/ninja/luci-*.ipk
           generate_release_notes: true
 
   docker:
@@ -238,4 +238,4 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASS }}
-          repository: gngpp/opengpt
+          repository: gngpp/ninja

@@ -1,7 +1,7 @@
 {
-  "name": "OpenGPT",
-  "short_name": "OpenGPT",
-  "description": "OpenGPT app powered by gngpp",
+  "name": "Ninja",
+  "short_name": "Ninja",
+  "description": "Ninja app powered by gngpp",
   "icons": [
     {
       "src": "/resources/apple-touch-icon.png",

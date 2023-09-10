@@ -45,17 +45,18 @@ pub async fn prompt() -> anyhow::Result<()> {
 
 fn print_boot_message() {
     let logo = r"
-    ___                    ____ ____ _____ 
-    / _ \ _ __   ___ _ __  / ___|  _ \_   _|
-   | | | | '_ \ / _ \ '_ \| |  _| |_) || |  
-   | |_| | |_) |  __/ | | | |_| |  __/ | |  
-    \___/| .__/ \___|_| |_|\____|_|    |_|  
-         |_|                                   
+    ____  _____  _              _         
+    |_   \|_   _|(_)            (_)        
+      |   \ | |  __  _ .--.     __  ,--.   
+      | |\ \| | [  |[ `.-. |   [  |`'_\ :  
+     _| |_\   |_ | | | | | | _  | |// | |, 
+    |_____|\____[___|___||__| \_| |\'-;__/ 
+                             \____/                            
    ";
 
-    let welcome = "Welcome to OpenGPT terminal!";
+    let welcome = "Welcome to Ninja terminal!";
     let enjoy = "You can enjoy professional GPT services";
-    let repo = "Repository: https://github.com/gngpp/opengpt\n";
+    let repo = "Repository: https://github.com/gngpp/ninja\n";
     println!("\x1B[1m{logo}\x1B[1m");
     println!("\x1B[1m{welcome}\x1B[1m");
     println!("\x1B[1m{enjoy}\x1B[1m");
