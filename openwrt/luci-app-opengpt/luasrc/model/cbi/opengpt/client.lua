@@ -42,7 +42,7 @@ o = s:option(Value, "arkose_har_file", translate("HAR file path"), translate("Ab
 
 o = s:option(Value, "arkose_har_upload_key", translate("HAR Auth Key"), translate("HAR file upload authenticate key"))
 
-o = s:option(Value, "arkose_solver", translate("Solver"), translate("About ArkoseLabs solver platform"))
+o = s:option(ListValue, "arkose_solver", translate("Solver"), translate("About ArkoseLabs solver platform"))
 o:value("yescaptcha", "yescaptcha");
 o:value("capsolver", "capsolver");
 o.default = "yescaptcha"
