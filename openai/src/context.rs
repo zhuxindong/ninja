@@ -1,6 +1,11 @@
 use std::path::PathBuf;
 
-use crate::{arkose, auth::AuthClient, balancer::ClientLoadBalancer, error, info, warn};
+use crate::{
+    arkose::{self, funcaptcha::ArkoseSolver},
+    auth::AuthClient,
+    balancer::ClientLoadBalancer,
+    error, info, warn,
+};
 use derive_builder::Builder;
 use reqwest::Client;
 use tokio::sync::{OnceCell, RwLock};
@@ -32,16 +37,16 @@ pub struct ContextArgs {
     pub arkose_endpoint: Option<String>,
     /// Arkoselabs HAR record file path
     #[builder(setter(into), default)]
-    pub arkose_har_path: Option<PathBuf>,
+    pub arkose_har_file: Option<PathBuf>,
     /// HAR file upload authenticate key
     #[builder(setter(into), default)]
     pub arkose_har_upload_key: Option<String>,
     /// get arkose-token endpoint
     #[builder(setter(into), default)]
     pub arkose_token_endpoint: Option<String>,
-    /// yescaptcha client key
+    /// arkoselabs solver
     #[builder(setter(into), default)]
-    pub yescaptcha_client_key: Option<String>,
+    pub arkose_solver: Option<ArkoseSolver>,
     /// Account Plus puid cookie value
     #[builder(setter(into), default)]
     pub puid: Option<String>,
@@ -55,9 +60,9 @@ pub struct Context {
     auth_client_load: Option<ClientLoadBalancer<AuthClient>>,
     share_puid: RwLock<String>,
     arkose_token_endpoint: Option<String>,
-    arkose_har_file_path: Option<PathBuf>,
+    arkose_har_file: Option<PathBuf>,
     arkose_har_upload_key: Option<String>,
-    yescaptcha_client_key: Option<String>,
+    arkose_solver: Option<ArkoseSolver>,
     hotwatch: Option<hotwatch::Hotwatch>,
 }
 
@@ -81,7 +86,7 @@ impl Context {
     }
 
     fn new(args: ContextArgs) -> Self {
-        let hotwatch = args.arkose_har_path.clone().map(|path| {
+        let hotwatch = args.arkose_har_file.clone().map(|path| {
             let mut hotwatch = Hotwatch::new().expect("hotwatch failed to initialize!");
             hotwatch
                 .watch(path.clone(), move |event: Event| {
@@ -104,8 +109,8 @@ impl Context {
                     .expect("Failed to initialize the requesting oauth client"),
             ),
             arkose_token_endpoint: args.arkose_token_endpoint,
-            yescaptcha_client_key: args.yescaptcha_client_key,
-            arkose_har_file_path: args.arkose_har_path,
+            arkose_solver: args.arkose_solver,
+            arkose_har_file: args.arkose_har_file,
             arkose_har_upload_key: args.arkose_har_upload_key,
             share_puid: RwLock::new(args.puid.unwrap_or_default()),
             hotwatch,
@@ -137,20 +142,20 @@ impl Context {
         drop(lock)
     }
 
-    pub fn arkose_har_file_path(&self) -> Option<&PathBuf> {
-        self.arkose_har_file_path.as_ref()
+    pub fn arkose_har_file(&self) -> Option<&PathBuf> {
+        self.arkose_har_file.as_ref()
+    }
+
+    pub fn arkose_har_upload_key(&self) -> Option<&String> {
+        self.arkose_har_upload_key.as_ref()
     }
 
     pub fn arkose_token_endpoint(&self) -> Option<&String> {
         self.arkose_token_endpoint.as_ref()
     }
 
-    pub fn yescaptcha_client_key(&self) -> Option<&String> {
-        self.yescaptcha_client_key.as_ref()
-    }
-
-    pub fn arkose_har_upload_key(&self) -> Option<&String> {
-        self.arkose_har_upload_key.as_ref()
+    pub fn arkose_solver(&self) -> Option<&ArkoseSolver> {
+        self.arkose_solver.as_ref()
     }
 }
 
@@ -158,11 +163,7 @@ impl Drop for Context {
     fn drop(&mut self) {
         self.hotwatch
             .as_mut()
-            .and_then(|hotwatch| {
-                self.arkose_har_file_path
-                    .as_ref()
-                    .map(|path| (hotwatch, path))
-            })
+            .and_then(|hotwatch| self.arkose_har_file.as_ref().map(|path| (hotwatch, path)))
             .and_then(|(hotwatch, path)| hotwatch.unwatch(path).err())
             .map(|err| warn!("unwatch path error: {err}"));
     }

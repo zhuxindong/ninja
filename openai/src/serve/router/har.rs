@@ -74,7 +74,7 @@ async fn upload_form(
             );
         }
 
-        match ctx.arkose_har_file_path() {
+        match ctx.arkose_har_file() {
             Some(path) => {
                 if tokio::fs::write(path, data).await.is_err() {
                     return error_html("File write error");

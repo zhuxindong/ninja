@@ -1,6 +1,7 @@
 use std::{ops::Not, path::PathBuf};
 
 use clap::CommandFactory;
+use openai::{arkose::funcaptcha::Solver, serve::tokenbucket::Strategy};
 
 use crate::{
     args::{self, ServeArgs},
@@ -47,7 +48,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .disable_direct(args.disable_direct)
         .api_prefix(args.api_prefix)
         .arkose_endpoint(args.arkose_endpoint)
-        .arkose_har_path(args.arkose_har_path)
+        .arkose_har_file(args.arkose_har_file)
         .arkose_har_upload_key(args.arkose_har_upload_key)
         .arkose_token_endpoint(args.arkose_token_endpoint)
         .tls_keypair(None)
@@ -62,7 +63,8 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .puid(args.puid)
         .puid_email(puid_user.0)
         .puid_password(puid_user.1)
-        .yescaptcha_client_key(args.arkose_yescaptcha_key)
+        .arkose_solver(args.arkose_solver)
+        .arkose_solver_key(args.arkose_solver_key)
         .puid_mfa(puid_user.2);
 
     #[cfg(feature = "limit")]
@@ -252,7 +254,7 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
         arkose_token_endpoint: None,
         sign_secret_key: None,
         tb_enable: false,
-        tb_store_strategy: openai::serve::tokenbucket::Strategy::Mem,
+        tb_store_strategy: Strategy::Mem,
         tb_redis_url: "redis://127.0.0.1:6379".to_string(),
         tb_capacity: 60,
         tb_fill_rate: 1,
@@ -262,10 +264,11 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
         disable_webui: false,
         puid_user: None,
         puid: None,
-        arkose_yescaptcha_key: None,
-        arkose_har_path: None,
+        arkose_har_file: None,
         arkose_har_upload_key: None,
         disable_direct: false,
+        arkose_solver: Solver::Yescaptcha,
+        arkose_solver_key: None,
     };
 
     let write = |out: PathBuf, args: ServeArgs| -> anyhow::Result<()> {

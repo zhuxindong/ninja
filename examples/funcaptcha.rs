@@ -1,5 +1,5 @@
 use openai::arkose::{
-    funcaptcha::{self, start_challenge, yescaptcha::SubmitTaskBuilder},
+    funcaptcha::{self, solver::SubmitSolverBuilder, start_challenge},
     ArkoseToken,
 };
 use std::sync::Arc;
@@ -22,14 +22,15 @@ async fn main() -> anyhow::Result<()> {
                     let (tx, mut rx) = tokio::sync::mpsc::channel(max_cap);
                     for (i, fun) in funs.into_iter().enumerate() {
                         let sender = tx.clone();
-                        let submit_task = SubmitTaskBuilder::default()
+                        let submit_task = SubmitSolverBuilder::default()
+                            .solved(funcaptcha::Solver::Capsolver)
                             .client_key(key.clone())
-                            .question(fun.instructions)
+                            .question(fun.game_variant)
                             .image_as_base64(fun.image)
                             .build()
                             .unwrap();
                         tokio::spawn(async move {
-                            let res = funcaptcha::yescaptcha::submit_task(submit_task).await;
+                            let res = funcaptcha::solver::submit_task(submit_task).await;
                             sender.send((i, res)).await.expect("Send failed")
                         });
                     }
@@ -38,7 +39,9 @@ async fn main() -> anyhow::Result<()> {
                     let mut r = Vec::with_capacity(max_cap);
                     for _ in 0..max_cap {
                         if let Some((i, res)) = rx.recv().await {
-                            r.push((i, res?));
+                            let answer = res?;
+                            r.push((i, answer));
+                            println!("recv: {answer}");
                         }
                     }
 

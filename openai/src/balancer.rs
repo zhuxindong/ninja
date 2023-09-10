@@ -37,9 +37,7 @@ impl<T: Clone> ClientLoadBalancer<T> {
         if args.proxies.is_empty() {
             clients.push(build(None));
         } else {
-            if args.disable_direct {
-                info!("[AuthClient] Disable direct connection");
-            } else {
+            if !args.disable_direct {
                 clients.push(build(None));
             }
             for proxy in args.proxies.clone() {
@@ -60,7 +58,7 @@ impl<T: Clone> ClientLoadBalancer<T> {
             let mut client_builder = reqwest::Client::builder();
             if let Some(url) = proxy_url {
                 info!("[Client] Add {url} to the API load balancing client proxy pool");
-                let proxy = reqwest::Proxy::all(url).unwrap();
+                let proxy = reqwest::Proxy::all(url).expect("Failed to build proxy");
                 client_builder = client_builder.proxy(proxy)
             }
 
@@ -82,9 +80,7 @@ impl<T: Clone> ClientLoadBalancer<T> {
         if args.proxies.is_empty() {
             clients.push(build(None));
         } else {
-            if args.disable_direct {
-                info!("[Client] Disable direct connection");
-            } else {
+            if !args.disable_direct {
                 clients.push(build(None));
             }
             for proxy in args.proxies.clone() {

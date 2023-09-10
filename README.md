@@ -36,9 +36,10 @@ Sending a `GPT4` conversation requires `Arkose Token` to be sent as a parameter,
 
 2) The `ChatGPT` official website sends a `GPT4` session message, and the browser `F12` downloads `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` interface The HAR log record file, use the startup parameter `--arkose-har-path` to specify the HAR file path to use. Support uploading and updating HAR `request path: /har/upload`, the HAR file must exist, at this time, uploading and updating the HAR file is supported, optional upload authentication parameter `--arkose-har-upload-key`
 
-3) Use the [YesCaptcha](https://yescaptcha.atlassian.net/wiki/spaces/YESCAPTCHA/overview?homepageId=33020) platform for AI coding, start the parameter `--arkose-yescaptcha-key` fill in the Key to enable, Affordable price, `10RMB` is calculated by point submission, `10000/3 ~= 3333 submissions`,
+3) Use [YesCaptcha](https://yescaptcha.atlassian.net/wiki/spaces/YESCAPTCHA/overview?homepageId=33020)/[CapSolver](https://docs.capsolver.com/guide/why-choose-capsolver.html) platform for verification code parsing, start the parameter `--arkose-solver` to select the platform (the default is `YesCaptcha`), `--arkose-solver-key` fill in `Client Key`
 
-All three schemes are used, and the priority is: `HAR` > `Arkose Token endpoint` > `YesCaptcha`
+- All three solutions are used, the priority is: `HAR` > `YesCaptcha/CapSolver` > `Arkose Token endpoint`
+- `YesCaptcha/CapSolver` is recommended to be used with HAR. When the verification code is generated, the parser is called for processing. After verification, HAR is more durable.
 
 ### Platform Support
 
@@ -214,12 +215,14 @@ Options:
           Arkose endpoint, Example: https://client-api.arkoselabs.com
   -A, --arkose-token-endpoint <ARKOSE_TOKEN_ENDPOINT>
           Get arkose token endpoint
-  -a, --arkose-har-path <ARKOSE_HAR_PATH>
+  -a, --arkose-har-file <ARKOSE_HAR_FILE>
           About the browser HAR file path requested by ArkoseLabs
   -K, --arkose-har-upload-key <ARKOSE_HAR_UPLOAD_KEY>
           HAR file upload authenticate key
-  -Y, --arkose-yescaptcha-key <ARKOSE_YESCAPTCHA_KEY>
-          About the YesCaptcha platform client key solved by ArkoseLabs
+  -s, --arkose-solver <ARKOSE_SOLVER>
+          About ArkoseLabs solver platform [default: yescaptcha]
+  -k, --arkose-solver-key <ARKOSE_SOLVER_KEY>
+          About the solver client key by ArkoseLabs
   -S, --sign-secret-key <SIGN_SECRET_KEY>
           Enable url signature (signature secret key)
   -T, --tb-enable
@@ -227,7 +230,7 @@ Options:
       --tb-store-strategy <TB_STORE_STRATEGY>
           Token bucket store strategy (mem/redis) [default: mem]
       --tb-redis-url <TB_REDIS_URL>
-          Token bucket redis url, Example: redis://user:pass@ip:port [default: redis://127.0.0.1:6379]
+          Token bucket redis connection url [default: redis://127.0.0.1:6379]
       --tb-capacity <TB_CAPACITY>
           Token bucket capacity [default: 60]
       --tb-fill-rate <TB_FILL_RATE>
