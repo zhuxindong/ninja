@@ -38,6 +38,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 
+use crate::arkose::funcaptcha::{ArkoseSolver, Solver};
 use crate::auth::model::{AccessToken, AuthAccount, AuthStrategy, RefreshToken};
 use crate::auth::AuthHandle;
 use crate::context::{Context, ContextArgsBuilder};
@@ -87,11 +88,13 @@ pub struct Launcher {
     /// Get arkose token endpoint
     arkose_token_endpoint: Option<String>,
     /// Arkoselabs HAR record file path
-    arkose_har_path: Option<PathBuf>,
+    arkose_har_file: Option<PathBuf>,
     /// HAR file upload authenticate key
     arkose_har_upload_key: Option<String>,
-    /// yescaptcha client key
-    yescaptcha_client_key: Option<String>,
+    /// arkoselabs solver
+    arkose_solver: Solver,
+    /// arkoselabs solver client key
+    arkose_solver_key: Option<String>,
     /// Enable url signature (signature secret key)
     #[cfg(feature = "sign")]
     sign_secret_key: Option<String>,
@@ -130,21 +133,40 @@ impl Launcher {
             .with(tracing_subscriber::fmt::layer())
             .init();
 
+        info!(
+            "Starting HTTP(S) server at http(s)://{}:{}",
+            self.host, self.port
+        );
+        info!("Starting {} workers", self.workers);
+        info!("Concurrent limit {}", self.concurrent_limit);
+        info!("Keepalive {} seconds", self.tcp_keepalive);
+        info!("Timeout {} seconds", self.timeout);
+        info!("Connect timeout {} seconds", self.connect_timeout);
+        if self.disable_direct {
+            info!("Disable direct connection");
+        }
+
+        let arkose_sovler = match self.arkose_solver_key.as_ref() {
+            Some(key) => {
+                info!("ArkoseLabs solver: {:?}", self.arkose_solver);
+                Some(ArkoseSolver::new(self.arkose_solver.clone(), key.clone()))
+            }
+            None => None,
+        };
         let args = ContextArgsBuilder::default()
             .api_prefix(self.api_prefix.clone())
             .arkose_endpoint(self.arkose_endpoint.clone())
-            .arkose_har_path(self.arkose_har_path.clone())
+            .arkose_har_file(self.arkose_har_file.clone())
             .arkose_har_upload_key(self.arkose_har_upload_key.clone())
             .arkose_token_endpoint(self.arkose_token_endpoint.clone())
-            .yescaptcha_client_key(self.yescaptcha_client_key.clone())
+            .arkose_solver(arkose_sovler)
             .puid(self.puid.clone())
             .proxies(self.proxies.clone())
             .disable_direct(self.disable_direct)
             .timeout(self.timeout.clone())
             .connect_timeout(self.connect_timeout)
             .tcp_keepalive(self.tcp_keepalive)
-            .build()
-            .expect("Failed to initialize configuration parameters");
+            .build()?;
 
         Context::init(args);
 
@@ -230,13 +252,6 @@ impl Launcher {
             .build()?;
 
         runtime.block_on(async {
-            info!(
-                "Starting HTTP(S) server at http(s)://{}:{}",
-                self.host, self.port
-            );
-            info!("Starting {} workers", self.workers);
-            info!("Concurrent limit {}", self.concurrent_limit);
-
             tokio::spawn(check_wan_address());
             tokio::spawn(initialize_puid(
                 self.puid_email.clone(),

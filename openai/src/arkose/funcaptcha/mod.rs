@@ -1,12 +1,49 @@
-pub mod yescaptcha;
+pub mod solver;
+
 use super::crypto;
 use crate::{context, debug};
 use anyhow::Context;
 use reqwest::header;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 const INIT_HEX: &str = "cd12da708fe6cbe6e068918c38de2ad9";
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Solver {
+    Yescaptcha,
+    Capsolver,
+}
+
+impl Default for Solver {
+    fn default() -> Self {
+        Self::Yescaptcha
+    }
+}
+
+impl FromStr for Solver {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "yescaptcha" => Ok(Self::Yescaptcha),
+            "capsolver" => Ok(Self::Capsolver),
+            _ => anyhow::bail!("Only support `yescaptcha` and `capsolver`"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ArkoseSolver {
+    pub solver: Solver,
+    pub client_key: String,
+}
+
+impl ArkoseSolver {
+    pub fn new(solver: Solver, client_key: String) -> Self {
+        Self { solver, client_key }
+    }
+}
 
 pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
     let fields: Vec<&str> = arkose_token.split('|').collect();
@@ -33,7 +70,7 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
         client: ctx.load_client(),
     };
 
-    session.headers.insert(header::REFERER, format!("https://client-api.arkoselabs.com/fc/assets/ec-game-core/game-core/1.13.0/standard/index.html?session={}", arkose_token.replace("|", "&")).parse().unwrap());
+    session.headers.insert(header::REFERER, format!("https://client-api.arkoselabs.com/fc/assets/ec-game-core/game-core/1.13.0/standard/index.html?session={}", arkose_token.replace("|", "&")).parse()?);
     session
         .headers
         .insert(header::DNT, header::HeaderValue::from_static("1"));
@@ -53,8 +90,9 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
         let images = session
             .download_image_to_base64(&concise_challenge.urls)
             .await?;
-        debug!("concise_challenge: {:#?}", concise_challenge);
+
         debug!("instructions: {:#?}", concise_challenge.instructions);
+        debug!("game_variant: {:#?}", concise_challenge.game_variant);
         debug!("images: {:#?}", concise_challenge.urls);
 
         let funcaptcha_list = images
@@ -62,6 +100,7 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
             .map(|i| FunCaptcha {
                 image: i,
                 instructions: concise_challenge.instructions.clone(),
+                game_variant: concise_challenge.game_variant.clone(),
             })
             .collect::<Vec<FunCaptcha>>();
 
@@ -121,6 +160,7 @@ impl Session {
         Ok(())
     }
 
+    #[inline]
     async fn request_challenge(&mut self) -> anyhow::Result<()> {
         let challenge_request = RequestChallenge {
             sid: self.sid.clone(),
@@ -179,13 +219,15 @@ impl Session {
         };
 
         let remove_html_tags = |input: &str| {
-            let re = regex::Regex::new(r"<[^>]*>").unwrap();
+            let re = regex::Regex::new(r"<[^>]*>").expect("invalid regex");
             re.replace_all(input, "").to_string()
         };
 
+        println!("{:#?}", challenge.game_data);
         self.concise_challenge = Some(ConciseChallenge {
             game_type: challenge_type.to_string(),
             urls: challenge_urls.clone(),
+            game_variant: challenge.game_data.instruction_string.clone(),
             instructions: remove_html_tags(&challenge.string_table[&key]),
         });
 
@@ -217,13 +259,10 @@ impl Session {
 
         let request_id = crypto::encrypt("{{\"sc\":[147,307]}}", &pwd)?;
 
-        self.headers
-            .insert("X-Requested-ID", request_id.parse().unwrap());
+        self.headers.insert("X-Requested-ID", request_id.parse()?);
 
-        self.headers.insert(
-            "X-NewRelic-Timestamp",
-            Self::get_time_stamp().parse().unwrap(),
-        );
+        self.headers
+            .insert("X-NewRelic-Timestamp", Self::get_time_stamp().parse()?);
 
         let resp = self
             .client
@@ -284,7 +323,6 @@ impl Session {
                 .await?
                 .bytes()
                 .await?;
-            std::fs::write("img.png", &bytes)?;
             let b64 = general_purpose::STANDARD.encode(bytes);
             b64_imgs.push(format!("data:image/png;base64,{b64}"));
         }
@@ -354,6 +392,7 @@ struct ConciseChallenge {
     game_type: String,
     urls: Vec<String>,
     instructions: String,
+    game_variant: String,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -372,6 +411,7 @@ struct ChallengeLogger {
 pub struct FunCaptcha {
     pub image: String,
     pub instructions: String,
+    pub game_variant: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

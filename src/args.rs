@@ -1,6 +1,6 @@
-use crate::util;
+use crate::parse;
 use clap::{Args, Parser, Subcommand};
-use openai::serve::tokenbucket;
+use openai::{arkose::funcaptcha::Solver, serve::tokenbucket::Strategy};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -54,15 +54,15 @@ pub(super) enum ServeSubcommand {
 #[derive(Args, Debug, Default, Serialize, Deserialize)]
 pub(super) struct ServeArgs {
     /// Configuration file path (toml format file)
-    #[clap(short = 'C', long, env = "CONFIG", value_parser = util::parse_file_path)]
+    #[clap(short = 'C', long, env = "CONFIG", value_parser = parse::parse_file_path)]
     pub(super) config: Option<PathBuf>,
 
     /// Server Listen host
-    #[clap(short = 'H', long, env = "HOST", default_value = "0.0.0.0", value_parser = util::parse_host)]
+    #[clap(short = 'H', long, env = "HOST", default_value = "0.0.0.0", value_parser = parse::parse_host)]
     pub(super) host: Option<std::net::IpAddr>,
 
     /// Server Listen port
-    #[clap(short = 'P', long, env = "PORT", default_value = "7999", value_parser = util::parse_port_in_range)]
+    #[clap(short = 'P', long, env = "PORT", default_value = "7999", value_parser = parse::parse_port_in_range)]
     pub(super) port: Option<u16>,
 
     /// Server worker-pool size (Recommended number of CPU cores)
@@ -74,7 +74,7 @@ pub(super) struct ServeArgs {
     pub(super) concurrent_limit: usize,
 
     /// Server proxies pool, Example: protocol://user:pass@ip:port
-    #[clap(short = 'x',long, env = "PROXIES", value_parser = util::parse_proxies_url)]
+    #[clap(short = 'x',long, env = "PROXIES", value_parser = parse::parse_proxies_url)]
     pub(super) proxies: Option<std::vec::Vec<String>>,
 
     /// Disable direct connection
@@ -106,32 +106,41 @@ pub(super) struct ServeArgs {
     pub(super) puid: Option<String>,
 
     /// Obtain the PUID of the Plus account user, Example: `user:pass` or `user:pass:mfa`
-    #[clap(long, value_parser = util::parse_puid_user)]
+    #[clap(long, value_parser = parse::parse_puid_user)]
     pub(super) puid_user: Option<(String, String, Option<String>)>,
 
     /// Web UI api prefix
-    #[clap(long, env = "UI_API_PREFIX", value_parser = util::parse_url)]
+    #[clap(long, env = "UI_API_PREFIX", value_parser = parse::parse_url)]
     pub(super) api_prefix: Option<String>,
 
     /// Arkose endpoint, Example: https://client-api.arkoselabs.com
-    #[clap(long, value_parser = util::parse_url)]
+    #[clap(long, value_parser = parse::parse_url)]
     pub(super) arkose_endpoint: Option<String>,
 
     /// Get arkose token endpoint
-    #[clap(short = 'A', long, value_parser = util::parse_url)]
+    #[clap(short = 'A', long, value_parser = parse::parse_url)]
     pub(super) arkose_token_endpoint: Option<String>,
 
     /// About the browser HAR file path requested by ArkoseLabs
-    #[clap(short, long, value_parser = util::parse_file_path)]
-    pub(super) arkose_har_path: Option<PathBuf>,
+    #[clap(short, long, value_parser = parse::parse_file_path)]
+    pub(super) arkose_har_file: Option<PathBuf>,
 
     /// HAR file upload authenticate key
-    #[clap(short = 'K', long, requires = "arkose_har_path")]
+    #[clap(short = 'K', long, requires = "arkose_har_file")]
     pub(super) arkose_har_upload_key: Option<String>,
 
-    /// About the YesCaptcha platform client key solved by ArkoseLabs
-    #[clap(short = 'Y', long)]
-    pub(super) arkose_yescaptcha_key: Option<String>,
+    /// About ArkoseLabs solver platform
+    #[clap(
+        short = 's',
+        long,
+        default_value = "yescaptcha",
+        requires = "arkose_solver_key"
+    )]
+    pub(super) arkose_solver: Solver,
+
+    #[clap(short = 'k', long)]
+    /// About the solver client key by ArkoseLabs
+    pub(super) arkose_solver_key: Option<String>,
 
     /// Enable url signature (signature secret key)
     #[clap(short = 'S', long)]
@@ -146,10 +155,10 @@ pub(super) struct ServeArgs {
     /// Token bucket store strategy (mem/redis)
     #[clap(long, default_value = "mem", requires = "tb_enable")]
     #[cfg(feature = "limit")]
-    pub(super) tb_store_strategy: tokenbucket::Strategy,
+    pub(super) tb_store_strategy: Strategy,
 
-    /// Token bucket redis url, Example: redis://user:pass@ip:port
-    #[clap(long, default_value = "redis://127.0.0.1:6379", requires = "tb_enable", value_parser = util::parse_url)]
+    /// Token bucket redis connection url
+    #[clap(long, default_value = "redis://127.0.0.1:6379", requires = "tb_enable", value_parser = parse::parse_url)]
     #[cfg(feature = "limit")]
     pub(super) tb_redis_url: String,
 
