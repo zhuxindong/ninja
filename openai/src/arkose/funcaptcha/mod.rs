@@ -10,6 +10,7 @@ use std::{collections::HashMap, str::FromStr};
 const INIT_HEX: &str = "cd12da708fe6cbe6e068918c38de2ad9";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Solver {
     Yescaptcha,
     Capsolver,
