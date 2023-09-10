@@ -1,11 +1,11 @@
 msgid ""
 msgstr "Content-Type: text/plain; charset=UTF-8\n"
 
-msgid "OpenGPT"
-msgstr "OpenGPT"
+msgid "Ninja"
+msgstr "Ninja"
 
-msgid "<a>A reverse engineered unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)</a> | <a href=\"https://github.com/gngpp/opengpt\" target=\"_blank\">Project GitHub URL</a>"
-msgstr "<a>一个逆向工程的非官方的 ChatGPT 代理（绕过 Cloudflare 403 Access Denied）</a> | <a href=\"https://github.com/gngpp/opengpt\" target=\"_blank\">GitHub 项目地址</a>"
+msgid "<a>A reverse engineered unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)</a> | <a href=\"https://github.com/gngpp/ninja\" target=\"_blank\">Project GitHub URL</a>"
+msgstr "<a>一个逆向工程的非官方的 ChatGPT 代理（绕过 Cloudflare 403 Access Denied）</a> | <a href=\"https://github.com/gngpp/ninja\" target=\"_blank\">GitHub 项目地址</a>"
 
 msgid "Enabled"
 msgstr "启用"

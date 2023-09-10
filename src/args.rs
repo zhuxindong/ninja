@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[clap(author, version, about)]
+#[clap(author, version, about, arg_required_else_help = true)]
 pub(super) struct Opt {
     #[clap(subcommand)]
     pub(super) command: Option<SubCommands>,

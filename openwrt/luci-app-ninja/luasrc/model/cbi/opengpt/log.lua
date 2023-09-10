@@ -4,6 +4,6 @@ log.reset = false
 
 t = log:field(DummyValue, '', '')
 t.rawhtml = true
-t.template = 'opengpt/opengpt_log'
+t.template = 'ninja/ninja_log'
 
 return log

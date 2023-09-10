@@ -35,7 +35,7 @@ afkEyGvifAMJFPwO78=\n\
     .as_bytes();
 
 pub type TokenResult<T, E = anyhow::Error> = anyhow::Result<T, E>;
-const DEFAULT_TOKEN_FILE: &str = ".opengpt-access_tokens";
+const DEFAULT_TOKEN_FILE: &str = ".ninja-access_tokens";
 
 #[async_trait]
 pub trait AuthenticateTokenStore: Send + Sync {
@@ -69,7 +69,7 @@ impl TokenMemStore {
     ///
     /// ```
     /// let mut auth = openai::oauth::OpenOAuth0Builder::builder()
-    ///    .email("opengpt@gmail.com".to_string())
+    ///    .email("ninja@gmail.com".to_string())
     ///    .password("gngpp".to_string())
     ///    .cache(true)
     ///    .cookie_store(true)

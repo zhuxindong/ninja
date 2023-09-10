@@ -14,7 +14,7 @@ map["x86_64-pc-windows-msvc"]="ghcr.io/gngpp/cargo-xwin:latest"
 for key in "${!map[@]}"; do
   docker pull "${map[$key]}"
   docker buildx build --platform linux/amd64,linux/arm64 \
-    --tag gngpp/opengpt-builder:"$key" \
-    --tag ghcr.io/gngpp/opengpt-builder:"$key" \
+    --tag gngpp/ninja-builder:"$key" \
+    --tag ghcr.io/gngpp/ninja-builder:"$key" \
     --build-arg BASE_IMAGE="${map[$key]}" . --push 
 done

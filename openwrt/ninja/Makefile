@@ -2,7 +2,7 @@
 
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=opengpt
+PKG_NAME:=ninja
 
 PKG_VERSION:=0.5.1
 
@@ -20,8 +20,8 @@ ifeq ($(ARCH),arm)
   endif
 endif
 
-PKG_SOURCE:=opengpt-$(PKG_VERSION)-$(PKG_ARCH)-unknown-linux-$(PKG_LIBC).tar.gz
-PKG_SOURCE_URL:=https://github.com/gngpp/opengpt/releases/download/v$(PKG_VERSION)/
+PKG_SOURCE:=ninja-$(PKG_VERSION)-$(PKG_ARCH)-unknown-linux-$(PKG_LIBC).tar.gz
+PKG_SOURCE_URL:=https://github.com/gngpp/ninja/releases/download/v$(PKG_VERSION)/
 PKG_HASH:=skip
 STRIP:=false
 
@@ -31,8 +31,8 @@ define Package/$(PKG_NAME)
   SECTION:=net
   CATEGORY:=Network
   SUBMENU:=Web Servers/Proxies
-  TITLE:=opengpt
-  URL:=https://github.com/gngpp/opengpt
+  TITLE:=ninja
+  URL:=https://github.com/gngpp/ninja
 endef
 
 define Package/$(PKG_NAME)/description
@@ -58,20 +58,20 @@ define Build/Prepare
 endef
 
 define Build/Compile
-	echo "opengpt using precompiled binary."
+	echo "ninja using precompiled binary."
 endef
 
-define Package/opengpt/conffiles
-/etc/config/opengpt
+define Package/ninja/conffiles
+/etc/config/ninja
 endef
 
-define Package/opengpt/install
+define Package/ninja/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/opengpt $(1)/usr/bin/opengpt
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/ninja $(1)/usr/bin/ninja
 	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) ./files/opengpt.init $(1)/etc/init.d/opengpt
+	$(INSTALL_BIN) ./files/ninja.init $(1)/etc/init.d/ninja
 	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_CONF) ./files/opengpt.config $(1)/etc/config/opengpt
+	$(INSTALL_CONF) ./files/ninja.config $(1)/etc/config/ninja
 endef
 
 $(eval $(call BuildPackage,$(PKG_NAME)))

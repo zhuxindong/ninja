@@ -1,11 +1,11 @@
 use crate::args::ServeArgs;
 
 #[cfg(target_family = "unix")]
-pub(crate) const PID_PATH: &str = "/var/run/opengpt.pid";
+pub(crate) const PID_PATH: &str = "/var/run/ninja.pid";
 #[cfg(target_family = "unix")]
-pub(crate) const DEFAULT_STDOUT_PATH: &str = "/var/run/opengpt.out";
+pub(crate) const DEFAULT_STDOUT_PATH: &str = "/var/run/ninja.out";
 #[cfg(target_family = "unix")]
-pub(crate) const DEFAULT_STDERR_PATH: &str = "/var/run/opengpt.err";
+pub(crate) const DEFAULT_STDERR_PATH: &str = "/var/run/ninja.err";
 #[cfg(target_family = "unix")]
 pub(crate) const DEFAULT_WORK_DIR: &str = "/";
 

@@ -1,6 +1,6 @@
-name: opengpt
+name: ninja
 version: '0.5.1'
-summary: OpenGPT - A reverse engineered unofficial ChatGPT proxy
+summary: Ninja - A reverse engineered unofficial ChatGPT proxy
 description: |
   A reverse engineered unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)
 
@@ -14,7 +14,7 @@ architectures:
   - build-on: arm64
 
 parts:
-  opengpt-binary:
+  ninja-binary:
     plugin: nil
     override-build: |
       #!/bin/bash
@@ -32,12 +32,12 @@ parts:
           exit 1
       esac
 
-      PACKAGE="opengpt-${SNAPCRAFT_PROJECT_VERSION}-${ARCH_SUFFIX}-unknown-linux-musl.tar.gz"
-      BINARY_URL="https://github.com/gngpp/opengpt/releases/download/v${SNAPCRAFT_PROJECT_VERSION}/${PACKAGE}"
+      PACKAGE="ninja-${SNAPCRAFT_PROJECT_VERSION}-${ARCH_SUFFIX}-unknown-linux-musl.tar.gz"
+      BINARY_URL="https://github.com/gngpp/ninja/releases/download/v${SNAPCRAFT_PROJECT_VERSION}/${PACKAGE}"
       tar -xf ${PACKAGE}
-      mv ./opengpt $SNAPCRAFT_PART_INSTALL/bin/opengpt
+      mv ./ninja $SNAPCRAFT_PART_INSTALL/bin/ninja
 
 apps:
-  opengpt:
-    command: bin/opengpt
+  ninja:
+    command: bin/ninja
     plugs: [network, network-bind]

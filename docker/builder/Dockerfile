@@ -8,7 +8,7 @@ ARG BASE_IMAGE
 WORKDIR /home/rust/src
 
 LABEL org.opencontainers.image.authors "gngpp <gngppz@gmail.com>"
-LABEL org.opencontainers.image.source https://github.com/gngpp/opengpt
+LABEL org.opencontainers.image.source https://github.com/gngpp/ninja
 
 RUN mkdir -p /root/.cargo/registry
 RUN mkdir -p /root/.cargo/git

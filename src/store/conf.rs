@@ -134,8 +134,8 @@ pub struct ConfFileStore(PathBuf);
 impl ConfFileStore {
     pub fn new() -> Self {
         let path = match home_dir() {
-            Some(home_dir) => home_dir.join(".opengpt-conf"),
-            None => PathBuf::from(".opengpt-conf"),
+            Some(home_dir) => home_dir.join(".ninja-conf"),
+            None => PathBuf::from(".ninja-conf"),
         };
         if let Some(parent) = path.parent() {
             if path.exists().not() {
