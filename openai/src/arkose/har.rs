@@ -1,4 +1,6 @@
 use crate::arkose::crypto;
+use crate::urldecoding;
+use base64::Engine;
 use serde::Deserialize;
 use std::{path::Path, sync::Mutex};
 
@@ -15,6 +17,7 @@ pub struct RequestEntry {
     pub bv: String,
 }
 
+#[inline]
 fn parse(har: Har) -> anyhow::Result<RequestEntry> {
     if let Some(entry) = har
         .log
@@ -46,7 +49,8 @@ fn parse(har: Har) -> anyhow::Result<RequestEntry> {
                 .iter()
                 .find(|p| p.name.eq_ignore_ascii_case("bda"))
             {
-                #[allow(deprecated)]
+                let cow = urldecoding::decode(&bda_param.value)?;
+                let bda = base64::engine::general_purpose::STANDARD.decode(cow.into_owned())?;
                 let entry = RequestEntry {
                     url: entry.request.url,
                     method: entry.request.method,
@@ -67,7 +71,7 @@ fn parse(har: Har) -> anyhow::Result<RequestEntry> {
                         .filter(|s| !s.contains("bda") && !s.contains("rnd"))
                         .collect::<Vec<&str>>()
                         .join("&"),
-                    bx: crypto::decrypt(base64::decode(&bda_param.value)?, &format!("{bv}{bw}"))?,
+                    bx: crypto::decrypt(bda, &format!("{bv}{bw}"))?,
                     bv,
                 };
 
@@ -84,16 +88,19 @@ fn parse(har: Har) -> anyhow::Result<RequestEntry> {
     anyhow::bail!("Unable to find har related request entry")
 }
 
+#[inline]
 pub fn check_from_slice(s: &[u8]) -> anyhow::Result<()> {
     let _ = serde_json::from_slice::<Har>(&s)?;
     Ok(())
 }
 
+#[inline]
 pub fn check_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
     let bytes = std::fs::read(path)?;
     check_from_slice(&bytes)
 }
 
+#[inline]
 pub fn parse_from_slice(s: &[u8]) -> anyhow::Result<RequestEntry> {
     if let Some(entry) = unsafe { CACHE_REQUEST_ENTRY.clone() } {
         return Ok(entry);
@@ -102,6 +109,7 @@ pub fn parse_from_slice(s: &[u8]) -> anyhow::Result<RequestEntry> {
     parse(har)
 }
 
+#[inline]
 pub fn parse_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<RequestEntry> {
     if let Some(entry) = unsafe { CACHE_REQUEST_ENTRY.clone() } {
         return Ok(entry);

@@ -11,6 +11,7 @@ pub mod log;
 pub mod model;
 pub mod platform;
 pub mod unescape;
+pub mod urldecoding;
 pub mod uuid;
 
 #[cfg(feature = "serve")]
