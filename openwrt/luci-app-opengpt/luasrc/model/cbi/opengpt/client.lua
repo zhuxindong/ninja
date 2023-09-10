@@ -38,11 +38,16 @@ o.default = "60"
 o = s:option(Value, "tcp_keepalive", translate("TCP Keep-Alive"), translate("Default 60 seconds"))
 o.default = "60"
 
-o = s:option(Value, "arkose_har_path", translate("HAR file path"), translate("About the browser HAR file path requested by ArkoseLabs"))
+o = s:option(Value, "arkose_har_file", translate("HAR file path"), translate("About the browser HAR file path requested by ArkoseLabs"))
 
 o = s:option(Value, "arkose_har_upload_key", translate("HAR Auth Key"), translate("HAR file upload authenticate key"))
 
-o = s:option(Value, "arkose_yescaptcha_key", translate("YesCaptcha Client Key"), translate("About the YesCaptcha platform client key solved by ArkoseLabs"))
+o = s:option(Value, "arkose_solver", translate("Solver"), translate("About ArkoseLabs solver platform"))
+o:value("yescaptcha", "yescaptcha");
+o:value("capsolver", "capsolver");
+o.default = "yescaptcha"
+
+o = s:option(Value, "arkose_solver_key", translate("Solver Client Key"), translate("About the solver client key by ArkoseLabs"))
 
 o = s:option(Value, "arkose_token_endpoint", translate("Arkose token endpoint"), translate("Get arkose token endpoint"))
 
