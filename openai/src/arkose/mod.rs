@@ -169,10 +169,10 @@ async fn get_arkose_token_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<Ar
     let bda = crypto::encrypt(bx, &format!("{bv}{bw}"))?;
     let rnd = format!("{}", rand::Rng::gen::<f64>(&mut rand::thread_rng()));
 
-    #[allow(deprecated)]
-    entry
-        .body
-        .push_str(&format!("&bda={}", base64::encode(bda)));
+    entry.body.push_str(&format!(
+        "&bda={}",
+        base64::engine::general_purpose::STANDARD.encode(&bda)
+    ));
     entry.body.push_str(&format!("&rnd={rnd}"));
 
     let client = Context::get_instance().await.load_client();
