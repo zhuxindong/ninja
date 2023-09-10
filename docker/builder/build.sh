@@ -16,5 +16,8 @@ for key in "${!map[@]}"; do
   docker buildx build --platform linux/amd64,linux/arm64 \
     --tag gngpp/ninja-builder:"$key" \
     --tag ghcr.io/gngpp/ninja-builder:"$key" \
-    --build-arg BASE_IMAGE="${map[$key]}" . --push 
+    --build-arg BASE_IMAGE="${map[$key]}" . --push
+  echo "Build complete for $key"
+  docker rmi ghcr.io/gngpp/ninja-builder:"$key"
+  docker rmi ghcr.io/gngpp/ninja-builder:"${map[$key]}"
 done
