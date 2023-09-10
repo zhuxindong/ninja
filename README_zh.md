@@ -34,7 +34,7 @@
 
 1) `Arkose Token` 获取的端点，不管你用什么方式，使用 `--arkose-token-endpoint` 指定端点获取token，支持的`JSON`格式，一般按照社区的格式：`{"token":"xxxxxx"}`
 
-2) `ChatGPT` 官网发送一次 `GPT4` 会话消息，浏览器 `F12` 下载 `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` 接口的HAR日志记录文件，使用启动参数 `--arkose-har-path` 指定HAR文件路径使用。支持上传更新HAR `请求路径: /har/upload`，HAR文件是必须是存在的，此时才支持上传更新HAR文件，可选上传身份验证参数 `--arkose-har-upload-key`
+2) `ChatGPT` 官网发送一次 `GPT4` 会话消息，浏览器 `F12` 下载 `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` 接口的HAR日志记录文件，使用启动参数 `--arkose-har-file` 指定HAR文件路径使用。支持上传更新HAR `请求路径: /har/upload`，HAR文件是必须是存在的，此时才支持上传更新HAR文件，可选上传身份验证参数 `--arkose-har-upload-key`
 
 3) 使用[YesCaptcha](https://yescaptcha.atlassian.net/wiki/spaces/YESCAPTCHA/overview?homepageId=33020)/[CapSolver](https://docs.capsolver.com/guide/why-choose-capsolver.html)平台进行验证码解析，启动参数`--arkose-solver`选择平台（默认使用`YesCaptcha`），`--arkose-solver-key` 填写`Client Key`
 
@@ -99,8 +99,8 @@
   GitHub [Releases](https://github.com/gngpp/opengpt/releases/latest) 中有预编译的 deb包，二进制文件，以Ubuntu为例：
 
 ```shell
-wget https://github.com/gngpp/opengpt/releases/download/v0.5.0/opengpt-0.5.0-x86_64-unknown-linux-musl.deb
-dpkg -i opengpt-0.5.0-x86_64-unknown-linux-musl.deb
+wget https://github.com/gngpp/opengpt/releases/download/v0.5.1/opengpt-0.5.1-x86_64-unknown-linux-musl.deb
+dpkg -i opengpt-0.5.1-x86_64-unknown-linux-musl.deb
 opengpt serve run
 ```
 
@@ -109,11 +109,11 @@ opengpt serve run
 GitHub [Releases](https://github.com/gngpp/opengpt/releases/latest) 中有预编译的 ipk 文件， 目前提供了 aarch64/x86_64 等架构的版本，下载后使用 opkg 安装，以 nanopi r4s 为例：
 
 ```shell
-wget https://github.com/gngpp/opengpt/releases/download/v0.5.0/opengpt_0.5.0_aarch64_generic.ipk
-wget https://github.com/gngpp/opengpt/releases/download/v0.5.0/luci-app-opengpt_1.0.6-1_all.ipk
-wget https://github.com/gngpp/opengpt/releases/download/v0.5.0/luci-i18n-opengpt-zh-cn_1.0.6-1_all.ipk
+wget https://github.com/gngpp/opengpt/releases/download/v0.5.1/opengpt_0.5.1_aarch64_generic.ipk
+wget https://github.com/gngpp/opengpt/releases/download/v0.5.1/luci-app-opengpt_1.0.6-1_all.ipk
+wget https://github.com/gngpp/opengpt/releases/download/v0.5.1/luci-i18n-opengpt-zh-cn_1.0.6-1_all.ipk
 
-opkg install opengpt_0.5.0_aarch64_generic.ipk
+opkg install opengpt_0.5.1_aarch64_generic.ipk
 opkg install luci-app-opengpt_1.0.6-1_all.ipk
 opkg install luci-i18n-opengpt-zh-cn_1.0.6-1_all.ipk
 ```

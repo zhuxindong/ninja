@@ -40,19 +40,19 @@ pub(super) async fn config_prompt() -> anyhow::Result<()> {
         }
     };
 
-    let mut arkose_har_path = Text::new("Arkose HAR file ›")
+    let mut arkose_har_file = Text::new("Arkose HAR file ›")
         .with_render_config(render_config())
         .with_help_message("About the browser HAR file path requested by ArkoseLabs")
         .with_validator(valid_file_path);
-    if let Some(content) = conf.arkose_har_path.as_deref() {
-        arkose_har_path = arkose_har_path.with_initial_value(content)
+    if let Some(content) = conf.arkose_har_file.as_deref() {
+        arkose_har_file = arkose_har_file.with_initial_value(content)
     };
 
-    let mut arkose_yescaptcha_key = Text::new("Arkose YesCaptcha key ›")
+    let mut arkose_solver_key = Text::new("Arkose YesCaptcha key ›")
         .with_render_config(render_config())
         .with_help_message("About the YesCaptcha platform client key solved by ArkoseLabs");
-    if let Some(content) = conf.arkose_yescaptcha_key.as_deref() {
-        arkose_yescaptcha_key = arkose_yescaptcha_key.with_initial_value(content)
+    if let Some(content) = conf.arkose_solver_key.as_deref() {
+        arkose_solver_key = arkose_solver_key.with_initial_value(content)
     };
 
     let mut arkose_token_endpoint = Text::new("Arkose token endpoint ›")
@@ -78,15 +78,15 @@ pub(super) async fn config_prompt() -> anyhow::Result<()> {
         .map(|ok| if ok.is_empty() { None } else { Some(ok) })
         .unwrap_or(conf.proxy);
 
-    conf.arkose_har_path = arkose_har_path
+    conf.arkose_har_file = arkose_har_file
         .prompt_skippable()?
         .map(|ok| if ok.is_empty() { None } else { Some(ok) })
-        .unwrap_or(conf.arkose_har_path);
+        .unwrap_or(conf.arkose_har_file);
 
-    conf.arkose_yescaptcha_key = arkose_yescaptcha_key
+    conf.arkose_solver_key = arkose_solver_key
         .prompt_skippable()?
         .map(|ok| if ok.is_empty() { None } else { Some(ok) })
-        .unwrap_or(conf.arkose_yescaptcha_key);
+        .unwrap_or(conf.arkose_solver_key);
 
     conf.arkose_token_endpoint = arkose_token_endpoint
         .prompt_skippable()?

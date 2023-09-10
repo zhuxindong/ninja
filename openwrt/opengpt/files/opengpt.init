@@ -17,9 +17,10 @@ get_config() {
 	config_get tcp_keepalive $1 tcp_keepalive "5"
 	config_get tls_cert $1 tls_cert ''
 	config_get tls_key $1 tls_key ''
-	config_get arkose_har_path $1 arkose_har_path ''
+	config_get arkose_har_file $1 arkose_har_file ''
 	config_get arkose_har_upload_key $1 arkose_har_upload_key ''
-	config_get arkose_yescaptcha_key $1 arkose_yescaptcha_key ''
+	config_get arkose_solver_key $1 arkose_solver_key ''
+	config_get arkose_solver $1 arkose_solver 'yescaptcha'
 	config_get arkose_token_endpoint $1 arkose_token_endpoint ''
 	config_get sign_secret_key $1 sign_secret_key ''
 	config_get tb_store_strategy $1 tb_store_strategy "mem"
@@ -68,16 +69,20 @@ start_service() {
 		args="$args --tcp-keepalive $tcp_keepalive"
 	fi
 
-	if [ -n "$arkose_har_path" ]; then
-		args="$args --arkose-har-path $arkose_har_path"
+	if [ -n "$arkose_har_file" ]; then
+		args="$args --arkose-har-file $arkose_har_file"
 	fi
 	
 	if [ -n "$arkose_har_upload_key" ]; then
 		args="$args --arkose-har-upload-key $arkose_har_upload_key"
 	fi
 	
-	if [ -n "$arkose_yescaptcha_key" ]; then
-		args="$args --arkose-yescaptcha-key $arkose_yescaptcha_key"
+	if [ -n "$arkose_solver" ]; then
+		args="$args --arkose-solver $arkose_solver"
+	fi
+
+	if [ -n "$arkose_solver_key" ]; then
+		args="$args --arkose-solver-key $arkose_solver_key"
 	fi
 
 	if [ -n "$arkose_token_endpoint" ]; then

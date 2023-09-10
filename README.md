@@ -34,7 +34,7 @@ Sending a `GPT4` conversation requires `Arkose Token` to be sent as a parameter,
 
 1) The endpoint obtained by `Arkose Token`, no matter what method you use, use `--arkose-token-endpoint` to specify the endpoint to obtain the token. The supported `JSON` format is generally in accordance with the format of the community: `{"token": "xxxxxx"}`
 
-2) The `ChatGPT` official website sends a `GPT4` session message, and the browser `F12` downloads `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` interface The HAR log record file, use the startup parameter `--arkose-har-path` to specify the HAR file path to use. Support uploading and updating HAR `request path: /har/upload`, the HAR file must exist, at this time, uploading and updating the HAR file is supported, optional upload authentication parameter `--arkose-har-upload-key`
+2) The `ChatGPT` official website sends a `GPT4` session message, and the browser `F12` downloads `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` interface The HAR log record file, use the startup parameter `--arkose-har-file` to specify the HAR file path to use. Support uploading and updating HAR `request path: /har/upload`, the HAR file must exist, at this time, uploading and updating the HAR file is supported, optional upload authentication parameter `--arkose-har-upload-key`
 
 3) Use [YesCaptcha](https://yescaptcha.atlassian.net/wiki/spaces/YESCAPTCHA/overview?homepageId=33020)/[CapSolver](https://docs.capsolver.com/guide/why-choose-capsolver.html) platform for verification code parsing, start the parameter `--arkose-solver` to select the platform (the default is `YesCaptcha`), `--arkose-solver-key` fill in `Client Key`
 
@@ -100,8 +100,8 @@ Sending a `GPT4` conversation requires `Arkose Token` to be sent as a parameter,
 Making [Releases](https://github.com/gngpp/opengpt/releases/latest) has a precompiled deb package, binaries, in Ubuntu, for example:
 
 ```shell
-wget https://github.com/gngpp/opengpt/releases/download/v0.5.0/opengpt-0.5.0-x86_64-unknown-linux-musl.deb
-dpkg -i opengpt-0.5.0-x86_64-unknown-linux-musl.deb
+wget https://github.com/gngpp/opengpt/releases/download/v0.5.1/opengpt-0.5.1-x86_64-unknown-linux-musl.deb
+dpkg -i opengpt-0.5.1-x86_64-unknown-linux-musl.deb
 opengpt serve run
 ```
 
@@ -110,11 +110,11 @@ opengpt serve run
 There are pre-compiled ipk files in GitHub [Releases](https://github.com/gngpp/opengpt/releases/latest), which currently provide versions of aarch64/x86_64 and other architectures. After downloading, use opkg to install, and use nanopi r4s as example:
 
 ```shell
-wget https://github.com/gngpp/opengpt/releases/download/v0.5.0/opengpt_0.5.0_aarch64_generic.ipk
-wget https://github.com/gngpp/opengpt/releases/download/v0.5.0/luci-app-opengpt_1.0.6-1_all.ipk
-wget https://github.com/gngpp/opengpt/releases/download/v0.5.0/luci-i18n-opengpt-zh-cn_1.0.6-1_all.ipk
+wget https://github.com/gngpp/opengpt/releases/download/v0.5.1/opengpt_0.5.1_aarch64_generic.ipk
+wget https://github.com/gngpp/opengpt/releases/download/v0.5.1/luci-app-opengpt_1.0.6-1_all.ipk
+wget https://github.com/gngpp/opengpt/releases/download/v0.5.1/luci-i18n-opengpt-zh-cn_1.0.6-1_all.ipk
 
-opkg install opengpt_0.5.0_aarch64_generic.ipk
+opkg install opengpt_0.5.1_aarch64_generic.ipk
 opkg install luci-app-opengpt_1.0.6-1_all.ipk
 opkg install luci-i18n-opengpt-zh-cn_1.0.6-1_all.ipk
 ```
