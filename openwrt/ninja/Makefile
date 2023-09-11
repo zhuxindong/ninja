@@ -36,7 +36,7 @@ define Package/$(PKG_NAME)
 endef
 
 define Package/$(PKG_NAME)/description
-  Not just an unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)
+  Reverse engineered ChatGPT proxy (bypass Cloudflare 403 Access Denied)
 endef
 
 define Download/sha256sum
