@@ -20,7 +20,7 @@ get_config() {
 	config_get arkose_har_file $1 arkose_har_file ''
 	config_get arkose_har_upload_key $1 arkose_har_upload_key ''
 	config_get arkose_solver_key $1 arkose_solver_key ''
-	config_get arkose_solver $1 arkose_solver 'yescaptcha'
+	config_get arkose_solver $1 arkose_solver ''
 	config_get arkose_token_endpoint $1 arkose_token_endpoint ''
 	config_get sign_secret_key $1 sign_secret_key ''
 	config_get tb_store_strategy $1 tb_store_strategy "mem"
