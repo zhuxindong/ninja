@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/gngpp/ninja/actions/workflows/CI.yml/badge.svg)](https://github.com/gngpp/ninja/actions/workflows/CI.yml)
 [![CI](https://github.com/gngpp/ninja/actions/workflows/Release.yml/badge.svg)](https://github.com/gngpp/ninja/actions/workflows/Release.yml)
-	<a target="_blank" href="https://github.com/gngpp/vdns/blob/main/LICENSE">
-		<img src="https://img.shields.io/badge/license-MIT-blue.svg"/>
-	</a>
+ <a target="_blank" href="https://github.com/gngpp/vdns/blob/main/LICENSE">
+  <img src="https://img.shields.io/badge/license-MIT-blue.svg"/>
+ </a>
   <a href="https://github.com/gngpp/ninja/releases">
     <img src="https://img.shields.io/github/release/gngpp/ninja.svg?style=flat">
   </a><a href="https://github.com/gngpp/ninja/releases">
@@ -61,20 +61,22 @@
 
 ### Http 服务
 
-> 公开接口, `*` 表示任意`URL`后缀
->
-> - backend-api, <https://host:port/backend-api/*>
-> - public-api, <https://host:port/public-api/*>
-> - platform-api, <https://host:port/v1/*>
-> - dashboard-api, <https://host:port/dashboard/*>
-> - chatgpt-to-api, <https://host:port/to/v1/chat/completions>
->
-> 详细API文档
->
-> - Platfrom API [doc](https://platform.openai.com/docs/api-reference)
-> - Backend API [doc](doc/rest.http)
->
-> 关于关于`ChatGPT`转`API`使用，直接拿`AceessToken`当`API Key`使用，接口路径`https://host:port/to/v1/chat/completions`
+#### 公开接口, `*` 表示任意`URL`后缀
+
+- backend-api, <https://host:port/backend-api/*>
+- public-api, <https://host:port/public-api/*>
+- platform-api, <https://host:port/v1/*>
+- dashboard-api, <https://host:port/dashboard/*>
+- chatgpt-to-api, <https://host:port/to/v1/chat/completions>
+
+#### API文档
+
+- Platfrom API [doc](https://platform.openai.com/docs/api-reference)
+- Backend API [doc](doc/rest.http)
+
+> 关于关于`ChatGPT`转`API`使用，直接拿`AceessToken`当`API Key`使用，接口路径：`/to/v1/chat/completions`
+
+#### 基本服务
 
 - 原汁原味ChatGPT WebUI
 - 公开`非官方`/`官方API`代理
@@ -91,6 +93,7 @@
   - `--tls-key`，环境变量 `TLS_KEY`，TLS证书私钥
   - `--proxies`，代理，支持代理池，多个代理使用`,`隔开，格式: protocol://user:pass@ip:port，如果本地IP被Ban，使用代理池时需要关闭直连IP使用，`--disable-direct`关闭直连，否则会根据负载均衡使用你被Ban的本地IP
   - `--workers`， 工作线程: 默认1
+  - `--disable-webui`, 如果不想使用默认自带的WebUI，使用此参数关闭
 
 [...](https://github.com/gngpp/ninja/blob/main/README_zh.md#%E5%91%BD%E4%BB%A4%E6%89%8B%E5%86%8C)
 

@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/gngpp/ninja/actions/workflows/CI.yml/badge.svg)](https://github.com/gngpp/ninja/actions/workflows/CI.yml)
 [![CI](https://github.com/gngpp/ninja/actions/workflows/Release.yml/badge.svg)](https://github.com/gngpp/ninja/actions/workflows/Release.yml)
-	<a target="_blank" href="https://github.com/gngpp/vdns/blob/main/LICENSE">
-		<img src="https://img.shields.io/badge/license-MIT-blue.svg"/>
-	</a>
+ <a target="_blank" href="https://github.com/gngpp/vdns/blob/main/LICENSE">
+  <img src="https://img.shields.io/badge/license-MIT-blue.svg"/>
+ </a>
   <a href="https://github.com/gngpp/ninja/releases">
     <img src="https://img.shields.io/github/release/gngpp/ninja.svg?style=flat">
   </a><a href="https://github.com/gngpp/ninja/releases">
@@ -17,7 +17,7 @@
 
 Reverse engineered `ChatGPT` proxy (bypass Cloudflare 403 Access Denied)
 
-###  Features
+### Features
 
 - API key acquisition
 - Email/password account authentication (Google/Microsoft third-party login is temporarily not supported)
@@ -61,20 +61,22 @@ Sending a `GPT4` conversation requires `Arkose Token` to be sent as a parameter,
 
 ### Http Server
 
-> Public API, `*` means any `URL` suffix
->
-> - backend-api, <https://host:port/backend-api/*>
-> - public-api, <https://host:port/public-api/*>
-> - platform-api, <https://host:port/v1/*>
-> - dashboard-api, <https://host:port/dashboard/*>
-> - chatgpt-to-api, <https://host:port/to/v1/chat/completions>
->
-> Detailed API documentation
->
-> - Platform API [doc](https://platform.openai.com/docs/api-reference)
-> - Backend API [doc](doc/rest.http)
->
-> About using `ChatGPT` to `API`, use `AceessToken` directly as `API Key`, the interface path `https://host:port/to/v1/chat/completions`
+#### Public interface, `*` represents any `URL` suffix
+
+- backend-api, <https://host:port/backend-api/*>
+- public-api, <https://host:port/public-api/*>
+- platform-api, <https://host:port/v1/*>
+- dashboard-api, <https://host:port/dashboard/*>
+- chatgpt-to-api, <https://host:port/to/v1/chat/completions>
+
+#### API documentation
+
+- Platfrom API [doc](https://platform.openai.com/docs/api-reference)
+- Backend API [doc](doc/rest.http)
+
+> About using `ChatGPT` to `API`, use `AceessToken` directly as `API Key`, interface path: `/to/v1/chat/completions`
+
+#### Basic services
 
 - Authentic ChatGPT WebUI
 - Expose `unofficial`/`official API` proxies
@@ -92,6 +94,7 @@ Sending a `GPT4` conversation requires `Arkose Token` to be sent as a parameter,
   - `--tls-key`, environment variable `TLS_KEY`, TLS certificate private key
   - `--proxies`, Proxy, supports proxy pool, multiple proxies are separated by `,`, format: protocol://user:pass@ip:port, if the local IP is banned, you need to turn off the use of direct IP when using the proxy pool, `-- disable-direct` turns off direct connection, otherwise your banned local IP will be used according to load balancing
   - `--workers`, worker threads: default 1
+  - `--disable-webui`, if you don’t want to use the default built-in WebUI, use this parameter to turn it off
 
 [...](https://github.com/gngpp/ninja/blob/main/README.md#command-manual)
 
