@@ -23,5 +23,5 @@ for key in "${!map[@]}"; do
   docker rmi gngpp/ninja-builder:"$key"
   docker rmi ghcr.io/gngpp/ninja-builder:"$key"
   
-  docker rmi ${map[$key]}
+  docker rmi "${map[$key]}"
 done
