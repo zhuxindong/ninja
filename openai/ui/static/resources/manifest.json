@@ -1,7 +1,7 @@
 {
   "name": "ChatGPT",
   "short_name": "ChatGPT",
-  "description": "Ninja app powered by gngpp",
+  "description": "ChatGPT",
   "icons": [
     {
       "src": "/resources/apple-touch-icon.png",
