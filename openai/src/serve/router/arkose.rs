@@ -48,7 +48,7 @@ async fn proxy(
     {
         if let Ok(arkose_token) = ArkoseToken::new_from_context().await {
             if arkose_token.valid() {
-                let body = serde_json::json!({
+                let target = serde_json::json!({
                     "token": arkose_token,
                     "challenge_url":"",
                     "challenge_url_cdn":"https://client-api.arkoselabs.com/cdn/fc/assets/ec-game-core/bootstrap/1.14.1/standard/game_core_bootstrap.js",
@@ -75,11 +75,10 @@ async fn proxy(
                 return Ok(Response::builder()
                     .status(StatusCode::OK)
                     .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
-                    .body(Body::from(body.to_string()))
+                    .body(Body::from(target.to_string()))
                     .map_err(ResponseError::InternalServerError)?);
             }
         }
-        headers.remove(header::COOKIE);
     }
 
     headers.remove(header::CONNECTION);
