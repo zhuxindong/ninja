@@ -17,7 +17,11 @@ for key in "${!map[@]}"; do
     --tag gngpp/ninja-builder:"$key" \
     --tag ghcr.io/gngpp/ninja-builder:"$key" \
     --build-arg BASE_IMAGE="${map[$key]}" . --push
+
   echo "Build complete for $key"
+
+  docker rmi gngpp/ninja-builder:"$key"
   docker rmi ghcr.io/gngpp/ninja-builder:"$key"
-  docker rmi ghcr.io/gngpp/ninja-builder:"${map[$key]}"
+  
+  docker rmi ${map[$key]}
 done
