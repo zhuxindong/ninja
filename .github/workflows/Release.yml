@@ -144,6 +144,7 @@ jobs:
       - name: Build Package
         run: |
           set -e
+          rm -rf ./openwrt && svn co https://github.com/gngpp/ninja/trunk/openwrt
           echo "src-link ninja $GITHUB_WORKSPACE/openwrt" > openwrt-sdk/feeds.conf
           echo 'CONFIG_PACKAGE_ninja=y
           CONFIG_PACKAGE_luci-app-ninja=y
