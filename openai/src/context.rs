@@ -4,7 +4,9 @@ use crate::{
     arkose::{self, funcaptcha::ArkoseSolver},
     auth::AuthClient,
     balancer::ClientLoadBalancer,
-    error, info, warn,
+    error,
+    homedir::home_dir,
+    info, warn,
 };
 use derive_builder::Builder;
 use reqwest::Client;
@@ -86,7 +88,21 @@ impl Context {
     }
 
     fn new(args: ContextArgs) -> Self {
-        let hotwatch = args.arkose_har_file.clone().map(|path| {
+        let har_path = match args.arkose_har_file.as_ref() {
+            Some(file) => Some(file.clone()),
+            None => {
+                let home_dir = home_dir();
+                let har_path = home_dir
+                    .expect("Failed to get home directory")
+                    .join("chat.openai.com.har");
+                if !har_path.is_file() {
+                    std::fs::File::create(&har_path).expect("Failed to create har file");
+                    info!("Default HAR file path: {}", har_path.display());
+                }
+                Some(har_path)
+            }
+        };
+        let hotwatch = har_path.clone().map(|path| {
             let mut hotwatch = Hotwatch::new().expect("hotwatch failed to initialize!");
             hotwatch
                 .watch(path.clone(), move |event: Event| {
@@ -110,7 +126,7 @@ impl Context {
             ),
             arkose_token_endpoint: args.arkose_token_endpoint,
             arkose_solver: args.arkose_solver,
-            arkose_har_file: args.arkose_har_file,
+            arkose_har_file: har_path,
             arkose_har_upload_key: args.arkose_har_upload_key,
             share_puid: RwLock::new(args.puid.unwrap_or_default()),
             hotwatch,

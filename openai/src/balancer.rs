@@ -18,7 +18,7 @@ impl<T: Clone> ClientLoadBalancer<T> {
     ) -> anyhow::Result<ClientLoadBalancer<AuthClient>> {
         let build = |proxy_url: Option<String>| -> AuthClient {
             if let Some(ref url) = proxy_url {
-                info!("[AuthClient] Add {url} to the Auth load balancing client proxy pool");
+                info!("[AuthClient] Add {url} to proxy pool");
             }
             // auth client
             let auth_client = auth::AuthClientBuilder::builder()
@@ -57,7 +57,7 @@ impl<T: Clone> ClientLoadBalancer<T> {
         let build = |proxy_url: Option<String>| -> reqwest::Client {
             let mut client_builder = reqwest::Client::builder();
             if let Some(url) = proxy_url {
-                info!("[Client] Add {url} to the API load balancing client proxy pool");
+                info!("[Client] Add {url} to proxy pool");
                 let proxy = reqwest::Proxy::all(url).expect("Failed to build proxy");
                 client_builder = client_builder.proxy(proxy)
             }

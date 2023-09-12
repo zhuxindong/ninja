@@ -1,5 +1,5 @@
 use super::{Store, StoreId, StoreResult};
-use crate::homedir::home_dir;
+use openai::homedir::home_dir;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, ops::Not, path::PathBuf};
 

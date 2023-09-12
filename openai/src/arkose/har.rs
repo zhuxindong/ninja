@@ -110,14 +110,24 @@ pub fn parse_from_slice(s: &[u8]) -> anyhow::Result<RequestEntry> {
 }
 
 #[inline]
-pub fn parse_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<RequestEntry> {
-    if let Some(entry) = unsafe { CACHE_REQUEST_ENTRY.clone() } {
-        return Ok(entry);
+pub fn parse_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Option<RequestEntry>> {
+    if unsafe { CACHE_REQUEST_ENTRY.is_some() } {
+        return Ok(unsafe { CACHE_REQUEST_ENTRY.clone() });
     }
+
+    if path.as_ref().exists() {
+        anyhow::bail!("File {} not found", path.as_ref().display());
+    }
+
     let bytes = std::fs::read(path)?;
+
+    if bytes.is_empty() {
+        return Ok(None);
+    }
+
     let har = serde_json::from_slice::<Har>(&bytes)?;
     drop(bytes);
-    parse(har)
+    parse(har).map(Some)
 }
 
 pub fn clear_cache() {

@@ -126,7 +126,7 @@ pub(super) struct ServeArgs {
     pub(super) arkose_har_file: Option<PathBuf>,
 
     /// HAR file upload authenticate key
-    #[clap(short = 'K', long, requires = "arkose_har_file")]
+    #[clap(short = 'K', long)]
     pub(super) arkose_har_upload_key: Option<String>,
 
     /// About ArkoseLabs solver platform
