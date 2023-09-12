@@ -95,6 +95,9 @@ impl<T: Clone> ClientLoadBalancer<T> {
     }
 
     pub(super) fn next(&self) -> T {
+        if self.clients.len() == 1 {
+            return self.clients.first().cloned().expect("Init client failed");
+        }
         let len = self.clients.len();
         let mut old = self.index.load(Ordering::Relaxed);
         let mut new;
