@@ -171,7 +171,8 @@ async fn get_arkose_token_from_endpoint(endpoint: &str) -> anyhow::Result<Arkose
 
 #[inline]
 async fn get_arkose_token_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<ArkoseToken> {
-    let mut entry = har::parse_from_file(path)?;
+    let mut entry =
+        anyhow::Context::context(har::parse_from_file(path)?, "Uninitialized HAR file")?;
 
     let bt = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let bw = bt - (bt % 21600);

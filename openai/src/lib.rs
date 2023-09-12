@@ -7,6 +7,7 @@ pub mod context;
 pub mod error;
 #[cfg(feature = "stream")]
 pub mod eventsource;
+pub mod homedir;
 pub mod log;
 pub mod model;
 pub mod platform;

@@ -1,5 +1,5 @@
 use super::{Store, StoreId, StoreResult};
-use crate::homedir::home_dir;
+use openai::homedir::home_dir;
 use openai::{auth::model::AuthStrategy, model::AuthenticateToken};
 use std::{collections::HashMap, ops::Not, path::PathBuf};
 
