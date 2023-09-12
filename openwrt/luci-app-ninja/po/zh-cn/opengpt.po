@@ -37,6 +37,12 @@ msgstr "工作线程"
 msgid "Proxies"
 msgstr "代理"
 
+msgid "Turn off direct connection"
+msgstr "关闭直连"
+
+msgid "Turn off direct connection using proxy"
+msgstr "关闭直连使用代理"
+
 msgid "TCP Keep-Alive (seconds)"
 msgstr "TCP保活机制 (秒)"
 
