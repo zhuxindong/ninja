@@ -294,7 +294,7 @@ async fn event_convert_handler(
             .unwrap()])
         .build()
         .unwrap();
-    let data = format!(" {}\n\n", serde_json::to_string(&resp)?);
+    let data = format!(" {}", serde_json::to_string(&resp)?);
     Ok(Event::default().data(data))
 }
 
@@ -309,7 +309,7 @@ async fn model_mapper(model: &str) -> Result<(&str, &str, Option<ArkoseToken>), 
             Some(ArkoseToken::new_from_context().await?),
         )),
         _ => Err(ResponseError::BadRequest(anyhow::anyhow!(
-            "model is required!"
+            "not support model: {model}"
         ))),
     }
 }
