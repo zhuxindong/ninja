@@ -294,7 +294,8 @@ async fn event_convert_handler(
             .unwrap()])
         .build()
         .unwrap();
-    Event::default().json_data(resp)
+    let data = format!(" {}\n\n", serde_json::to_string(&resp)?);
+    Ok(Event::default().data(data))
 }
 
 async fn model_mapper(model: &str) -> Result<(&str, &str, Option<ArkoseToken>), ResponseError> {
