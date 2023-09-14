@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::net::SocketAddr;
-use std::sync::Once;
+use std::sync::OnceLock;
 
 use anyhow::anyhow;
 use axum::body::Body;
@@ -55,10 +55,8 @@ const TEMP_DETAIL: &str = "detail.htm";
 const TEMP_LOGIN: &str = "login.htm";
 const TEMP_SHARE: &str = "share.htm";
 
-static INIT: Once = Once::new();
-
-static mut TEMPLATE: Option<tera::Tera> = None;
-static mut TEMPLATE_DATA: Option<TemplateData> = None;
+static TEMPLATE: OnceLock<tera::Tera> = OnceLock::new();
+static TEMPLATE_DATA: OnceLock<TemplateData> = OnceLock::new();
 
 #[derive(Serialize, Deserialize)]
 struct Session {
@@ -136,10 +134,15 @@ impl From<Launcher> for TemplateData {
 // this function could be located in a different module
 pub(super) fn config(router: Router, args: &Launcher) -> Router {
     if !args.disable_ui {
-        unsafe { TEMPLATE_DATA = Some(TemplateData::from(args.clone())) };
-        if let Some(url) = unsafe { TEMPLATE_DATA.as_ref().unwrap().api_prefix.as_ref() } {
-            info!("WebUI site use api: {url}")
+        let data = TEMPLATE_DATA.get_or_init(|| TemplateData::from(args.clone()));
+        if let Some(url) = data.api_prefix.as_ref() {
+            info!("WebUI site use API: {url}")
         }
+
+        if let Some(endpoint) = data.arkose_endpoint.as_ref() {
+            info!("WebUI site use Arkose endpoint: {endpoint}")
+        }
+
         let mut tera = tera::Tera::default();
         tera.add_raw_templates(vec![
             (TEMP_404, include_str!("../../../ui/404.htm")),
@@ -151,9 +154,7 @@ pub(super) fn config(router: Router, args: &Launcher) -> Router {
         ])
         .expect("The static template failed to load");
 
-        INIT.call_once(|| unsafe {
-            TEMPLATE = Some(tera);
-        });
+        let _ = TEMPLATE.set(tera);
 
         router
             .route("/auth", get(get_auth))
@@ -172,7 +173,7 @@ pub(super) fn config(router: Router, args: &Launcher) -> Router {
                         .status(StatusCode::FOUND)
                         .header(header::LOCATION, "/")
                         .body(Body::empty())
-                        .unwrap()
+                        .expect("An error occurred while redirecting")
                 }),
             )
             .route(
@@ -182,7 +183,7 @@ pub(super) fn config(router: Router, args: &Launcher) -> Router {
                         .status(StatusCode::FOUND)
                         .header(header::LOCATION, "/")
                         .body(Body::empty())
-                        .unwrap()
+                        .expect("An error occurred while redirecting")
                 }),
             )
             .route("/share/:share_id", get(get_share_chat))
@@ -373,7 +374,9 @@ async fn get_session(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
     if let Some(cookie) = jar.get(SESSION_ID) {
         let session = extract_session(cookie.value())?;
         let dt = DateTime::<Utc>::from_naive_utc_and_offset(
-            NaiveDateTime::from_timestamp_opt(session.expires, 0).unwrap(),
+            NaiveDateTime::from_timestamp_opt(session.expires, 0).ok_or(
+                ResponseError::InternalServerError(anyhow!("Invalid timestamp")),
+            )?,
             Utc,
         );
 
@@ -567,7 +570,11 @@ async fn get_share_chat(
                                 }
                         );
                         let mut ctx = tera::Context::new();
-                        ctx.insert("props", &serde_json::to_string(&props).unwrap());
+                        ctx.insert(
+                            "props",
+                            &serde_json::to_string(&props)
+                                .map_err(ResponseError::InternalServerError)?,
+                        );
                         settings_template_data(&mut ctx);
                         render_template(TEMP_SHARE, &ctx)
                     }
@@ -586,7 +593,11 @@ async fn get_share_chat(
                         });
 
                         let mut ctx = tera::Context::new();
-                        ctx.insert("props", &serde_json::to_string(&props).unwrap());
+                        ctx.insert(
+                            "props",
+                            &serde_json::to_string(&props)
+                                .map_err(ResponseError::InternalServerError)?,
+                        );
                         settings_template_data(&mut ctx);
                         render_template(TEMP_404, &ctx)
                     }
@@ -654,14 +665,18 @@ async fn get_share_chat_info(
                     Ok(Response::builder()
                         .status(StatusCode::OK)
                         .header(header::CONTENT_TYPE, "application/json")
-                        .body(Body::from(serde_json::to_string(&props).unwrap()))
+                        .body(Body::from(
+                            serde_json::to_string(&props)
+                                .map_err(ResponseError::InternalServerError)?,
+                        ))
                         .map_err(ResponseError::InternalServerError)?)
                 }
                 Err(_) => Ok(Response::builder()
                     .status(StatusCode::OK)
                     .header(header::CONTENT_TYPE, "application/json")
                     .body(Body::from(
-                        serde_json::to_string(&serde_json::json!({"notFound": true})).unwrap(),
+                        serde_json::to_string(&serde_json::json!({"notFound": true}))
+                            .map_err(ResponseError::InternalServerError)?,
                     ))
                     .map_err(ResponseError::InternalServerError)?),
             };
@@ -697,50 +712,30 @@ async fn get_share_chat_continue_info(
             Ok(session) => {
                 let ctx = context::Context::get_instance().await;
                 let url = get_url();
-                let resp = ctx.load_client()
-                .get(format!("{url}/backend-api/share/{}", share_id.0))
-                .headers(header_convert(&headers, &jar).await?)
-                .bearer_auth(session.access_token)
-                .send()
-                .await
-                .map_err(ResponseError::InternalServerError)?;
-            match resp.json::<Value>().await {
-                Ok(mut share_data) => {
-                    if let Some(replace) = share_data
-                        .get_mut("continue_conversation_url")
-                        .and_then(|v| v.as_str())
-                    {
-                        let new_value = replace.replace("https://chat.openai.com", "");
-                        share_data.as_object_mut().and_then(|data| {
-                            data.insert("continue_conversation_url".to_owned(), json!(new_value))
-                        });
-                    }
-                    let props = serde_json::json!({
-                        "pageProps": {
-                            "user": {
-                                "id": session.user_id,
-                                "name": session.email,
-                                "email": session.email,
-                                "image": session.picture,
-                                "picture": session.picture,
-                                "groups": [],
-                            },
-                            "serviceStatus": {},
-                            "userCountry": "US",
-                            "geoOk": true,
-                            "serviceAnnouncement": {
-                                "paid": {},
-                                "public": {}
-                            },
-                            "isUserInCanPayGroup": true,
-                            "sharedConversationId": share_id.0,
-                            "serverResponse": {
-                                "type": "data",
-                                "data": share_data,
-                            },
-                            "continueMode": true,
-                            "moderationMode": false,
-                            "chatPageProps": {
+                let resp = ctx
+                    .load_client()
+                    .get(format!("{url}/backend-api/share/{}", share_id.0))
+                    .headers(header_convert(&headers, &jar).await?)
+                    .bearer_auth(session.access_token)
+                    .send()
+                    .await
+                    .map_err(ResponseError::InternalServerError)?;
+                match resp.json::<Value>().await {
+                    Ok(mut share_data) => {
+                        if let Some(replace) = share_data
+                            .get_mut("continue_conversation_url")
+                            .and_then(|v| v.as_str())
+                        {
+                            let new_value = replace.replace("https://chat.openai.com", "");
+                            share_data.as_object_mut().and_then(|data| {
+                                data.insert(
+                                    "continue_conversation_url".to_owned(),
+                                    json!(new_value),
+                                )
+                            });
+                        }
+                        let props = serde_json::json!({
+                            "pageProps": {
                                 "user": {
                                     "id": session.user_id,
                                     "name": session.email,
@@ -757,35 +752,67 @@ async fn get_share_chat_continue_info(
                                     "public": {}
                                 },
                                 "isUserInCanPayGroup": true,
+                                "sharedConversationId": share_id.0,
+                                "serverResponse": {
+                                    "type": "data",
+                                    "data": share_data,
+                                },
+                                "continueMode": true,
+                                "moderationMode": false,
+                                "chatPageProps": {
+                                    "user": {
+                                        "id": session.user_id,
+                                        "name": session.email,
+                                        "email": session.email,
+                                        "image": session.picture,
+                                        "picture": session.picture,
+                                        "groups": [],
+                                    },
+                                    "serviceStatus": {},
+                                    "userCountry": "US",
+                                    "geoOk": true,
+                                    "serviceAnnouncement": {
+                                        "paid": {},
+                                        "public": {}
+                                    },
+                                    "isUserInCanPayGroup": true,
+                                },
                             },
-                        },
-                        "__N_SSP": true
-                    });
-                    Ok(Response::builder()
-                    .status(StatusCode::OK)
-                    .header(header::CONTENT_TYPE, "application/json")
-                    .body(Body::from(serde_json::to_string(&props).unwrap()))
-                    .map_err(ResponseError::InternalServerError)?)
+                            "__N_SSP": true
+                        });
+                        Ok(Response::builder()
+                            .status(StatusCode::OK)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Body::from(
+                                serde_json::to_string(&props)
+                                    .map_err(ResponseError::InternalServerError)?,
+                            ))
+                            .map_err(ResponseError::InternalServerError)?)
+                    }
+                    Err(_) => Ok(Response::builder()
+                        .status(StatusCode::OK)
+                        .header(header::CONTENT_TYPE, "same-origin")
+                        .body(Body::from(
+                            serde_json::to_string(&serde_json::json!({"notFound": true}))
+                                .map_err(ResponseError::InternalServerError)?,
+                        ))
+                        .map_err(ResponseError::InternalServerError)?),
                 }
-                Err(_) => Ok(Response::builder()
-                    .status(StatusCode::OK)
-                    .header(header::CONTENT_TYPE, "same-origin")
-                    .body(Body::from(serde_json::to_string(&serde_json::json!({"notFound": true})).unwrap()))
-                    .map_err(ResponseError::InternalServerError)?),
             }
-            },
             Err(_) => {
+                let body = Body::from(serde_json::to_string(&serde_json::json!({
+                    "pageProps": {
+                        "__N_REDIRECT": format!("/auth/login?next=%2Fshare%2F{}%2Fcontinue", share_id.0),
+                        "__N_REDIRECT_STATUS": 307
+                    },
+                    "__N_SSP": true
+                })).map_err(ResponseError::InternalServerError)?);
                 Ok(Response::builder()
                     .status(StatusCode::TEMPORARY_REDIRECT)
-                            .header(header::CONTENT_TYPE, "application/json")
-                                .body(Body::from(serde_json::to_string(&serde_json::json!({
-                                    "pageProps": {
-                                        "__N_REDIRECT": format!("/auth/login?next=%2Fshare%2F{}%2Fcontinue", share_id.0),
-                                        "__N_REDIRECT_STATUS": 307
-                                    },
-                                    "__N_SSP": true
-                                })).unwrap())).map_err(ResponseError::InternalServerError)?)
-            },
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(body)
+                    .map_err(ResponseError::InternalServerError)?)
+            }
         };
     }
     redirect_login()
@@ -847,13 +874,11 @@ fn redirect_login() -> Result<Response<Body>, ResponseError> {
 }
 
 fn render_template(name: &str, context: &tera::Context) -> Result<Response<Body>, ResponseError> {
-    let tm = unsafe {
-        TEMPLATE
-            .as_ref()
-            .unwrap()
-            .render(name, context)
-            .map_err(ResponseError::InternalServerError)
-    }?;
+    let tm = TEMPLATE
+        .get()
+        .expect("template not init")
+        .render(name, context)
+        .map_err(ResponseError::InternalServerError)?;
 
     Ok(Response::builder()
         .status(StatusCode::OK)
@@ -863,7 +888,7 @@ fn render_template(name: &str, context: &tera::Context) -> Result<Response<Body>
 }
 
 fn settings_template_data(ctx: &mut tera::Context) {
-    let data = unsafe { TEMPLATE_DATA.as_ref().unwrap() };
+    let data = TEMPLATE_DATA.get().expect("template data not init");
     if let Some(site_key) = &data.cf_site_key {
         ctx.insert("site_key", site_key);
     }
@@ -881,7 +906,7 @@ fn check_token(token: &str) -> Result<(), ResponseError> {
 }
 
 async fn cf_captcha_check(addr: IpAddr, cf_response: Option<&str>) -> Result<(), ResponseError> {
-    let data = unsafe { TEMPLATE_DATA.as_ref().unwrap() };
+    let data = TEMPLATE_DATA.get().expect("template data not init");
     if data.cf_site_key.is_some() && data.cf_secret_key.is_some() {
         let cf_response = cf_response.ok_or(ResponseError::BadRequest(anyhow::anyhow!(
             "Missing cf_captcha_response"
@@ -894,7 +919,7 @@ async fn cf_captcha_check(addr: IpAddr, cf_response: Option<&str>) -> Result<(),
         }
 
         let form = CfCaptchaForm {
-            secret: data.cf_secret_key.as_ref().unwrap(),
+            secret: data.cf_secret_key.as_ref().expect("cf_secret_key not init"),
             response: cf_response,
             remoteip: &addr.to_string(),
             idempotency_key: crate::uuid::uuid(),
@@ -919,7 +944,7 @@ async fn cf_captcha_check(addr: IpAddr, cf_response: Option<&str>) -> Result<(),
 }
 
 fn get_url() -> &'static str {
-    let data = unsafe { TEMPLATE_DATA.as_ref().unwrap() };
+    let data = TEMPLATE_DATA.get().expect("template data not init");
     match data.api_prefix.as_ref() {
         Some(ref api_prefix) => api_prefix,
         None => URL_CHATGPT_API,

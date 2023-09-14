@@ -199,19 +199,15 @@ impl ConvoResponse {
         &self.message.content.content_type
     }
 
-    pub fn metadata_message_type(&self) -> String {
-        self.message
-            .metadata
-            .message_type
-            .clone()
-            .unwrap_or_default()
+    pub fn metadata_message_type(&self) -> &str {
+        self.message.metadata.message_type.as_deref().unwrap_or("")
     }
 
-    pub fn metadata_finish_details_type(&self) -> String {
+    pub fn metadata_finish_details_type(&self) -> &str {
         if let Some(ref f) = self.message.metadata.finish_details {
-            return f._type.clone().unwrap_or_default();
+            return f._type.as_deref().unwrap();
         }
-        "".to_owned()
+        ""
     }
 
     pub fn messages(&self) -> Vec<String> {

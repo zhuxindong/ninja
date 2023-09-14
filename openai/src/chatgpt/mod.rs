@@ -281,7 +281,7 @@ impl ChatGPT {
             .bearer_auth(&self.access_token.read().await)
             .json(&req)
             .eventsource()
-            .unwrap();
+            .expect("eventsource error");
         Self::process_stream::<resp::PostConvoResponse>(resp).await
     }
 

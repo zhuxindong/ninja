@@ -75,11 +75,11 @@ fn parse(har: Har) -> anyhow::Result<RequestEntry> {
                     bv,
                 };
 
-                let lock = LOCK.lock().unwrap();
+                let lock = LOCK.lock().expect("Unable to lock");
                 unsafe {
                     CACHE_REQUEST_ENTRY = Some(entry);
                     drop(lock);
-                    return Ok(CACHE_REQUEST_ENTRY.clone().unwrap());
+                    return Ok(CACHE_REQUEST_ENTRY.clone().expect("HAR cache not found"));
                 }
             }
         }
@@ -131,7 +131,7 @@ pub fn parse_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Option<Request
 }
 
 pub fn clear_cache() {
-    let lock = LOCK.lock().unwrap();
+    let lock = LOCK.lock().expect("Unable to lock");
     unsafe { CACHE_REQUEST_ENTRY = None }
     drop(lock)
 }

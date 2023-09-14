@@ -194,7 +194,8 @@ impl From<(Strategy, bool, u32, u32, u32, String)> for TokenBucketLimitContext {
                 value.1, value.2, value.3, value.4,
             ))),
             Strategy::Redis => Self(Box::new(
-                RedisTokenBucket::new(value.1, value.2, value.3, value.4, value.5).unwrap(),
+                RedisTokenBucket::new(value.1, value.2, value.3, value.4, value.5)
+                    .expect("redis token bucket init failed"),
             )),
         };
         strategy

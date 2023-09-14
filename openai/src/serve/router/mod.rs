@@ -1,4 +1,5 @@
-use std::{collections::HashMap, sync::Once};
+use std::collections::HashMap;
+use std::sync::OnceLock;
 
 use axum::http::header;
 use axum::http::StatusCode;
@@ -13,8 +14,7 @@ mod ui;
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
-static INIT: Once = Once::new();
-static mut STATIC_FILES: Option<HashMap<&'static str, static_files::Resource>> = None;
+static STATIC_FILES: OnceLock<HashMap<&'static str, static_files::Resource>> = OnceLock::new();
 
 pub(super) fn config(router: Router, args: &Launcher) -> Router {
     init_static_files();
@@ -25,18 +25,13 @@ pub(super) fn config(router: Router, args: &Launcher) -> Router {
 }
 
 fn init_static_files() {
-    INIT.call_once(|| {
-        let generated_files = generate();
-        unsafe {
-            STATIC_FILES = Some(generated_files);
-        }
-    });
+    STATIC_FILES.get_or_init(|| generate());
 }
 
 async fn get_static_resource(path: Path<String>) -> Result<Response<Body>, ResponseError> {
     let path = path.0;
-    let mut x = unsafe { STATIC_FILES.as_ref().unwrap().iter() };
-    match x.find(|(k, _v)| k.contains(&path)) {
+    let mut static_files = STATIC_FILES.get().expect("static file not init").iter();
+    match static_files.find(|(k, _v)| k.contains(&path)) {
         Some((_, v)) => Ok(Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, v.mime_type)

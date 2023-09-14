@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-
 use crate::arkose::ArkoseToken;
 use crate::context::Context;
 use crate::serve::err::ResponseError;
+use crate::serve::router::STATIC_FILES;
 use crate::serve::Launcher;
 use axum::body::Body;
 use axum::http::header;
@@ -15,6 +14,7 @@ use axum::{
     routing::any,
     Form, Router,
 };
+use std::collections::HashMap;
 
 pub(super) fn config(router: Router, args: &Launcher) -> Router {
     if args.arkose_endpoint.is_none() {
@@ -32,7 +32,10 @@ async fn proxy(
     mut headers: HeaderMap,
     body: Option<Form<HashMap<String, String>>>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    if let Some((_, v)) = unsafe { super::STATIC_FILES.as_ref().unwrap().iter() }
+    if let Some((_, v)) = STATIC_FILES
+        .get()
+        .expect("static file")
+        .iter()
         .find(|(k, _v)| k.contains(uri.path()))
     {
         return Ok(Response::builder()
