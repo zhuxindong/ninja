@@ -1,13 +1,15 @@
 use derive_builder::Builder;
 use serde::Serialize;
 
+use crate::chatgpt::model::Role;
+
 #[derive(Serialize, Builder, Clone)]
 pub struct Resp<'a> {
     id: &'a str,
     object: &'a str,
-    created: i64,
+    created: &'a i64,
     model: &'a str,
-    choices: Vec<Choice>,
+    choices: Vec<Choice<'a>>,
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     usage: Option<Usage>,
@@ -21,16 +23,16 @@ pub struct Usage {
 }
 
 #[derive(Serialize, Builder, Clone)]
-pub struct Choice {
+pub struct Choice<'a> {
     pub index: i64,
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<Message>,
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub delta: Option<Delta>,
+    pub delta: Option<Delta<'a>>,
     #[builder(default)]
-    pub finish_reason: Option<String>,
+    pub finish_reason: Option<&'a str>,
 }
 
 #[derive(Serialize, Builder, Clone)]
@@ -40,11 +42,11 @@ pub struct Message {
 }
 
 #[derive(Serialize, Builder, Clone)]
-pub struct Delta {
+pub struct Delta<'a> {
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub role: Option<String>,
+    pub role: Option<&'a Role>,
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<String>,
+    pub content: Option<&'a str>,
 }
