@@ -24,7 +24,7 @@ rand = "0.8.5"
 async-trait = "0.1.68"
 derive_builder = "0.12.0"
 jsonwebtokens = "1"
-sha2 = "0.10.6"
+sha2 = "0.10.7"
 hmac = { version = "0.12.1", optional = true }
 futures-core = { version = "0.3.28", optional = true}
 tera = { version = "1.19.0", default-features = false, optional = true }
