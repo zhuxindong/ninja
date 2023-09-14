@@ -104,9 +104,12 @@ pub(crate) async fn chat_to_api(
                     Sse::new(stream_handler(event_source, model_mapper.1.to_owned()))
                         .into_response(),
                 ),
-                false => Ok(not_stream_handler(event_source, model_mapper.1.to_owned())
-                    .await?
-                    .into_response()),
+                false => {
+                    let res = not_stream_handler(event_source, model_mapper.1.to_owned())
+                        .await
+                        .map_err(ResponseError::InternalServerError)?;
+                    Ok(res.into_response())
+                }
             }
         }
         Err(err) => match err.status() {
@@ -149,7 +152,7 @@ async fn not_stream_handler(
         impl Stream<Item = Result<bytes::Bytes, reqwest::Error>> + std::marker::Unpin,
     >,
     model: String,
-) -> Result<Json<Value>, ResponseError> {
+) -> anyhow::Result<Json<Value>> {
     let id = generate_id(29);
     let timestamp = current_timestamp();
     let mut previous_message = String::new();
@@ -162,8 +165,15 @@ async fn not_stream_handler(
                 }
                 if let Ok(res) = serde_json::from_str::<PostConvoResponse>(&message.data) {
                     if let PostConvoResponse::Conversation(convo) = res {
-                        finish_reason = Some(convo.metadata_finish_details_type());
-                        previous_message = convo.messages().first().cloned().unwrap_or_default();
+                        let finish = convo.metadata_finish_details_type();
+                        if !finish.is_empty() {
+                            finish_reason = Some(finish.to_owned())
+                        }
+                        let messages = convo.messages();
+                        if let Some(message) = messages.first() {
+                            previous_message.clear();
+                            previous_message.push_str(message);
+                        }
                     }
                 }
             }
@@ -177,31 +187,27 @@ async fn not_stream_handler(
     let message = resp::MessageBuilder::default()
         .role(Role::Assistant.to_string())
         .content(previous_message)
-        .build()
-        .unwrap();
+        .build()?;
 
     let resp = resp::RespBuilder::default()
         .id(&id)
         .object("chat.completion.chunk")
-        .created(timestamp)
+        .created(&timestamp)
         .model(&model)
         .choices(vec![resp::ChoiceBuilder::default()
             .index(0)
             .message(Some(message))
-            .finish_reason(finish_reason)
-            .build()
-            .unwrap()])
+            .finish_reason(finish_reason.as_deref())
+            .build()?])
         .usage(Some(
             resp::UsageBuilder::default()
                 .prompt_tokens(0)
                 .completion_tokens(0)
                 .total_tokens(0)
-                .build()
-                .unwrap(),
+                .build()?,
         ))
-        .build()
-        .unwrap();
-    let value = serde_json::to_value(&resp).map_err(ResponseError::InternalServerError)?;
+        .build()?;
+    let value = serde_json::to_value(&resp)?;
     Ok(Json(value))
 }
 
@@ -216,6 +222,7 @@ fn stream_handler(
     async_stream::stream! {
         let mut previous_message = String::new();
         let mut set_role = true;
+        let mut stop: u8 = 0;
         while let Some(event_result) = event_soure.next().await {
             match event_result {
                 Ok(message) =>  {
@@ -231,9 +238,20 @@ fn stream_handler(
                                 continue;
                             }
 
-                            match event_convert_handler(&id, timestamp, &model, &mut previous_message, &mut set_role, convo).await {
+                            match event_convert_handler(
+                                &mut stop,
+                                &id,
+                                &timestamp,
+                                &model,
+                                &mut previous_message,
+                                &mut set_role,
+                                convo).await {
                                 Ok(event) => {
-                                    yield Ok(event)
+                                    if stop == 0 {
+                                        yield Ok(event)
+                                    } else if stop <= 1 {
+                                        yield Ok(event)
+                                    }
                                 },
                                 Err(err) => {
                                     debug!("event source json serialize error: {}", err);
@@ -251,35 +269,45 @@ fn stream_handler(
 }
 
 async fn event_convert_handler(
+    stop: &mut u8,
     id: &String,
-    timestamp: i64,
+    timestamp: &i64,
     model: &String,
     previous_message: &mut String,
     set_role: &mut bool,
     convo: ConvoResponse,
-) -> Result<Event, serde_json::Error> {
-    let message = &convo.messages()[0];
+) -> anyhow::Result<Event> {
+    let messages = convo.messages();
+    let message = messages
+        .first()
+        .ok_or(anyhow::anyhow!("message is empty"))?;
 
     let finish_reason = convo
         .end_turn()
         .filter(|&end| end)
         .map(|_| convo.metadata_finish_details_type());
 
-    let role: Option<String> = if *set_role {
+    let role = if *set_role {
         *set_role = false;
-        Some(convo.role().to_string())
+        Some(convo.role())
     } else {
         None
     };
 
-    let return_message = message.replace(&*previous_message, "");
-    *previous_message = message.to_string();
+    let return_message = if finish_reason.is_some_and(|finish| finish.eq("stop")) {
+        *stop += 1;
+        None
+    } else {
+        Some(message.trim_start_matches(previous_message.as_str()))
+    };
+
+    previous_message.clear();
+    previous_message.push_str(message);
 
     let delta = resp::DeltaBuilder::default()
         .role(role)
-        .content(Some(return_message))
-        .build()
-        .unwrap();
+        .content(return_message)
+        .build()?;
 
     let resp = resp::RespBuilder::default()
         .id(&id)
@@ -290,10 +318,8 @@ async fn event_convert_handler(
             .index(0)
             .delta(Some(delta))
             .finish_reason(finish_reason)
-            .build()
-            .unwrap()])
-        .build()
-        .unwrap();
+            .build()?])
+        .build()?;
     let data = format!(" {}", serde_json::to_string(&resp)?);
     Ok(Event::default().data(data))
 }
