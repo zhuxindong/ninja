@@ -1,6 +1,6 @@
 [package]
 name = "ninja"
-version = "0.5.4"
+version = "0.5.5"
 edition = "2021"
 description = "Ninja - Reverse engineered ChatGPT proxy (bypass Cloudflare 403 Access Denied)\nGithub: https://github.com/gngpp/ninja"
 license = "MIT"
