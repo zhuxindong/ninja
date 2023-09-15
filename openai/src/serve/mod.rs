@@ -133,10 +133,11 @@ impl Launcher {
             .with(tracing_subscriber::fmt::layer())
             .init();
 
-        info!(
-            "Starting HTTP(S) server at http(s)://{}:{}",
-            self.host, self.port
-        );
+        let host = match self.host.is_ipv4() {
+            true => self.host.to_string(),
+            false => format!("[{}]", self.host),
+        };
+        info!("Starting HTTP(S) server at http(s)://{host}:{}", self.port);
         info!("Starting {} workers", self.workers);
         info!("Concurrent limit {}", self.concurrent_limit);
         info!("Keepalive {} seconds", self.tcp_keepalive);
@@ -504,7 +505,7 @@ pub(super) async fn header_convert(
     let mut cookie = String::new();
 
     if let Some(puid) = headers.get("PUID") {
-        let puid = puid.to_str().unwrap();
+        let puid = puid.to_str()?;
         cookie.push_str(&format!("_puid={puid};"))
     }
 
@@ -625,7 +626,8 @@ async fn handle_body(
                 {
                     headers.insert(
                         header::COOKIE,
-                        HeaderValue::from_str(&format!("_puid={};", puid_cookie.value())).unwrap(),
+                        HeaderValue::from_str(&format!("_puid={};", puid_cookie.value()))
+                            .map_err(ResponseError::BadRequest)?,
                     );
                 }
             }
@@ -701,8 +703,8 @@ async fn initialize_puid(username: Option<String>, password: Option<String>, mfa
     }
     let mut interval = tokio::time::interval(Duration::from_secs(24 * 60 * 60)); // 24 hours
     let mut account = AuthAccount {
-        username: username.unwrap(),
-        password: password.unwrap(),
+        username: username.expect("username is empty"),
+        password: password.expect("password is empty"),
         mfa,
         option: AuthStrategy::Apple,
         cf_turnstile_response: None,

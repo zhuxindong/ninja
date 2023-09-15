@@ -80,7 +80,10 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
     let mut builder = builder.sign_secret_key(args.sign_secret_key);
 
     if args.tls_key.is_some() && args.tls_cert.is_some() {
-        builder = builder.tls_keypair(Some((args.tls_cert.unwrap(), args.tls_key.unwrap())));
+        builder = builder.tls_keypair(Some((
+            args.tls_cert.expect("tls_cert not init"),
+            args.tls_key.expect("tls_key not init"),
+        )));
     }
     builder.build()?.run()
 }
@@ -101,13 +104,13 @@ pub(super) fn serve_start(mut args: ServeArgs) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let pid_file = File::create(env::PID_PATH).unwrap();
+    let pid_file = File::create(env::PID_PATH)?;
     pid_file.set_permissions(Permissions::from_mode(0o755))?;
 
-    let stdout = File::create(env::DEFAULT_STDOUT_PATH).unwrap();
+    let stdout = File::create(env::DEFAULT_STDOUT_PATH)?;
     stdout.set_permissions(Permissions::from_mode(0o755))?;
 
-    let stderr = File::create(env::DEFAULT_STDERR_PATH).unwrap();
+    let stderr = File::create(env::DEFAULT_STDERR_PATH)?;
     stdout.set_permissions(Permissions::from_mode(0o755))?;
 
     let mut daemonize = Daemonize::new()
@@ -239,7 +242,7 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
 
     let args = args::ServeArgs {
         config: None,
-        host: Some("0.0.0.0".parse().unwrap()),
+        host: Some("0.0.0.0".parse()?),
         port: Some(7999),
         workers: 1,
         concurrent_limit: 65535,

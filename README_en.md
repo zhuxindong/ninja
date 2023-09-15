@@ -31,7 +31,7 @@ Reverse engineered `ChatGPT` proxy (bypass Cloudflare 403 Access Denied)
 ### Bypass IP restrictions
 
 Here `IP limit` refers to `OpenAI`'s request rate limit for `single IP`. You need to understand what `puid` is. The default request models interface returns `puid cookie`.
-In addition, the `GPT-4` session must be sent with `puid`. When using a third-party client to send a `GPT-4` reply, the `puid` may not be saved or obtained. You need to handle it on the server side:
+In addition, the `GPT-4` session must be sent with `puid`. When using a third-party client to send a `GPT-4` conversation, the `puid` may not be saved or obtained. You need to handle it on the server side:
 
 - Use the startup parameter `--puid` to set up shared use separately. This method does not support updates.
 - Use the startup parameter `--puid-user` to set the `Account Plus` account to obtain the `puid`, and it will be updated regularly
@@ -97,8 +97,8 @@ Sending a `GPT4` conversation requires `Arkose Token` to be sent as a parameter,
 Making [Releases](https://github.com/gngpp/ninja/releases/latest) has a precompiled deb package, binaries, in Ubuntu, for example:
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.5.4/ninja-0.5.4-x86_64-unknown-linux-musl.deb
-dpkg -i ninja-0.5.4-x86_64-unknown-linux-musl.deb
+wget https://github.com/gngpp/ninja/releases/download/v0.5.5/ninja-0.5.5-x86_64-unknown-linux-musl.deb
+dpkg -i ninja-0.5.5-x86_64-unknown-linux-musl.deb
 ninja serve run
 ```
 
@@ -107,11 +107,11 @@ ninja serve run
 There are pre-compiled ipk files in GitHub [Releases](https://github.com/gngpp/ninja/releases/latest), which currently provide versions of aarch64/x86_64 and other architectures. After downloading, use opkg to install, and use nanopi r4s as example:
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.5.4/ninja_0.5.4_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.5.4/luci-app-ninja_1.0.9-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.5.4/luci-i18n-ninja-zh-cn_1.0.9-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.5.5/ninja_0.5.5_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.5.5/luci-app-ninja_1.0.9-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.5.5/luci-i18n-ninja-zh-cn_1.0.9-1_all.ipk
 
-opkg install ninja_0.5.4_aarch64_generic.ipk
+opkg install ninja_0.5.5_aarch64_generic.ipk
 opkg install luci-app-ninja_1.0.9-1_all.ipk
 opkg install luci-i18n-ninja-zh-cn_1.0.9-1_all.ipk
 ```

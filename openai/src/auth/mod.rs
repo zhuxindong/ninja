@@ -128,7 +128,7 @@ impl AuthHandle for AuthClient {
         if let Some(err) = last_err {
             bail!(err)
         }
-        Ok(last_res.unwrap())
+        Ok(last_res.expect("Refresh token not found"))
     }
 }
 

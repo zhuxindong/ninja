@@ -114,8 +114,8 @@ impl ProgressBar<'_> {
                 for chars in progress_chars {
                     out.write_all(format!("\r\x1B[34m{chars}\x1B[0m {msg}").as_bytes())
                         .await
-                        .unwrap();
-                    out.flush().await.unwrap();
+                        .expect("write to stdout");
+                    out.flush().await.expect("flush stdout");
                     thread::sleep(Duration::from_millis(100));
                 }
             }
