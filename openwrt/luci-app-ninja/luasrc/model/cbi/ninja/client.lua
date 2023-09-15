@@ -1,7 +1,7 @@
 local m, s
 
 m = Map("ninja", translate("Ninja"))
-m.description = translate("<a>A reverse engineered unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)</a> | <a href=\"https://github.com/gngpp/ninja\" target=\"_blank\">Project GitHub URL</a>")
+m.description = translate("<a>A reverse engineered unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)</a> | <a href=\"https://github.com/zhuxindong/ninja\" target=\"_blank\">Project GitHub URL</a>")
 
 m:section(SimpleSection).template = "ninja/ninja_status"
 
