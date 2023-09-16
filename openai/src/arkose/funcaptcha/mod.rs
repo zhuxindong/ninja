@@ -239,7 +239,7 @@ impl Session {
 
     pub async fn submit_answer(mut self, answers: Vec<i32>) -> anyhow::Result<()> {
         debug!("answer index:{answers:?}");
-        let mut answer_index = vec![];
+        let mut answer_index = Vec::with_capacity(answers.len());
         for answer in answers {
             answer_index.push(format!(r#"{{"index":{answer}}}"#))
         }
