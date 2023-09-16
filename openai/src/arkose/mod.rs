@@ -9,11 +9,13 @@ use std::time::UNIX_EPOCH;
 
 use base64::Engine;
 use rand::Rng;
+use regex::Regex;
 use reqwest::header;
 use reqwest::Method;
 use serde::Deserialize;
 use serde::Serialize;
 use serde::Serializer;
+use tokio::sync::OnceCell;
 
 use crate::arkose::crypto::encrypt;
 use crate::context::Context;
@@ -169,23 +171,39 @@ async fn get_arkose_token_from_endpoint(endpoint: &str) -> anyhow::Result<Arkose
     Ok(resp.json::<ArkoseToken>().await?)
 }
 
+static REGEX: OnceCell<Regex> = OnceCell::const_new();
+
 #[inline]
 async fn get_arkose_token_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<ArkoseToken> {
+    use base64::engine::general_purpose;
+
+    let regex = REGEX
+        .get_or_init(|| async {
+            Regex::new(r#"\{"key":"n","value":"[^"]+"\}"#).expect("Invalid regex")
+        })
+        .await;
+
     let mut entry =
         anyhow::Context::context(har::parse_from_file(path)?, "Uninitialized HAR file")?;
 
     let bt = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let bw = bt - (bt % 21600);
     let bv = &entry.bv;
-    let bx = &entry.bx;
 
-    let bda = crypto::encrypt(bx, &format!("{bv}{bw}"))?;
+    let bx = regex.replace_all(
+        &entry.bx,
+        format!(
+            r#"{{"key":"n","value":"{}"}}"#,
+            general_purpose::STANDARD.encode(bt.to_string())
+        ),
+    );
+
+    let bda = crypto::encrypt(&bx, &format!("{bv}{bw}"))?;
     let rnd = format!("{}", rand::Rng::gen::<f64>(&mut rand::thread_rng()));
 
-    entry.body.push_str(&format!(
-        "&bda={}",
-        base64::engine::general_purpose::STANDARD.encode(&bda)
-    ));
+    entry
+        .body
+        .push_str(&format!("&bda={}", general_purpose::STANDARD.encode(&bda)));
     entry.body.push_str(&format!("&rnd={rnd}"));
 
     let client = Context::get_instance().await.load_client();
