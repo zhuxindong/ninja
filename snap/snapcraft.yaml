@@ -1,5 +1,5 @@
 name: ninja
-version: '0.5.5'
+version: '0.5.6'
 summary: Ninja - A reverse engineered unofficial ChatGPT proxy
 description: |
   A reverse engineered unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)
