@@ -37,7 +37,7 @@ pub(crate) async fn chat_to_api(
     jar: CookieJar,
     body: Json<req::Req>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let mut messages = vec![];
+    let mut messages = Vec::with_capacity(body.messages.len());
     for body_msg in body.messages.iter() {
         let role = if body_msg.role.eq(&Role::System) {
             Role::Critic

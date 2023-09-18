@@ -2,9 +2,11 @@ use openai::arkose::ArkoseToken;
 
 #[tokio::main]
 async fn main() {
-    let token =
-        ArkoseToken::new_form_har("/Users/gngpp/Desktop/incogniton/117.chat.openai.com.har")
+    for _ in 0..100 {
+        let token = ArkoseToken::new_form_har("/Users/gngpp/chat.openai.com.har")
             .await
             .unwrap();
-    println!("{}", token.value())
+        println!("{}", token.value());
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    }
 }
