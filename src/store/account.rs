@@ -1,6 +1,7 @@
 use super::{Store, StoreId, StoreResult};
 use openai::homedir::home_dir;
 use openai::{auth::model::AuthStrategy, model::AuthenticateToken};
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, ops::Not, path::PathBuf};
 
 pub struct AccountStore(PathBuf);
@@ -79,7 +80,7 @@ impl Store<Account> for AccountStore {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Account {
     email: String,
     state: HashMap<AuthStrategy, AuthenticateToken>,
@@ -97,12 +98,16 @@ impl Account {
         &self.email
     }
 
-    pub fn state(&self) -> &HashMap<AuthStrategy, AuthenticateToken> {
-        &self.state
+    pub fn state_mut(&mut self) -> &mut HashMap<AuthStrategy, AuthenticateToken> {
+        &mut self.state
     }
 
     pub fn push_state(&mut self, auth_strategy: AuthStrategy, token: AuthenticateToken) {
         self.state.insert(auth_strategy, token);
+    }
+
+    pub fn remove_state(&mut self, auth_strategy: &AuthStrategy) {
+        self.state.remove(auth_strategy);
     }
 }
 

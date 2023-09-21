@@ -92,11 +92,7 @@ pub struct DashUser {
     pub name: String,
     pub picture: String,
     pub created: i64,
-    pub groups: Vec<Value>,
     pub session: DashUserSession,
-    pub orgs: DashUserOrgs,
-    pub intercom_hash: String,
-    pub amr: Vec<Value>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -107,12 +103,6 @@ pub struct DashUserSession {
     pub created: i64,
     pub last_use: Option<i64>,
     pub publishable: bool,
-}
-
-#[derive(Deserialize)]
-pub struct DashUserOrgs {
-    pub object: String,
-    pub data: Vec<DashUserOrgsData>,
 }
 
 #[derive(Deserialize)]
@@ -129,24 +119,23 @@ pub struct DashUserOrgsData {
     pub groups: Vec<Value>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct ApiKey {
     pub result: String,
     pub key: Option<Key>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct ApiKeyList {
     pub object: String,
     pub data: Vec<Key>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct Key {
-    #[serde(rename = "sensitive_id")]
     pub sensitive_id: String,
     pub object: String,
-    pub name: String,
+    pub name: Option<String>,
     pub created: i64,
     #[serde(rename = "last_use")]
     pub last_use: Value,
@@ -193,4 +182,28 @@ impl Serialize for AccessToken {
             AccessToken::OAuth(apple) => serializer.serialize_some(apple),
         }
     }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Billing {
+    pub total_granted: f64,
+    pub total_used: f64,
+    pub total_available: f64,
+    pub total_paid_available: f64,
+    pub grants: Grants,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Grants {
+    pub data: Vec<Daum>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Daum {
+    pub object: String,
+    pub id: String,
+    pub grant_amount: f64,
+    pub used_amount: f64,
+    pub effective_at: f64,
+    pub expires_at: f64,
 }
