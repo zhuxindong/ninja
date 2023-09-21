@@ -211,10 +211,7 @@ async fn get_arkose_token_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<Ar
     let method = Method::from_bytes(entry.method.as_bytes())?;
 
     let mut builder = client
-        .request(
-            method,
-            "https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147",
-        )
+        .request(method, entry.url)
         .timeout(std::time::Duration::from_secs(10));
 
     builder = builder.body(entry.body);

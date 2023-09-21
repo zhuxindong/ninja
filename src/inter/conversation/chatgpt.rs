@@ -1,3 +1,3 @@
-pub(crate) async fn chatgpt_prompt() -> anyhow::Result<()> {
+pub(crate) async fn prompt() -> anyhow::Result<()> {
     Ok(())
 }

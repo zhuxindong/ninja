@@ -34,6 +34,15 @@ impl FromStr for Solver {
     }
 }
 
+impl ToString for Solver {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Yescaptcha => "yescaptcha".to_string(),
+            Self::Capsolver => "capsolver".to_string(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ArkoseSolver {
     pub solver: Solver,
