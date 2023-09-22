@@ -233,7 +233,6 @@ impl Session {
             re.replace_all(input, "").to_string()
         };
 
-        println!("{:#?}", challenge.game_data);
         self.concise_challenge = Some(ConciseChallenge {
             game_type: challenge_type.to_string(),
             urls: challenge_urls.clone(),

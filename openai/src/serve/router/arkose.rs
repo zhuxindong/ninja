@@ -50,7 +50,7 @@ async fn proxy(
         .eq("/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147")
     {
         if let Ok(arkose_token) = ArkoseToken::new_from_context().await {
-            if arkose_token.valid() {
+            if arkose_token.success() {
                 let target = serde_json::json!({
                     "token": arkose_token,
                     "challenge_url":"",

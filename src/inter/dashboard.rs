@@ -1,4 +1,5 @@
 use inquire::{MultiSelect, Select, Text};
+use openai::arkose::ArkoseToken;
 use openai::{
     auth::{ApiKeyAction, ApiKeyDataBuilder, AuthClient},
     model::AuthenticateToken,
@@ -78,6 +79,13 @@ pub async fn prompt() -> anyhow::Result<()> {
     Ok(())
 }
 
+async fn get_arkose_token(har_file: Option<&String>) -> anyhow::Result<ArkoseToken> {
+    match har_file {
+        None => ArkoseToken::new_platform().await,
+        Some(har_file) => ArkoseToken::new_form_har(har_file).await,
+    }
+}
+
 async fn billing(client: &AuthClient, token: &str) -> anyhow::Result<()> {
     match client.billing_credit_grants(token).await {
         Ok(credit_grants) => json_to_table("Billing", credit_grants),
@@ -105,33 +113,33 @@ async fn list_api_key(client: &AuthClient, token: &str) -> anyhow::Result<()> {
 async fn create_api_key(client: &AuthClient, token: &str) -> anyhow::Result<()> {
     let conf = Context::get_conf().await?;
 
-    if let Some(har_file) = conf.arkose_platform_har_file {
-        let opt_name = tokio::task::spawn_blocking(|| {
-            Text::new("API key name ›")
-                .with_help_message("Enter a name for the API key")
-                .prompt_skippable()
-        })
-        .await??;
+    let opt_name = tokio::task::spawn_blocking(|| {
+        Text::new("API key name ›")
+            .with_help_message("Enter a name for the API key")
+            .prompt_skippable()
+    })
+    .await??;
 
-        if let Some(name) = opt_name {
-            let arkose_token = openai::arkose::ArkoseToken::new_form_har(har_file).await?;
-            let data = ApiKeyDataBuilder::default()
-                .action(ApiKeyAction::Create)
-                .name(name.as_str())
-                .arkose_token(&arkose_token)
-                .build()?;
+    if let Some(name) = opt_name {
+        match get_arkose_token(conf.arkose_platform_har_file.as_ref()).await {
+            Ok(arkose_token) => {
+                let data = ApiKeyDataBuilder::default()
+                    .action(ApiKeyAction::Create)
+                    .name(name.as_str())
+                    .arkose_token(&arkose_token)
+                    .build()?;
 
-            match client.do_api_key(token, data).await {
-                Ok(api_key) => {
-                    json_to_table("Field", api_key.key);
-                }
-                Err(err) => {
-                    println!("Error: {}", err);
+                match client.do_api_key(token, data).await {
+                    Ok(api_key) => {
+                        json_to_table("Field", api_key.key);
+                    }
+                    Err(err) => {
+                        println!("Error: {}", err);
+                    }
                 }
             }
+            Err(err) => println!("Error: {}", err),
         }
-    } else {
-        println!("No har file found");
     }
 
     Ok(())
@@ -139,14 +147,6 @@ async fn create_api_key(client: &AuthClient, token: &str) -> anyhow::Result<()> 
 
 async fn delete_api_key(client: &AuthClient, token: &str) -> anyhow::Result<()> {
     let conf = Context::get_conf().await?;
-
-    // 早期返回以减少嵌套
-    let har_file = if let Some(har) = &conf.arkose_platform_har_file {
-        har.clone()
-    } else {
-        println!("No har file found");
-        return Ok(());
-    };
 
     match client.do_get_api_key_list(token).await {
         Ok(api_key_list) => {
@@ -168,17 +168,20 @@ async fn delete_api_key(client: &AuthClient, token: &str) -> anyhow::Result<()> 
             {
                 for s in select {
                     if let Some(key) = api_key_list.data.iter().find(|k| k.sensitive_id.eq(&s)) {
-                        let arkose_token =
-                            openai::arkose::ArkoseToken::new_form_har(&har_file).await?;
-                        let data = ApiKeyDataBuilder::default()
-                            .action(ApiKeyAction::Delete)
-                            .created_at(key.created as u64)
-                            .redacted_key(key.sensitive_id.as_str())
-                            .arkose_token(&arkose_token)
-                            .build()?;
+                        match get_arkose_token(conf.arkose_platform_har_file.as_ref()).await {
+                            Ok(arkose_token) => {
+                                let data = ApiKeyDataBuilder::default()
+                                    .action(ApiKeyAction::Delete)
+                                    .created_at(key.created as u64)
+                                    .redacted_key(key.sensitive_id.as_str())
+                                    .arkose_token(&arkose_token)
+                                    .build()?;
 
-                        if let Err(err) = client.do_api_key(token, data).await {
-                            println!("Error: {}", err);
+                                if let Err(err) = client.do_api_key(token, data).await {
+                                    println!("Error: {}", err);
+                                }
+                            }
+                            Err(err) => println!("Error: {}", err),
                         }
                     }
                 }
