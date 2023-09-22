@@ -80,12 +80,12 @@ pub async fn submit_task(submit_task: SubmitSolver) -> anyhow::Result<i32> {
     let client = Context::get_instance().await;
     let resp = client.load_client().post(url).json(&body).send().await?;
 
-    match resp.error_for_status() {
-        Ok(resp) => {
+    match resp.error_for_status_ref() {
+        Ok(_) => {
             let task = resp.json::<TaskResp>().await?;
             debug!("solver captcha task: {task:#?}");
             if let Some(error_description) = task.error_description {
-                anyhow::bail!(format!("yescaptcha task error: {error_description}"))
+                anyhow::bail!(format!("solver task error: {error_description}"))
             }
             let target = task.solution.objects;
             return match target.is_empty() {
@@ -95,8 +95,9 @@ pub async fn submit_task(submit_task: SubmitSolver) -> anyhow::Result<i32> {
                 }
             };
         }
-        Err(err) => {
-            anyhow::bail!("Error: {err}")
+        Err(_) => {
+            let err = resp.text().await?;
+            anyhow::bail!(err)
         }
     }
 }

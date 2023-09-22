@@ -1,3 +1,4 @@
+use crate::inter::valid::valid_solver;
 use crate::store::{conf::Conf, Store};
 use inquire::{Confirm, CustomType, Text};
 use openai::arkose::funcaptcha::Solver;
@@ -65,10 +66,14 @@ pub async fn prompt() -> anyhow::Result<()> {
         arkose_platform_har_file = arkose_platform_har_file.with_initial_value(content)
     };
 
-    let arkose_solver = CustomType::<Solver>::new("Arkose solver ›")
+    let default_solver = Solver::default().to_string();
+    let init_solver = conf.arkose_solver.to_string();
+    let arkose_solver = Text::new("Arkose solver ›")
         .with_render_config(render_config())
         .with_help_message("About ArkoseLabs solver platform")
-        .with_default(Solver::default());
+        .with_validator(valid_solver)
+        .with_default(default_solver.as_str())
+        .with_initial_value(init_solver.as_str());
 
     let mut arkose_solver_key = Text::new("Arkose solver key ›")
         .with_render_config(render_config())
@@ -110,7 +115,7 @@ pub async fn prompt() -> anyhow::Result<()> {
         .map(|ok| if ok.is_empty() { None } else { Some(ok) })
         .unwrap_or(conf.arkose_platform_har_file);
 
-    conf.arkose_solver = arkose_solver.prompt()?;
+    conf.arkose_solver = arkose_solver.prompt()?.parse()?;
 
     conf.arkose_solver_key = arkose_solver_key
         .prompt_skippable()?
