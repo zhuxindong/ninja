@@ -1,5 +1,7 @@
+use crate::inter::valid::valid_solver;
 use crate::store::{conf::Conf, Store};
 use inquire::{Confirm, CustomType, Text};
+use openai::arkose::funcaptcha::Solver;
 
 use super::{
     context::Context,
@@ -7,7 +9,15 @@ use super::{
     valid::{valid_file_path, valid_url},
 };
 
-pub(super) async fn config_prompt() -> anyhow::Result<()> {
+pub async fn prompt() -> anyhow::Result<()> {
+    let ans = Confirm::new("Are you sure you want to change the configuration?")
+        .with_default(false)
+        .prompt_skippable()?;
+
+    if ans.is_none() || !ans.unwrap_or_default() {
+        return Ok(());
+    }
+
     let store = Context::get_conf_store().await;
     let mut conf = store.get(Conf::default())?.unwrap_or(Conf::default());
     let mut official_api = Text::new("Official API prefix ›")
@@ -32,7 +42,7 @@ pub(super) async fn config_prompt() -> anyhow::Result<()> {
 
     let mut proxy = Text::new("Proxy ›")
         .with_render_config(render_config())
-        .with_help_message("Example: https://example.com")
+        .with_help_message("Supports http, https, socks5, socks5")
         .with_validator(valid_url);
     if let Some(content) = conf.proxy.as_deref() {
         if !content.is_empty() {
@@ -40,17 +50,34 @@ pub(super) async fn config_prompt() -> anyhow::Result<()> {
         }
     };
 
-    let mut arkose_har_file = Text::new("Arkose HAR file ›")
+    let mut arkose_har_file = Text::new("ChatGPT ArkoseLabs HAR file ›")
         .with_render_config(render_config())
-        .with_help_message("About the browser HAR file path requested by ArkoseLabs")
+        .with_help_message("About the browser HAR file path requested by ChatGPT ArkoseLabs")
         .with_validator(valid_file_path);
     if let Some(content) = conf.arkose_har_file.as_deref() {
         arkose_har_file = arkose_har_file.with_initial_value(content)
     };
 
-    let mut arkose_solver_key = Text::new("Arkose YesCaptcha key ›")
+    let mut arkose_platform_har_file = Text::new("Platform ArkoseLabs HAR file ›")
         .with_render_config(render_config())
-        .with_help_message("About the YesCaptcha platform client key solved by ArkoseLabs");
+        .with_help_message("About the browser HAR file path requested by Platform ArkoseLabs")
+        .with_validator(valid_file_path);
+    if let Some(content) = conf.arkose_platform_har_file.as_deref() {
+        arkose_platform_har_file = arkose_platform_har_file.with_initial_value(content)
+    };
+
+    let default_solver = Solver::default().to_string();
+    let init_solver = conf.arkose_solver.to_string();
+    let arkose_solver = Text::new("Arkose solver ›")
+        .with_render_config(render_config())
+        .with_help_message("About ArkoseLabs solver platform")
+        .with_validator(valid_solver)
+        .with_default(default_solver.as_str())
+        .with_initial_value(init_solver.as_str());
+
+    let mut arkose_solver_key = Text::new("Arkose solver key ›")
+        .with_render_config(render_config())
+        .with_help_message("About the solver client key by ArkoseLabs");
     if let Some(content) = conf.arkose_solver_key.as_deref() {
         arkose_solver_key = arkose_solver_key.with_initial_value(content)
     };
@@ -82,6 +109,13 @@ pub(super) async fn config_prompt() -> anyhow::Result<()> {
         .prompt_skippable()?
         .map(|ok| if ok.is_empty() { None } else { Some(ok) })
         .unwrap_or(conf.arkose_har_file);
+
+    conf.arkose_platform_har_file = arkose_platform_har_file
+        .prompt_skippable()?
+        .map(|ok| if ok.is_empty() { None } else { Some(ok) })
+        .unwrap_or(conf.arkose_platform_har_file);
+
+    conf.arkose_solver = arkose_solver.prompt()?.parse()?;
 
     conf.arkose_solver_key = arkose_solver_key
         .prompt_skippable()?
@@ -126,7 +160,7 @@ pub(super) async fn config_prompt() -> anyhow::Result<()> {
         conf.tcp_keepalive = tcp_keepalive;
     }
 
-    let ans = Confirm::new("Are you sure you want to change the configuration?")
+    let ans = Confirm::new("Are you sure you want to save the configuration?")
         .with_default(false)
         .prompt()?;
 

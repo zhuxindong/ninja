@@ -1,13 +1,14 @@
 use super::{Store, StoreId, StoreResult};
-use openai::homedir::home_dir;
+use openai::{arkose::funcaptcha::Solver, homedir::home_dir};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, ops::Not, path::PathBuf};
 
-const DEFAULT_ID: &str = "999999999999999999";
+const DEFAULT_ID: &str = "ninja-default-config";
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Conf {
     id: String,
+    pub using_user: Option<String>,
     /// Oofficial API prefix. Format: https://example.com
     pub official_api: Option<String>,
     /// Unofficial API prefix. Format: https://example.com
@@ -16,10 +17,14 @@ pub struct Conf {
     pub proxy: Option<String>,
     /// Get arkose-token endpoint
     pub arkose_token_endpoint: Option<String>,
-    /// About ArkoseLabs solver platformAbout the solver client key by ArkoseLabs
+    /// About the solver client by ArkoseLabs
+    pub arkose_solver: Solver,
+    /// About the solver client key by ArkoseLabs
     pub arkose_solver_key: Option<String>,
-    /// About the browser HAR file path requested by ArkoseLabs
+    /// About the browser HAR file path requested by ChatGPT ArkoseLabs
     pub arkose_har_file: Option<String>,
+    /// About the browser HAR file path requested by Platform ArkoseLabs
+    pub arkose_platform_har_file: Option<String>,
     /// Client timeout (seconds)
     pub timeout: usize,
     /// Client connect timeout (seconds)
@@ -37,6 +42,7 @@ impl StoreId for Conf {
 impl Default for Conf {
     fn default() -> Self {
         Self {
+            using_user: None,
             official_api: None,
             unofficial_api: None,
             proxy: None,
@@ -47,84 +53,8 @@ impl Default for Conf {
             id: DEFAULT_ID.to_owned(),
             arkose_solver_key: None,
             arkose_har_file: None,
-        }
-    }
-}
-
-pub struct ConfBuilder {
-    official_api: Option<String>,
-    unofficial_api: Option<String>,
-    proxy: Option<String>,
-    arkose_token_endpoint: Option<String>,
-    timeout: usize,
-    connect_timeout: usize,
-    tcp_keepalive: usize,
-    arkose_solver_key: Option<String>,
-    arkose_har_file: Option<String>,
-}
-
-impl ConfBuilder {
-    pub fn builder() -> Self {
-        ConfBuilder {
-            official_api: None,
-            unofficial_api: None,
-            proxy: None,
-            arkose_token_endpoint: None,
-            timeout: 60,
-            connect_timeout: 600,
-            tcp_keepalive: 75,
-            arkose_har_file: None,
-            arkose_solver_key: None,
-        }
-    }
-
-    pub fn official_api(mut self, official_api: String) -> Self {
-        self.official_api = Some(official_api);
-        self
-    }
-
-    pub fn unofficial_api(mut self, unofficial_api: String) -> Self {
-        self.unofficial_api = Some(unofficial_api);
-        self
-    }
-
-    pub fn proxy(mut self, proxy: String) -> Self {
-        self.proxy = Some(proxy);
-        self
-    }
-
-    pub fn arkose_token_endpoint(mut self, arkose_token_endpoint: String) -> Self {
-        self.arkose_token_endpoint = Some(arkose_token_endpoint);
-        self
-    }
-
-    pub fn timeout(mut self, timeout: usize) -> Self {
-        self.connect_timeout = timeout;
-        self
-    }
-
-    pub fn connect_timeout(mut self, connect_timeout: usize) -> Self {
-        self.connect_timeout = connect_timeout;
-        self
-    }
-
-    pub fn tcp_keepalive(mut self, tcp_keepalive: usize) -> Self {
-        self.tcp_keepalive = tcp_keepalive;
-        self
-    }
-
-    pub fn build(self) -> Conf {
-        Conf {
-            id: DEFAULT_ID.to_owned(),
-            official_api: self.official_api,
-            unofficial_api: self.unofficial_api,
-            proxy: self.proxy,
-            arkose_token_endpoint: self.arkose_token_endpoint,
-            timeout: self.timeout,
-            connect_timeout: self.connect_timeout,
-            tcp_keepalive: self.tcp_keepalive,
-            arkose_solver_key: self.arkose_solver_key,
-            arkose_har_file: self.arkose_har_file,
+            arkose_solver: Solver::default(),
+            arkose_platform_har_file: None,
         }
     }
 }
@@ -134,8 +64,8 @@ pub struct ConfFileStore(PathBuf);
 impl ConfFileStore {
     pub fn new() -> Self {
         let path = match home_dir() {
-            Some(home_dir) => home_dir.join(".ninja-conf"),
-            None => PathBuf::from(".ninja-conf"),
+            Some(home_dir) => home_dir.join(".ninja_config"),
+            None => PathBuf::from(".ninja_config"),
         };
         if let Some(parent) = path.parent() {
             if path.exists().not() {

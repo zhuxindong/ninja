@@ -43,7 +43,7 @@ o.default = "60"
 o = s:option(Value, "tcp_keepalive", translate("TCP Keep-Alive"), translate("Default 60 seconds"))
 o.default = "60"
 
-o = s:option(Value, "arkose_har_file", translate("HAR file path"), translate("About the browser HAR file path requested by ArkoseLabs"))
+o = s:option(Value, "arkose_har_file", translate("HAR file path"), translate("About the browser HAR file path requested by ChatGPT ArkoseLabs"))
 
 o = s:option(Value, "arkose_har_upload_key", translate("HAR Auth Key"), translate("HAR file upload authenticate key"))
 

@@ -23,6 +23,7 @@ use sha2::{Digest, Sha256};
 
 pub mod model;
 
+use crate::arkose::ArkoseToken;
 use crate::error::AuthError;
 use crate::{debug, URL_CHATGPT_API};
 
@@ -62,76 +63,6 @@ pub struct AuthClient {
     handle_strategies: Arc<HashMap<AuthStrategy, Box<dyn AuthHandle + Send + Sync>>>,
 }
 
-#[async_trait::async_trait]
-impl AuthHandle for AuthClient {
-    async fn do_access_token(
-        &self,
-        account: &model::AuthAccount,
-    ) -> AuthResult<model::AccessToken> {
-        if !self.email_regex.is_match(&account.username) || account.password.is_empty() {
-            bail!(AuthError::InvalidEmailOrPassword)
-        }
-
-        self.handle_strategies
-            .get(&account.option)
-            .context("Logon implementation is not supported")?
-            .do_access_token(account)
-            .await
-    }
-
-    async fn do_revoke_token(&self, refresh_token: &str) -> AuthResult<()> {
-        let mut last_err: Option<anyhow::Error> = None;
-
-        for (strategy, handle) in self.handle_strategies.iter() {
-            match strategy {
-                AuthStrategy::Apple | AuthStrategy::Platform => {
-                    match handle.do_revoke_token(refresh_token).await {
-                        Ok(_) => {
-                            last_err = None;
-                        }
-                        Err(err) => last_err = Some(err),
-                    }
-                }
-                _ => continue,
-            };
-
-            if last_err.is_none() {
-                break;
-            }
-        }
-
-        if let Some(err) = last_err {
-            bail!(err)
-        }
-
-        Ok(())
-    }
-
-    async fn do_refresh_token(&self, refresh_token: &str) -> AuthResult<model::RefreshToken> {
-        let mut last_err: Option<anyhow::Error> = None;
-        let mut last_res: Option<model::RefreshToken> = None;
-        for (strategy, handle) in self.handle_strategies.iter() {
-            match strategy {
-                &AuthStrategy::Platform | &AuthStrategy::Apple => {
-                    match handle.do_refresh_token(refresh_token).await {
-                        Ok(res) => {
-                            last_res = Some(res);
-                            last_err = None;
-                            break;
-                        }
-                        Err(err) => last_err = Some(err),
-                    }
-                }
-                _ => continue,
-            }
-        }
-        if let Some(err) = last_err {
-            bail!(err)
-        }
-        Ok(last_res.expect("Refresh token not found"))
-    }
-}
-
 impl AuthClient {
     pub async fn do_get_user_picture(&self, access_token: &str) -> AuthResult<Option<String>> {
         let access_token = access_token.replace("Bearer ", "");
@@ -163,26 +94,7 @@ impl AuthClient {
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
-        Self::response_handle(resp).await
-    }
 
-    pub async fn do_get_api_key(
-        &self,
-        sensitive_id: &str,
-        name: &str,
-    ) -> AuthResult<model::ApiKey> {
-        let data = ApiKeyDataBuilder::default()
-            .action("create")
-            .name(name)
-            .build()?;
-        let resp = self
-            .client
-            .post(format!("{OPENAI_API_URL}/dashboard/user/api_keys"))
-            .bearer_auth(sensitive_id)
-            .json(&data)
-            .send()
-            .await
-            .map_err(AuthError::FailedRequest)?;
         Self::response_handle(resp).await
     }
 
@@ -197,22 +109,30 @@ impl AuthClient {
         Self::response_handle(resp).await
     }
 
-    pub async fn do_delete_api_key(
+    pub async fn do_api_key<'a>(
         &self,
         sensitive_id: &str,
-        redacted_key: &str,
-        created_at: u64,
+        data: ApiKeyData<'a>,
     ) -> AuthResult<model::ApiKey> {
-        let data = ApiKeyDataBuilder::default()
-            .action("delete")
-            .redacted_key(redacted_key)
-            .created_at(created_at)
-            .build()?;
         let resp = self
             .client
             .post(format!("{OPENAI_API_URL}/dashboard/user/api_keys"))
             .bearer_auth(sensitive_id)
             .json(&data)
+            .send()
+            .await
+            .map_err(AuthError::FailedRequest)?;
+        Self::response_handle(resp).await
+    }
+
+    pub async fn billing_credit_grants(
+        &self,
+        sensitive_id: &str,
+    ) -> anyhow::Result<model::Billing> {
+        let resp = self
+            .client
+            .get(format!("{OPENAI_API_URL}/dashboard/billing/credit_grants"))
+            .bearer_auth(sensitive_id)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
@@ -344,6 +264,76 @@ impl AuthClient {
             bail!(AuthError::InvalidRefreshToken)
         }
         Ok(refresh_token)
+    }
+}
+
+#[async_trait::async_trait]
+impl AuthHandle for AuthClient {
+    async fn do_access_token(
+        &self,
+        account: &model::AuthAccount,
+    ) -> AuthResult<model::AccessToken> {
+        if !self.email_regex.is_match(&account.username) || account.password.is_empty() {
+            bail!(AuthError::InvalidEmailOrPassword)
+        }
+
+        self.handle_strategies
+            .get(&account.option)
+            .context("Logon implementation is not supported")?
+            .do_access_token(account)
+            .await
+    }
+
+    async fn do_revoke_token(&self, refresh_token: &str) -> AuthResult<()> {
+        let mut last_err: Option<anyhow::Error> = None;
+
+        for (strategy, handle) in self.handle_strategies.iter() {
+            match strategy {
+                AuthStrategy::Apple | AuthStrategy::Platform => {
+                    match handle.do_revoke_token(refresh_token).await {
+                        Ok(_) => {
+                            last_err = None;
+                        }
+                        Err(err) => last_err = Some(err),
+                    }
+                }
+                _ => continue,
+            };
+
+            if last_err.is_none() {
+                break;
+            }
+        }
+
+        if let Some(err) = last_err {
+            bail!(err)
+        }
+
+        Ok(())
+    }
+
+    async fn do_refresh_token(&self, refresh_token: &str) -> AuthResult<model::RefreshToken> {
+        let mut last_err: Option<anyhow::Error> = None;
+        let mut last_res: Option<model::RefreshToken> = None;
+        for (strategy, handle) in self.handle_strategies.iter() {
+            match strategy {
+                &AuthStrategy::Platform | &AuthStrategy::Apple => {
+                    match handle.do_refresh_token(refresh_token).await {
+                        Ok(res) => {
+                            last_res = Some(res);
+                            last_err = None;
+                            break;
+                        }
+                        Err(err) => last_err = Some(err),
+                    }
+                }
+                _ => continue,
+            }
+        }
+        if let Some(err) = last_err {
+            bail!(err)
+        }
+        Ok(last_res.expect("Refresh token not found"))
     }
 }
 
@@ -1232,13 +1222,34 @@ impl PlatformAuthHandle {
 
 #[derive(Serialize, Builder)]
 pub struct ApiKeyData<'a> {
-    action: &'a str,
+    action: ApiKeyAction,
     #[builder(setter(into, strip_option), default)]
     name: Option<&'a str>,
     #[builder(setter(into, strip_option), default)]
     redacted_key: Option<&'a str>,
     #[builder(setter(into, strip_option), default)]
     created_at: Option<u64>,
+    arkose_token: &'a ArkoseToken,
+}
+
+#[derive(Clone)]
+pub enum ApiKeyAction {
+    Create,
+    Update,
+    Delete,
+}
+
+impl Serialize for ApiKeyAction {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            ApiKeyAction::Create => serializer.serialize_str("create"),
+            ApiKeyAction::Update => serializer.serialize_str("update"),
+            ApiKeyAction::Delete => serializer.serialize_str("delete"),
+        }
+    }
 }
 
 #[derive(Serialize, Builder)]

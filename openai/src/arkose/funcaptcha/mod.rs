@@ -34,6 +34,15 @@ impl FromStr for Solver {
     }
 }
 
+impl ToString for Solver {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Yescaptcha => "yescaptcha".to_string(),
+            Self::Capsolver => "capsolver".to_string(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ArkoseSolver {
     pub solver: Solver,
@@ -224,7 +233,6 @@ impl Session {
             re.replace_all(input, "").to_string()
         };
 
-        println!("{:#?}", challenge.game_data);
         self.concise_challenge = Some(ConciseChallenge {
             game_type: challenge_type.to_string(),
             urls: challenge_urls.clone(),

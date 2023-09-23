@@ -1,25 +1,37 @@
-mod configure;
+mod authorize;
+mod config;
 mod context;
 mod conversation;
-mod dash;
+mod dashboard;
 mod enums;
-mod oauth;
 mod valid;
 
-use crate::inter::conversation::{api, chatgpt};
+use crate::{
+    inter::conversation::{api, chatgpt},
+    store::Store,
+};
 use enums::Usage;
+use indicatif::{ProgressBar, ProgressStyle};
 use inquire::{
     ui::{
         Attributes, Color, ErrorMessageRenderConfig, IndexPrefix, RenderConfig, StyleSheet, Styled,
     },
     Select,
 };
-use std::cell::RefCell;
-use std::thread;
-use std::time::Duration;
-use tokio::{io::AsyncWriteExt, task};
+use openai::{
+    auth::{model::AuthStrategy, AuthHandle},
+    model::AuthenticateToken,
+};
+use serde::Serialize;
+use serde_json::json;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tokio::task;
+
+use self::context::Context;
 
 pub async fn prompt() -> anyhow::Result<()> {
+    check_authorization().await?;
+
     print_boot_message();
 
     loop {
@@ -27,17 +39,22 @@ pub async fn prompt() -> anyhow::Result<()> {
             Select::new("Usage Wizard ›", Usage::USAGE_VARS.to_vec())
                 .with_render_config(render_config())
                 .with_formatter(&|i| format!("${i:.2}"))
-                .prompt()
+                .with_help_message("↑↓ to move, enter to select, type to filter, Esc to quit")
+                .prompt_skippable()
         })
         .await??;
 
-        match choice {
-            Usage::OpenAI => api::api_prompt().await?,
-            Usage::ChatGPT => chatgpt::chatgpt_prompt().await?,
-            Usage::Dashboard => dash::dashboard_prompt().await?,
-            Usage::OAuth => oauth::oauth_prompt().await?,
-            Usage::Configuration => configure::config_prompt().await?,
-            Usage::Quit => break,
+        if let Some(choice) = choice {
+            match choice {
+                Usage::TurboAPI => api::prompt().await?,
+                Usage::ChatGPT => chatgpt::prompt().await?,
+                Usage::Dashboard => dashboard::prompt().await?,
+                Usage::Authorize => authorize::prompt().await?,
+                Usage::Config => config::prompt().await?,
+            }
+        } else {
+            // Esc to quit
+            break;
         }
     }
     Ok(())
@@ -63,7 +80,57 @@ fn print_boot_message() {
     println!("\x1B[1m{repo}\x1B[1m");
 }
 
-pub(super) fn render_config() -> RenderConfig {
+pub async fn check_authorization() -> anyhow::Result<()> {
+    let pb = new_spinner("Initializing login...");
+
+    Context::init_openai_context().await?;
+    let store = Context::get_account_store().await;
+    let client = Context::get_auth_client().await;
+    let current_time = get_duration_since_epoch()?;
+
+    for mut account in store.list()? {
+        let mut change = false;
+
+        let state = account.state_mut();
+        // Remove expired token state
+        state.retain(|_, token| {
+            let expired = token.is_expired();
+            if expired {
+                change = true;
+            }
+            !expired
+        });
+
+        // Refresh if it is less than two weeks old
+        for (k, token) in state.iter_mut() {
+            if let AuthStrategy::Platform | AuthStrategy::Apple = k {
+                if token.expires() - current_time < token.expires_in() / 2 {
+                    if let Some(refresh_token) = token.refresh_token() {
+                        let refresh_token = client.do_refresh_token(refresh_token).await?;
+                        let new_token = AuthenticateToken::try_from(refresh_token)?;
+                        *token = new_token;
+                        change = true;
+                    }
+                }
+            }
+        }
+
+        if change {
+            store.add(account)?;
+        }
+    }
+
+    pb.finish_and_clear();
+
+    Ok(())
+}
+
+fn get_duration_since_epoch() -> anyhow::Result<i64> {
+    let duration_since_epoch = SystemTime::now().duration_since(UNIX_EPOCH)?;
+    Ok(duration_since_epoch.as_secs() as i64)
+}
+
+pub fn render_config() -> RenderConfig {
     RenderConfig {
         prompt_prefix: Styled::new("?").with_fg(Color::DarkYellow),
         answered_prompt_prefix: Styled::new("❯").with_fg(Color::LightGreen),
@@ -91,41 +158,36 @@ pub(super) fn render_config() -> RenderConfig {
     }
 }
 
-pub struct ProgressBar<'a> {
-    message: &'a str,
-    task: RefCell<Option<tokio::task::JoinHandle<()>>>,
+pub fn new_spinner(msg: &str) -> ProgressBar {
+    let pb = ProgressBar::new_spinner();
+    pb.enable_steady_tick(Duration::from_millis(120));
+    pb.set_style(
+        ProgressStyle::with_template("{spinner:.blue} {msg}")
+            .unwrap()
+            // For more spinners check out the cli-spinners project:
+            // https://github.com/sindresorhus/cli-spinners/blob/master/spinners.json
+            .tick_strings(&[
+                "▹▹▹▹▹",
+                "▸▹▹▹▹",
+                "▹▸▹▹▹",
+                "▹▹▸▹▹",
+                "▹▹▹▸▹",
+                "▹▹▹▹▸",
+                "▪▪▪▪▪",
+            ]),
+    );
+    pb.set_message(msg.to_owned());
+    pb
 }
 
-impl ProgressBar<'_> {
-    pub fn new(msg: &str) -> ProgressBar<'_> {
-        ProgressBar {
-            message: msg,
-            task: RefCell::new(None),
-        }
-    }
-
-    pub fn start(&self) {
-        let msg = self.message.to_owned();
-        let mut task = self.task.borrow_mut();
-        *task = Some(tokio::spawn(async move {
-            let progress_chars = &["▹▹▹▹▹", "▸▹▹▹▹", "▹▸▹▹▹", "▹▹▸▹▹", "▹▹▹▸▹", "▹▹▹▹▸"];
-            let mut out = tokio::io::stdout();
-            loop {
-                for chars in progress_chars {
-                    out.write_all(format!("\r\x1B[34m{chars}\x1B[0m {msg}").as_bytes())
-                        .await
-                        .expect("write to stdout");
-                    out.flush().await.expect("flush stdout");
-                    thread::sleep(Duration::from_millis(100));
-                }
-            }
-        }));
-    }
-
-    pub async fn finish(self) {
-        if let Some(join) = self.task.into_inner() {
-            join.abort();
-            println!("\r");
-        }
-    }
+pub fn json_to_table<T: Serialize>(header: &str, value: T) {
+    use tabled::settings::{style::BorderColor, Color, Panel, Style, Width};
+    let json = json!(value);
+    let mut table = json_to_table::json_to_table(&json).into_table();
+    table
+        .with(Style::extended())
+        .with(Panel::header(header))
+        .with(Width::increase(15))
+        .with(BorderColor::filled(Color::FG_CYAN));
+    println!("{table}");
 }

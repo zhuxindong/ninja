@@ -214,7 +214,7 @@ Options:
   -A, --arkose-token-endpoint <ARKOSE_TOKEN_ENDPOINT>
           Get arkose token endpoint
   -a, --arkose-har-file <ARKOSE_HAR_FILE>
-          About the browser HAR file path requested by ArkoseLabs
+          About the browser HAR file path requested by ChatGPT ArkoseLabs
   -K, --arkose-har-upload-key <ARKOSE_HAR_UPLOAD_KEY>
           HAR file upload authenticate key
   -s, --arkose-solver <ARKOSE_SOLVER>

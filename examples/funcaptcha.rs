@@ -2,19 +2,18 @@ use openai::arkose::{
     funcaptcha::{self, solver::SubmitSolverBuilder, start_challenge},
     ArkoseToken,
 };
-use std::sync::Arc;
 use tokio::time::Instant;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let key = std::env::var("KEY").unwrap();
+    let key = std::env::var("KEY")?;
     // start time
     let start_time = Instant::now();
 
-    let arkose_token = Arc::new(ArkoseToken::new().await.unwrap());
+    let arkose_token = ArkoseToken::new_platform().await?;
     let token = arkose_token.value();
     println!("arkose_token: {:?}", token);
-    if !arkose_token.valid() {
+    if !arkose_token.success() {
         match start_challenge(token).await {
             Ok(session) => {
                 if let Some(funs) = session.funcaptcha() {
@@ -27,8 +26,7 @@ async fn main() -> anyhow::Result<()> {
                             .client_key(key.clone())
                             .question(fun.game_variant)
                             .image_as_base64(fun.image)
-                            .build()
-                            .unwrap();
+                            .build()?;
                         tokio::spawn(async move {
                             let res = funcaptcha::solver::submit_task(submit_task).await;
                             sender.send((i, res)).await.expect("Send failed")

@@ -121,7 +121,7 @@ pub(super) struct ServeArgs {
     #[clap(short = 'A', long, value_parser = parse::parse_url)]
     pub(super) arkose_token_endpoint: Option<String>,
 
-    /// About the browser HAR file path requested by ArkoseLabs
+    /// About the browser HAR file path requested by ChatGPT ArkoseLabs
     #[clap(short, long, value_parser = parse::parse_file_path)]
     pub(super) arkose_har_file: Option<PathBuf>,
 
