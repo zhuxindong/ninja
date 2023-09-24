@@ -1,4 +1,6 @@
 #![recursion_limit = "256"]
+
+use std::time::Duration;
 pub mod arkose;
 pub mod auth;
 pub mod balancer;
@@ -25,3 +27,15 @@ pub const URL_CHATGPT_API: &str = "https://chat.openai.com";
 pub const URL_PLATFORM_API: &str = "https://api.openai.com";
 pub const ORIGIN_CHATGPT: &str = "https://chat.openai.com/chat";
 pub const HOST_CHATGPT: &str = "chat.openai.com";
+
+pub fn now_duration() -> anyhow::Result<Duration> {
+    let now = std::time::SystemTime::now();
+    let duration = now.duration_since(std::time::UNIX_EPOCH)?;
+    Ok(duration)
+}
+
+pub fn format_time(timestamp: i64) -> anyhow::Result<String> {
+    let time = time::OffsetDateTime::from_unix_timestamp(timestamp)?
+        .format(&time::format_description::well_known::Rfc3339)?;
+    Ok(time)
+}

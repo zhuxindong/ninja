@@ -9,8 +9,8 @@ pub struct AccountStore(PathBuf);
 impl AccountStore {
     pub fn new() -> Self {
         let path = match home_dir() {
-            Some(home_dir) => home_dir.join(".ninja-accounts"),
-            None => PathBuf::from(".ninja-accounts"),
+            Some(home_dir) => home_dir.join(".ninja_accounts"),
+            None => PathBuf::from(".ninja_accounts"),
         };
         if let Some(parent) = path.parent() {
             if path.exists().not() {
