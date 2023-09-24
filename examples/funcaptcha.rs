@@ -71,32 +71,32 @@ async fn parse(
                         }
                         Solver::Capsolver => {
                             let mut classified_data = std::collections::HashMap::new();
-                
+
                             for item in funs.iter() {
                                 let question = item.game_variant.clone();
-                
+
                                 classified_data
                                     .entry(question)
                                     .or_insert(Vec::new())
                                     .push(item);
                             }
-                
+
                             for (i, data) in classified_data.into_iter().enumerate() {
                                 let sender = tx.clone();
-                
+
                                 let images = data
                                     .1
                                     .into_iter()
                                     .map(|item| item.image.clone())
                                     .collect::<Vec<String>>();
-                
+
                                 let submit_task = SubmitSolverBuilder::default()
                                     .solved(solver)
                                     .client_key(key)
                                     .question(data.0)
                                     .images(images)
                                     .build()?;
-                
+
                                 tokio::spawn(async move {
                                     let res = funcaptcha::solver::submit_task(submit_task).await;
                                     if let Some(err) = sender.send((i, res)).await.err() {
@@ -106,7 +106,7 @@ async fn parse(
                             }
                         }
                     }
-                
+
                     // Wait for all tasks to complete
                     let mut r = Vec::with_capacity(max_cap);
                     let mut need_soty = false;
@@ -127,7 +127,7 @@ async fn parse(
                             }
                         }
                     }
-                
+
                     if need_soty {
                         r.sort_by_key(|&(i, _)| i);
                     }
