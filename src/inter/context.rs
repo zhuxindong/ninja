@@ -68,7 +68,19 @@ impl Context {
 
     pub async fn get_conf_store() -> &'static ConfFileStore {
         CONF_STORE
-            .get_or_init(|| async { ConfFileStore::new() })
+            .get_or_init(|| async {
+                let store = ConfFileStore::new();
+                if store
+                    .list()
+                    .expect("Failed to read configuration")
+                    .is_empty()
+                {
+                    store
+                        .add(Conf::default())
+                        .expect("Failed to write configuration");
+                }
+                store
+            })
             .await
     }
 

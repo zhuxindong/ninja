@@ -22,12 +22,11 @@ use axum_extra::extract::cookie;
 use axum_extra::extract::CookieJar;
 
 use base64::Engine;
-use chrono::NaiveDateTime;
-use chrono::{prelude::DateTime, Utc};
 
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use time::format_description::well_known::Rfc3339;
 
 use crate::context;
 use crate::info;
@@ -373,12 +372,12 @@ async fn get_logout(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
 async fn get_session(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
     if let Some(cookie) = jar.get(SESSION_ID) {
         let session = extract_session(cookie.value())?;
-        let dt = DateTime::<Utc>::from_naive_utc_and_offset(
-            NaiveDateTime::from_timestamp_opt(session.expires, 0).ok_or(
-                ResponseError::InternalServerError(anyhow!("Invalid timestamp")),
-            )?,
-            Utc,
-        );
+
+        let time = time::OffsetDateTime::from_unix_timestamp(session.expires)
+            .map_err(ResponseError::InternalServerError)?;
+        let expires = time
+            .format(&Rfc3339)
+            .map_err(ResponseError::InternalServerError)?;
 
         let props = serde_json::json!({
             "user": {
@@ -389,7 +388,7 @@ async fn get_session(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
                 "picture": session.picture,
                 "groups": [],
             },
-            "expires" : dt.naive_utc(),
+            "expires" : expires,
             "accessToken": session.access_token,
             "authProvider": "auth0"
         });

@@ -1,11 +1,14 @@
-use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
 use base64::{engine::general_purpose, Engine};
 
 use serde_json::Value;
+use time::format_description::well_known::Rfc3339;
 
-use crate::auth;
+use crate::{
+    auth::{self, model::AccessToken},
+    now_duration,
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AuthenticateToken {
@@ -44,7 +47,8 @@ impl AuthenticateToken {
     }
 
     pub fn is_expired(&self) -> bool {
-        chrono::Utc::now().timestamp() > self.expires
+        let duration = now_duration().expect("Time went backwards");
+        (duration.as_secs() as i64) > self.expires
     }
 
     pub fn expires(&self) -> i64 {
@@ -61,14 +65,12 @@ impl TryFrom<auth::model::AccessToken> for AuthenticateToken {
 
     fn try_from(value: auth::model::AccessToken) -> Result<Self, Self::Error> {
         match value {
-            auth::model::AccessToken::Session(value) => {
-                let expires_timestamp = chrono::DateTime::parse_from_rfc3339(&value.expires)
-                    .context("Failed to parse time string")?
-                    .naive_utc()
-                    .timestamp();
+            AccessToken::Session(value) => {
+                let expires_timestamp =
+                    time::OffsetDateTime::parse(&value.expires, &Rfc3339)?.unix_timestamp();
 
                 // current timestamp (secends)
-                let current_timestamp = chrono::Utc::now().timestamp();
+                let current_timestamp = now_duration()?.as_secs() as i64;
                 // expires (secends)
                 let expires_in = expires_timestamp - current_timestamp;
 
@@ -83,10 +85,9 @@ impl TryFrom<auth::model::AccessToken> for AuthenticateToken {
                     picture: value.user.picture,
                 })
             }
-            auth::model::AccessToken::OAuth(value) => {
+            AccessToken::OAuth(value) => {
                 let profile = Profile::try_from(value.id_token)?;
-                let expires =
-                    (chrono::Utc::now() + chrono::Duration::seconds(value.expires_in)).timestamp();
+                let expires = now_duration()?.as_secs() as i64 + value.expires_in;
                 Ok(Self {
                     access_token: value.access_token,
                     refresh_token: Some(value.refresh_token),
@@ -107,8 +108,7 @@ impl TryFrom<auth::model::RefreshToken> for AuthenticateToken {
 
     fn try_from(value: auth::model::RefreshToken) -> Result<Self, Self::Error> {
         let profile = Profile::try_from(value.id_token)?;
-        let expires =
-            (chrono::Utc::now() + chrono::Duration::seconds(value.expires_in)).timestamp();
+        let expires = now_duration()?.as_secs() as i64 + value.expires_in;
         Ok(Self {
             access_token: value.access_token,
             refresh_token: Some(value.refresh_token),

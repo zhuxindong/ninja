@@ -558,13 +558,10 @@ fn response_convert(
             let timestamp_nanos = expires
                 .duration_since(UNIX_EPOCH)
                 .expect("Failed to get timestamp")
-                .as_nanos() as i128;
+                .as_secs_f64();
             let cookie = Cookie::build(c.name(), c.value())
                 .path("/")
-                .expires(
-                    time::OffsetDateTime::from_unix_timestamp_nanos(timestamp_nanos)
-                        .expect("get cookie expires exception"),
-                )
+                .max_age(time::Duration::seconds_f64(timestamp_nanos))
                 .same_site(cookie::SameSite::Lax)
                 .secure(false)
                 .http_only(false)
