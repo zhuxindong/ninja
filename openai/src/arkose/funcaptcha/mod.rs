@@ -5,6 +5,7 @@ use crate::{context, debug};
 use anyhow::Context;
 use reqwest::header;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use std::{collections::HashMap, str::FromStr};
 
 const INIT_HEX: &str = "cd12da708fe6cbe6e068918c38de2ad9";
@@ -74,7 +75,6 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
             category: None,
             action: None,
         },
-        concise_challenge: None,
         funcaptcha: None,
         challenge: None,
         client: ctx.load_client(),
@@ -94,28 +94,26 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
         )
         .await?;
 
-    session.request_challenge().await?;
+    let concise_challenge = session.request_challenge().await?;
 
-    if let Some(concise_challenge) = &session.concise_challenge {
-        let images = session
-            .download_image_to_base64(&concise_challenge.urls)
-            .await?;
+    let images = session
+        .download_image_to_base64(&concise_challenge.urls)
+        .await?;
 
-        debug!("instructions: {:#?}", concise_challenge.instructions);
-        debug!("game_variant: {:#?}", concise_challenge.game_variant);
-        debug!("images: {:#?}", concise_challenge.urls);
+    debug!("instructions: {:#?}", concise_challenge.instructions);
+    debug!("game_variant: {:#?}", concise_challenge.game_variant);
+    debug!("images: {:#?}", concise_challenge.urls);
 
-        let funcaptcha_list = images
-            .into_iter()
-            .map(|i| FunCaptcha {
-                image: i,
-                instructions: concise_challenge.instructions.clone(),
-                game_variant: concise_challenge.game_variant.clone(),
-            })
-            .collect::<Vec<FunCaptcha>>();
+    let funcaptcha_list = images
+        .into_iter()
+        .map(|image| FunCaptcha {
+            image,
+            instructions: concise_challenge.instructions.clone(),
+            game_variant: concise_challenge.game_variant.clone(),
+        })
+        .collect::<Vec<FunCaptcha>>();
 
-        session.funcaptcha = Some(funcaptcha_list);
-    }
+    session.funcaptcha = Some(Arc::new(funcaptcha_list));
 
     Ok(session)
 }
@@ -129,13 +127,12 @@ pub struct Session {
     #[allow(dead_code)]
     challenge: Option<Challenge>,
     challenge_logger: ChallengeLogger,
-    concise_challenge: Option<ConciseChallenge>,
-    funcaptcha: Option<Vec<FunCaptcha>>,
+    funcaptcha: Option<Arc<Vec<FunCaptcha>>>,
 }
 
 impl Session {
-    pub fn funcaptcha(&self) -> Option<Vec<FunCaptcha>> {
-        self.funcaptcha.clone()
+    pub fn funcaptcha(&self) -> Option<&Arc<Vec<FunCaptcha>>> {
+        self.funcaptcha.as_ref()
     }
 
     async fn challenge_logger(
@@ -171,7 +168,7 @@ impl Session {
     }
 
     #[inline]
-    async fn request_challenge(&mut self) -> anyhow::Result<()> {
+    async fn request_challenge(&mut self) -> anyhow::Result<ConciseChallenge> {
         let challenge_request = RequestChallenge {
             sid: self.sid.clone(),
             token: self.session_token.clone(),
@@ -233,16 +230,15 @@ impl Session {
             re.replace_all(input, "").to_string()
         };
 
-        self.concise_challenge = Some(ConciseChallenge {
+        let concise_challenge = ConciseChallenge {
             game_type: challenge_type.to_string(),
             urls: challenge_urls.clone(),
             game_variant: challenge.game_data.instruction_string.clone(),
             instructions: remove_html_tags(&challenge.string_table[&key]),
-        });
-
+        };
         self.challenge = Some(challenge);
 
-        Ok(())
+        Ok(concise_challenge)
     }
 
     pub async fn submit_answer(mut self, answers: Vec<i32>) -> anyhow::Result<()> {
@@ -333,7 +329,7 @@ impl Session {
                 .bytes()
                 .await?;
             let b64 = general_purpose::STANDARD.encode(bytes);
-            b64_imgs.push(format!("data:image/png;base64,{b64}"));
+            b64_imgs.push(b64);
         }
 
         Ok(b64_imgs)
@@ -362,19 +358,8 @@ struct Challenge {
     #[serde(rename = "challengeURL")]
     challenge_url: String,
     audio_challenge_urls: Option<Vec<String>>,
-    audio_game_rate_limited: Option<serde_json::Value>,
-    sec: i32,
-    end_url: Option<serde_json::Value>,
     game_data: GameData,
-    game_sid: String,
-    sid: String,
-    lang: String,
-    string_table_prefixes: Vec<Option<serde_json::Value>>,
     string_table: HashMap<String, String>,
-    #[serde(rename = "earlyVictoryMessage")]
-    early_victory_message: Option<serde_json::Value>,
-    font_size_adjustments: Option<serde_json::Value>,
-    style_theme: String,
 }
 
 #[derive(Debug, Deserialize, Default)]
