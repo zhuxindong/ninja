@@ -1,3 +1,5 @@
+use anyhow::anyhow;
+use base64::{engine::general_purpose, Engine};
 use nom::AsBytes;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -21,7 +23,7 @@ pub fn decrypt(data: Vec<u8>, key: &str) -> anyhow::Result<String> {
 
 fn aes_encrypt(content: &str, password: &str) -> anyhow::Result<EncryptionData> {
     let salt: Vec<u8> = rand::thread_rng().gen::<[u8; 8]>().to_vec();
-    let (key, iv) = default_evp_kdf(password.as_bytes(), &salt).map_err(|s| anyhow::anyhow!(s))?;
+    let (key, iv) = default_evp_kdf(password.as_bytes(), &salt).map_err(|err| anyhow!(err))?;
 
     use aes::cipher::{block_padding::Pkcs7, BlockEncryptMut, KeyIvInit};
     type Aes256CbcEnc = cbc::Encryptor<aes::Aes256>;
@@ -47,8 +49,8 @@ fn aes_encrypt(content: &str, password: &str) -> anyhow::Result<EncryptionData> 
 
         salted += &dx.iter().map(|b| format!("{:02x}", b)).collect::<String>();
     }
-    #[allow(deprecated)]
-    let cipher_text = base64::encode(&cipher_bytes);
+
+    let cipher_text = general_purpose::STANDARD.encode(&cipher_bytes);
     let enc_data = EncryptionData {
         ct: cipher_text,
         iv: salted[64..64 + 32].to_string(),
@@ -63,8 +65,7 @@ fn aes_encrypt(content: &str, password: &str) -> anyhow::Result<EncryptionData> 
 fn ase_decrypt(content: Vec<u8>, password: &str) -> anyhow::Result<Vec<u8>> {
     let encode_data = serde_json::from_slice::<EncryptionData>(&content)?;
 
-    #[allow(deprecated)]
-    let decode_ct = base64::decode(&encode_data.ct)?;
+    let decode_ct = general_purpose::STANDARD.decode(&encode_data.ct)?;
 
     let salt: Result<Vec<u8>, _> = (0..encode_data.s.len())
         .step_by(2)
