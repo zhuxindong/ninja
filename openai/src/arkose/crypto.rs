@@ -1,7 +1,6 @@
 use anyhow::anyhow;
 use base64::{engine::general_purpose, Engine};
-use nom::AsBytes;
-use rand::Rng;
+use rand::random;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -22,7 +21,7 @@ pub fn decrypt(data: Vec<u8>, key: &str) -> anyhow::Result<String> {
 }
 
 fn aes_encrypt(content: &str, password: &str) -> anyhow::Result<EncryptionData> {
-    let salt: Vec<u8> = rand::thread_rng().gen::<[u8; 8]>().to_vec();
+    let salt: Vec<u8> = random::<[u8; 8]>().to_vec();
     let (key, iv) = default_evp_kdf(password.as_bytes(), &salt).map_err(|err| anyhow!(err))?;
 
     use aes::cipher::{block_padding::Pkcs7, BlockEncryptMut, KeyIvInit};
@@ -72,8 +71,7 @@ fn ase_decrypt(content: Vec<u8>, password: &str) -> anyhow::Result<Vec<u8>> {
         .map(|i| u8::from_str_radix(&encode_data.s[i..i + 2], 16))
         .collect();
 
-    let (key, iv) =
-        default_evp_kdf(password.as_bytes(), salt?.as_bytes()).map_err(|s| anyhow::anyhow!(s))?;
+    let (key, iv) = default_evp_kdf(password.as_bytes(), &salt?).map_err(|s| anyhow::anyhow!(s))?;
 
     use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
     type Aes256CbcDec = cbc::Decryptor<aes::Aes256>;
