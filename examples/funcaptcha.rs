@@ -49,10 +49,9 @@ async fn parse(
         match start_challenge(token).await {
             Ok(session) => {
                 if let Some(funs) = session.funcaptcha() {
-                    let max_cap = funs.len();
-                    let (tx, mut rx) = tokio::sync::mpsc::channel(max_cap);
-                    match solver {
+                    let mut rx = match solver {
                         Solver::Yescaptcha => {
+                            let (tx, rx) = tokio::sync::mpsc::channel(funs.len());
                             for (i, fun) in funs.iter().enumerate() {
                                 let sender = tx.clone();
                                 let submit_task = SubmitSolverBuilder::default()
@@ -68,35 +67,34 @@ async fn parse(
                                     }
                                 });
                             }
+                            rx
                         }
                         Solver::Capsolver => {
                             let mut classified_data = std::collections::HashMap::new();
 
                             for item in funs.iter() {
                                 let question = item.game_variant.clone();
-
                                 classified_data
                                     .entry(question)
                                     .or_insert(Vec::new())
                                     .push(item);
                             }
 
-                            for (i, data) in classified_data.into_iter().enumerate() {
-                                let sender = tx.clone();
+                            let (tx, rx) = tokio::sync::mpsc::channel(classified_data.len());
 
+                            for (i, data) in classified_data.into_iter().enumerate() {
                                 let images = data
                                     .1
                                     .into_iter()
                                     .map(|item| item.image.clone())
                                     .collect::<Vec<String>>();
-
                                 let submit_task = SubmitSolverBuilder::default()
                                     .solved(solver)
                                     .client_key(key)
                                     .question(data.0)
                                     .images(images)
                                     .build()?;
-
+                                let sender = tx.clone();
                                 tokio::spawn(async move {
                                     let res = funcaptcha::solver::submit_task(submit_task).await;
                                     if let Some(err) = sender.send((i, res)).await.err() {
@@ -104,27 +102,27 @@ async fn parse(
                                     }
                                 });
                             }
+                            rx
                         }
-                    }
+                    };
 
                     // Wait for all tasks to complete
-                    let mut r = Vec::with_capacity(max_cap);
+                    let mut r = Vec::new();
                     let mut need_soty = false;
-                    for _ in 0..max_cap {
-                        if let Some((i, res)) = rx.recv().await {
-                            let answers = res?;
-                            println!("index: {i}, answers: {:?}", answers);
-                            if answers.len() == 1 {
-                                r.push((i, answers[0]));
-                                need_soty = true;
-                            } else {
-                                r.extend(
-                                    answers
-                                        .into_iter()
-                                        .enumerate()
-                                        .map(|(i, answer)| (i, answer)),
-                                );
-                            }
+
+                    while let Some((i, res)) = rx.recv().await {
+                        let answers = res?;
+                        println!("index: {i}, answers: {:?}", answers);
+                        if answers.len() == 1 {
+                            r.push((i, answers[0]));
+                            need_soty = true;
+                        } else {
+                            r.extend(
+                                answers
+                                    .into_iter()
+                                    .enumerate()
+                                    .map(|(i, answer)| (i, answer)),
+                            );
                         }
                     }
 
