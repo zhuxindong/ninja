@@ -22,9 +22,11 @@ pub struct Conf {
     /// About the solver client key by ArkoseLabs
     pub arkose_solver_key: Option<String>,
     /// About the browser HAR file path requested by ChatGPT ArkoseLabs
-    pub arkose_har_file: Option<String>,
+    pub arkose_chat_har_path: Option<String>,
+    /// About the browser HAR file path requested by Auth0 ArkoseLabs
+    pub arkose_auth_har_path: Option<String>,
     /// About the browser HAR file path requested by Platform ArkoseLabs
-    pub arkose_platform_har_file: Option<String>,
+    pub arkose_platform_har_path: Option<String>,
     /// Client timeout (seconds)
     pub timeout: usize,
     /// Client connect timeout (seconds)
@@ -52,9 +54,10 @@ impl Default for Conf {
             tcp_keepalive: 75,
             id: DEFAULT_ID.to_owned(),
             arkose_solver_key: None,
-            arkose_har_file: None,
             arkose_solver: Solver::default(),
-            arkose_platform_har_file: None,
+            arkose_chat_har_path: None,
+            arkose_platform_har_path: None,
+            arkose_auth_har_path: None,
         }
     }
 }

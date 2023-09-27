@@ -1,5 +1,6 @@
 use crate::arkose::ArkoseToken;
-use crate::context::Context;
+use crate::arkose::Type;
+use crate::context;
 use crate::serve::err::ResponseError;
 use crate::serve::router::STATIC_FILES;
 use crate::serve::Launcher;
@@ -49,7 +50,7 @@ async fn proxy(
         .path()
         .eq("/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147")
     {
-        if let Ok(arkose_token) = ArkoseToken::new_from_context().await {
+        if let Ok(arkose_token) = ArkoseToken::new_from_context(Type::Chat).await {
             if arkose_token.success() {
                 let target = serde_json::json!({
                     "token": arkose_token,
@@ -88,7 +89,7 @@ async fn proxy(
     headers.remove(header::CONTENT_TYPE);
     headers.remove(header::CONTENT_LENGTH);
 
-    let client = Context::get_instance().await.load_client();
+    let client = context::get_instance().load_client();
 
     let url = format!("https://client-api.arkoselabs.com{}", uri.path());
     let resp = match body {

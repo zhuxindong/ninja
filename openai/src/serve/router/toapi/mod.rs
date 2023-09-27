@@ -9,12 +9,12 @@ use futures::StreamExt;
 use futures_core::Stream;
 use reqwest::StatusCode;
 use serde_json::Value;
-use std::convert::Infallible;
+use std::{convert::Infallible, str::FromStr};
 
 use crate::{
-    arkose::{ArkoseToken, GPT4Model},
+    arkose::{ArkoseToken, GPT4Model, Type},
     chatgpt::model::resp::{ConvoResponse, PostConvoResponse},
-    context::Context,
+    context,
     serve::{err::ResponseError, has_puid, header_convert},
 };
 use crate::{chatgpt::model::Role, debug};
@@ -71,9 +71,9 @@ pub(crate) async fn chat_to_api(
         .build()
         .map_err(ResponseError::InternalServerError)?;
 
-    let client = Context::get_instance().await.load_client();
+    let client = context::get_instance().load_client();
     let new_headers = header_convert(&headers, &jar).await?;
-    if let Ok(_) = GPT4Model::try_from(model_mapper.0) {
+    if GPT4Model::from_str(model_mapper.0).is_ok() {
         if !has_puid(&new_headers)? {
             let result = client
                 .get(format!("{URL_CHATGPT_API}/backend-api/models"))
@@ -332,7 +332,7 @@ async fn model_mapper(model: &str) -> Result<(&str, &str, Option<ArkoseToken>), 
         model if model.starts_with("gpt-4") => Ok((
             "gpt-4",
             "gpt-4",
-            Some(ArkoseToken::new_from_context().await?),
+            Some(ArkoseToken::new_from_context(Type::Chat).await?),
         )),
         _ => Err(ResponseError::BadRequest(anyhow::anyhow!(
             "not support model: {model}"

@@ -9,6 +9,7 @@ use anyhow::{bail, Context};
 use async_recursion::async_recursion;
 use derive_builder::Builder;
 use regex::Regex;
+use reqwest::cookie::Jar;
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::impersonate::Impersonate;
 use reqwest::redirect::Policy;
@@ -23,9 +24,9 @@ use sha2::{Digest, Sha256};
 
 pub mod model;
 
-use crate::arkose::ArkoseToken;
+use crate::arkose::{self, ArkoseToken, Type};
 use crate::error::AuthError;
-use crate::{debug, URL_CHATGPT_API};
+use crate::{debug, warn, URL_CHATGPT_API};
 
 use self::model::AuthStrategy;
 
@@ -59,6 +60,7 @@ pub trait AuthHandle: Send + Sync {
 #[derive(Clone)]
 pub struct AuthClient {
     client: Client,
+    jar: Arc<reqwest::cookie::Jar>,
     email_regex: Regex,
     handle_strategies: Arc<HashMap<AuthStrategy, Box<dyn AuthHandle + Send + Sync>>>,
 }
@@ -265,6 +267,18 @@ impl AuthClient {
         }
         Ok(refresh_token)
     }
+
+    async fn set_arkose_token(&self) -> AuthResult<()> {
+        let arkose_token = arkose::ArkoseToken::new_from_context(Type::Auth0).await?;
+        if !arkose_token.success() {
+            bail!(AuthError::FailedArkoseToken)
+        }
+        self.jar.add_cookie_str(
+            &format!("arkoseToken={};", arkose_token.value()),
+            &Url::parse(OPENAI_OAUTH_URL)?,
+        );
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
@@ -276,6 +290,8 @@ impl AuthHandle for AuthClient {
         if !self.email_regex.is_match(&account.username) || account.password.is_empty() {
             bail!(AuthError::InvalidEmailOrPassword)
         }
+
+        self.set_arkose_token().await?;
 
         self.handle_strategies
             .get(&account.option)
@@ -390,18 +406,22 @@ impl WebAuthHandle {
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
-        if resp.status().is_success() {
-            let res = resp.json::<Value>().await?;
-            let csrf_token = res
-                .as_object()
-                .context(AuthError::FailedCsrfToken)?
-                .get("csrfToken")
-                .context(AuthError::FailedCsrfToken)?
-                .as_str()
-                .context(AuthError::FailedCsrfToken)?;
-            return Ok(csrf_token.to_string());
+
+        match resp.error_for_status_ref() {
+            Ok(_) => {
+                let res = resp.json::<Value>().await?;
+                let csrf_token = res
+                    .as_object()
+                    .and_then(|obj| obj.get("csrfToken"))
+                    .and_then(|csrf| csrf.as_str())
+                    .context(AuthError::FailedCsrfToken)?;
+                return Ok(csrf_token.to_string());
+            }
+            Err(err) => {
+                warn!("{err}");
+                bail!(AuthError::FailedCsrfToken)
+            }
         }
-        bail!(AuthError::FailedCsrfToken)
     }
 
     async fn get_authorized_url(&self, csrf_token: String) -> AuthResult<String> {
@@ -424,10 +444,8 @@ impl WebAuthHandle {
             let res = resp.json::<Value>().await?;
             let url = res
                 .as_object()
-                .context(AuthError::FailedAuthorizedUrl)?
-                .get("url")
-                .context(AuthError::FailedAuthorizedUrl)?
-                .as_str()
+                .and_then(|v| v.get("url"))
+                .and_then(|v| v.as_str())
                 .context(AuthError::FailedAuthorizedUrl)?
                 .to_owned();
             debug!("WebAuthHandle authorized url: {url}");
@@ -1396,21 +1414,6 @@ impl AuthClientBuilder {
         self
     }
 
-    /// Enable a persistent cookie store for the client.
-    ///
-    /// Cookies received in responses will be preserved and included in
-    /// additional requests.
-    ///
-    /// By default, no cookie store is used.
-    ///
-    /// # Optional
-    ///
-    /// This requires the optional `cookies` feature to be enabled.
-    pub fn cookie_store(mut self, store: bool) -> Self {
-        self.builder = self.builder.cookie_store(store);
-        self
-    }
-
     /// Set that all sockets have `SO_KEEPALIVE` set with the supplied duration.
     ///
     /// If `None`, the option will not be set.
@@ -1435,7 +1438,13 @@ impl AuthClientBuilder {
     }
 
     pub fn build(self) -> AuthClient {
-        let client = self.builder.build().expect("ClientBuilder::build()");
+        let jar = Arc::new(Jar::default());
+
+        let client = self
+            .builder
+            .cookie_provider(jar.clone())
+            .build()
+            .expect("ClientBuilder::build()");
 
         let mut handle_strategies: HashMap<AuthStrategy, Box<dyn AuthHandle + Send + Sync>> =
             HashMap::new();
@@ -1453,6 +1462,7 @@ impl AuthClientBuilder {
         );
         AuthClient {
             client,
+            jar,
             email_regex: Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b")
                 .expect("Regex::new()"),
             handle_strategies: Arc::new(handle_strategies),

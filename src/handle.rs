@@ -48,7 +48,9 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .disable_direct(args.disable_direct)
         .api_prefix(args.api_prefix)
         .arkose_endpoint(args.arkose_endpoint)
-        .arkose_har_file(args.arkose_har_file)
+        .arkose_chat_har_path(args.arkose_chat_har_path)
+        .arkose_auth_har_path(args.arkose_auth_har_path)
+        .arkose_platform_har_path(args.arkose_platform_har_path)
         .arkose_har_upload_key(args.arkose_har_upload_key)
         .arkose_token_endpoint(args.arkose_token_endpoint)
         .tls_keypair(None)
@@ -267,11 +269,13 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
         disable_webui: false,
         puid_user: None,
         puid: None,
-        arkose_har_file: None,
+        arkose_chat_har_path: None,
         arkose_har_upload_key: None,
         disable_direct: false,
         arkose_solver: Solver::Yescaptcha,
         arkose_solver_key: None,
+        arkose_platform_har_path: None,
+        arkose_auth_har_path: None,
     };
 
     let write = |out: PathBuf, args: ServeArgs| -> anyhow::Result<()> {
