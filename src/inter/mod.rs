@@ -18,6 +18,7 @@ use inquire::{
     },
     Select,
 };
+use openai::arkose::{funcaptcha, ArkoseToken};
 use openai::{
     auth::{model::AuthStrategy, AuthHandle},
     model::AuthenticateToken,
@@ -162,7 +163,7 @@ pub fn new_spinner(msg: &str) -> ProgressBar {
     let pb = ProgressBar::new_spinner();
     pb.enable_steady_tick(Duration::from_millis(120));
     pb.set_style(
-        ProgressStyle::with_template("{spinner:.blue} {msg}")
+        ProgressStyle::with_template("{spinner:.green} {msg}")
             .unwrap()
             // For more spinners check out the cli-spinners project:
             // https://github.com/sindresorhus/cli-spinners/blob/master/spinners.json
@@ -190,4 +191,47 @@ pub fn json_to_table<T: Serialize>(header: &str, value: T) {
         .with(Width::increase(15))
         .with(BorderColor::filled(Color::FG_CYAN));
     println!("{table}");
+}
+
+#[allow(dead_code)]
+async fn get_chat_arkose_token(har_file: Option<&String>) -> anyhow::Result<ArkoseToken> {
+    match har_file {
+        None => {
+            let arkose_token = ArkoseToken::new().await?;
+            arkose_challenge(&arkose_token).await;
+            Ok(arkose_token)
+        }
+        Some(har_file) => ArkoseToken::new_form_har(har_file).await,
+    }
+}
+async fn get_platform_arkose_token(har_file: Option<&String>) -> anyhow::Result<ArkoseToken> {
+    match har_file {
+        None => {
+            let arkose_token = ArkoseToken::new_platform().await?;
+            arkose_challenge(&arkose_token).await;
+            Ok(arkose_token)
+        }
+        Some(har_file) => ArkoseToken::new_form_har(har_file).await,
+    }
+}
+
+#[allow(dead_code)]
+async fn arkose_challenge(arkose_token: &ArkoseToken) {
+    if arkose_token.success() {
+        match funcaptcha::start_challenge(arkose_token.value()).await {
+            Ok(session) => {
+                if let Some(funs) = session.funcaptcha() {
+                    let max_cap = funs.len();
+                    // Wait for all tasks to complete
+                    let answers = Vec::with_capacity(max_cap);
+                    if let Some(err) = session.submit_answer(answers).await.err() {
+                        eprintln!("Error submitting answer: {}", err);
+                    }
+                }
+            }
+            Err(error) => {
+                eprintln!("Error creating session: {}", error);
+            }
+        }
+    }
 }

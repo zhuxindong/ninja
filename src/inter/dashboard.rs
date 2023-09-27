@@ -1,5 +1,5 @@
+use crate::inter::get_platform_arkose_token;
 use inquire::{MultiSelect, Select, Text};
-use openai::arkose::ArkoseToken;
 use openai::{
     auth::{ApiKeyAction, ApiKeyDataBuilder, AuthClient},
     model::AuthenticateToken,
@@ -37,7 +37,7 @@ pub async fn prompt() -> anyhow::Result<()> {
             .collect::<Vec<&AuthenticateToken>>();
 
         if let Some(auth_token) = state.first() {
-            let pb = new_spinner("Login to Dashboard...");
+            let pb = new_spinner("Login Dashboard...");
             match client.do_dashboard_login(auth_token.access_token()).await {
                 Ok(session) => {
                     pb.finish_and_clear();
@@ -79,13 +79,6 @@ pub async fn prompt() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn get_arkose_token(har_file: Option<&String>) -> anyhow::Result<ArkoseToken> {
-    match har_file {
-        None => ArkoseToken::new_platform().await,
-        Some(har_file) => ArkoseToken::new_form_har(har_file).await,
-    }
-}
-
 async fn billing(client: &AuthClient, token: &str) -> anyhow::Result<()> {
     match client.billing_credit_grants(token).await {
         Ok(credit_grants) => json_to_table("Billing", credit_grants),
@@ -121,7 +114,8 @@ async fn create_api_key(client: &AuthClient, token: &str) -> anyhow::Result<()> 
     .await??;
 
     if let Some(name) = opt_name {
-        match get_arkose_token(conf.arkose_platform_har_file.as_ref()).await {
+        let pb = new_spinner("Creating API key...");
+        match get_platform_arkose_token(conf.arkose_platform_har_file.as_ref()).await {
             Ok(arkose_token) => {
                 let data = ApiKeyDataBuilder::default()
                     .action(ApiKeyAction::Create)
@@ -131,14 +125,19 @@ async fn create_api_key(client: &AuthClient, token: &str) -> anyhow::Result<()> 
 
                 match client.do_api_key(token, data).await {
                     Ok(api_key) => {
+                        pb.finish_and_clear();
                         json_to_table("Field", api_key.key);
                     }
                     Err(err) => {
+                        pb.finish_and_clear();
                         println!("Error: {}", err);
                     }
                 }
             }
-            Err(err) => println!("Error: {}", err),
+            Err(err) => {
+                pb.finish_and_clear();
+                println!("Error: {}", err)
+            }
         }
     }
 
@@ -160,7 +159,7 @@ async fn delete_api_key(client: &AuthClient, token: &str) -> anyhow::Result<()> 
                 .collect::<Vec<String>>();
 
             if let Some(select) = tokio::task::spawn_blocking(move || {
-                MultiSelect::new("Select API Key ›", select_list)
+                MultiSelect::new("Select API key ›", select_list)
                     .with_help_message("↑↓ to move, enter to select, type to filter, Esc to quit")
                     .prompt_skippable()
             })
@@ -168,7 +167,10 @@ async fn delete_api_key(client: &AuthClient, token: &str) -> anyhow::Result<()> 
             {
                 for s in select {
                     if let Some(key) = api_key_list.data.iter().find(|k| k.sensitive_id.eq(&s)) {
-                        match get_arkose_token(conf.arkose_platform_har_file.as_ref()).await {
+                        let pb = new_spinner("Deleting API key...");
+                        match get_platform_arkose_token(conf.arkose_platform_har_file.as_ref())
+                            .await
+                        {
                             Ok(arkose_token) => {
                                 let data = ApiKeyDataBuilder::default()
                                     .action(ApiKeyAction::Delete)
@@ -178,10 +180,16 @@ async fn delete_api_key(client: &AuthClient, token: &str) -> anyhow::Result<()> 
                                     .build()?;
 
                                 if let Err(err) = client.do_api_key(token, data).await {
+                                    pb.finish_and_clear();
                                     println!("Error: {}", err);
+                                } else {
+                                    pb.finish_and_clear()
                                 }
                             }
-                            Err(err) => println!("Error: {}", err),
+                            Err(err) => {
+                                pb.finish_and_clear();
+                                println!("Error: {}", err)
+                            }
                         }
                     }
                 }

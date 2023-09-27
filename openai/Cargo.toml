@@ -1,6 +1,6 @@
 [package]
 name = "openai"
-version = "0.5.6"
+version = "0.5.7"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -9,7 +9,6 @@ edition = "2021"
 log = "0.4.20"
 anyhow = "1.0.75"
 thiserror = "1.0.48"
-chrono = { version = "0.4.31", features = ["serde"] }
 reqwest = { git = "https://github.com/gngpp/reqwest.git", branch ="main", default-features = false, features = [
     "boring-tls", "impersonate","json", "cookies", "stream", "multipart", "socks"
 ] }
@@ -61,6 +60,7 @@ static-files = { version = "0.2.3", optional = true }
 tracing = { version = "0.1.37", optional = true }
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"], optional = true }
 async-stream = { version = "0.3.5", optional = true }
+serde_with = "3.3.0"
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.48.0"

@@ -21,6 +21,7 @@ use tokio::sync::OnceCell;
 use crate::arkose::crypto::encrypt;
 use crate::context::Context;
 use crate::debug;
+use crate::warn;
 use crate::HEADER_UA;
 
 use self::funcaptcha::solver::SubmitSolverBuilder;
@@ -345,8 +346,8 @@ where
 
 #[inline]
 async fn submit_captcha(
-    solver: &Solver,
-    key: &str,
+    solver: &'static Solver,
+    key: &'static str,
     arkose_token: ArkoseToken,
 ) -> anyhow::Result<ArkoseToken> {
     let session = funcaptcha::start_challenge(arkose_token.value())
@@ -354,37 +355,85 @@ async fn submit_captcha(
         .map_err(|error| anyhow::anyhow!(format!("Error creating session: {}", error)))?;
 
     let funs = anyhow::Context::context(session.funcaptcha(), "Valid funcaptcha error")?;
-    let max_cap = funs.len();
-    let (tx, mut rx) = tokio::sync::mpsc::channel(max_cap);
-    for (i, fun) in funs.into_iter().enumerate() {
-        let sender = tx.clone();
-        let question = match solver {
-            Solver::Yescaptcha => fun.instructions,
-            Solver::Capsolver => fun.game_variant,
-        };
-        let submit_task = SubmitSolverBuilder::default()
-            .solved(solver.clone())
-            .client_key(key.to_string())
-            .question(question)
-            .image_as_base64(fun.image)
-            .build()?;
-        tokio::spawn(async move {
-            let res = funcaptcha::solver::submit_task(submit_task).await;
-            if let Some(err) = sender.send((i, res)).await.err() {
-                println!("submit funcaptcha answer error: {err}")
+    let mut rx = match solver {
+        Solver::Yescaptcha => {
+            let (tx, rx) = tokio::sync::mpsc::channel(funs.len());
+            for (i, fun) in funs.iter().enumerate() {
+                let submit_task = SubmitSolverBuilder::default()
+                    .solved(solver)
+                    .client_key(key)
+                    .question(fun.instructions.clone())
+                    .image(fun.image.clone())
+                    .build()?;
+                let sender = tx.clone();
+                tokio::spawn(async move {
+                    let res = funcaptcha::solver::submit_task(submit_task).await;
+                    if let Some(err) = sender.send((i, res)).await.err() {
+                        warn!("submit funcaptcha answer error: {err}")
+                    }
+                });
             }
-        });
-    }
+            rx
+        }
+        Solver::Capsolver => {
+            let mut classified_data = std::collections::HashMap::new();
+
+            for item in funs.iter() {
+                let question = item.game_variant.clone();
+                classified_data
+                    .entry(question)
+                    .or_insert(Vec::new())
+                    .push(item);
+            }
+
+            let (tx, rx) = tokio::sync::mpsc::channel(classified_data.len());
+
+            for (i, data) in classified_data.into_iter().enumerate() {
+                let images = data
+                    .1
+                    .into_iter()
+                    .map(|item| item.image.clone())
+                    .collect::<Vec<String>>();
+                let submit_task = SubmitSolverBuilder::default()
+                    .solved(solver)
+                    .client_key(key)
+                    .question(data.0)
+                    .images(images)
+                    .build()?;
+                let sender = tx.clone();
+                tokio::spawn(async move {
+                    let res = funcaptcha::solver::submit_task(submit_task).await;
+                    if let Some(err) = sender.send((i, res)).await.err() {
+                        warn!("submit funcaptcha answer error: {err}")
+                    }
+                });
+            }
+            rx
+        }
+    };
 
     // Wait for all tasks to complete
-    let mut r = Vec::with_capacity(max_cap);
-    for _ in 0..max_cap {
-        if let Some((i, res)) = rx.recv().await {
-            r.push((i, res?));
+    let mut r = Vec::new();
+    let mut need_soty = false;
+
+    while let Some((i, res)) = rx.recv().await {
+        let answers = res?;
+        if answers.len() == 1 {
+            r.push((i, answers[0]));
+            need_soty = true;
+        } else {
+            r.extend(
+                answers
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, answer)| (i, answer)),
+            );
         }
     }
 
-    r.sort_by_key(|&(i, _)| i);
+    if need_soty {
+        r.sort_by_key(|&(i, _)| i);
+    }
 
     let answers = r
         .into_iter()

@@ -1,18 +1,7 @@
-use std::{
-    ops::Not,
-    path::PathBuf,
-    time::{SystemTime, UNIX_EPOCH},
-};
-
-use crate::{error::TokenStoreError, model::AuthenticateToken};
-use anyhow::Context;
+use crate::now_duration;
 
 use jsonwebtokens::{Algorithm, AlgorithmID, Verifier};
 use serde::{Deserialize, Serialize};
-
-use std::{collections::HashMap, sync::RwLock};
-
-use async_trait::async_trait;
 
 pub const PUBLIC_KEY: &[u8] = "-----BEGIN PUBLIC KEY-----\n\
 MIIC+zCCAeOgAwIBAgIJLlfMWYK8snRdMA0GCSqGSIb3DQEBCwUAMBsxGTAXBgNVBAM\n\
@@ -35,180 +24,6 @@ afkEyGvifAMJFPwO78=\n\
     .as_bytes();
 
 pub type TokenResult<T, E = anyhow::Error> = anyhow::Result<T, E>;
-const DEFAULT_TOKEN_FILE: &str = ".ninja-access_tokens";
-
-#[async_trait]
-pub trait AuthenticateTokenStore: Send + Sync {
-    /// Store Authenticate Token return an old Token
-    async fn set_token(
-        &mut self,
-        token: AuthenticateToken,
-    ) -> TokenResult<Option<AuthenticateToken>>;
-
-    /// Read Authenticate Token return a copy of the Token
-    async fn get_token(&self, email: &str) -> TokenResult<Option<AuthenticateToken>>;
-
-    /// Delete Authenticate Token return an current Token
-    async fn delete_token(&mut self, email: &str) -> TokenResult<Option<AuthenticateToken>>;
-
-    /// List Authenticate Token
-    async fn token_list(&self) -> TokenResult<Vec<AuthenticateToken>>;
-}
-
-#[derive(Debug)]
-pub struct TokenMemStore(RwLock<HashMap<String, AuthenticateToken>>);
-
-impl Default for TokenMemStore {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl TokenMemStore {
-    /// # Examples
-    ///
-    /// ```
-    /// let mut auth = openai::oauth::OpenOAuth0Builder::builder()
-    ///    .email("ninja@gmail.com".to_string())
-    ///    .password("gngpp".to_string())
-    ///    .cache(true)
-    ///    .cookie_store(true)
-    ///    .token_store(openai::token::MemStore::new())
-    ///    .client_timeout(std::time::Duration::from_secs(20))
-    ///    .build();
-    /// let token = auth.authenticate().await?;
-    /// println!("Token: {}", token);
-    /// println!("Profile: {:#?}", auth.get_user_info()?);
-    /// ```
-    pub fn new() -> Self {
-        TokenMemStore(RwLock::new(HashMap::new()))
-    }
-}
-
-#[async_trait]
-impl AuthenticateTokenStore for TokenMemStore {
-    async fn set_token(
-        &mut self,
-        token: AuthenticateToken,
-    ) -> TokenResult<Option<AuthenticateToken>> {
-        Ok(self
-            .0
-            .write()
-            .map_err(|_| TokenStoreError::AccessError)?
-            .insert(token.email().to_string(), token))
-    }
-
-    async fn get_token(&self, email: &str) -> TokenResult<Option<AuthenticateToken>> {
-        let binding = self.0.read().map_err(|_| TokenStoreError::AccessError)?;
-        Ok(binding.get(email).cloned())
-    }
-
-    async fn delete_token(&mut self, email: &str) -> TokenResult<Option<AuthenticateToken>> {
-        Ok(self
-            .0
-            .write()
-            .map_err(|_| TokenStoreError::AccessError)?
-            .remove(email))
-    }
-
-    async fn token_list(&self) -> TokenResult<Vec<AuthenticateToken>> {
-        let binding = self.0.read().map_err(|_| TokenStoreError::AccessError)?;
-        let list = binding
-            .values()
-            .map(|v| v.clone())
-            .collect::<Vec<AuthenticateToken>>();
-        Ok(list)
-    }
-}
-
-pub struct TokenFileStore(PathBuf);
-
-impl Default for TokenFileStore {
-    fn default() -> Self {
-        let default_path = PathBuf::from(DEFAULT_TOKEN_FILE);
-        if default_path.exists().not() {
-            std::fs::File::create(&default_path).unwrap_or_else(|_| {
-                panic!(
-                    "{}",
-                    TokenStoreError::CreateDefaultTokenFileError.to_string()
-                )
-            });
-        }
-        TokenFileStore(default_path)
-    }
-}
-
-impl TokenFileStore {
-    pub async fn new(path: Option<PathBuf>) -> TokenResult<Self> {
-        let path = path.unwrap_or(Default::default());
-        if let Some(parent) = path.parent() {
-            if path.exists().not() {
-                tokio::fs::create_dir_all(parent).await?
-            }
-        }
-        if path.exists().not() {
-            tokio::fs::File::create(&path).await?;
-        }
-        Ok(TokenFileStore(path))
-    }
-}
-
-#[async_trait]
-impl AuthenticateTokenStore for TokenFileStore {
-    async fn set_token(
-        &mut self,
-        token: AuthenticateToken,
-    ) -> TokenResult<Option<AuthenticateToken>> {
-        check(&token.access_token()).context(TokenStoreError::AccessTokenVerifyError)?;
-        let bytes = tokio::fs::read(&self.0).await?;
-        let mut data: HashMap<String, AuthenticateToken> = if bytes.is_empty() {
-            HashMap::new()
-        } else {
-            serde_json::from_slice(&bytes).map_err(|_| TokenStoreError::AccessError)?
-        };
-        let v = data.insert(token.email().to_string(), token);
-        let json = serde_json::to_string_pretty(&data)?;
-        tokio::fs::write(&self.0, json.as_bytes()).await?;
-        Ok(v)
-    }
-
-    async fn get_token(&self, email: &str) -> TokenResult<Option<AuthenticateToken>> {
-        let bytes = tokio::fs::read(&self.0).await?;
-        if bytes.is_empty() {
-            return Ok(None);
-        }
-        let data: HashMap<String, AuthenticateToken> =
-            serde_json::from_slice(&bytes).map_err(TokenStoreError::DeserializeError)?;
-        Ok(data.get(email).cloned())
-    }
-
-    async fn delete_token(&mut self, email: &str) -> TokenResult<Option<AuthenticateToken>> {
-        let bytes = tokio::fs::read(&self.0).await?;
-        if bytes.is_empty() {
-            return Ok(None);
-        }
-        let mut data: HashMap<String, AuthenticateToken> =
-            serde_json::from_slice(&bytes).map_err(|_| TokenStoreError::AccessError)?;
-        let v = data.remove(email);
-        let json = serde_json::to_string_pretty(&data)?;
-        tokio::fs::write(&self.0, json).await?;
-        Ok(v)
-    }
-
-    async fn token_list(&self) -> TokenResult<Vec<AuthenticateToken>> {
-        let bytes = tokio::fs::read(&self.0).await?;
-        if bytes.is_empty() {
-            return Ok(vec![]);
-        }
-        let data: HashMap<String, AuthenticateToken> =
-            serde_json::from_slice(&bytes).map_err(TokenStoreError::DeserializeError)?;
-        let list = data
-            .values()
-            .map(|v| v.clone())
-            .collect::<Vec<AuthenticateToken>>();
-        Ok(list)
-    }
-}
 
 #[cfg(feature = "remote-token")]
 #[derive(Deserialize)]
@@ -225,14 +40,12 @@ struct KeyResult {
 
 #[cfg(feature = "remote--token")]
 async fn keys() -> TokenResult<KeyResult> {
-    use reqwest::header;
-    use std::str::FromStr;
-    let client = reqwest::Client::builder()
-        .user_agent("ChatGPT/1.2023.21 (iOS 16.2; iPad11,1; build 623)")
-        .timeout(std::time::Duration::from_secs(3))
-        .build()?;
+    use crate::context::Context;
+    use crate::error::AuthError;
+    let client = Context::get_instance().await.load_client();
     let resp = client
         .get("https://auth0.openai.com/.well-known/jwks.json")
+        .timeout(std::time::Duration::from_secs(3))
         .send()
         .await?;
     if resp.status().is_success() {
@@ -294,8 +107,7 @@ pub fn check(token: &str) -> TokenResult<Option<TokenProfile>> {
     Ok(Some(check_info(token, PUBLIC_KEY, AlgorithmID::RS256)?))
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Default, Serialize, Deserialize)]
 pub struct TokenProfile {
     #[serde(rename = "https://api.openai.com/profile")]
     pub https_api_openai_com_profile: HttpsApiOpenaiComProfile,
@@ -324,25 +136,21 @@ impl TokenProfile {
     }
 
     pub fn expires_in(&self) -> i64 {
-        let current_timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Failed to get current timestamp.")
+        let current_timestamp = now_duration()
+            .expect("Failed to get current timestamp")
             .as_secs();
         self.exp - (current_timestamp as i64)
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Default, Serialize, Deserialize)]
 pub struct HttpsApiOpenaiComProfile {
     pub email: String,
-    #[serde(rename = "email_verified")]
     pub email_verified: bool,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Default, Serialize, Deserialize)]
 pub struct HttpsApiOpenaiComAuth {
-    #[serde(rename = "user_id", default)]
+    #[serde(default)]
     pub user_id: String,
 }

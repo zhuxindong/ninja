@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{context::Context, debug};
+use crate::context::Context;
 
 use super::Solver;
 
@@ -40,24 +40,31 @@ struct ReqBody<'a> {
 struct ReqTask<'a> {
     #[serde(rename = "type")]
     type_field: &'static str,
-    image: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    image: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    images: Option<Vec<String>>,
     question: &'a str,
 }
 
 #[derive(derive_builder::Builder)]
-pub struct SubmitSolver {
-    solved: Solver,
-    client_key: String,
-    image_as_base64: String,
+pub struct SubmitSolver<'a> {
+    solved: &'a Solver,
+    client_key: &'a str,
+    #[builder(setter(into), default)]
+    image: Option<String>,
+    #[builder(setter(into), default)]
+    images: Option<Vec<String>>,
     question: String,
 }
 
-pub async fn submit_task(submit_task: SubmitSolver) -> anyhow::Result<i32> {
+pub async fn submit_task(submit_task: SubmitSolver<'_>) -> anyhow::Result<Vec<i32>> {
     let mut body = ReqBody {
         client_key: &submit_task.client_key,
         task: ReqTask {
             type_field: "FunCaptchaClassification",
-            image: &submit_task.image_as_base64,
+            image: submit_task.image,
+            images: submit_task.images,
             question: &submit_task.question,
         },
         soft_id: None,
@@ -83,21 +90,18 @@ pub async fn submit_task(submit_task: SubmitSolver) -> anyhow::Result<i32> {
     match resp.error_for_status_ref() {
         Ok(_) => {
             let task = resp.json::<TaskResp>().await?;
-            debug!("solver captcha task: {task:#?}");
             if let Some(error_description) = task.error_description {
                 anyhow::bail!(format!("solver task error: {error_description}"))
             }
             let target = task.solution.objects;
             return match target.is_empty() {
-                true => Ok(0),
-                false => {
-                    Ok(anyhow::Context::context(target.get(0), "funcaptcha solver error")?.clone())
-                }
+                true => Ok(vec![0]),
+                false => Ok(target),
             };
         }
-        Err(_) => {
-            let err = resp.text().await?;
-            anyhow::bail!(err)
+        Err(err) => {
+            let msg = resp.text().await?;
+            anyhow::bail!("Status: {err}, {msg}")
         }
     }
 }

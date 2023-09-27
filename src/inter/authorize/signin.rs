@@ -108,6 +108,7 @@ async fn sign_in() -> anyhow::Result<()> {
                     let mut account = store
                         .get(Account::new(token.email()))?
                         .unwrap_or(Account::new(token.email()));
+                    Context::set_using_user(Some(token.email().to_owned())).await?;
                     account.push_state(strategy, token);
                     store.add(account)?;
                 }
@@ -193,20 +194,19 @@ async fn using() -> anyhow::Result<()> {
         })
         .unwrap_or(0);
 
-    let switch = tokio::task::spawn_blocking(move || {
+    let opt_switch = tokio::task::spawn_blocking(move || {
         Select::new("Using Account", ids)
             .with_help_message("↑↓ to move, enter to select, type to filter, Esc to quit")
             .with_starting_cursor(select)
             .prompt_skippable()
     })
     .await??;
-    if let Some(using) = switch {
+    if let Some(using) = opt_switch {
+        println!("Using Account: {}", using);
         Context::set_using_user(Some(using)).await?;
     }
     Ok(())
 }
-
-use chrono::{DateTime, Utc};
 
 #[derive(serde::Serialize)]
 struct AccountState {
@@ -225,10 +225,9 @@ async fn state() -> anyhow::Result<()> {
     let store = Context::get_account_store().await;
     let account_list = store.list()?;
 
-    fn format_time(timestamp: i64) -> String {
-        let datetime =
-            DateTime::<Utc>::from_timestamp(timestamp as i64, 0).expect("invalid timestamp");
-        datetime.format("%Y-%m-%d %H:%M:%S").to_string()
+    if account_list.is_empty() {
+        println!("No account found");
+        return Ok(());
     }
 
     let mut list = Vec::with_capacity(account_list.len());
@@ -239,7 +238,7 @@ async fn state() -> anyhow::Result<()> {
             .into_iter()
             .map(|(k, v)| State {
                 _type: k.to_owned(),
-                expires: format_time(v.expires()),
+                expires: openai::format_time(v.expires()).expect("Failed to format time"),
             })
             .collect::<Vec<State>>();
         list.push(AccountState {
