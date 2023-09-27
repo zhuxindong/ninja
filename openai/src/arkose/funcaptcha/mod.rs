@@ -60,7 +60,7 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
     let fields: Vec<&str> = arkose_token.split('|').collect();
     let session_token = fields[0].to_string();
     let sid = fields[1].split('=').nth(1).unwrap_or_default();
-    let ctx = context::Context::get_instance().await;
+    let ctx = context::get_instance();
     let mut session = Session {
         sid: sid.to_owned(),
         session_token: session_token.clone(),

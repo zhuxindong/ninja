@@ -115,7 +115,7 @@ async fn create_api_key(client: &AuthClient, token: &str) -> anyhow::Result<()> 
 
     if let Some(name) = opt_name {
         let pb = new_spinner("Creating API key...");
-        match get_platform_arkose_token(conf.arkose_platform_har_file.as_ref()).await {
+        match get_platform_arkose_token(conf.arkose_platform_har_path.as_ref()).await {
             Ok(arkose_token) => {
                 let data = ApiKeyDataBuilder::default()
                     .action(ApiKeyAction::Create)
@@ -168,7 +168,7 @@ async fn delete_api_key(client: &AuthClient, token: &str) -> anyhow::Result<()> 
                 for s in select {
                     if let Some(key) = api_key_list.data.iter().find(|k| k.sensitive_id.eq(&s)) {
                         let pb = new_spinner("Deleting API key...");
-                        match get_platform_arkose_token(conf.arkose_platform_har_file.as_ref())
+                        match get_platform_arkose_token(conf.arkose_platform_har_path.as_ref())
                             .await
                         {
                             Ok(arkose_token) => {

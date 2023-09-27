@@ -1,12 +1,15 @@
 use crate::arkose::crypto;
 use crate::urldecoding;
+use anyhow::Context;
 use base64::Engine;
 use serde::Deserialize;
+use std::collections::HashMap;
+use std::sync::OnceLock;
 use std::{path::Path, sync::Mutex};
 use time::format_description::well_known::Rfc3339;
 
 static LOCK: Mutex<()> = Mutex::new(());
-static mut CACHE_REQUEST_ENTRY: Option<RequestEntry> = None;
+static mut CACHE_REQUEST_ENTRY: OnceLock<HashMap<String, RequestEntry>> = OnceLock::new();
 
 #[derive(Clone)]
 pub struct RequestEntry {
@@ -16,6 +19,48 @@ pub struct RequestEntry {
     pub body: String,
     pub bx: String,
     pub bv: String,
+}
+
+pub fn check_from_slice(s: &[u8]) -> anyhow::Result<()> {
+    let _ = serde_json::from_slice::<Har>(&s)?;
+    Ok(())
+}
+
+#[inline]
+pub fn check_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
+    let bytes = std::fs::read(path)?;
+    check_from_slice(&bytes)
+}
+
+#[inline]
+pub fn parse_from_slice(s: &[u8]) -> anyhow::Result<RequestEntry> {
+    let har = serde_json::from_slice::<Har>(&s)?;
+    parse(har)
+}
+
+#[inline]
+pub fn parse_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<RequestEntry> {
+    if !path.as_ref().is_file() {
+        anyhow::bail!("{} not a file", path.as_ref().display());
+    }
+
+    let _ = unsafe { CACHE_REQUEST_ENTRY.get_or_init(|| HashMap::new()) };
+    let cache = unsafe { CACHE_REQUEST_ENTRY.get_mut().context("Unable to get cache") }?;
+
+    let key = format!("{}", path.as_ref().display());
+    match cache.get(&key) {
+        Some(entry) => Ok(entry.clone()),
+        None => {
+            let lock = LOCK.lock().expect("Unable to lock");
+            let bytes = std::fs::read(path)?;
+            let har = serde_json::from_slice::<Har>(&bytes)?;
+            drop(bytes);
+            let entry = parse(har)?;
+            cache.insert(key, entry.clone());
+            drop(lock);
+            Ok(entry)
+        }
+    }
 }
 
 #[inline]
@@ -76,13 +121,7 @@ fn parse(har: Har) -> anyhow::Result<RequestEntry> {
                     bx: crypto::decrypt(bda, &format!("{bv}{bw}"))?,
                     bv,
                 };
-
-                let lock = LOCK.lock().expect("Unable to lock");
-                unsafe {
-                    CACHE_REQUEST_ENTRY = Some(entry);
-                    drop(lock);
-                    return Ok(CACHE_REQUEST_ENTRY.clone().expect("HAR cache not found"));
-                }
+                return Ok(entry);
             }
         }
     }
@@ -90,51 +129,14 @@ fn parse(har: Har) -> anyhow::Result<RequestEntry> {
     anyhow::bail!("Unable to find har related request entry")
 }
 
-#[inline]
-pub fn check_from_slice(s: &[u8]) -> anyhow::Result<()> {
-    let _ = serde_json::from_slice::<Har>(&s)?;
-    Ok(())
-}
-
-#[inline]
-pub fn check_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
-    let bytes = std::fs::read(path)?;
-    check_from_slice(&bytes)
-}
-
-#[inline]
-pub fn parse_from_slice(s: &[u8]) -> anyhow::Result<RequestEntry> {
-    if let Some(entry) = unsafe { CACHE_REQUEST_ENTRY.clone() } {
-        return Ok(entry);
-    }
-    let har = serde_json::from_slice::<Har>(&s)?;
-    parse(har)
-}
-
-#[inline]
-pub fn parse_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Option<RequestEntry>> {
-    if unsafe { CACHE_REQUEST_ENTRY.is_some() } {
-        return Ok(unsafe { CACHE_REQUEST_ENTRY.clone() });
-    }
-
-    if !path.as_ref().is_file() {
-        anyhow::bail!("{} not a file", path.as_ref().display());
-    }
-
-    let bytes = std::fs::read(path)?;
-
-    if bytes.is_empty() {
-        return Ok(None);
-    }
-
-    let har = serde_json::from_slice::<Har>(&bytes)?;
-    drop(bytes);
-    parse(har).map(Some)
-}
-
-pub fn clear_cache() {
+pub fn clear(key: &str) {
     let lock = LOCK.lock().expect("Unable to lock");
-    unsafe { CACHE_REQUEST_ENTRY = None }
+    unsafe {
+        if let Some(cache) = CACHE_REQUEST_ENTRY.get_mut() {
+            cache.remove(key);
+        }
+    };
+
     drop(lock)
 }
 

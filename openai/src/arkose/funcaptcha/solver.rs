@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::context::Context;
+use crate::context;
 
 use super::Solver;
 
@@ -84,7 +84,7 @@ pub async fn submit_task(submit_task: SubmitSolver<'_>) -> anyhow::Result<Vec<i3
         }
     }
 
-    let client = Context::get_instance().await;
+    let client = context::get_instance();
     let resp = client.load_client().post(url).json(&body).send().await?;
 
     match resp.error_for_status_ref() {

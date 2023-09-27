@@ -18,7 +18,7 @@ use inquire::{
     },
     Select,
 };
-use openai::arkose::{funcaptcha, ArkoseToken};
+use openai::arkose::{funcaptcha, ArkoseToken, Type};
 use openai::{
     auth::{model::AuthStrategy, AuthHandle},
     model::AuthenticateToken,
@@ -197,21 +197,21 @@ pub fn json_to_table<T: Serialize>(header: &str, value: T) {
 async fn get_chat_arkose_token(har_file: Option<&String>) -> anyhow::Result<ArkoseToken> {
     match har_file {
         None => {
-            let arkose_token = ArkoseToken::new().await?;
+            let arkose_token = ArkoseToken::new_from_context(Type::Chat).await?;
             arkose_challenge(&arkose_token).await;
             Ok(arkose_token)
         }
-        Some(har_file) => ArkoseToken::new_form_har(har_file).await,
+        Some(har_file) => ArkoseToken::new_from_har(har_file).await,
     }
 }
 async fn get_platform_arkose_token(har_file: Option<&String>) -> anyhow::Result<ArkoseToken> {
     match har_file {
         None => {
-            let arkose_token = ArkoseToken::new_platform().await?;
+            let arkose_token = ArkoseToken::new_from_context(Type::Platform).await?;
             arkose_challenge(&arkose_token).await;
             Ok(arkose_token)
         }
-        Some(har_file) => ArkoseToken::new_form_har(har_file).await,
+        Some(har_file) => ArkoseToken::new_from_har(har_file).await,
     }
 }
 

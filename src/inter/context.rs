@@ -17,8 +17,18 @@ impl Context {
     pub async fn init_openai_context() -> anyhow::Result<()> {
         let conf = Self::get_conf().await?;
 
-        let arkose_har_file = conf
-            .arkose_har_file
+        let arkose_chat_har_file = conf
+            .arkose_chat_har_path
+            .map(|f| Some(PathBuf::from(f)))
+            .unwrap_or(None);
+
+        let arkose_auth_har_file = conf
+            .arkose_auth_har_path
+            .map(|f| Some(PathBuf::from(f)))
+            .unwrap_or(None);
+
+        let arkose_platform_har_file = conf
+            .arkose_platform_har_path
             .map(|f| Some(PathBuf::from(f)))
             .unwrap_or(None);
 
@@ -31,14 +41,16 @@ impl Context {
 
         let args = openai::context::ContextArgsBuilder::default()
             .arkose_endpoint(conf.arkose_token_endpoint)
-            .arkose_har_file(arkose_har_file)
+            .arkose_chat_har_file(arkose_chat_har_file)
+            .arkose_auth_har_file(arkose_auth_har_file)
+            .arkose_platform_har_file(arkose_platform_har_file)
             .arkose_solver(arkose_solver)
             .timeout(conf.timeout)
             .connect_timeout(conf.connect_timeout)
             .tcp_keepalive(conf.tcp_keepalive)
             .proxies(proxies)
             .build()?;
-        openai::context::Context::init(args);
+        openai::context::init(args);
         Ok(())
     }
     pub async fn using_user() -> Option<String> {
@@ -101,7 +113,6 @@ impl Context {
                     .timeout(time::Duration::from_secs(conf.timeout as u64))
                     .connect_timeout(time::Duration::from_secs(conf.connect_timeout as u64))
                     .tcp_keepalive(time::Duration::from_secs(conf.tcp_keepalive as u64))
-                    .cookie_store(true)
                     .build()
             })
             .await

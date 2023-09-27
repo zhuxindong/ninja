@@ -30,6 +30,7 @@ use axum_server::HttpConfig;
 use derive_builder::Builder;
 use reqwest::header::{HeaderMap, HeaderValue};
 use serde_json::{json, Value};
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, UNIX_EPOCH};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
@@ -39,9 +40,10 @@ use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 
 use crate::arkose::funcaptcha::{ArkoseSolver, Solver};
+use crate::arkose::Type;
 use crate::auth::model::{AccessToken, AuthAccount, AuthStrategy, RefreshToken};
 use crate::auth::AuthHandle;
-use crate::context::{Context, ContextArgsBuilder};
+use crate::context::{self, ContextArgsBuilder};
 use crate::serve::router::toapi::chat_to_api;
 use crate::serve::tokenbucket::TokenBucketLimitContext;
 use crate::{arkose, debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
@@ -87,8 +89,12 @@ pub struct Launcher {
     arkose_endpoint: Option<String>,
     /// Get arkose token endpoint
     arkose_token_endpoint: Option<String>,
-    /// Arkoselabs HAR record file path
-    arkose_har_file: Option<PathBuf>,
+    /// ChatGPT Arkoselabs HAR record file path
+    arkose_chat_har_file: Option<PathBuf>,
+    /// Platform Arkoselabs HAR record file path
+    arkose_platform_har_file: Option<PathBuf>,
+    /// Auth Arkoselabs HAR record file path
+    arkose_auth_har_file: Option<PathBuf>,
     /// HAR file upload authenticate key
     arkose_har_upload_key: Option<String>,
     /// arkoselabs solver
@@ -157,7 +163,9 @@ impl Launcher {
         let args = ContextArgsBuilder::default()
             .api_prefix(self.api_prefix.clone())
             .arkose_endpoint(self.arkose_endpoint.clone())
-            .arkose_har_file(self.arkose_har_file.clone())
+            .arkose_chat_har_file(self.arkose_chat_har_file.clone())
+            .arkose_auth_har_file(self.arkose_auth_har_file.clone())
+            .arkose_platform_har_file(self.arkose_platform_har_file.clone())
             .arkose_har_upload_key(self.arkose_har_upload_key.clone())
             .arkose_token_endpoint(self.arkose_token_endpoint.clone())
             .arkose_solver(arkose_sovler)
@@ -169,7 +177,7 @@ impl Launcher {
             .tcp_keepalive(self.tcp_keepalive)
             .build()?;
 
-        Context::init(args);
+        context::init(args);
 
         let global_layer = tower::ServiceBuilder::new()
             .layer(tower_http::trace::TraceLayer::new_for_http())
@@ -317,7 +325,7 @@ impl Launcher {
 async fn post_access_token(
     mut account: axum::Form<AuthAccount>,
 ) -> Result<Json<AccessToken>, ResponseError> {
-    let ctx = Context::get_instance().await;
+    let ctx = context::get_instance();
     let mut result: Result<Json<AccessToken>, ResponseError> = Err(
         ResponseError::InternalServerError(anyhow!("There was an error logging in to the Body")),
     );
@@ -346,7 +354,7 @@ async fn post_access_token(
 async fn post_refresh_token(
     TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
 ) -> Result<Json<RefreshToken>, ResponseError> {
-    let ctx = Context::get_instance().await;
+    let ctx = context::get_instance();
     match ctx
         .load_auth_client()
         .do_refresh_token(bearer.token())
@@ -360,7 +368,7 @@ async fn post_refresh_token(
 async fn post_revoke_token(
     TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
 ) -> Result<axum::http::StatusCode, ResponseError> {
-    let ctx = Context::get_instance().await;
+    let ctx = context::get_instance();
     match ctx.load_auth_client().do_revoke_token(bearer.token()).await {
         Ok(_) => Ok(axum::http::StatusCode::OK),
         Err(err) => Err(ResponseError::BadRequest(err)),
@@ -416,7 +424,7 @@ async fn official_proxy(
             format!("{URL_PLATFORM_API}{}?{}", uri.path(), query)
         }
     };
-    let ctx = Context::get_instance().await;
+    let ctx = context::get_instance();
     let builder = ctx
         .load_client()
         .request(method, &url)
@@ -457,7 +465,7 @@ async fn unofficial_proxy(
 
     handle_body(&url, &method, &mut headers, &mut body).await?;
 
-    let ctx = Context::get_instance().await;
+    let ctx = context::get_instance();
     let builder = ctx
         .load_client()
         .request(method, url)
@@ -517,8 +525,8 @@ pub(super) async fn header_convert(
         }
         None => {
             if !has_puid(&headers)? {
-                let ctx = Context::get_instance().await;
-                let puid = ctx.get_share_puid().await;
+                let ctx = context::get_instance();
+                let puid = ctx.get_share_puid();
                 if !puid.is_empty() {
                     let c = &format!("_puid={};", puid);
                     cookie.push_str(c);
@@ -594,7 +602,7 @@ async fn handle_body(
         None => return Ok(()),
     };
 
-    if arkose::GPT4Model::try_from(model).is_err() {
+    if arkose::GPT4Model::from_str(model).is_err() {
         return Ok(());
     }
 
@@ -609,8 +617,7 @@ async fn handle_body(
         )))?;
 
     if !has_puid(headers)? {
-        let resp = Context::get_instance()
-            .await
+        let resp = context::get_instance()
             .load_client()
             .get(format!("{URL_CHATGPT_API}/backend-api/models"))
             .header(header::AUTHORIZATION, authorization)
@@ -632,7 +639,7 @@ async fn handle_body(
         }
     }
 
-    if let Ok(arkose_token) = arkose::ArkoseToken::new_from_context().await {
+    if let Ok(arkose_token) = arkose::ArkoseToken::new_from_context(Type::Chat).await {
         let _ = body.insert("arkose_token".to_owned(), json!(arkose_token));
     }
 
@@ -671,8 +678,7 @@ pub(super) fn has_puid(headers: &HeaderMap) -> Result<bool, ResponseError> {
 }
 
 async fn check_wan_address() {
-    match Context::get_instance()
-        .await
+    match context::get_instance()
         .load_client()
         .get("https://ifconfig.me")
         .timeout(Duration::from_secs(70))
@@ -706,7 +712,7 @@ async fn initialize_puid(username: Option<String>, password: Option<String>, mfa
         option: AuthStrategy::Apple,
         cf_turnstile_response: None,
     };
-    let ctx = Context::get_instance().await;
+    let ctx = context::get_instance();
     loop {
         interval.tick().await;
         for _ in 0..2 {
