@@ -90,11 +90,11 @@ pub struct Launcher {
     /// Get arkose token endpoint
     arkose_token_endpoint: Option<String>,
     /// ChatGPT Arkoselabs HAR record file path
-    arkose_chat_har_path: Option<PathBuf>,
+    arkose_chat_har_file: Option<PathBuf>,
     /// Platform Arkoselabs HAR record file path
-    arkose_platform_har_path: Option<PathBuf>,
+    arkose_platform_har_file: Option<PathBuf>,
     /// Auth Arkoselabs HAR record file path
-    arkose_auth_har_path: Option<PathBuf>,
+    arkose_auth_har_file: Option<PathBuf>,
     /// HAR file upload authenticate key
     arkose_har_upload_key: Option<String>,
     /// arkoselabs solver
@@ -163,9 +163,9 @@ impl Launcher {
         let args = ContextArgsBuilder::default()
             .api_prefix(self.api_prefix.clone())
             .arkose_endpoint(self.arkose_endpoint.clone())
-            .arkose_chat_har_path(self.arkose_chat_har_path.clone())
-            .arkose_auth_har_path(self.arkose_auth_har_path.clone())
-            .arkose_platform_har_path(self.arkose_platform_har_path.clone())
+            .arkose_chat_har_file(self.arkose_chat_har_file.clone())
+            .arkose_auth_har_file(self.arkose_auth_har_file.clone())
+            .arkose_platform_har_file(self.arkose_platform_har_file.clone())
             .arkose_har_upload_key(self.arkose_har_upload_key.clone())
             .arkose_token_endpoint(self.arkose_token_endpoint.clone())
             .arkose_solver(arkose_sovler)

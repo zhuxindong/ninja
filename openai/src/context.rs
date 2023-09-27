@@ -56,13 +56,13 @@ pub struct ContextArgs {
     pub arkose_endpoint: Option<String>,
     /// ChatGPT Arkoselabs HAR record file path
     #[builder(setter(into), default)]
-    pub arkose_chat_har_path: Option<PathBuf>,
+    pub arkose_chat_har_file: Option<PathBuf>,
     /// Auth Arkoselabs HAR record file path
     #[builder(setter(into), default)]
-    pub arkose_auth_har_path: Option<PathBuf>,
+    pub arkose_auth_har_file: Option<PathBuf>,
     /// Platform Arkoselabs HAR record file path
     #[builder(setter(into), default)]
-    pub arkose_platform_har_path: Option<PathBuf>,
+    pub arkose_platform_har_file: Option<PathBuf>,
     /// HAR file upload authenticate key
     #[builder(setter(into), default)]
     pub arkose_har_upload_key: Option<String>,
@@ -112,17 +112,17 @@ impl Context {
     fn new(args: ContextArgs) -> Self {
         let chat_har = get_har_path(
             arkose::Type::Chat,
-            &args.arkose_chat_har_path,
+            &args.arkose_chat_har_file,
             ".chat.openai.com.har",
         );
         let auth_har = get_har_path(
             arkose::Type::Auth0,
-            &args.arkose_auth_har_path,
+            &args.arkose_auth_har_file,
             ".auth.openai.com.har",
         );
         let platform_har = get_har_path(
             arkose::Type::Platform,
-            &args.arkose_platform_har_path,
+            &args.arkose_platform_har_file,
             ".platform.openai.com.har",
         );
 
@@ -186,7 +186,7 @@ impl Context {
         self.arkose_solver.as_ref()
     }
 
-    pub fn arkose_har_path(&self, _type: &arkose::Type) -> (bool, PathBuf) {
+    pub fn arkose_har_filepath(&self, _type: &arkose::Type) -> (bool, PathBuf) {
         let har_lock = HAR
             .get()
             .expect("Failed to get har lock")

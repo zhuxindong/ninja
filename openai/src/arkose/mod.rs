@@ -362,7 +362,7 @@ async fn get_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<ArkoseToken> {
 async fn get_from_context(t: Type) -> anyhow::Result<ArkoseToken> {
     let ctx = context::get_instance();
 
-    let (state, file_path) = ctx.arkose_har_path(&t);
+    let (state, file_path) = ctx.arkose_har_filepath(&t);
     if state {
         let token = ArkoseToken::new_from_har(file_path).await?;
         return Ok(token);
