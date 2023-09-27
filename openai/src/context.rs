@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf, sync::OnceLock};
 
 use crate::{
     arkose::{self, funcaptcha::ArkoseSolver},
@@ -10,9 +10,26 @@ use crate::{
 };
 use derive_builder::Builder;
 use reqwest::Client;
-use tokio::sync::{OnceCell, RwLock};
+use std::sync::RwLock;
 
 use hotwatch::{Event, EventKind, Hotwatch};
+
+/// Use Once to guarantee initialization only once
+pub fn init(args: ContextArgs) {
+    if let Some(_) = CTX.set(Context::new(args)).err() {
+        error!("Failed to initialize context");
+    };
+}
+
+pub fn get_instance() -> &'static Context {
+    CTX.get_or_init(|| {
+        Context::new(
+            ContextArgsBuilder::default()
+                .build()
+                .expect("Context arguments initialization build failed"),
+        )
+    })
+}
 
 #[derive(Builder, Clone, Default)]
 pub struct ContextArgs {
@@ -37,9 +54,15 @@ pub struct ContextArgs {
     /// Arkose endpoint
     #[builder(setter(into), default)]
     pub arkose_endpoint: Option<String>,
-    /// Arkoselabs HAR record file path
+    /// ChatGPT Arkoselabs HAR record file path
     #[builder(setter(into), default)]
-    pub arkose_har_file: Option<PathBuf>,
+    pub arkose_chat_har_path: Option<PathBuf>,
+    /// Auth Arkoselabs HAR record file path
+    #[builder(setter(into), default)]
+    pub arkose_auth_har_path: Option<PathBuf>,
+    /// Platform Arkoselabs HAR record file path
+    #[builder(setter(into), default)]
+    pub arkose_platform_har_path: Option<PathBuf>,
     /// HAR file upload authenticate key
     #[builder(setter(into), default)]
     pub arkose_har_upload_key: Option<String>,
@@ -54,66 +77,61 @@ pub struct ContextArgs {
     pub puid: Option<String>,
 }
 
+#[derive(Debug)]
+pub struct Har {
+    /// HAR file path
+    path: PathBuf,
+    /// HAR file state (file changed)
+    state: bool,
+    /// File Hotwatch
+    hotwatch: Hotwatch,
+}
+
+impl Drop for Har {
+    fn drop(&mut self) {
+        if let Some(err) = self.hotwatch.unwatch(self.path.as_path()).err() {
+            warn!("hotwatch stop error: {err}")
+        }
+    }
+}
+
 // Program context
-static CTX: OnceCell<Context> = OnceCell::const_new();
+static CTX: OnceLock<Context> = OnceLock::new();
+static HAR: OnceLock<RwLock<HashMap<arkose::Type, Har>>> = OnceLock::new();
 
 pub struct Context {
     client_load: Option<ClientLoadBalancer<Client>>,
     auth_client_load: Option<ClientLoadBalancer<AuthClient>>,
     share_puid: RwLock<String>,
-    arkose_token_endpoint: Option<String>,
-    arkose_har_file: Option<PathBuf>,
-    arkose_har_upload_key: Option<String>,
     arkose_solver: Option<ArkoseSolver>,
-    hotwatch: Option<hotwatch::Hotwatch>,
+    arkose_token_endpoint: Option<String>,
+    arkose_har_upload_key: Option<String>,
 }
 
 impl Context {
-    /// Use Once to guarantee initialization only once
-    pub fn init(args: ContextArgs) {
-        if let Some(err) = CTX.set(Context::new(args)).err() {
-            error!("Error: {err}")
-        }
-    }
-
-    pub async fn get_instance() -> &'static Context {
-        CTX.get_or_init(|| async {
-            Context::new(
-                ContextArgsBuilder::default()
-                    .build()
-                    .expect("Context arguments initialization build failed"),
-            )
-        })
-        .await
-    }
-
     fn new(args: ContextArgs) -> Self {
-        let har_path = match args.arkose_har_file.as_ref() {
-            Some(file) => Some(file.clone()),
-            None => {
-                let home_dir = home_dir();
-                let har_path = home_dir
-                    .expect("Failed to get home directory")
-                    .join("chat.openai.com.har");
-                if !har_path.is_file() {
-                    std::fs::File::create(&har_path).expect("Failed to create har file");
-                    info!("Default HAR file path: {}", har_path.display());
-                }
-                Some(har_path)
-            }
-        };
-        let hotwatch = har_path.clone().map(|path| {
-            let mut hotwatch = Hotwatch::new().expect("hotwatch failed to initialize!");
-            hotwatch
-                .watch(path.clone(), move |event: Event| {
-                    if let EventKind::Modify(_) = event.kind {
-                        info!("HAR file changes observed: {}", path.display());
-                        arkose::har::clear_cache();
-                    }
-                })
-                .expect("failed to watch file!");
-            hotwatch
-        });
+        let chat_har = get_har_path(
+            arkose::Type::Chat,
+            &args.arkose_chat_har_path,
+            ".chat.openai.com.har",
+        );
+        let auth_har = get_har_path(
+            arkose::Type::Auth0,
+            &args.arkose_auth_har_path,
+            ".auth.openai.com.har",
+        );
+        let platform_har = get_har_path(
+            arkose::Type::Platform,
+            &args.arkose_platform_har_path,
+            ".platform.openai.com.har",
+        );
+
+        let mut har_map = HashMap::with_capacity(3);
+        har_map.insert(arkose::Type::Chat, chat_har);
+        har_map.insert(arkose::Type::Auth0, auth_har);
+        har_map.insert(arkose::Type::Platform, platform_har);
+        HAR.set(std::sync::RwLock::new(har_map))
+            .expect("Failed to set har map");
 
         Context {
             client_load: Some(
@@ -124,12 +142,10 @@ impl Context {
                 ClientLoadBalancer::<AuthClient>::new_auth_client(&args)
                     .expect("Failed to initialize the requesting oauth client"),
             ),
-            arkose_token_endpoint: args.arkose_token_endpoint,
             arkose_solver: args.arkose_solver,
-            arkose_har_file: har_path,
+            arkose_token_endpoint: args.arkose_token_endpoint,
             arkose_har_upload_key: args.arkose_har_upload_key,
             share_puid: RwLock::new(args.puid.unwrap_or_default()),
-            hotwatch,
         }
     }
 
@@ -147,19 +163,15 @@ impl Context {
             .next()
     }
 
-    pub async fn get_share_puid(&self) -> tokio::sync::RwLockReadGuard<'_, String> {
-        self.share_puid.read().await
+    pub fn get_share_puid(&self) -> std::sync::RwLockReadGuard<'_, String> {
+        self.share_puid.read().expect("Failed to get puid")
     }
 
     pub async fn set_share_puid(&self, puid: &str) {
-        let mut lock = self.share_puid.write().await;
+        let mut lock = self.share_puid.write().expect("Failed to get puid");
         lock.clear();
         lock.push_str(puid);
         drop(lock)
-    }
-
-    pub fn arkose_har_file(&self) -> Option<&PathBuf> {
-        self.arkose_har_file.as_ref()
     }
 
     pub fn arkose_har_upload_key(&self) -> Option<&String> {
@@ -173,14 +185,77 @@ impl Context {
     pub fn arkose_solver(&self) -> Option<&ArkoseSolver> {
         self.arkose_solver.as_ref()
     }
+
+    pub fn arkose_har_path(&self, _type: &arkose::Type) -> (bool, PathBuf) {
+        let har_lock = HAR
+            .get()
+            .expect("Failed to get har lock")
+            .read()
+            .expect("Failed to get har map");
+        har_lock
+            .get(_type)
+            .map(|h| (h.state, h.path.clone()))
+            .expect("Failed to get har path")
+    }
 }
 
-impl Drop for Context {
-    fn drop(&mut self) {
-        self.hotwatch
-            .as_mut()
-            .and_then(|hotwatch| self.arkose_har_file.as_ref().map(|path| (hotwatch, path)))
-            .and_then(|(hotwatch, path)| hotwatch.unwatch(path).err())
-            .map(|err| warn!("unwatch path error: {err}"));
+fn get_har_path(_type: arkose::Type, path: &Option<PathBuf>, default_filename: &str) -> Har {
+    if let Some(file_path) = path {
+        return Har {
+            path: file_path.to_owned(),
+            state: true,
+            hotwatch: watch_har_file(_type, &file_path),
+        };
     }
+
+    let default_har_path = home_dir()
+        .expect("Failed to get home directory")
+        .join(default_filename);
+
+    let state = match default_har_path.is_file() {
+        true => {
+            let har_data = std::fs::read(&default_har_path).expect("Failed to read har file");
+            !har_data.is_empty()
+        }
+        false => {
+            info!("Create default HAR file: {}", default_har_path.display());
+            let har_file =
+                std::fs::File::create(&default_har_path).expect("Failed to create har file");
+            drop(har_file);
+            false
+        }
+    };
+
+    Har {
+        hotwatch: watch_har_file(_type, &default_har_path),
+        path: default_har_path,
+        state,
+    }
+}
+
+fn watch_har_file(_type: arkose::Type, path: &PathBuf) -> Hotwatch {
+    let watch_path = path.display();
+    let mut hotwatch = Hotwatch::new().expect("hotwatch failed to initialize!");
+    hotwatch
+        .watch(watch_path.to_string(), {
+            let _type = _type;
+            move |event: Event| {
+                if let EventKind::Modify(_) = event.kind {
+                    event.paths.iter().for_each(|path| {
+                        info!("HAR file changes observed: {}", path.display());
+                        let lock = HAR.get().expect("Failed to get har lock");
+                        let mut har_map = lock.write().expect("Failed to get har lock");
+                        if let Some(har) = har_map.get_mut(&_type) {
+                            har.state = true;
+                        }
+                        match path.to_str() {
+                            Some(path_str) => arkose::har::clear(path_str),
+                            None => warn!("Failed to convert path to string"),
+                        }
+                    });
+                }
+            }
+        })
+        .expect("failed to watch file!");
+    hotwatch
 }

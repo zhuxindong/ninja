@@ -42,7 +42,7 @@ struct KeyResult {
 async fn keys() -> TokenResult<KeyResult> {
     use crate::context::Context;
     use crate::error::AuthError;
-    let client = Context::get_instance().await.load_client();
+    let client = context::get_instance().load_client();
     let resp = client
         .get("https://auth0.openai.com/.well-known/jwks.json")
         .timeout(std::time::Duration::from_secs(3))

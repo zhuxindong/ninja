@@ -26,7 +26,6 @@ impl<T: Clone> ClientLoadBalancer<T> {
                 .impersonate(Impersonate::OkHttpAndroid13)
                 .timeout(Duration::from_secs((args.timeout + 1) as u64))
                 .connect_timeout(Duration::from_secs((args.connect_timeout + 1) as u64))
-                .cookie_store(true)
                 .proxy(proxy_url)
                 .build();
             auth_client

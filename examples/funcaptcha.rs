@@ -8,7 +8,6 @@ use tokio::sync::OnceCell;
 use tokio::time::Instant;
 
 static KEY: OnceCell<String> = OnceCell::const_new();
-
 static SOLVER: OnceCell<Solver> = OnceCell::const_new();
 
 #[tokio::main]
@@ -25,16 +24,13 @@ async fn main() -> anyhow::Result<()> {
         .await;
 
     // start time
-    let start_time = Instant::now();
+    let now = Instant::now();
 
-    let arkose_token = ArkoseToken::new_platform().await?;
+    let arkose_token = ArkoseToken::new(openai::arkose::Type::Platform).await?;
 
     parse(arkose_token, solver, key).await?;
 
-    // use time
-    let elapsed_time = Instant::now() - start_time;
-
-    println!("Function execution time: {} ms", elapsed_time.as_millis());
+    println!("Function execution time: {:?}", now.elapsed());
     Ok(())
 }
 
