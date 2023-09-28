@@ -1,4 +1,4 @@
 runtime: image
 
 image:
-  url: ghcr.io/gngpp/ninja:latest
+  url: gngpp/ninja:warp
