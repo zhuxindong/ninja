@@ -71,7 +71,7 @@ pub(crate) async fn chat_to_api(
         .build()
         .map_err(ResponseError::InternalServerError)?;
 
-    let client = context::get_instance().load_client();
+    let client = context::get_instance().client();
     let new_headers = header_convert(&headers, &jar).await?;
     if GPT4Model::from_str(model_mapper.0).is_ok() {
         if !has_puid(&new_headers)? {

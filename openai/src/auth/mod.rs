@@ -21,6 +21,7 @@ use rand::Rng;
 use reqwest::{Client, Proxy, StatusCode, Url};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use tokio::sync::OnceCell;
 
 pub mod model;
 
@@ -43,6 +44,8 @@ const OPENAI_OAUTH_PLATFORM_CALLBACK_URL: &str = "https://platform.openai.com/au
 
 pub type AuthResult<T, E = anyhow::Error> = anyhow::Result<T, E>;
 
+static EMAIL_REGEX: OnceCell<Regex> = OnceCell::const_new();
+
 #[async_trait::async_trait]
 pub trait AuthHandle: Send + Sync {
     async fn do_access_token(&self, account: &model::AuthAccount)
@@ -61,7 +64,6 @@ pub trait AuthHandle: Send + Sync {
 pub struct AuthClient {
     client: Client,
     jar: Arc<reqwest::cookie::Jar>,
-    email_regex: Regex,
     handle_strategies: Arc<HashMap<AuthStrategy, Box<dyn AuthHandle + Send + Sync>>>,
 }
 
@@ -75,16 +77,17 @@ impl AuthClient {
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
-        if resp.status().is_success() {
-            return Ok(resp
+
+        match resp.error_for_status_ref() {
+            Ok(_) => Ok(resp
                 .json::<Value>()
                 .await?
                 .as_object()
                 .and_then(|v| v.get("picture"))
                 .and_then(|v| v.as_str())
-                .and_then(|v| Some(v.to_string())));
+                .and_then(|v| Some(v.to_string()))),
+            Err(_) => bail!(AuthError::InvalidRequest(resp.text().await?)),
         }
-        bail!(AuthError::InvalidRequest(resp.text().await?))
     }
 
     pub async fn do_dashboard_login(&self, access_token: &str) -> AuthResult<model::DashSession> {
@@ -260,7 +263,7 @@ impl AuthClient {
             .to_str()?)
     }
 
-    fn verify_refresh_token(t: &str) -> AuthResult<&str> {
+    fn trim_bearer(t: &str) -> AuthResult<&str> {
         let refresh_token = t.trim_start_matches("Bearer ");
         if refresh_token.is_empty() {
             bail!(AuthError::InvalidRefreshToken)
@@ -270,14 +273,14 @@ impl AuthClient {
 
     async fn set_arkose_token(&self) -> AuthResult<()> {
         let arkose_token = arkose::ArkoseToken::new_from_context(Type::Auth0).await?;
-        if !arkose_token.success() {
-            bail!(AuthError::FailedArkoseToken)
+        if arkose_token.success() {
+            self.jar.add_cookie_str(
+                &format!("arkoseToken={};", arkose_token.value()),
+                &Url::parse(OPENAI_OAUTH_URL)?,
+            );
+            return Ok(());
         }
-        self.jar.add_cookie_str(
-            &format!("arkoseToken={};", arkose_token.value()),
-            &Url::parse(OPENAI_OAUTH_URL)?,
-        );
-        Ok(())
+        bail!(AuthError::InvalidArkoseToken)
     }
 }
 
@@ -287,7 +290,13 @@ impl AuthHandle for AuthClient {
         &self,
         account: &model::AuthAccount,
     ) -> AuthResult<model::AccessToken> {
-        if !self.email_regex.is_match(&account.username) || account.password.is_empty() {
+        let regex = EMAIL_REGEX
+            .get_or_try_init(|| async {
+                Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b")
+            })
+            .await?;
+
+        if !regex.is_match(&account.username) || account.password.is_empty() {
             bail!(AuthError::InvalidEmailOrPassword)
         }
 
@@ -295,7 +304,7 @@ impl AuthHandle for AuthClient {
 
         self.handle_strategies
             .get(&account.option)
-            .context("Logon implementation is not supported")?
+            .context("Login implementation is not supported")?
             .do_access_token(account)
             .await
     }
@@ -918,7 +927,7 @@ impl AuthHandle for AppleAuthHandle {
     }
 
     async fn do_refresh_token(&self, refresh_token: &str) -> AuthResult<model::RefreshToken> {
-        let refresh_token = AuthClient::verify_refresh_token(refresh_token)?;
+        let refresh_token = AuthClient::trim_bearer(refresh_token)?;
         let data = RefreshTokenDataBuilder::default()
             .redirect_uri(OPENAI_OAUTH_APPLE_CALLBACK_URL)
             .grant_type(GrantType::RefreshToken)
@@ -939,7 +948,7 @@ impl AuthHandle for AppleAuthHandle {
     }
 
     async fn do_revoke_token(&self, refresh_token: &str) -> AuthResult<()> {
-        let refresh_token = AuthClient::verify_refresh_token(refresh_token)?;
+        let refresh_token = AuthClient::trim_bearer(refresh_token)?;
         let data = RevokeTokenDataBuilder::default()
             .client_id(APPLE_CLIENT_ID)
             .token(refresh_token)
@@ -981,7 +990,7 @@ impl AuthHandle for PlatformAuthHandle {
     }
 
     async fn do_refresh_token(&self, refresh_token: &str) -> AuthResult<model::RefreshToken> {
-        let refresh_token = AuthClient::verify_refresh_token(refresh_token)?;
+        let refresh_token = AuthClient::trim_bearer(refresh_token)?;
         let data = RefreshTokenDataBuilder::default()
             .redirect_uri(OPENAI_OAUTH_PLATFORM_CALLBACK_URL)
             .grant_type(GrantType::RefreshToken)
@@ -1002,7 +1011,7 @@ impl AuthHandle for PlatformAuthHandle {
     }
 
     async fn do_revoke_token(&self, refresh_token: &str) -> AuthResult<()> {
-        let refresh_token = AuthClient::verify_refresh_token(refresh_token)?;
+        let refresh_token = AuthClient::trim_bearer(refresh_token)?;
         let data = RevokeTokenDataBuilder::default()
             .client_id(PLATFORM_CLIENT_ID)
             .token(refresh_token)
@@ -1463,8 +1472,6 @@ impl AuthClientBuilder {
         AuthClient {
             client,
             jar,
-            email_regex: Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b")
-                .expect("Regex::new()"),
             handle_strategies: Arc::new(handle_strategies),
         }
     }
