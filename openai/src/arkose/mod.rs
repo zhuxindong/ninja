@@ -236,7 +236,7 @@ async fn get_from_bx_common(
 
     let client = context::get_instance();
     let resp = client
-        .load_client()
+        .client()
         .post(format!("https://{host}/fc/gt2/public_key/{public_key}"))
         .header(header::USER_AGENT, HEADER_UA)
         .header(header::ACCEPT, "*/*")
@@ -268,7 +268,7 @@ async fn get_from_bx_common(
 async fn get_from_endpoint(endpoint: &str) -> anyhow::Result<ArkoseToken> {
     let client = context::get_instance();
     let resp = client
-        .load_client()
+        .client()
         .get(endpoint)
         .timeout(std::time::Duration::from_secs(10))
         .send()
@@ -318,7 +318,7 @@ async fn get_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<ArkoseToken> {
         .push_str(&format!("&bda={}", general_purpose::STANDARD.encode(&bda)));
     entry.body.push_str(&format!("&rnd={rnd}"));
 
-    let client = context::get_instance().load_client();
+    let client = context::get_instance().client();
 
     let method = Method::from_bytes(entry.method.as_bytes())?;
 
@@ -362,7 +362,7 @@ async fn get_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<ArkoseToken> {
 async fn get_from_context(t: Type) -> anyhow::Result<ArkoseToken> {
     let ctx = context::get_instance();
 
-    let (state, file_path) = ctx.arkose_har_filepath(&t);
+    let (state, file_path) = ctx.arkose_har_path(&t);
     if state {
         let token = ArkoseToken::new_from_har(file_path).await?;
         return Ok(token);

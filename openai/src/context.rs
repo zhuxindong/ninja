@@ -35,46 +35,52 @@ pub fn get_instance() -> &'static Context {
 pub struct ContextArgs {
     /// Server proxies
     #[builder(setter(into), default)]
-    pub proxies: Vec<String>,
+    pub(crate) proxies: Vec<String>,
     /// Disable direct connection
     #[builder(default = "false")]
-    pub disable_direct: bool,
+    pub(crate) disable_direct: bool,
     /// TCP keepalive (second)
     #[builder(setter(into), default = "75")]
-    pub tcp_keepalive: usize,
+    pub(crate) tcp_keepalive: usize,
     /// Client timeout
     #[builder(setter(into), default = "600")]
-    pub timeout: usize,
+    pub(crate) timeout: usize,
     /// Client connect timeout
     #[builder(setter(into), default = "60")]
-    pub connect_timeout: usize,
+    pub(crate) connect_timeout: usize,
     /// Web UI api prefix
     #[builder(setter(into), default)]
-    pub api_prefix: Option<String>,
+    pub(crate) api_prefix: Option<String>,
     /// Arkose endpoint
     #[builder(setter(into), default)]
-    pub arkose_endpoint: Option<String>,
+    pub(crate) arkose_endpoint: Option<String>,
     /// ChatGPT Arkoselabs HAR record file path
     #[builder(setter(into), default)]
-    pub arkose_chat_har_file: Option<PathBuf>,
+    pub(crate) arkose_chat_har_file: Option<PathBuf>,
     /// Auth Arkoselabs HAR record file path
     #[builder(setter(into), default)]
-    pub arkose_auth_har_file: Option<PathBuf>,
+    pub(crate) arkose_auth_har_file: Option<PathBuf>,
     /// Platform Arkoselabs HAR record file path
     #[builder(setter(into), default)]
-    pub arkose_platform_har_file: Option<PathBuf>,
+    pub(crate) arkose_platform_har_file: Option<PathBuf>,
     /// HAR file upload authenticate key
     #[builder(setter(into), default)]
-    pub arkose_har_upload_key: Option<String>,
+    pub(crate) arkose_har_upload_key: Option<String>,
     /// get arkose-token endpoint
     #[builder(setter(into), default)]
-    pub arkose_token_endpoint: Option<String>,
+    pub(crate) arkose_token_endpoint: Option<String>,
     /// arkoselabs solver
     #[builder(setter(into), default)]
-    pub arkose_solver: Option<ArkoseSolver>,
+    pub(crate) arkose_solver: Option<ArkoseSolver>,
     /// Account Plus puid cookie value
     #[builder(setter(into), default)]
-    pub puid: Option<String>,
+    pub(crate) puid: Option<String>,
+    /// Cloudflare captcha site key
+    #[builder(setter(into), default)]
+    pub(crate) cf_site_key: Option<String>,
+    /// Cloudflare captcha secret key
+    #[builder(setter(into), default)]
+    pub(crate) cf_secret_key: Option<String>,
 }
 
 #[derive(Debug)]
@@ -95,6 +101,11 @@ impl Drop for Har {
     }
 }
 
+pub struct CfTurnstile {
+    pub site_key: String,
+    pub secret_key: String,
+}
+
 // Program context
 static CTX: OnceLock<Context> = OnceLock::new();
 static HAR: OnceLock<RwLock<HashMap<arkose::Type, Har>>> = OnceLock::new();
@@ -102,25 +113,35 @@ static HAR: OnceLock<RwLock<HashMap<arkose::Type, Har>>> = OnceLock::new();
 pub struct Context {
     client_load: Option<ClientLoadBalancer<Client>>,
     auth_client_load: Option<ClientLoadBalancer<AuthClient>>,
+    /// Account Plus puid cookie value
     share_puid: RwLock<String>,
+    /// arkoselabs solver
     arkose_solver: Option<ArkoseSolver>,
+    /// get arkose-token endpoint
     arkose_token_endpoint: Option<String>,
+    /// HAR file upload authenticate key
     arkose_har_upload_key: Option<String>,
+    /// Cloudflare Turnstile
+    cf_turnstile: Option<CfTurnstile>,
+    /// Web UI api prefix
+    api_prefix: Option<String>,
+    /// Arkose endpoint
+    arkose_endpoint: Option<String>,
 }
 
 impl Context {
     fn new(args: ContextArgs) -> Self {
-        let chat_har = get_har_path(
+        let chat_har = init_har(
             arkose::Type::Chat,
             &args.arkose_chat_har_file,
             ".chat.openai.com.har",
         );
-        let auth_har = get_har_path(
+        let auth_har = init_har(
             arkose::Type::Auth0,
             &args.arkose_auth_har_file,
             ".auth.openai.com.har",
         );
-        let platform_har = get_har_path(
+        let platform_har = init_har(
             arkose::Type::Platform,
             &args.arkose_platform_har_file,
             ".platform.openai.com.har",
@@ -142,21 +163,31 @@ impl Context {
                 ClientLoadBalancer::<AuthClient>::new_auth_client(&args)
                     .expect("Failed to initialize the requesting oauth client"),
             ),
+            arkose_endpoint: args.arkose_endpoint,
             arkose_solver: args.arkose_solver,
             arkose_token_endpoint: args.arkose_token_endpoint,
             arkose_har_upload_key: args.arkose_har_upload_key,
             share_puid: RwLock::new(args.puid.unwrap_or_default()),
+            cf_turnstile: args.cf_site_key.and_then(|site_key| {
+                args.cf_secret_key.map(|secret_key| CfTurnstile {
+                    site_key,
+                    secret_key,
+                })
+            }),
+            api_prefix: args.api_prefix,
         }
     }
 
-    pub fn load_client(&self) -> Client {
+    /// Get the reqwest client
+    pub fn client(&self) -> Client {
         self.client_load
             .as_ref()
             .expect("The load balancer client is not initialized")
             .next()
     }
 
-    pub fn load_auth_client(&self) -> AuthClient {
+    /// Get the reqwest auth client
+    pub fn auth_client(&self) -> AuthClient {
         self.auth_client_load
             .as_ref()
             .expect("The load balancer auth client is not initialized")
@@ -167,7 +198,7 @@ impl Context {
         self.share_puid.read().expect("Failed to get puid")
     }
 
-    pub async fn set_share_puid(&self, puid: &str) {
+    pub fn set_share_puid(&self, puid: &str) {
         let mut lock = self.share_puid.write().expect("Failed to get puid");
         lock.clear();
         lock.push_str(puid);
@@ -186,7 +217,7 @@ impl Context {
         self.arkose_solver.as_ref()
     }
 
-    pub fn arkose_har_filepath(&self, _type: &arkose::Type) -> (bool, PathBuf) {
+    pub fn arkose_har_path(&self, _type: &arkose::Type) -> (bool, PathBuf) {
         let har_lock = HAR
             .get()
             .expect("Failed to get har lock")
@@ -197,9 +228,21 @@ impl Context {
             .map(|h| (h.state, h.path.clone()))
             .expect("Failed to get har path")
     }
+
+    pub fn cf_turnstile(&self) -> Option<&CfTurnstile> {
+        self.cf_turnstile.as_ref()
+    }
+
+    pub fn api_prefix(&self) -> Option<&String> {
+        self.api_prefix.as_ref()
+    }
+
+    pub fn arkose_endpoint(&self) -> Option<&String> {
+        self.arkose_endpoint.as_ref()
+    }
 }
 
-fn get_har_path(_type: arkose::Type, path: &Option<PathBuf>, default_filename: &str) -> Har {
+fn init_har(_type: arkose::Type, path: &Option<PathBuf>, default_filename: &str) -> Har {
     if let Some(file_path) = path {
         return Har {
             path: file_path.to_owned(),
@@ -208,27 +251,26 @@ fn get_har_path(_type: arkose::Type, path: &Option<PathBuf>, default_filename: &
         };
     }
 
-    let default_har_path = home_dir()
+    let default_path = home_dir()
         .expect("Failed to get home directory")
         .join(default_filename);
 
-    let state = match default_har_path.is_file() {
+    let state = match default_path.is_file() {
         true => {
-            let har_data = std::fs::read(&default_har_path).expect("Failed to read har file");
+            let har_data = std::fs::read(&default_path).expect("Failed to read har file");
             !har_data.is_empty()
         }
         false => {
-            info!("Create default HAR file: {}", default_har_path.display());
-            let har_file =
-                std::fs::File::create(&default_har_path).expect("Failed to create har file");
+            info!("Create default HAR file: {}", default_path.display());
+            let har_file = std::fs::File::create(&default_path).expect("Failed to create har file");
             drop(har_file);
             false
         }
     };
 
     Har {
-        hotwatch: watch_har_file(_type, &default_har_path),
-        path: default_har_path,
+        hotwatch: watch_har_file(_type, &default_path),
+        path: default_path,
         state,
     }
 }
@@ -244,13 +286,13 @@ fn watch_har_file(_type: arkose::Type, path: &PathBuf) -> Hotwatch {
                     event.paths.iter().for_each(|path| {
                         info!("HAR file changes observed: {}", path.display());
                         let lock = HAR.get().expect("Failed to get har lock");
-                        let mut har_map = lock.write().expect("Failed to get har lock");
+                        let mut har_map = lock.write().expect("Failed to get har map");
                         if let Some(har) = har_map.get_mut(&_type) {
                             har.state = true;
-                        }
-                        match path.to_str() {
-                            Some(path_str) => arkose::har::clear(path_str),
-                            None => warn!("Failed to convert path to string"),
+                            match path.to_str() {
+                                Some(path_str) => arkose::har::clear(path_str),
+                                None => warn!("Failed to convert path to string"),
+                            }
                         }
                     });
                 }

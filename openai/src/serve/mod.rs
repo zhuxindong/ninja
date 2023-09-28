@@ -5,6 +5,7 @@ pub mod sign;
 pub mod tokenbucket;
 
 pub mod err;
+pub mod turnstile;
 
 #[cfg(feature = "template")]
 pub mod router;
@@ -12,6 +13,7 @@ pub mod signal;
 
 use anyhow::anyhow;
 use axum::body::StreamBody;
+use axum::extract::ConnectInfo;
 use axum::headers::authorization::Bearer;
 use axum::headers::Authorization;
 use axum::http::Response;
@@ -175,6 +177,8 @@ impl Launcher {
             .timeout(self.timeout.clone())
             .connect_timeout(self.connect_timeout)
             .tcp_keepalive(self.tcp_keepalive)
+            .cf_secret_key(self.cf_secret_key.clone())
+            .cf_site_key(self.cf_site_key.clone())
             .build()?;
 
         context::init(args);
@@ -323,15 +327,18 @@ impl Launcher {
 }
 
 async fn post_access_token(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     mut account: axum::Form<AuthAccount>,
 ) -> Result<Json<AccessToken>, ResponseError> {
+    turnstile::cf_turnstile_check(&addr.ip(), account.cf_turnstile_response.as_deref()).await?;
+
     let ctx = context::get_instance();
-    let mut result: Result<Json<AccessToken>, ResponseError> = Err(
-        ResponseError::InternalServerError(anyhow!("There was an error logging in to the Body")),
-    );
+    let mut result = Err(ResponseError::InternalServerError(anyhow!(
+        "There was an error logging in to the Body"
+    )));
 
     for _ in 0..2 {
-        match ctx.load_auth_client().do_access_token(&account.0).await {
+        match ctx.auth_client().do_access_token(&account.0).await {
             Ok(access_token) => {
                 result = Ok(Json(access_token));
                 break;
@@ -355,11 +362,7 @@ async fn post_refresh_token(
     TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
 ) -> Result<Json<RefreshToken>, ResponseError> {
     let ctx = context::get_instance();
-    match ctx
-        .load_auth_client()
-        .do_refresh_token(bearer.token())
-        .await
-    {
+    match ctx.auth_client().do_refresh_token(bearer.token()).await {
         Ok(refresh_token) => Ok(Json(refresh_token)),
         Err(err) => Err(ResponseError::BadRequest(err)),
     }
@@ -369,7 +372,7 @@ async fn post_revoke_token(
     TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
 ) -> Result<axum::http::StatusCode, ResponseError> {
     let ctx = context::get_instance();
-    match ctx.load_auth_client().do_revoke_token(bearer.token()).await {
+    match ctx.auth_client().do_revoke_token(bearer.token()).await {
         Ok(_) => Ok(axum::http::StatusCode::OK),
         Err(err) => Err(ResponseError::BadRequest(err)),
     }
@@ -426,7 +429,7 @@ async fn official_proxy(
     };
     let ctx = context::get_instance();
     let builder = ctx
-        .load_client()
+        .client()
         .request(method, &url)
         .headers(header_convert(&headers, &jar).await?);
     let resp = match body {
@@ -467,7 +470,7 @@ async fn unofficial_proxy(
 
     let ctx = context::get_instance();
     let builder = ctx
-        .load_client()
+        .client()
         .request(method, url)
         .headers(header_convert(&headers, &jar).await?);
     let resp = match body {
@@ -618,7 +621,7 @@ async fn handle_body(
 
     if !has_puid(headers)? {
         let resp = context::get_instance()
-            .load_client()
+            .client()
             .get(format!("{URL_CHATGPT_API}/backend-api/models"))
             .header(header::AUTHORIZATION, authorization)
             .send()
@@ -679,7 +682,7 @@ pub(super) fn has_puid(headers: &HeaderMap) -> Result<bool, ResponseError> {
 
 async fn check_wan_address() {
     match context::get_instance()
-        .load_client()
+        .client()
         .get("https://ifconfig.me")
         .timeout(Duration::from_secs(70))
         .header(header::ACCEPT, "application/json")
@@ -716,14 +719,14 @@ async fn initialize_puid(username: Option<String>, password: Option<String>, mfa
     loop {
         interval.tick().await;
         for _ in 0..2 {
-            match ctx.load_auth_client().do_access_token(&account).await {
+            match ctx.auth_client().do_access_token(&account).await {
                 Ok(v) => {
                     let access_token = match v {
                         AccessToken::Session(access_token) => access_token.access_token,
                         AccessToken::OAuth(access_token) => access_token.access_token,
                     };
                     match ctx
-                        .load_client()
+                        .client()
                         .get(format!("{URL_CHATGPT_API}/backend-api/models"))
                         .bearer_auth(access_token)
                         .send()
@@ -734,7 +737,7 @@ async fn initialize_puid(username: Option<String>, password: Option<String>, mfa
                                 Some(cookie) => {
                                     let puid = cookie.value();
                                     info!("Update PUID: {puid}");
-                                    ctx.set_share_puid(puid).await;
+                                    ctx.set_share_puid(puid);
                                     break;
                                 }
                                 None => {

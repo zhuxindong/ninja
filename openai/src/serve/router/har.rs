@@ -76,7 +76,7 @@ async fn upload_form(
             );
         }
 
-        if tokio::fs::write(ctx.arkose_har_filepath(&_type.0 .0).1, data)
+        if tokio::fs::write(ctx.arkose_har_path(&_type.0 .0).1, data)
             .await
             .is_err()
         {

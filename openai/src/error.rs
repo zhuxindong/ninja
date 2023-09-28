@@ -16,12 +16,12 @@ pub enum AuthError {
     FailedPubKeyRequest,
     #[error("failed login")]
     FailedLogin,
-    #[error("failed to get arkose token")]
-    FailedArkoseToken,
     #[error(transparent)]
     FailedRequest(#[from] reqwest::Error),
     #[error("invalid client request (error {0:?})")]
     InvalidClientRequest(String),
+    #[error("invalid arkose token")]
+    InvalidArkoseToken,
     #[error("failed get code from callback url")]
     FailedCallbackCode,
     #[error("failed callback url")]
