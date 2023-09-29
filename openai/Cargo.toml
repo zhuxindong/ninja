@@ -50,7 +50,7 @@ cbc = "0.1.2"
 
 # axum
 axum = { version = "0.6.20", features = ["http2", "multipart", "headers"], optional = true }
-axum-extra ={ version = "0.7.7", features = ["cookie"], optional = true }
+axum-extra ={ version = "0.8.0", features = ["cookie"], optional = true }
 axum-server = { version = "0.5.1", features = ["tls-rustls"], optional = true }
 tower-http = { version = "0.4.4", default-features = false, features = ["cors", "trace"], optional = true }
 tower = { version = "0.4.13", default-features = false, features = ["limit", "timeout"], optional = true}
