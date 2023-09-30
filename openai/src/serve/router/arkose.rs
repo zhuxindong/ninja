@@ -89,7 +89,7 @@ async fn proxy(
     headers.remove(header::CONTENT_TYPE);
     headers.remove(header::CONTENT_LENGTH);
 
-    let client = context::get_instance().load_client();
+    let client = context::get_instance().client();
 
     let url = format!("https://client-api.arkoselabs.com{}", uri.path());
     let resp = match body {

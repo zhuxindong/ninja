@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::net::IpAddr;
 use std::net::SocketAddr;
 use std::sync::OnceLock;
 
@@ -33,6 +32,7 @@ use crate::info;
 use crate::serve::err::ResponseError;
 use crate::serve::header_convert;
 use crate::serve::response_convert;
+use crate::serve::turnstile;
 use crate::serve::Launcher;
 use crate::serve::EMPTY;
 use crate::{
@@ -55,7 +55,6 @@ const TEMP_LOGIN: &str = "login.htm";
 const TEMP_SHARE: &str = "share.htm";
 
 static TEMPLATE: OnceLock<tera::Tera> = OnceLock::new();
-static TEMPLATE_DATA: OnceLock<TemplateData> = OnceLock::new();
 
 #[derive(Serialize, Deserialize)]
 struct Session {
@@ -106,39 +105,15 @@ impl From<AuthenticateToken> for Session {
     }
 }
 
-#[allow(dead_code)]
-#[derive(Clone)]
-pub(super) struct TemplateData {
-    /// WebSite api prefix
-    api_prefix: Option<String>,
-    /// GPT-4 model arkose token endpoint
-    arkose_endpoint: Option<String>,
-    /// Cloudflare captcha site key
-    cf_site_key: Option<String>,
-    /// Cloudflare captcha secret key
-    cf_secret_key: Option<String>,
-}
-
-impl From<Launcher> for TemplateData {
-    fn from(value: Launcher) -> Self {
-        Self {
-            api_prefix: value.api_prefix,
-            cf_site_key: value.cf_site_key,
-            cf_secret_key: value.cf_secret_key,
-            arkose_endpoint: value.arkose_endpoint,
-        }
-    }
-}
-
 // this function could be located in a different module
 pub(super) fn config(router: Router, args: &Launcher) -> Router {
     if !args.disable_ui {
-        let data = TEMPLATE_DATA.get_or_init(|| TemplateData::from(args.clone()));
-        if let Some(url) = data.api_prefix.as_ref() {
+        let ctx = context::get_instance();
+        if let Some(url) = ctx.api_prefix() {
             info!("WebUI site use API: {url}")
         }
 
-        if let Some(endpoint) = data.arkose_endpoint.as_ref() {
+        if let Some(endpoint) = ctx.arkose_endpoint() {
             info!("WebUI site use Arkose endpoint: {endpoint}")
         }
 
@@ -238,20 +213,10 @@ async fn post_login(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     account: axum::Form<AuthAccount>,
 ) -> Result<Response<Body>, ResponseError> {
-    let account = account.0;
-    if let Some(err) = cf_captcha_check(addr.ip(), account.cf_turnstile_response.as_deref())
-        .await
-        .err()
-    {
-        let mut ctx = tera::Context::new();
-        ctx.insert("username", &account.username);
-        ctx.insert("error", &err.msg());
-        return render_template(TEMP_LOGIN, &ctx);
-    }
-
+    turnstile::cf_turnstile_check(&addr.ip(), account.cf_turnstile_response.as_deref()).await?;
     match context::get_instance()
-        .load_auth_client()
-        .do_access_token(&account)
+        .auth_client()
+        .do_access_token(&account.0)
         .await
     {
         Ok(access_token) => {
@@ -274,10 +239,10 @@ async fn post_login(
                 .body(Body::empty())
                 .map_err(ResponseError::InternalServerError)?)
         }
-        Err(e) => {
+        Err(err) => {
             let mut ctx = tera::Context::new();
             ctx.insert("username", &account.username);
-            ctx.insert("error", &e.to_string());
+            ctx.insert("error", &err.to_string());
             render_template(TEMP_LOGIN, &ctx)
         }
     }
@@ -299,7 +264,7 @@ async fn post_login_token(
         )))?;
 
     let session = match context::get_instance()
-        .load_auth_client()
+        .auth_client()
         .do_get_user_picture(access_token)
         .await
     {
@@ -345,7 +310,7 @@ async fn get_logout(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
             Ok(session) => {
                 if let Some(refresh_token) = session.refresh_token {
                     let ctx = context::get_instance();
-                    let _a = ctx.load_auth_client().do_revoke_token(&refresh_token).await;
+                    let _a = ctx.auth_client().do_revoke_token(&refresh_token).await;
                 }
             }
             Err(_) => {}
@@ -519,7 +484,7 @@ async fn get_share_chat(
                 let ctx = context::get_instance();
                 let url = get_url();
                 let resp = ctx
-                    .load_client()
+                    .client()
                     .get(format!("{url}/backend-api/share/{share_id}"))
                     .headers(header_convert(&headers, &jar).await?)
                     .bearer_auth(session.access_token)
@@ -625,7 +590,7 @@ async fn get_share_chat_info(
             let ctx = context::get_instance();
             let url = get_url();
             let resp = ctx
-                .load_client()
+                .client()
                 .get(format!("{url}/backend-api/share/{share_id}"))
                 .headers(header_convert(&headers, &jar).await?)
                 .bearer_auth(session.access_token)
@@ -710,7 +675,7 @@ async fn get_share_chat_continue_info(
                 let ctx = context::get_instance();
                 let url = get_url();
                 let resp = ctx
-                    .load_client()
+                    .client()
                     .get(format!("{url}/backend-api/share/{}", share_id.0))
                     .headers(header_convert(&headers, &jar).await?)
                     .bearer_auth(session.access_token)
@@ -822,7 +787,7 @@ async fn get_image(
         "Missing URL parameter"
     )))?;
     let resp = context::get_instance()
-        .load_client()
+        .client()
         .get(&query.url)
         .send()
         .await;
@@ -884,14 +849,14 @@ fn render_template(name: &str, context: &tera::Context) -> Result<Response<Body>
 }
 
 fn settings_template_data(ctx: &mut tera::Context) {
-    let data = TEMPLATE_DATA.get().expect("template data not init");
-    if let Some(site_key) = &data.cf_site_key {
-        ctx.insert("site_key", site_key);
+    let g_ctx = context::get_instance();
+    if let Some(site_key) = g_ctx.cf_turnstile() {
+        ctx.insert("site_key", &site_key.site_key);
     }
-    if let Some(api_prefix) = &data.api_prefix {
+    if let Some(api_prefix) = g_ctx.api_prefix() {
         ctx.insert("api_prefix", api_prefix);
     }
-    if let Some(arkose_endpoint) = &data.arkose_endpoint {
+    if let Some(arkose_endpoint) = g_ctx.arkose_endpoint() {
         ctx.insert("arkose_endpoint", arkose_endpoint)
     }
 }
@@ -901,47 +866,10 @@ fn check_token(token: &str) -> Result<(), ResponseError> {
     Ok(())
 }
 
-async fn cf_captcha_check(addr: IpAddr, cf_response: Option<&str>) -> Result<(), ResponseError> {
-    let data = TEMPLATE_DATA.get().expect("template data not init");
-    if data.cf_site_key.is_some() && data.cf_secret_key.is_some() {
-        let cf_response = cf_response.ok_or(ResponseError::BadRequest(anyhow::anyhow!(
-            "Missing cf_captcha_response"
-        )))?;
-
-        if cf_response.is_empty() {
-            return Err(ResponseError::BadRequest(anyhow::anyhow!(
-                "Missing cf_captcha_response"
-            )));
-        }
-
-        let form = CfCaptchaForm {
-            secret: data.cf_secret_key.as_ref().expect("cf_secret_key not init"),
-            response: cf_response,
-            remoteip: &addr.to_string(),
-            idempotency_key: crate::uuid::uuid(),
-        };
-
-        let resp = context::get_instance()
-            .load_client()
-            .post("https://challenges.cloudflare.com/turnstile/v0/siteverify")
-            .form(&form)
-            .send()
-            .await
-            .map_err(ResponseError::InternalServerError)?;
-
-        let _ = resp
-            .error_for_status()
-            .map_err(ResponseError::Unauthorized)?;
-
-        return Ok(());
-    };
-    Ok(())
-}
-
 fn get_url() -> &'static str {
-    let data = TEMPLATE_DATA.get().expect("template data not init");
-    match data.api_prefix.as_ref() {
-        Some(ref api_prefix) => api_prefix,
+    let ctx = context::get_instance();
+    match ctx.api_prefix() {
+        Some(api_prefix) => api_prefix,
         None => URL_CHATGPT_API,
     }
 }
@@ -951,12 +879,4 @@ struct ImageQuery {
     url: String,
     w: String,
     q: String,
-}
-
-#[derive(serde::Serialize)]
-struct CfCaptchaForm<'a> {
-    secret: &'a str,
-    response: &'a str,
-    remoteip: &'a str,
-    idempotency_key: String,
 }

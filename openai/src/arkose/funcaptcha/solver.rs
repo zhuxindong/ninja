@@ -85,7 +85,7 @@ pub async fn submit_task(submit_task: SubmitSolver<'_>) -> anyhow::Result<Vec<i3
     }
 
     let client = context::get_instance();
-    let resp = client.load_client().post(url).json(&body).send().await?;
+    let resp = client.client().post(url).json(&body).send().await?;
 
     match resp.error_for_status_ref() {
         Ok(_) => {

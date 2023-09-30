@@ -77,7 +77,7 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
         },
         funcaptcha: None,
         challenge: None,
-        client: ctx.load_client(),
+        client: ctx.client(),
     };
 
     session.headers.insert(header::REFERER, format!("https://client-api.arkoselabs.com/fc/assets/ec-game-core/game-core/1.13.0/standard/index.html?session={}", arkose_token.replace("|", "&")).parse()?);
