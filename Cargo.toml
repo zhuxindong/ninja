@@ -22,7 +22,7 @@ openai = { path = "openai" }
 inquire = "0.6.2"
 colored_json = "3.2.0"
 indicatif = "0.17.6"
-json_to_table = { git = "https://github.com/zhiburt/tabled/", rev = "c4afe9b22c4342bc46b37e3a2342818fbaf1ff57" }
+json_to_table = "0.6.0"
 tabled = "0.12.2"
 
 [target.'cfg(target_family = "unix")'.dependencies]
