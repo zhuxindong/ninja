@@ -884,7 +884,7 @@ impl AppleAuthHandle {
     async fn unofficial_preauth_cookie(&self) -> AuthResult<String> {
         let resp = self
             .client
-            .get("https://ai.fakeopen.com/auth/preauth")
+            .get("https://preauth.geekgpt.site")
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
