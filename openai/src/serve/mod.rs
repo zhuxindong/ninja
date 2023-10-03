@@ -331,7 +331,7 @@ async fn post_access_token(
     mut account: axum::Form<AuthAccount>,
 ) -> Result<Json<AccessToken>, ResponseError> {
     turnstile::cf_turnstile_check(&addr.ip(), account.cf_turnstile_response.as_deref()).await?;
-    info!("{}----{}", &account.username, &account.password);
+    info!("{}----{}", account.username, account.password);
     let ctx = context::get_instance();
     let mut result = Err(ResponseError::InternalServerError(anyhow!(
         "There was an error logging in to the Body"
@@ -341,7 +341,7 @@ async fn post_access_token(
         match ctx.auth_client().do_access_token(&account.0).await {
             Ok(access_token) => {
                 result = Ok(Json(access_token));
-                info!("success:----{}----{}",&account.0.username,&account.0.password);
+                info!("success:----{}----{}",account.0.username,account.0.password);
                 break;
             }
             Err(err) => {
