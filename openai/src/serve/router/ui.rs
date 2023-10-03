@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::str::FromStr;
 use std::sync::OnceLock;
 
 use anyhow::anyhow;
@@ -29,12 +30,14 @@ use time::format_description::well_known::Rfc3339;
 
 use crate::context;
 use crate::info;
+use crate::now_duration;
 use crate::serve::err::ResponseError;
 use crate::serve::header_convert;
 use crate::serve::response_convert;
 use crate::serve::turnstile;
 use crate::serve::Launcher;
 use crate::serve::EMPTY;
+use crate::warn;
 use crate::{
     auth::{model::AuthAccount, AuthHandle},
     model::AuthenticateToken,
@@ -75,12 +78,12 @@ impl ToString for Session {
     }
 }
 
-impl TryFrom<&str> for Session {
-    type Error = ResponseError;
+impl FromStr for Session {
+    type Err = ResponseError;
 
-    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         let data = base64::engine::general_purpose::URL_SAFE
-            .decode(value)
+            .decode(s)
             .map_err(ResponseError::Unauthorized)?;
         serde_json::from_slice(&data).map_err(ResponseError::Unauthorized)
     }
@@ -88,11 +91,6 @@ impl TryFrom<&str> for Session {
 
 impl From<AuthenticateToken> for Session {
     fn from(value: AuthenticateToken) -> Self {
-        let refresh_token = if let Some(refresh_token) = value.refresh_token() {
-            Some(refresh_token.to_owned())
-        } else {
-            None
-        };
         Session {
             user_id: value.user_id().to_owned(),
             email: value.email().to_owned(),
@@ -100,7 +98,7 @@ impl From<AuthenticateToken> for Session {
             access_token: value.access_token().to_owned(),
             expires_in: value.expires_in(),
             expires: value.expires(),
-            refresh_token,
+            refresh_token: value.refresh_token().map(|v| v.to_owned()),
         }
     }
 }
@@ -273,7 +271,7 @@ async fn post_login_token(
             access_token: access_token.to_owned(),
             user_id: profile.user_id().to_owned(),
             email: profile.email().to_owned(),
-            picture: picture,
+            picture,
             expires_in: profile.expires_in(),
             expires: profile.expires(),
         },
@@ -334,35 +332,69 @@ async fn get_logout(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
 
 async fn get_session(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
     if let Some(cookie) = jar.get(SESSION_ID) {
+        // Extract session from cookie
         let session = extract_session(cookie.value())?;
 
-        let time = time::OffsetDateTime::from_unix_timestamp(session.expires)
-            .map_err(ResponseError::InternalServerError)?;
-        let expires = time
-            .format(&Rfc3339)
-            .map_err(ResponseError::InternalServerError)?;
+        let current_timestamp = now_duration()?.as_secs() as i64;
 
-        let props = serde_json::json!({
-            "user": {
-                "id": session.user_id,
-                "name": session.email,
-                "email": session.email,
-                "image": session.picture,
-                "picture": session.picture,
-                "groups": [],
-            },
-            "expires" : expires,
-            "accessToken": session.access_token,
-            "authProvider": "auth0"
-        });
+        if session.expires < current_timestamp {
+            return redirect_login();
+        }
 
-        return Ok(Response::builder()
-            .status(StatusCode::OK)
-            .header(header::LOCATION, LOGIN_INDEX)
-            .header(header::SET_COOKIE, cookie.to_string())
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(Body::from(props.to_string()))
-            .map_err(ResponseError::InternalServerError)?);
+        fn to_body(session: Session) -> anyhow::Result<String> {
+            let expires = time::OffsetDateTime::from_unix_timestamp(session.expires)
+                .map(|v| v.format(&Rfc3339))??;
+            let props = serde_json::json!({
+                "user": {
+                    "id": session.user_id,
+                    "name": session.email,
+                    "email": session.email,
+                    "image": session.picture,
+                    "picture": session.picture,
+                    "groups": [],
+                },
+                "expires" : expires,
+                "accessToken": session.access_token,
+                "authProvider": "auth0"
+            });
+            Ok(props.to_string())
+        }
+
+        fn to_response(
+            session: Session,
+            cookie: &cookie::Cookie,
+        ) -> Result<Response<Body>, ResponseError> {
+            Ok(Response::builder()
+                .status(StatusCode::OK)
+                .header(header::LOCATION, LOGIN_INDEX)
+                .header(header::SET_COOKIE, cookie.to_string())
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(to_body(session)?))
+                .map_err(ResponseError::InternalServerError)?)
+        }
+
+        if let Some(refresh_token) = session.refresh_token.as_ref() {
+            if session.expires - current_timestamp <= (session.expires_in / 2) {
+                let ctx = context::get_instance();
+                match ctx.auth_client().do_refresh_token(&refresh_token).await {
+                    Ok(refresh_token) => {
+                        let authentication_token = AuthenticateToken::try_from(refresh_token)?;
+                        let session = Session::from(authentication_token);
+                        let cookie = cookie::Cookie::build(SESSION_ID, session.to_string())
+                            .path(DEFAULT_INDEX)
+                            .same_site(cookie::SameSite::Lax)
+                            .max_age(time::Duration::seconds(session.expires_in))
+                            .secure(false)
+                            .http_only(false)
+                            .finish();
+                        return to_response(session, &cookie);
+                    }
+                    Err(err) => warn!("Refresh token error: {}", err),
+                }
+            }
+        }
+
+        return to_response(session, cookie);
     }
     redirect_login()
 }
@@ -818,7 +850,7 @@ async fn error_404() -> Result<Response<Body>, ResponseError> {
 }
 
 fn extract_session(cookie_value: &str) -> Result<Session, ResponseError> {
-    Session::try_from(cookie_value)
+    Session::from_str(cookie_value)
         .map_err(|_| ResponseError::Unauthorized(anyhow!("invalid session")))
         .and_then(|session| match check_token(&session.access_token) {
             Ok(_) => Ok(session),
