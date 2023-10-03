@@ -84,8 +84,8 @@ pub async fn submit_task(submit_task: SubmitSolver<'_>) -> anyhow::Result<Vec<i3
         }
     }
 
-    let client = context::get_instance();
-    let resp = client.client().post(url).json(&body).send().await?;
+    let ctx = context::get_instance();
+    let resp = ctx.client().post(url).json(&body).send().await?;
 
     match resp.error_for_status_ref() {
         Ok(_) => {
@@ -101,7 +101,7 @@ pub async fn submit_task(submit_task: SubmitSolver<'_>) -> anyhow::Result<Vec<i3
         }
         Err(err) => {
             let msg = resp.text().await?;
-            anyhow::bail!("Status: {err}, {msg}")
+            anyhow::bail!(format!("solver task error: {err}\n{msg}"))
         }
     }
 }

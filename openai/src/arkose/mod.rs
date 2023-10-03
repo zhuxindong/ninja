@@ -3,7 +3,6 @@ pub mod funcaptcha;
 pub mod har;
 pub mod murmur;
 
-use anyhow::bail;
 use base64::engine::general_purpose;
 use std::path::Path;
 use std::time::SystemTime;
@@ -21,7 +20,7 @@ use tokio::sync::OnceCell;
 
 use crate::arkose::crypto::encrypt;
 use crate::context;
-use crate::debug;
+use crate::generate_random_string;
 use crate::warn;
 use crate::HEADER_UA;
 
@@ -68,7 +67,7 @@ impl std::str::FromStr for GPT4Model {
                 if value.starts_with("gpt-4") || value.starts_with("gpt4") {
                     return Ok(GPT4Model::Gpt4Other);
                 }
-                bail!("Invalid GPT-4 model")
+                anyhow::bail!("Invalid GPT-4 model")
             }
         }
     }
@@ -248,20 +247,10 @@ async fn get_from_bx_common(
         .header("Sec-Fetch-Sitet", "same-origin")
         .form(&form)
         .send()
-        .await?;
+        .await?
+        .error_for_status()?;
 
-    match resp.error_for_status() {
-        Ok(resp) => {
-            let arkose_token = resp.json::<ArkoseToken>().await?;
-            let get = move || async { Ok(arkose_token) };
-            if context::get_instance().arkose_solver().is_some() {
-                submit_if_invalid(get).await
-            } else {
-                get().await
-            }
-        }
-        Err(err) => anyhow::bail!("get arkose token from bx error: {err}"),
-    }
+    Ok(resp.json::<ArkoseToken>().await?)
 }
 
 /// Build it yourself: https://github.com/gngpp/arkose-generator
@@ -274,18 +263,7 @@ async fn get_from_endpoint(endpoint: &str) -> anyhow::Result<ArkoseToken> {
         .send()
         .await?
         .error_for_status()?;
-    match resp.error_for_status() {
-        Ok(resp) => {
-            let arkose_token = resp.json::<ArkoseToken>().await?;
-            let get = move || async { Ok(arkose_token) };
-            if context::get_instance().arkose_solver().is_some() {
-                submit_if_invalid(get).await
-            } else {
-                get().await
-            }
-        }
-        Err(err) => anyhow::bail!("get arkose token from endpoint error: {err}"),
-    }
+    Ok(resp.json::<ArkoseToken>().await?)
 }
 
 static REGEX: OnceCell<Regex> = OnceCell::const_new();
@@ -333,8 +311,8 @@ async fn get_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<ArkoseToken> {
             let value = format!(
                 "{};{}={}",
                 h.value,
-                generate_random_string(),
-                generate_random_string()
+                generate_random_string(32),
+                generate_random_string(32)
             );
             builder = builder.header(h.name, value);
             continue;
@@ -342,41 +320,42 @@ async fn get_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<ArkoseToken> {
         builder = builder.header(h.name, h.value)
     }
 
-    let resp = builder.send().await?;
-    match resp.error_for_status() {
-        Ok(resp) => {
-            let arkose_token = resp.json::<ArkoseToken>().await?;
-            let get = move || async { Ok(arkose_token) };
-            if context::get_instance().arkose_solver().is_some() {
-                submit_if_invalid(get).await
-            } else {
-                get().await
-            }
-        }
-        Err(err) => anyhow::bail!("get arkose token from har error: {err}"),
-    }
+    let resp = builder.send().await?.error_for_status()?;
+    Ok(resp.json::<ArkoseToken>().await?)
 }
 
 /// Get ArkoseLabs token from context (Only support ChatGPT, Platform, Auth)
 #[inline]
 async fn get_from_context(t: Type) -> anyhow::Result<ArkoseToken> {
+    let valid_arkose_token = move |arkose_token: ArkoseToken| async {
+        let get = move || async { Ok(arkose_token) };
+        if context::get_instance().arkose_solver().is_some() {
+            return submit_if_invalid(get).await;
+        } else {
+            return get().await;
+        }
+    };
+
     let ctx = context::get_instance();
 
-    let (state, file_path) = ctx.arkose_har_path(&t);
-    if state {
-        let token = ArkoseToken::new_from_har(file_path).await?;
-        return Ok(token);
-    }
+    match &t {
+        &Type::Chat => {
+            if let Some(arkose_token_endpoint) = ctx.arkose_token_endpoint() {
+                let arkose_token = ArkoseToken::new_from_endpoint(arkose_token_endpoint).await?;
+                return valid_arkose_token(arkose_token).await;
+            }
+        }
+        &Type::Auth0 | &Type::Platform => {
+            let (state, file_path) = ctx.arkose_har_path(&t);
+            if state {
+                let arkose_token = ArkoseToken::new_from_har(file_path).await?;
+                return valid_arkose_token(arkose_token).await;
+            }
 
-    if ctx.arkose_solver().is_some() {
-        let token = ArkoseToken::new(t).await?;
-        return Ok(token);
-    }
-
-    if t.eq(&Type::Chat) {
-        if let Some(arkose_token_endpoint) = ctx.arkose_token_endpoint() {
-            let token = ArkoseToken::new_from_endpoint(arkose_token_endpoint).await?;
-            return Ok(token);
+            if ctx.arkose_solver().is_some() {
+                let arkose_token = ArkoseToken::new(t).await?;
+                return valid_arkose_token(arkose_token).await;
+            }
         }
     }
 
@@ -413,7 +392,7 @@ async fn submit_captcha(
 ) -> anyhow::Result<ArkoseToken> {
     let session = funcaptcha::start_challenge(arkose_token.value())
         .await
-        .map_err(|error| anyhow::anyhow!(format!("Error creating session: {}", error)))?;
+        .map_err(|error| anyhow::anyhow!("Error creating session: {error}"))?;
 
     let funs = anyhow::Context::context(session.funcaptcha(), "Valid funcaptcha error")?;
     let mut rx = match solver {
@@ -506,25 +485,6 @@ async fn submit_captcha(
             let new_token = arkose_token.value().replace("at=40", "at=40|sup=1");
             Ok(ArkoseToken::from(new_token))
         }
-        Err(err) => {
-            debug!("submit funcaptcha answer error: {err}");
-            Ok(arkose_token)
-        }
+        Err(err) => anyhow::bail!("submit funcaptcha answer error: {err}"),
     };
-}
-
-pub fn generate_random_string() -> String {
-    const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-
-    let mut rng = rand::thread_rng();
-    let length = rng.gen_range(5..=15);
-
-    let result: String = (0..length)
-        .map(|_| {
-            let index = rng.gen_range(0..CHARSET.len());
-            CHARSET[index] as char
-        })
-        .collect();
-
-    result
 }
