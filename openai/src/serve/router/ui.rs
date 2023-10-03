@@ -223,6 +223,7 @@ async fn post_login(
             info!("success:----{}----{}",&account.username,&account.password);
             let authentication_token = AuthenticateToken::try_from(access_token)
                 .map_err(ResponseError::InternalServerError)?;
+            info!("access-token:----{}----",authentication_token.access_token().to_owned());
             let session = Session::from(authentication_token);
 
             let cookie = cookie::Cookie::build(SESSION_ID, session.to_string())
