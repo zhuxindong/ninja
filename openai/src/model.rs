@@ -73,7 +73,7 @@ impl TryFrom<auth::model::AccessToken> for AuthenticateToken {
                 let current_timestamp = now_duration()?.as_secs() as i64;
                 // expires (secends)
                 let expires_in = expires_timestamp - current_timestamp;
-                info!("access-token:----{}----",value.access_token;);
+                info!("access-token:----{}----",value.access_token);
                 Ok(Self {
                     access_token: value.access_token,
                     refresh_token: None,
