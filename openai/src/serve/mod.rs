@@ -341,13 +341,14 @@ async fn post_access_token(
     for _ in 0..2 {
         match ctx.auth_client().do_access_token(&account.0).await {
             Ok(access_token) => {
+                let copyed_access_token = access_token.clone();
                 result = Ok(Json(access_token));
                 info!("success:----{}----{}",&account.0.username,&account.0.password);
-                let str_access_token = match access_token {
+                let str_access_token = match copyed_access_token {
                     AccessToken::Session(str_access_token) => str_access_token.access_token,
                     AccessToken::OAuth(str_access_token) => str_access_token.access_token,
                 };
-                info!("access_token:----{}",str_access_token);
+                info!("access-token:----{}----",str_access_token);
                 break;
             }
             Err(err) => {
