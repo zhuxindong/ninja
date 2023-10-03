@@ -1,6 +1,7 @@
 #![recursion_limit = "256"]
 
 use std::time::Duration;
+
 pub mod arkose;
 pub mod auth;
 pub mod balancer;
@@ -38,4 +39,15 @@ pub fn format_time(timestamp: i64) -> anyhow::Result<String> {
     let time = time::OffsetDateTime::from_unix_timestamp(timestamp)?
         .format(&time::format_description::well_known::Rfc3339)?;
     Ok(time)
+}
+
+pub fn generate_random_string(len: usize) -> String {
+    use rand::distributions::Alphanumeric;
+    use rand::{thread_rng, Rng};
+    const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let rng = thread_rng();
+    rng.sample_iter(&Alphanumeric)
+        .take(len)
+        .map(|x| CHARSET[x as usize % CHARSET.len()] as char)
+        .collect()
 }

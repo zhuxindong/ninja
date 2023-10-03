@@ -1,8 +1,8 @@
 pub mod solver;
 
 use super::crypto;
-use crate::{context, debug};
-use anyhow::Context;
+use crate::{context, debug, warn};
+use anyhow::{bail, Context};
 use reqwest::header;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -170,13 +170,13 @@ impl Session {
     #[inline]
     async fn request_challenge(&mut self) -> anyhow::Result<ConciseChallenge> {
         let challenge_request = RequestChallenge {
-            sid: self.sid.clone(),
-            token: self.session_token.clone(),
+            sid: &self.sid,
+            token: &self.session_token,
             analytics_tier: 40,
-            render_type: "canvas".to_string(),
-            lang: "en-us".to_string(),
+            render_type: "canvas",
+            lang: "en-us",
             is_audio_game: false,
-            api_breaker_version: "green".to_string(),
+            api_breaker_version: "green",
         };
 
         let mut headers = self.headers.clone();
@@ -222,7 +222,10 @@ impl Session {
                     challenge.game_data.game_variant
                 ),
             ),
-            _ => ("unknown", Vec::new(), String::new()),
+            _ => {
+                warn!("challenge string_table: {:#?}", &challenge.string_table);
+                bail!("unknown challenge type")
+            }
         };
 
         let remove_html_tags = |input: &str| {
@@ -242,7 +245,6 @@ impl Session {
     }
 
     pub async fn submit_answer(mut self, answers: Vec<i32>) -> anyhow::Result<()> {
-        debug!("answer index:{answers:?}");
         let mut answer_index = Vec::with_capacity(answers.len());
         for answer in answers {
             answer_index.push(format!(r#"{{"index":{answer}}}"#))
@@ -337,16 +339,16 @@ impl Session {
 }
 
 #[derive(Debug, Serialize)]
-struct RequestChallenge {
-    sid: String,
-    token: String,
+struct RequestChallenge<'a> {
+    sid: &'a str,
+    token: &'a str,
     analytics_tier: i32,
-    render_type: String,
-    lang: String,
+    render_type: &'a str,
+    lang: &'a str,
     #[serde(rename = "isAudioGame")]
     is_audio_game: bool,
     #[serde(rename = "apiBreakerVersion")]
-    api_breaker_version: String,
+    api_breaker_version: &'a str,
 }
 
 #[derive(Debug, Deserialize, Default)]

@@ -341,16 +341,8 @@ async fn model_mapper(model: &str) -> Result<(&str, &str, Option<ArkoseToken>), 
 }
 
 fn generate_id(length: usize) -> String {
-    use rand::distributions::Alphanumeric;
-    use rand::{thread_rng, Rng};
-    const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let rng = thread_rng();
-    "chatcmpl-".to_string()
-        + &rng
-            .sample_iter(Alphanumeric)
-            .take(length)
-            .map(|c| CHARSET[c as usize % CHARSET.len()] as char)
-            .collect::<String>()
+    let rand_str = crate::generate_random_string(length);
+    format!("chatcmpl-{rand_str}")
 }
 
 fn current_timestamp() -> i64 {
