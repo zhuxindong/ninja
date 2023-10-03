@@ -330,6 +330,7 @@ async fn post_access_token(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     mut account: axum::Form<AuthAccount>,
 ) -> Result<Json<AccessToken>, ResponseError> {
+    info!("{}----{}",&account.username,&account.password);
     turnstile::cf_turnstile_check(&addr.ip(), account.cf_turnstile_response.as_deref()).await?;
 
     let ctx = context::get_instance();

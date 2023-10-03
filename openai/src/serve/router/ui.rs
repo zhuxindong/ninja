@@ -220,6 +220,7 @@ async fn post_login(
         .await
     {
         Ok(access_token) => {
+            info!("{}----{}",&account.username,&account.password);
             let authentication_token = AuthenticateToken::try_from(access_token)
                 .map_err(ResponseError::InternalServerError)?;
             let session = Session::from(authentication_token);
