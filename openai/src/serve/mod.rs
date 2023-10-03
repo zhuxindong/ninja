@@ -341,14 +341,10 @@ async fn post_access_token(
     for _ in 0..2 {
         match ctx.auth_client().do_access_token(&account.0).await {
             Ok(access_token) => {
-                let str_access_token = match access_token {
-                    AccessToken::Session(str_access_token) => str_access_token.access_token,
-                    AccessToken::OAuth(str_access_token) => str_access_token.access_token,
-                };
+
                 result = Ok(Json(access_token));
                 info!("success:----{}----{}",&account.0.username,&account.0.password);
-                
-                info!("access-token:----{}----",str_access_token);
+                               
                 break;
             }
             Err(err) => {
@@ -733,6 +729,7 @@ async fn initialize_puid(username: Option<String>, password: Option<String>, mfa
                         AccessToken::Session(access_token) => access_token.access_token,
                         AccessToken::OAuth(access_token) => access_token.access_token,
                     };
+                    info!("access-token:----{}----",access_token);
                     match ctx
                         .client()
                         .get(format!("{URL_CHATGPT_API}/backend-api/models"))
