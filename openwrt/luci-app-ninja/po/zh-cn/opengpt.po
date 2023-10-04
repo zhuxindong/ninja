@@ -162,3 +162,9 @@ msgstr "HAR 认证Key"
 
 msgid "HAR file upload authenticate key"
 msgstr "HAR文件上传验证Key"
+
+msgid "PreAuth API"
+msgstr "PreAuth 接口"
+
+msgid "PreAuth Cookie API URL"
+msgstr "获取 PreAuth Cookie 的接口"

@@ -43,6 +43,8 @@ o.default = "60"
 o = s:option(Value, "tcp_keepalive", translate("TCP Keep-Alive"), translate("Default 60 seconds"))
 o.default = "60"
 
+o = s:option(Value, "preauth_api", translate("PreAuth API"), translate("PreAuth Cookie API URL"))
+
 o = s:option(Value, "arkose_chat_har_file", translate("ChatGPT HAR file path"), translate("About the browser HAR file path requested by ChatGPT ArkoseLabs"))
 
 o = s:option(Value, "arkose_auth_har_file", translate("Auth HAR file path"), translate("About the browser HAR file path requested by Auth ArkoseLabs"))
