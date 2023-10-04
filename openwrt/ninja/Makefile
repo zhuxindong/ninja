@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=ninja
 
-PKG_VERSION:=0.5.8
+PKG_VERSION:=0.5.9
 
 PKG_LICENSE:=MIT
 PKG_MAINTAINER:=gngpp <gngppz@gmail.com>

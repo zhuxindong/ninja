@@ -42,7 +42,7 @@ Sending a `GPT4` conversation requires `Arkose Token` to be sent as a parameter,
 
 1) The endpoint obtained by `Arkose Token`, no matter what method you use, use `--arkose-token-endpoint` to specify the endpoint to obtain the token. The supported `JSON` format is generally in accordance with the format of the community: `{"token": "xxxxxx"}`
 
-2) Using HAR, `ChatGPT` official website sends a `GPT4` session message, and the browser `F12` downloads `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97- 6ADB7EFF8147` For the HAR log file of the interface, use the startup parameter `--arkose-chat-har-file` to specify the HAR file path to use (if the path is not specified, the default path `~/.chat.openai.com.har` will be used, and updates can be uploaded directly HAR), supports uploading and updating HAR, request path: `/har/upload`, optional upload authentication parameter: `--arkose-har-upload-key`
+2) Using HAR, `ChatGPT` official website sends a `GPT4` session message, and the browser `F12` downloads `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` For the HAR log file of the interface, use the startup parameter `--arkose-chat-har-file` to specify the HAR file path to use (if the path is not specified, the default path `~/.chat.openai.com.har` will be used, and updates can be uploaded directly HAR), supports uploading and updating HAR, request path: `/har/upload`, optional upload authentication parameter: `--arkose-har-upload-key`
 
 3) Use [YesCaptcha](https://yescaptcha.com/i/1Cc5i4)/[CapSolver](https://dashboard.capsolver.com/passport/register?inviteCode=y7CtB_a-3X6d) platform for verification code parsing, start the parameter `--arkose-solver` to select the platform (the default is `YesCaptcha`), `--arkose-solver-key` fill in `Client Key`
 
@@ -99,8 +99,8 @@ Sending a `GPT4` conversation requires `Arkose Token` to be sent as a parameter,
 Making [Releases](https://github.com/gngpp/ninja/releases/latest) has a precompiled deb package, binaries, in Ubuntu, for example:
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.5.8/ninja-0.5.8-x86_64-unknown-linux-musl.deb
-dpkg -i ninja-0.5.8-x86_64-unknown-linux-musl.deb
+wget https://github.com/gngpp/ninja/releases/download/v0.5.9/ninja-0.5.9-x86_64-unknown-linux-musl.deb
+dpkg -i ninja-0.5.9-x86_64-unknown-linux-musl.deb
 ninja serve run
 ```
 
@@ -109,11 +109,11 @@ ninja serve run
 There are pre-compiled ipk files in GitHub [Releases](https://github.com/gngpp/ninja/releases/latest), which currently provide versions of aarch64/x86_64 and other architectures. After downloading, use opkg to install, and use nanopi r4s as example:
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.5.8/ninja_0.5.8_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.5.8/luci-app-ninja_1.0.9-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.5.8/luci-i18n-ninja-zh-cn_1.0.9-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.5.9/ninja_0.5.9_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.5.9/luci-app-ninja_1.0.9-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.5.9/luci-i18n-ninja-zh-cn_1.0.9-1_all.ipk
 
-opkg install ninja_0.5.8_aarch64_generic.ipk
+opkg install ninja_0.5.9_aarch64_generic.ipk
 opkg install luci-app-ninja_1.0.9-1_all.ipk
 opkg install luci-i18n-ninja-zh-cn_1.0.9-1_all.ipk
 ```
@@ -211,7 +211,9 @@ Options:
       --puid-user <PUID_USER>
           Obtain the PUID of the Plus account user, Example: `user:pass` or `user:pass:mfa`
       --api-prefix <API_PREFIX>
-          Web UI api prefix [env: UI_API_PREFIX=]
+          WebUI api prefix [env: API_PREFIX=]
+      --preauth-api <PREAUTH_API>
+          PreAuth Cookie API URL [env: PREAUTH_API=]
       --arkose-endpoint <ARKOSE_ENDPOINT>
           Arkose endpoint, Example: https://client-api.arkoselabs.com
   -A, --arkose-token-endpoint <ARKOSE_TOKEN_ENDPOINT>
