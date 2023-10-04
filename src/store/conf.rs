@@ -13,6 +13,8 @@ pub struct Conf {
     pub official_api: Option<String>,
     /// Unofficial API prefix. Format: https://example.com
     pub unofficial_api: Option<String>,
+    /// OAuth preauth cookie api
+    pub preauth_api: Option<String>,
     /// Client proxy. Format: protocol://user:pass@ip:port
     pub proxy: Option<String>,
     /// Get arkose-token endpoint
@@ -47,6 +49,7 @@ impl Default for Conf {
             using_user: None,
             official_api: None,
             unofficial_api: None,
+            preauth_api: None,
             proxy: None,
             arkose_token_endpoint: None,
             timeout: 60,

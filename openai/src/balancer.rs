@@ -27,6 +27,7 @@ impl<T: Clone> ClientLoadBalancer<T> {
                 .timeout(Duration::from_secs((args.timeout + 1) as u64))
                 .connect_timeout(Duration::from_secs((args.connect_timeout + 1) as u64))
                 .proxy(proxy_url)
+                .preauth_api(args.preauth_api.clone())
                 .build();
             auth_client
         };

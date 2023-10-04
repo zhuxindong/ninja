@@ -14,7 +14,7 @@ pub enum AuthStrategy {
 
 impl Default for AuthStrategy {
     fn default() -> Self {
-        AuthStrategy::Web
+        AuthStrategy::Apple
     }
 }
 

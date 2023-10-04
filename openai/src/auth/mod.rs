@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{bail, Context};
+use anyhow::{anyhow, bail, Context};
 use async_recursion::async_recursion;
 use derive_builder::Builder;
 use regex::Regex;
@@ -272,7 +272,10 @@ impl AuthClient {
     }
 
     async fn set_arkose_token(&self) -> AuthResult<()> {
-        let arkose_token = arkose::ArkoseToken::new_from_context(Type::Auth0).await?;
+        let arkose_token = arkose::ArkoseToken::new_from_context(Type::Auth0)
+            .await
+            .map_err(AuthError::InvalidArkoseToken)?;
+
         if arkose_token.success() {
             self.jar.add_cookie_str(
                 &format!("arkoseToken={};", arkose_token.value()),
@@ -280,7 +283,9 @@ impl AuthClient {
             );
             return Ok(());
         }
-        bail!(AuthError::InvalidArkoseToken)
+        bail!(AuthError::InvalidArkoseToken(anyhow!(
+            "Arkose token failed"
+        )))
     }
 }
 
@@ -649,16 +654,20 @@ impl AuthHandle for WebAuthHandle {
 }
 
 struct AppleAuthHandle {
+    preauth_api: Url,
     client: Client,
 }
 
 impl AppleAuthHandle {
-    fn new(client: Client) -> impl AuthHandle + Send + Sync {
-        Self { client }
+    fn new(client: Client, preauth_api: Url) -> impl AuthHandle + Send + Sync {
+        Self {
+            client,
+            preauth_api,
+        }
     }
 
     async fn get_authorized_url(&self, code_challenge: &str) -> AuthResult<Url> {
-        let preauth_cookie = self.unofficial_preauth_cookie().await?;
+        let preauth_cookie = self.get_preauth_cookie().await?;
         let url = format!("{OPENAI_OAUTH_URL}/authorize?state=4DJBNv86mezKHDv-i2wMuDBea2-rHAo5nA_ZT4zJeak&ios_app_version=1744&client_id={APPLE_CLIENT_ID}&redirect_uri={OPENAI_OAUTH_APPLE_CALLBACK_URL}&code_challenge={code_challenge}&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write&prompt=login&preauth_cookie={preauth_cookie}&audience=https://api.openai.com/v1&code_challenge_method=S256&response_type=code&auth0Client=eyJ2ZXJzaW9uIjoiMi4zLjIiLCJuYW1lIjoiQXV0aDAuc3dpZnQiLCJlbnYiOnsic3dpZnQiOiI1LngiLCJpT1MiOiIxNi4yIn19");
         let resp = self
             .client
@@ -848,61 +857,29 @@ impl AppleAuthHandle {
         Ok(model::AccessToken::OAuth(access_token))
     }
 
-    /// It may fail at any time
-    #[allow(dead_code)]
-    async fn official_preauth_cookie(&self) -> AuthResult<String> {
-        let mut kv = HashMap::new();
-        kv.insert("bundle_id", "com.openai.chat");
-        kv.insert("device_id", "0E92DAF9-94F0-4F77-BDF4-53A60D19EC65");
-        kv.insert("request_flag", "true");
-        kv.insert("device_token", "AgAAALfdy5TZ/q3mQrVMNyFj6EAEUNk0+me89vLfv5ZingpyOOkgXXXyjPzYTzWmWSu+BYqcD47byirLZ++3dJccpF99hWppT7G5xAuU+y56WpSYsARu0oRhQKzWGsst4hriqugzJi0waP61xAZLwRzRgEWxcmWd/uhK+hcQhHi4TFHgF6myIK/0g+ONPwBwv0IPJ0LRBggAADrnBY/gynWaJ6i9E28ZHigdBkPdznZ7clul11eI2qG/+4XJ01ftsdEKkan/lV++M8OWhwDi7zb9OkK85YtzMNdCBu3sz+styX06Zf5G6gpXkgIx3xx7QicFyrhLfiyqZ3oPkWHjGWEkCCS5IMOvN0UyR8nm7KuDK5cn94K6n0F/hCWTAhExPpjZje7PnP4sjy6b2dd7uCIT0r9EBo9ayUB5ikNIYpPCmhKLgfFSnMaix343guH4KLV8SAkcuohezoJY38pL2w+9KkYV7X/PeX8fmWXDVbFjO2/fJXHv321iEM4haCr8BDZwfBiOVYM+rqsOU71286saohKTc1ujcLrxlFw6LSb/UApV4cZVIeoWIlwl13O61u5oEety4UbcLHY0tXdE8bXgGk4rKqzO0bmv7AsN7H9Z2/H5DlyopSQ9ksh+mTSDSGBIvVfUXJipA7sB2u4B48feTDI7Qb/8CEa2HpZhb8MIlVSOqKPRK23rIiEeNJ3i54PMPlAK/tpZqYoVK5tfYzXSj/FXqJ808c4Sa/eIbZhXktkw96xaguGYd4dHcwmSVwPJeJp6ZsYdF9ehiDXL9kDpz5udqeMkQaio6YuoMqIO9QpEIYCXbQ5+C/Q/HNY+yYEzGF9eYC3Vq2F9mT2y6oboZbkqLI5jBprb92LMNOcRVI40pJCzJCbpuXa/6pX7fso5EE9Tv0hCEVcfdGd1REb1D6ZG4JU6dKNnLtduQen7S8ZB4HKY7lL62pckchXiLCeSVixlXK7S86Apnq/kWIww16PglC1vzX2AQ3uq+aAWeXOFNok2GxpgL7uThY45jEg6B6AWKO/Nxrp5YhQ3Zxq/2doSl5xdmqaGbdL7MDyxg9S4i5V5KXU3mf2Pvmu8ulJGDGuyP4u8b8U0nDYfL/50/mZT8x9OBmHpvXCBKOHD05nvQSu1ck2q7IqLP2gd9hWE+glfLsDyIugUhHdiAiFKxkoaQPveS/ogoWcJHpgjQhsco2iDXCQytSOd4s4key17aONssIdEtueUgzWU0Uk1oEgPV+iA84vFXHa7RbELhauI37VKiaWDZTPnw4vbG8+Eo3WcUpRU6qXXqRVObCzAC2IN/oCFqmoUrHtPKmv45Be/jvXiShHVi5Y/Fy8UVHL+4eQlSB1WEdnrBYE/N/sFJkG/6puDDG1EaSas0cNnr/UwUkmR8dNsOCnRdj5kFAxelMPHnkcjM1j80wXzfI37JHz0HLeSP/nP58EKkisW2Ur9kOnmoT5uQRD5AOd/ymzlmE1oYDF9d5fMegY5YfAGvWXkcB/G0UjSNqsFSetJhqRPzCeUZhYDPMSrgfQBivofIobgLda7HJtcZPPSUnx9YUNZZffXZs+dImEYJV7OGvHWDZ6Nlw81Av7Dsm9MFsDfQQd5vxawlH/GKPGjD0vfmpHHExkNyisITnhsrNfB8YaTOyarK1+IyTCEFghMpWnyTzZCt91eEgyH11WB21/LoSO3lozAUJzVQFN2PYCjrBBBYx7m/T66ZvNqV7aUTrK5syXCUutNn4MHfmNoKf1Ftuuh+QR80yg4EG2d9duVd539tiCg2LzaVEvCZa1VTK6XNgBtnwNpCehZf7/ipF4/Lk4WOSQ8YNOK97EdxO4R2JaXQTQd52LnG1vkwT/I2snWPdleO7kK5evi0v4245WR0kmXyS/LHHqvoKoM1RmlqCOQWgokXuBgzDrUW5cMJomeEX4gdop+VQTTPy+Qv0uUZu/xWVzTlJs5Vx6PYxc+QvMafElkD3jw1fdFkxTVosWbfMoNshAQ8nsA0HgUAJm1tERNXISjPrjelM5JOJ8d8iWk4R5/7+raJi9b/vCG0qVKk33nz97QfJK0sTSNeOi1hg/9t28VPQJwo7WPfOs4PFlNl388GdPJ56CwUeuct+u86Ecc2UEKVyL0MLVL1rexRKp7tUOVQOHgmMlGHFCFF/rdi/TH3HHl+zELCbUdSu4tAn3pYVbgz9uz9zWB8H5IMMUt1F9EgjnLTq9DtqPdcjM6b9bB9EAoWTl/wr8X63ScpMDlrpjyF84ti5watRXqmD2Cu1n/SqiYCwoCgp2bW/I+Bqzo4Xu5C+8HKWmOSAQxkKWG5Ncwcw3SbxyqKJ7g3Vcq753lC+fKYdetBxcsSwohf8Ol8XlXQOFxJeF2Xqme0mdgVNjwmvHPdHhGpyLvP+ot4pGVblsJiIkro6NIhoBOGS9ZnMgcqpFc/GX4fb9dSoZHbaDqoO6vv40kyVgZgpXUoY2MWrzhYIp/1wfZBJHa2OjqQW0pdZk6uCoathyxFU4k2LNRHdEok+NgSElrIHioU/wnRI7lXW5aj4ZM4vLFtQAyoKFxb9uz6geMkU0WLW12hN/zZ4BxdWruZackOHB7vM+tYLcNs5oGwwquTmYPOarFY463LLdQKcOTe0ffXAVeMksORMzoo6lzqFkNCQDinjpgrrU+dIxWpC3j0Hs+XjbKBP7bKvuxm/HiO7giWEyy84CILeP2irARuVV6FVqAvgpqsRGFgxWUMXeGJYHVzRhah0MCmvr990y0A68KNKgjlVqXM8RVGLN2m8ESR2Lxwmpndt8JmbbbPgYtbTob8F4su1+YY9HoApOqoz4pk6E/OL5Ay4oUiR95BzpcP9Lg2HjRl6+rPpUeFQWTlSF8/YquXdZK5bhmxy4Ox+HrMpke0/zkLdew3WhITciob1OZuu63e4cheA5GrYULl1OhgumYiTU7Xgc7k5qI");
-
+    async fn get_preauth_cookie(&self) -> AuthResult<String> {
         let resp = self
             .client
-            .post("https://ios.chat.openai.com/backend-api/preauth_devicecheck")
-            .json(&kv)
+            .get(self.preauth_api.as_ref())
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
 
-        if resp.status().is_success() {
-            if let Some(preauth_cookie) = resp
-                .cookies()
-                .into_iter()
-                .find(|c| c.name().eq("_preauth_devicecheck"))
-            {
-                return Ok(preauth_cookie.value().to_owned());
-            }
-        }
+        let json = resp
+            .error_for_status()
+            .map_err(AuthError::FailedRequest)?
+            .json::<serde_json::Value>()
+            .await?;
 
-        bail!(AuthError::BadRequest(
-            "Failed to get preauth_devicecheck".to_owned()
-        ))
-    }
-
-    #[allow(dead_code)]
-    async fn unofficial_preauth_cookie(&self) -> AuthResult<String> {
-        let resp = self
-            .client
-            .get("https://ai.fakeopen.com/auth/preauth")
-            .send()
-            .await
-            .map_err(AuthError::FailedRequest)?;
-
-        if resp.status().is_success() {
-            let json = resp.json::<serde_json::Value>().await?;
-
-            if let Some(kv) = json.as_object() {
-                if let Some(preauth_cookie) = kv.get("preauth_cookie") {
-                    return Ok(preauth_cookie
-                        .as_str()
-                        .expect("failed to extract preauth_cookie")
-                        .to_owned());
-                }
-            }
-        }
-
-        bail!(AuthError::FailedLogin)
+        let preauth_cookie = json
+            .as_object()
+            .map(|v| v.get("preauth_cookie"))
+            .flatten()
+            .map(|v| v.as_str())
+            .flatten()
+            .ok_or(anyhow!("failed to extract preauth_cookie"))?
+            .to_owned();
+        Ok(preauth_cookie)
     }
 }
 
@@ -1360,6 +1337,7 @@ pub struct GetAuthorizedUrlData<'a> {
 }
 
 pub struct AuthClientBuilder {
+    preauth_api: Url,
     builder: reqwest::ClientBuilder,
 }
 
@@ -1446,6 +1424,13 @@ impl AuthClientBuilder {
         self
     }
 
+    pub fn preauth_api(mut self, preauth_api: Option<String>) -> Self {
+        if let Some(preauth_api) = preauth_api {
+            self.preauth_api = Url::parse(&preauth_api).expect("invalid preauth_api url");
+        }
+        self
+    }
+
     pub fn build(self) -> AuthClient {
         let jar = Arc::new(Jar::default());
 
@@ -1463,7 +1448,7 @@ impl AuthClientBuilder {
         );
         handle_strategies.insert(
             AuthStrategy::Apple,
-            Box::new(AppleAuthHandle::new(client.clone())),
+            Box::new(AppleAuthHandle::new(client.clone(), self.preauth_api)),
         );
         handle_strategies.insert(
             AuthStrategy::Platform,
@@ -1485,7 +1470,6 @@ impl AuthClientBuilder {
                 if url.contains("https://auth0.openai.com/u/login/identifier")
                     || url.contains("https://auth0.openai.com/auth/login?callbackUrl")
                 {
-                    // redirects to 'https://auth0.openai.com/u/login/identifier'
                     attempt.follow()
                 } else {
                     attempt.stop()
@@ -1493,6 +1477,8 @@ impl AuthClientBuilder {
             }));
         AuthClientBuilder {
             builder: client_builder,
+            preauth_api: Url::parse("https://ai.fakeopen.com/auth/preauth")
+                .expect("invalid preauth_api url"),
         }
     }
 }
