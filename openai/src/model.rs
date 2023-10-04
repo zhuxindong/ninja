@@ -4,7 +4,7 @@ use base64::{engine::general_purpose, Engine};
 
 use serde_json::Value;
 use time::format_description::well_known::Rfc3339;
-use crate::info;
+
 use crate::{
     auth::{self, model::AccessToken},
     now_duration,
@@ -73,7 +73,7 @@ impl TryFrom<auth::model::AccessToken> for AuthenticateToken {
                 let current_timestamp = now_duration()?.as_secs() as i64;
                 // expires (secends)
                 let expires_in = expires_timestamp - current_timestamp;
-                info!("access-token:----{}----",value.access_token;);
+
                 Ok(Self {
                     access_token: value.access_token,
                     refresh_token: None,
@@ -88,7 +88,6 @@ impl TryFrom<auth::model::AccessToken> for AuthenticateToken {
             AccessToken::OAuth(value) => {
                 let profile = Profile::try_from(value.id_token)?;
                 let expires = now_duration()?.as_secs() as i64 + value.expires_in;
-                info!("access-token:----{}----",value.access_token);
                 Ok(Self {
                     access_token: value.access_token,
                     refresh_token: Some(value.refresh_token),
@@ -110,7 +109,6 @@ impl TryFrom<auth::model::RefreshToken> for AuthenticateToken {
     fn try_from(value: auth::model::RefreshToken) -> Result<Self, Self::Error> {
         let profile = Profile::try_from(value.id_token)?;
         let expires = now_duration()?.as_secs() as i64 + value.expires_in;
-        info!("access-token:----{}----",value.access_token);
         Ok(Self {
             access_token: value.access_token,
             refresh_token: Some(value.refresh_token),
