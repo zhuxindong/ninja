@@ -33,51 +33,53 @@ impl Default for AccountStore {
 }
 
 impl Store<Account> for AccountStore {
-    fn add(&self, account: Account) -> StoreResult<Option<Account>> {
+    fn store(&self, target: Account) -> StoreResult<Option<Self::Obj>> {
         let bytes = std::fs::read(&self.0)?;
         let mut data: HashMap<String, Account> = if bytes.is_empty() {
             HashMap::new()
         } else {
             serde_json::from_slice(&bytes).map_err(|e| anyhow::anyhow!(e))?
         };
-        let v = data.insert(account.email.to_string(), account);
+        let v = data.insert(target.email.to_string(), target);
         let json = serde_json::to_string_pretty(&data)?;
         std::fs::write(&self.0, json.as_bytes())?;
         Ok(v)
     }
 
-    fn get(&self, account: Account) -> StoreResult<Option<Account>> {
+    fn read(&self, target: Account) -> StoreResult<Option<Self::Obj>> {
         let bytes = std::fs::read(&self.0)?;
         if bytes.is_empty() {
             return Ok(None);
         }
         let data: HashMap<String, Account> =
             serde_json::from_slice(&bytes).map_err(|e| anyhow::anyhow!(e))?;
-        Ok(data.get(&account.id()).cloned())
+        Ok(data.get(&target.id()).cloned())
     }
 
-    fn remove(&self, account: Account) -> StoreResult<Option<Account>> {
+    fn remove(&self, target: Account) -> StoreResult<Option<Self::Obj>> {
         let bytes = std::fs::read(&self.0)?;
         if bytes.is_empty() {
             return Ok(None);
         }
-        let mut data: HashMap<String, Account> =
+        let mut data: HashMap<String, Self::Obj> =
             serde_json::from_slice(&bytes).map_err(|e| anyhow::anyhow!(e))?;
-        let v = data.remove(&account.id());
+        let v = data.remove(&target.id());
         let json = serde_json::to_string_pretty(&data)?;
         std::fs::write(&self.0, json)?;
         Ok(v)
     }
 
-    fn list(&self) -> StoreResult<Vec<Account>> {
+    fn list(&self) -> StoreResult<Vec<Self::Obj>> {
         let bytes = std::fs::read(&self.0)?;
         if bytes.is_empty() {
             return Ok(vec![]);
         }
         let data: HashMap<String, Account> =
             serde_json::from_slice(&bytes).map_err(|e| anyhow::anyhow!(e))?;
-        Ok(data.into_values().collect::<Vec<Account>>())
+        Ok(data.into_values().collect::<Vec<Self::Obj>>())
     }
+
+    type Obj = Account;
 }
 
 #[derive(Serialize, Deserialize, Clone)]

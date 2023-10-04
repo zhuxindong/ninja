@@ -56,7 +56,7 @@ impl Context {
     pub async fn using_user() -> Option<String> {
         Self::get_conf_store()
             .await
-            .get(Conf::default())
+            .read(Conf::new())
             .expect("Failed to read configuration")
             .and_then(|conf| conf.using_user)
     }
@@ -66,7 +66,7 @@ impl Context {
         let mut conf = Self::get_conf().await?;
         conf.using_user = user;
         let _ = conf_store
-            .add(conf)?
+            .store(conf)?
             .ok_or(anyhow!("Failed to write configuration"));
         Ok(())
     }
@@ -74,7 +74,7 @@ impl Context {
     pub async fn get_conf() -> anyhow::Result<Conf> {
         Self::get_conf_store()
             .await
-            .get(Conf::default())?
+            .read(Conf::new())?
             .ok_or(anyhow!("Failed to read configuration"))
     }
 
@@ -82,14 +82,17 @@ impl Context {
         CONF_STORE
             .get_or_init(|| async {
                 let store = ConfFileStore::new();
-                if store
-                    .list()
-                    .expect("Failed to read configuration")
-                    .is_empty()
-                {
-                    store
-                        .add(Conf::default())
-                        .expect("Failed to write configuration");
+                match store.list() {
+                    Ok(list) => {
+                        if list.is_empty() {
+                            store
+                            .store(Conf::new())
+                            .expect("Failed to write configuration");
+                        }
+                    },
+                    Err(err) => {
+                        panic!("{}", err)
+                    },
                 }
                 store
             })

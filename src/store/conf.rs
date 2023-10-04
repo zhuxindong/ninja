@@ -5,7 +5,7 @@ use std::{collections::HashMap, ops::Not, path::PathBuf};
 
 const DEFAULT_ID: &str = "ninja-default-config";
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Conf {
     id: String,
     pub using_user: Option<String>,
@@ -43,24 +43,14 @@ impl StoreId for Conf {
     }
 }
 
-impl Default for Conf {
-    fn default() -> Self {
+impl Conf {
+    pub fn new() -> Self {
         Self {
-            using_user: None,
-            official_api: None,
-            unofficial_api: None,
-            preauth_api: None,
-            proxy: None,
-            arkose_token_endpoint: None,
             timeout: 60,
             connect_timeout: 600,
             tcp_keepalive: 75,
             id: DEFAULT_ID.to_owned(),
-            arkose_solver_key: None,
-            arkose_solver: Solver::default(),
-            arkose_chat_har_path: None,
-            arkose_platform_har_path: None,
-            arkose_auth_har_path: None,
+            ..Default::default()
         }
     }
 }
@@ -94,20 +84,20 @@ impl Default for ConfFileStore {
 }
 
 impl Store<Conf> for ConfFileStore {
-    fn add(&self, conf: Conf) -> StoreResult<Option<Conf>> {
+    fn store(&self, target: Conf) -> StoreResult<Option<Self::Obj>> {
         let bytes = std::fs::read(&self.0)?;
         let mut data: HashMap<String, Conf> = if bytes.is_empty() {
             HashMap::new()
         } else {
             serde_json::from_slice(&bytes).map_err(|e| anyhow::anyhow!(e))?
         };
-        let v = data.insert(conf.id(), conf);
+        let v = data.insert(target.id(), target);
         let json = serde_json::to_string_pretty(&data)?;
         std::fs::write(&self.0, json.as_bytes())?;
         Ok(v)
     }
 
-    fn get(&self, target: Conf) -> StoreResult<Option<Conf>> {
+    fn read(&self, target: Conf) -> StoreResult<Option<Self::Obj>> {
         let bytes = std::fs::read(&self.0)?;
         if bytes.is_empty() {
             return Ok(None);
@@ -117,7 +107,7 @@ impl Store<Conf> for ConfFileStore {
         Ok(data.get(&target.id()).cloned())
     }
 
-    fn remove(&self, target: Conf) -> StoreResult<Option<Conf>> {
+    fn remove(&self, target: Conf) -> StoreResult<Option<Self::Obj>> {
         let bytes = std::fs::read(&self.0)?;
         if bytes.is_empty() {
             return Ok(None);
@@ -130,7 +120,7 @@ impl Store<Conf> for ConfFileStore {
         Ok(v)
     }
 
-    fn list(&self) -> StoreResult<Vec<Conf>> {
+    fn list(&self) -> StoreResult<Vec<Self::Obj>> {
         let bytes = std::fs::read(&self.0)?;
         if bytes.is_empty() {
             return Ok(vec![]);
@@ -139,4 +129,6 @@ impl Store<Conf> for ConfFileStore {
             serde_json::from_slice(&bytes).map_err(|e| anyhow::anyhow!(e))?;
         Ok(data.into_values().collect::<Vec<Conf>>())
     }
+
+    type Obj = Conf;
 }

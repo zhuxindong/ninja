@@ -19,7 +19,7 @@ pub async fn prompt() -> anyhow::Result<()> {
     }
 
     let store = Context::get_conf_store().await;
-    let mut conf = store.get(Conf::default())?.unwrap_or(Conf::default());
+    let mut conf = store.read(Conf::new())?.unwrap_or(Conf::new());
     let mut official_api = Text::new("Official API prefix ›")
         .with_render_config(render_config())
         .with_help_message("Example: https://example.com")
@@ -52,7 +52,7 @@ pub async fn prompt() -> anyhow::Result<()> {
 
     let mut proxy = Text::new("Proxy ›")
         .with_render_config(render_config())
-        .with_help_message("Supports http, https, socks5, socks5")
+        .with_help_message("Supports http, https, socks5")
         .with_validator(valid_url);
     if let Some(content) = conf.proxy.as_deref() {
         if !content.is_empty() {
@@ -193,7 +193,7 @@ pub async fn prompt() -> anyhow::Result<()> {
         .prompt()?;
 
     if ans {
-        store.add(conf)?;
+        store.store(conf)?;
     }
 
     Ok(())

@@ -29,7 +29,7 @@ pub async fn prompt() -> anyhow::Result<()> {
 
         if let Some(wizard) = wizard {
             match wizard {
-                enums::Authorize::SignIn => signin::sign_in_prompt().await?,
+                enums::Authorize::Auth => signin::sign_in_prompt().await?,
                 enums::Authorize::OAuth => oauth::oauth_prompt().await?,
             }
         } else {

@@ -5,7 +5,7 @@ use openai::auth::model::{AuthAccount, AuthStrategy};
 use openai::auth::AuthHandle;
 use openai::model::AuthenticateToken;
 
-use crate::inter::enums::SignIn;
+use crate::inter::enums::Auth;
 use crate::inter::{json_to_table, new_spinner, render_config};
 use crate::store::account::Account;
 use crate::store::StoreId;
@@ -14,7 +14,7 @@ use crate::{inter::context::Context, store::Store};
 pub async fn sign_in_prompt() -> anyhow::Result<()> {
     loop {
         let wizard = tokio::task::spawn_blocking(move || {
-            Select::new("SignIn Wizard ›", SignIn::SIGN_IN_VARS.to_vec())
+            Select::new("SignIn Wizard ›", Auth::SIGN_IN_VARS.to_vec())
                 .with_render_config(render_config())
                 .with_formatter(&|i| format!("${i}"))
                 .with_vim_mode(true)
@@ -24,10 +24,10 @@ pub async fn sign_in_prompt() -> anyhow::Result<()> {
         .await??;
         if let Some(wizard) = wizard {
             match wizard {
-                SignIn::Using => using().await?,
-                SignIn::State => state().await?,
-                SignIn::SignIn => sign_in().await?,
-                SignIn::SignOut => sign_out().await?,
+                Auth::Using => using().await?,
+                Auth::State => state().await?,
+                Auth::Login => sign_in().await?,
+                Auth::Logout => sign_out().await?,
             }
         } else {
             // Esc to quit
@@ -106,11 +106,11 @@ async fn sign_in() -> anyhow::Result<()> {
                     println!("{} Login Success", strategy);
                     let token = AuthenticateToken::try_from(access_token)?;
                     let mut account = store
-                        .get(Account::new(token.email()))?
+                        .read(Account::new(token.email()))?
                         .unwrap_or(Account::new(token.email()));
                     Context::set_using_user(Some(token.email().to_owned())).await?;
                     account.push_state(strategy, token);
-                    store.add(account)?;
+                    store.store(account)?;
                 }
                 Err(err) => {
                     pb.finish_and_clear();
@@ -144,7 +144,7 @@ async fn sign_out() -> anyhow::Result<()> {
     .await??;
 
     if let Some(email) = switch {
-        if let Some(mut account) = store.get(Account::new(&email))? {
+        if let Some(mut account) = store.read(Account::new(&email))? {
             let client = Context::get_auth_client().await;
             let pb = new_spinner("Signing out...");
             for (k, v) in account.state_mut() {

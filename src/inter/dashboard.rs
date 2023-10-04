@@ -22,7 +22,7 @@ pub async fn prompt() -> anyhow::Result<()> {
         let account_store = Context::get_account_store().await;
 
         let mut account = account_store
-            .get(Account::new(&user))?
+            .read(Account::new(&user))?
             .ok_or(anyhow::anyhow!("No account found"))?;
 
         let state = account
