@@ -51,6 +51,9 @@ pub struct ContextArgs {
     /// Web UI api prefix
     #[builder(setter(into), default)]
     pub(crate) api_prefix: Option<String>,
+    /// PreAuth Cookie API URL
+    #[builder(setter(into), default)]
+    pub(crate) preauth_api: Option<String>,
     /// Arkose endpoint
     #[builder(setter(into), default)]
     pub(crate) arkose_endpoint: Option<String>,

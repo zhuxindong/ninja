@@ -19,7 +19,7 @@ pub async fn prompt() -> anyhow::Result<()> {
     }
 
     let store = Context::get_conf_store().await;
-    let mut conf = store.get(Conf::default())?.unwrap_or(Conf::default());
+    let mut conf = store.read(Conf::new())?.unwrap_or(Conf::new());
     let mut official_api = Text::new("Official API prefix ›")
         .with_render_config(render_config())
         .with_help_message("Example: https://example.com")
@@ -40,9 +40,19 @@ pub async fn prompt() -> anyhow::Result<()> {
         }
     };
 
+    let mut preauth_api = Text::new("PreAuth API ›")
+        .with_render_config(render_config())
+        .with_help_message("Example: https://example.com/auth/preauth")
+        .with_validator(valid_url);
+    if let Some(content) = conf.preauth_api.as_deref() {
+        if !content.is_empty() {
+            preauth_api = preauth_api.with_initial_value(content)
+        }
+    };
+
     let mut proxy = Text::new("Proxy ›")
         .with_render_config(render_config())
-        .with_help_message("Supports http, https, socks5, socks5")
+        .with_help_message("Supports http, https, socks5")
         .with_validator(valid_url);
     if let Some(content) = conf.proxy.as_deref() {
         if !content.is_empty() {
@@ -107,6 +117,11 @@ pub async fn prompt() -> anyhow::Result<()> {
         .prompt_skippable()?
         .map(|ok| if ok.is_empty() { None } else { Some(ok) })
         .unwrap_or(conf.unofficial_api);
+
+    conf.preauth_api = preauth_api
+        .prompt_skippable()?
+        .map(|ok| if ok.is_empty() { None } else { Some(ok) })
+        .unwrap_or(conf.preauth_api);
 
     conf.proxy = proxy
         .prompt_skippable()?
@@ -178,7 +193,7 @@ pub async fn prompt() -> anyhow::Result<()> {
         .prompt()?;
 
     if ans {
-        store.add(conf)?;
+        store.store(conf)?;
     }
 
     Ok(())

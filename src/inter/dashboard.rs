@@ -7,10 +7,10 @@ use openai::{
 
 use crate::store::{account::Account, Store};
 
-use super::{context::Context, enums::Dashboard, json_to_table, new_spinner};
+use super::{context::Context, json_to_table, new_spinner, standard::Dashboard};
 
 pub async fn prompt() -> anyhow::Result<()> {
-    let using_user = Context::using_user().await;
+    let using_user = Context::current_user().await;
 
     if using_user.is_none() {
         println!("No account found");
@@ -22,7 +22,7 @@ pub async fn prompt() -> anyhow::Result<()> {
         let account_store = Context::get_account_store().await;
 
         let mut account = account_store
-            .get(Account::new(&user))?
+            .read(Account::new(&user))?
             .ok_or(anyhow::anyhow!("No account found"))?;
 
         let state = account

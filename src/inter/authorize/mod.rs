@@ -1,6 +1,6 @@
 use inquire::{min_length, required, Select, Text};
 
-use crate::inter::{context::Context, enums, render_config};
+use crate::inter::{context::Context, render_config, standard};
 use inquire::{Password, PasswordDisplayMode};
 use openai::auth::{
     model::{AccessToken, AuthAccount, AuthStrategy},
@@ -9,15 +9,15 @@ use openai::auth::{
 
 use super::new_spinner;
 
+pub mod auth;
 pub mod oauth;
-pub mod signin;
 
 pub async fn prompt() -> anyhow::Result<()> {
     loop {
         let wizard = tokio::task::spawn_blocking(move || {
             Select::new(
                 "Authorization Wizard ›",
-                enums::Authorize::AUTHORIZE_VARS.to_vec(),
+                standard::Authorize::AUTHORIZE_VARS.to_vec(),
             )
             .with_render_config(render_config())
             .with_formatter(&|i| format!("${i}"))
@@ -29,8 +29,8 @@ pub async fn prompt() -> anyhow::Result<()> {
 
         if let Some(wizard) = wizard {
             match wizard {
-                enums::Authorize::SignIn => signin::sign_in_prompt().await?,
-                enums::Authorize::OAuth => oauth::oauth_prompt().await?,
+                standard::Authorize::Auth => auth::sign_in_prompt().await?,
+                standard::Authorize::OAuth => oauth::oauth_prompt().await?,
             }
         } else {
             // Esc to quit

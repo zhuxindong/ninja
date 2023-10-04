@@ -14,6 +14,7 @@ static AUTH_CLIENT: OnceCell<AuthClient> = OnceCell::const_new();
 pub struct Context;
 
 impl Context {
+    // Initialize context
     pub async fn init_openai_context() -> anyhow::Result<()> {
         let conf = Self::get_conf().await?;
 
@@ -53,28 +54,32 @@ impl Context {
         openai::context::init(args);
         Ok(())
     }
-    pub async fn using_user() -> Option<String> {
+
+    // Get current context user
+    pub async fn current_user() -> Option<String> {
         Self::get_conf_store()
             .await
-            .get(Conf::default())
+            .read(Conf::new())
             .expect("Failed to read configuration")
             .and_then(|conf| conf.using_user)
     }
 
+    // Set current context user
     pub async fn set_using_user(user: Option<String>) -> anyhow::Result<()> {
         let conf_store = Self::get_conf_store().await;
         let mut conf = Self::get_conf().await?;
         conf.using_user = user;
         let _ = conf_store
-            .add(conf)?
+            .store(conf)?
             .ok_or(anyhow!("Failed to write configuration"));
         Ok(())
     }
 
+    // Get current context configuration
     pub async fn get_conf() -> anyhow::Result<Conf> {
         Self::get_conf_store()
             .await
-            .get(Conf::default())?
+            .read(Conf::new())?
             .ok_or(anyhow!("Failed to read configuration"))
     }
 
@@ -82,14 +87,17 @@ impl Context {
         CONF_STORE
             .get_or_init(|| async {
                 let store = ConfFileStore::new();
-                if store
-                    .list()
-                    .expect("Failed to read configuration")
-                    .is_empty()
-                {
-                    store
-                        .add(Conf::default())
-                        .expect("Failed to write configuration");
+                match store.list() {
+                    Ok(list) => {
+                        if list.is_empty() {
+                            store
+                                .store(Conf::new())
+                                .expect("Failed to write configuration");
+                        }
+                    }
+                    Err(err) => {
+                        panic!("{}", err)
+                    }
                 }
                 store
             })

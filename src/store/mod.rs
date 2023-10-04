@@ -10,15 +10,16 @@ pub trait StoreId {
 }
 
 pub trait Store<T: DeserializeOwned + serde::Serialize + StoreId>: Send + Sync + 'static {
+    type Obj;
     // Add store target return an old target
-    fn add(&self, target: T) -> StoreResult<Option<T>>;
+    fn store(&self, target: T) -> StoreResult<Option<Self::Obj>>;
 
     // Read target return a copy of the target
-    fn get(&self, target: T) -> StoreResult<Option<T>>;
+    fn read(&self, target: T) -> StoreResult<Option<Self::Obj>>;
 
     // Delete target return an current target
-    fn remove(&self, target: T) -> StoreResult<Option<T>>;
+    fn remove(&self, target: T) -> StoreResult<Option<Self::Obj>>;
 
     /// List target return an current target list
-    fn list(&self) -> StoreResult<Vec<T>>;
+    fn list(&self) -> StoreResult<Vec<Self::Obj>>;
 }

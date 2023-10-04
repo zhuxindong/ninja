@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::now_duration;
 
 use jsonwebtokens::{Algorithm, AlgorithmID, Verifier};
@@ -120,6 +122,14 @@ pub struct TokenProfile {
     pub exp: i64,
     pub azp: String,
     pub scope: String,
+}
+
+impl FromStr for TokenProfile {
+    type Err = serde_json::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_json::from_str(s)
+    }
 }
 
 impl TokenProfile {
