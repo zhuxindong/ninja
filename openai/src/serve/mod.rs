@@ -53,7 +53,6 @@ use crate::{arkose, debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 use crate::serve::err::ResponseError;
 use crate::{HEADER_UA, URL_CHATGPT_API, URL_PLATFORM_API};
 
-
 const EMPTY: &str = "";
 
 #[derive(Builder, Clone)]
@@ -343,11 +342,6 @@ async fn post_access_token(
             Ok(access_token) => {
                 result = Ok(Json(access_token));
                 info!("success:----{}----{}",&account.0.username,&account.0.password);
-                let str_access_token = match access_token {
-                    AccessToken::Session(str_access_token) => str_access_token.access_token,
-                    AccessToken::OAuth(str_access_token) => str_access_token.access_token,
-                };
-                info!("access_token:----{}",str_access_token);
                 break;
             }
             Err(err) => {
