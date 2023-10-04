@@ -1,14 +1,14 @@
 #[derive(thiserror::Error, Debug)]
 pub enum AuthError {
-    #[error("other request (error {0:?}")]
+    #[error("other request (error {0:?})")]
     Other(String),
-    #[error("token access (error {0:?}")]
+    #[error("token access (error {0:?})")]
     TokenAccess(anyhow::Error),
-    #[error("bad request (error {0:?}")]
+    #[error("bad request (error {0:?})")]
     BadRequest(String),
     #[error("too many requests `{0}`")]
     TooManyRequests(String),
-    #[error("Unauthorized request (error {0:?}")]
+    #[error("Unauthorized request (error {0:?})")]
     Unauthorized(String),
     #[error("Server error {0:?}")]
     ServerError(String),
@@ -20,8 +20,8 @@ pub enum AuthError {
     FailedRequest(#[from] reqwest::Error),
     #[error("invalid client request (error {0:?})")]
     InvalidClientRequest(String),
-    #[error("invalid arkose token")]
-    InvalidArkoseToken,
+    #[error("invalid arkose token (error {0:?})")]
+    InvalidArkoseToken(anyhow::Error),
     #[error("failed get code from callback url")]
     FailedCallbackCode,
     #[error("failed callback url")]
@@ -32,7 +32,7 @@ pub enum AuthError {
     FailedState,
     #[error("failed get csrf token")]
     FailedCsrfToken,
-    #[error("invalid request login url (error {0:?}")]
+    #[error("invalid request login url (error {0:?})")]
     InvalidLoginUrl(String),
     #[error("invalid email or password")]
     InvalidEmailOrPassword,

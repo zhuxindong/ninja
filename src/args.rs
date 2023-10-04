@@ -109,9 +109,13 @@ pub(super) struct ServeArgs {
     #[clap(long, value_parser = parse::parse_puid_user)]
     pub(super) puid_user: Option<(String, String, Option<String>)>,
 
-    /// Web UI api prefix
-    #[clap(long, env = "UI_API_PREFIX", value_parser = parse::parse_url)]
+    /// WebUI api prefix
+    #[clap(long, env = "API_PREFIX", value_parser = parse::parse_url)]
     pub(super) api_prefix: Option<String>,
+
+    /// PreAuth Cookie API URL
+    #[clap(long, env = "PREAUTH_API", value_parser = parse::parse_url)]
+    pub(super) preauth_api: Option<String>,
 
     /// Arkose endpoint, Example: https://client-api.arkoselabs.com
     #[clap(long, value_parser = parse::parse_url)]

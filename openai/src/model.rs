@@ -1,13 +1,15 @@
+use std::str::FromStr;
+
 use serde::{Deserialize, Serialize};
 
 use base64::{engine::general_purpose, Engine};
 
 use serde_json::Value;
-use time::format_description::well_known::Rfc3339;
 
 use crate::{
     auth::{self, model::AccessToken},
     now_duration,
+    token::TokenProfile,
 };
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -66,19 +68,12 @@ impl TryFrom<auth::model::AccessToken> for AuthenticateToken {
     fn try_from(value: auth::model::AccessToken) -> Result<Self, Self::Error> {
         match value {
             AccessToken::Session(value) => {
-                let expires_timestamp =
-                    time::OffsetDateTime::parse(&value.expires, &Rfc3339)?.unix_timestamp();
-
-                // current timestamp (secends)
-                let current_timestamp = now_duration()?.as_secs() as i64;
-                // expires (secends)
-                let expires_in = expires_timestamp - current_timestamp;
-
+                let profile = TokenProfile::from_str(&value.access_token)?;
                 Ok(Self {
                     access_token: value.access_token,
                     refresh_token: None,
-                    expires: expires_timestamp,
-                    expires_in,
+                    expires: profile.expires(),
+                    expires_in: profile.expires_in(),
                     user_id: value.user.id,
                     name: value.user.name,
                     email: value.user.email,
@@ -87,11 +82,10 @@ impl TryFrom<auth::model::AccessToken> for AuthenticateToken {
             }
             AccessToken::OAuth(value) => {
                 let profile = Profile::try_from(value.id_token)?;
-                let expires = now_duration()?.as_secs() as i64 + value.expires_in;
                 Ok(Self {
                     access_token: value.access_token,
                     refresh_token: Some(value.refresh_token),
-                    expires,
+                    expires: now_duration()?.as_secs() as i64 + value.expires_in,
                     expires_in: value.expires_in,
                     user_id: profile.https_api_openai_com_auth.user_id,
                     name: profile.name,
