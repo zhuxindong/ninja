@@ -5,7 +5,7 @@ use openai::auth::model::{AuthAccount, AuthStrategy};
 use openai::auth::AuthHandle;
 use openai::model::AuthenticateToken;
 
-use crate::inter::enums::Auth;
+use crate::inter::standard::Auth;
 use crate::inter::{json_to_table, new_spinner, render_config};
 use crate::store::account::Account;
 use crate::store::StoreId;
@@ -24,7 +24,7 @@ pub async fn sign_in_prompt() -> anyhow::Result<()> {
         .await??;
         if let Some(wizard) = wizard {
             match wizard {
-                Auth::Using => using().await?,
+                Auth::User => using().await?,
                 Auth::State => state().await?,
                 Auth::Login => sign_in().await?,
                 Auth::Logout => sign_out().await?,
@@ -152,7 +152,7 @@ async fn sign_out() -> anyhow::Result<()> {
                     if let Some(refresh_token) = v.refresh_token() {
                         client.do_revoke_token(refresh_token).await?;
                         store.remove(Account::new(&email))?;
-                        if let Some(using_user) = Context::using_user().await {
+                        if let Some(using_user) = Context::current_user().await {
                             if using_user.eq(&email) {
                                 Context::set_using_user(None).await?;
                             }
@@ -169,7 +169,7 @@ async fn sign_out() -> anyhow::Result<()> {
 async fn using() -> anyhow::Result<()> {
     let store = Context::get_account_store().await;
 
-    let using_user = Context::using_user().await;
+    let using_user = Context::current_user().await;
 
     let mut ids = store
         .list()?

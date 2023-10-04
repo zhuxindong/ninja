@@ -14,6 +14,7 @@ static AUTH_CLIENT: OnceCell<AuthClient> = OnceCell::const_new();
 pub struct Context;
 
 impl Context {
+    // Initialize context
     pub async fn init_openai_context() -> anyhow::Result<()> {
         let conf = Self::get_conf().await?;
 
@@ -53,7 +54,9 @@ impl Context {
         openai::context::init(args);
         Ok(())
     }
-    pub async fn using_user() -> Option<String> {
+
+    // Get current context user
+    pub async fn current_user() -> Option<String> {
         Self::get_conf_store()
             .await
             .read(Conf::new())
@@ -61,6 +64,7 @@ impl Context {
             .and_then(|conf| conf.using_user)
     }
 
+    // Set current context user
     pub async fn set_using_user(user: Option<String>) -> anyhow::Result<()> {
         let conf_store = Self::get_conf_store().await;
         let mut conf = Self::get_conf().await?;
@@ -71,6 +75,7 @@ impl Context {
         Ok(())
     }
 
+    // Get current context configuration
     pub async fn get_conf() -> anyhow::Result<Conf> {
         Self::get_conf_store()
             .await
@@ -86,13 +91,13 @@ impl Context {
                     Ok(list) => {
                         if list.is_empty() {
                             store
-                            .store(Conf::new())
-                            .expect("Failed to write configuration");
+                                .store(Conf::new())
+                                .expect("Failed to write configuration");
                         }
-                    },
+                    }
                     Err(err) => {
                         panic!("{}", err)
-                    },
+                    }
                 }
                 store
             })

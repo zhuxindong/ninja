@@ -3,14 +3,13 @@ mod config;
 mod context;
 mod conversation;
 mod dashboard;
-mod enums;
+mod standard;
 mod valid;
 
 use crate::{
     inter::conversation::{api, chatgpt},
     store::Store,
 };
-use enums::Usage;
 use indicatif::{ProgressBar, ProgressStyle};
 use inquire::{
     ui::{
@@ -25,6 +24,7 @@ use openai::{
 };
 use serde::Serialize;
 use serde_json::json;
+use standard::Usage;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::task;
 
@@ -78,7 +78,7 @@ async fn print_boot_message() {
     println!("\x1B[1m{logo}\x1B[1m");
     println!("\x1B[1m{welcome}\x1B[1m");
     println!("\x1B[1m{enjoy}\x1B[1m");
-    if let Some(current_user) = Context::using_user().await {
+    if let Some(current_user) = Context::current_user().await {
         print!("\x1B[1m{repo}\x1B[1m");
         println!("\x1B[1mCurrent User: {current_user}\x1B[1m\n");
     } else {
@@ -87,7 +87,6 @@ async fn print_boot_message() {
 }
 
 pub async fn check_authorization() -> anyhow::Result<()> {
-   
     let store = Context::get_account_store().await;
     let client = Context::get_auth_client().await;
     let current_time = get_duration_since_epoch()?;
