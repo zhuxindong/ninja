@@ -4,7 +4,7 @@ use crate::inter::{context::Context, render_config, standard};
 use inquire::{Password, PasswordDisplayMode};
 use openai::auth::{
     model::{AccessToken, AuthAccount, AuthStrategy},
-    AuthHandle,
+    provide::AuthProvider,
 };
 
 use super::new_spinner;

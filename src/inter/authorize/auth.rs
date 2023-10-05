@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use inquire::{min_length, required, MultiSelect, Password, PasswordDisplayMode, Select, Text};
 use openai::auth::model::{AuthAccount, AuthStrategy};
-use openai::auth::AuthHandle;
+use openai::auth::provide::AuthProvider;
 use openai::model::AuthenticateToken;
 
 use crate::inter::standard::Auth;

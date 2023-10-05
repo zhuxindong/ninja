@@ -19,7 +19,7 @@ use inquire::{
 };
 use openai::arkose::{funcaptcha, ArkoseToken, Type};
 use openai::{
-    auth::{model::AuthStrategy, AuthHandle},
+    auth::{model::AuthStrategy, provide::AuthProvider},
     model::AuthenticateToken,
 };
 use serde::Serialize;

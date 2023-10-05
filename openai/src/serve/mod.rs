@@ -44,7 +44,7 @@ use std::path::PathBuf;
 use crate::arkose::funcaptcha::{ArkoseSolver, Solver};
 use crate::arkose::Type;
 use crate::auth::model::{AccessToken, AuthAccount, AuthStrategy, RefreshToken};
-use crate::auth::AuthHandle;
+use crate::auth::provide::AuthProvider;
 use crate::context::{self, ContextArgsBuilder};
 use crate::serve::router::toapi::chat_to_api;
 use crate::serve::tokenbucket::TokenBucketLimitContext;

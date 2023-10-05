@@ -39,7 +39,7 @@ use crate::serve::Launcher;
 use crate::serve::EMPTY;
 use crate::warn;
 use crate::{
-    auth::{model::AuthAccount, AuthHandle},
+    auth::{model::AuthAccount, provide::AuthProvider},
     model::AuthenticateToken,
     URL_CHATGPT_API,
 };
