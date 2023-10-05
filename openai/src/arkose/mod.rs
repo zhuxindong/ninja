@@ -168,7 +168,7 @@ async fn get_chat_from_bx(bx: &str) -> anyhow::Result<ArkoseToken> {
         bx,
         "35536E1E-65B4-4D96-9D97-6ADB7EFF8147",
         "https://chat.openai.com",
-        "1.5.2",
+        "1.5.5",
     )
     .await
 }
