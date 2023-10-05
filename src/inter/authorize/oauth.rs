@@ -1,6 +1,6 @@
 use colored_json::prelude::*;
 use inquire::{min_length, required, Select, Text};
-use openai::auth::AuthHandle;
+use openai::auth::provide::AuthProvider;
 
 use crate::inter::{context::Context, new_spinner, render_config, standard::OAuth};
 

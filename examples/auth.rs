@@ -2,7 +2,7 @@ use std::time;
 
 use openai::auth::{
     model::{AuthAccountBuilder, AuthStrategy},
-    AuthHandle,
+    provide::AuthProvider,
 };
 
 #[tokio::main]

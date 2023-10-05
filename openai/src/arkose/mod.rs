@@ -338,25 +338,22 @@ async fn get_from_context(t: Type) -> anyhow::Result<ArkoseToken> {
 
     let ctx = context::get_instance();
 
-    match &t {
-        &Type::Chat => {
-            if let Some(arkose_token_endpoint) = ctx.arkose_token_endpoint() {
-                let arkose_token = ArkoseToken::new_from_endpoint(arkose_token_endpoint).await?;
-                return valid_arkose_token(arkose_token).await;
-            }
+    if t.eq(&Type::Chat) {
+        if let Some(arkose_token_endpoint) = ctx.arkose_token_endpoint() {
+            let arkose_token = ArkoseToken::new_from_endpoint(arkose_token_endpoint).await?;
+            return valid_arkose_token(arkose_token).await;
         }
-        &Type::Auth0 | &Type::Platform => {
-            let (state, file_path) = ctx.arkose_har_path(&t);
-            if state {
-                let arkose_token = ArkoseToken::new_from_har(file_path).await?;
-                return valid_arkose_token(arkose_token).await;
-            }
+    }
 
-            if ctx.arkose_solver().is_some() {
-                let arkose_token = ArkoseToken::new(t).await?;
-                return valid_arkose_token(arkose_token).await;
-            }
-        }
+    let (state, file_path) = ctx.arkose_har_path(&t);
+    if state {
+        let arkose_token = ArkoseToken::new_from_har(file_path).await?;
+        return valid_arkose_token(arkose_token).await;
+    }
+
+    if ctx.arkose_solver().is_some() {
+        let arkose_token = ArkoseToken::new(t).await?;
+        return valid_arkose_token(arkose_token).await;
     }
 
     anyhow::bail!("No solver available")
