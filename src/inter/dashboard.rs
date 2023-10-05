@@ -1,7 +1,7 @@
 use crate::inter::get_platform_arkose_token;
 use inquire::{MultiSelect, Select, Text};
 use openai::{
-    auth::{ApiKeyAction, ApiKeyDataBuilder, AuthClient},
+    auth::{model::ApiKeyAction, model::ApiKeyDataBuilder, AuthClient},
     model::AuthenticateToken,
 };
 

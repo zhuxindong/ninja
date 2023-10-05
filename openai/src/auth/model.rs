@@ -4,6 +4,8 @@ use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::arkose::ArkoseToken;
+
 #[derive(Deserialize, Serialize, Clone, PartialEq, Eq, Hash, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum AuthStrategy {
@@ -206,4 +208,36 @@ pub struct Daum {
     pub used_amount: f64,
     pub effective_at: f64,
     pub expires_at: f64,
+}
+
+#[derive(Serialize, Builder)]
+pub struct ApiKeyData<'a> {
+    action: ApiKeyAction,
+    #[builder(setter(into, strip_option), default)]
+    name: Option<&'a str>,
+    #[builder(setter(into, strip_option), default)]
+    redacted_key: Option<&'a str>,
+    #[builder(setter(into, strip_option), default)]
+    created_at: Option<u64>,
+    arkose_token: &'a ArkoseToken,
+}
+
+#[derive(Clone)]
+pub enum ApiKeyAction {
+    Create,
+    Update,
+    Delete,
+}
+
+impl Serialize for ApiKeyAction {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            ApiKeyAction::Create => serializer.serialize_str("create"),
+            ApiKeyAction::Update => serializer.serialize_str("update"),
+            ApiKeyAction::Delete => serializer.serialize_str("delete"),
+        }
+    }
 }
