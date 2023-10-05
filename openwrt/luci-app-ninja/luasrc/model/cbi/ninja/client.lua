@@ -1,7 +1,7 @@
 local m, s
 
 m = Map("ninja", translate("Ninja"))
-m.description = translate("<a>A reverse engineered unofficial ChatGPT proxy (bypass Cloudflare 403 Access Denied)</a> | <a href=\"https://github.com/gngpp/ninja\" target=\"_blank\">Project GitHub URL</a>")
+m.description = translate("<a>Reverse engineered ChatGPT proxy</a> | <a href=\"https://github.com/gngpp/ninja\" target=\"_blank\">Project GitHub URL</a>")
 
 m:section(SimpleSection).template = "ninja/ninja_status"
 
@@ -43,7 +43,13 @@ o.default = "60"
 o = s:option(Value, "tcp_keepalive", translate("TCP Keep-Alive"), translate("Default 60 seconds"))
 o.default = "60"
 
-o = s:option(Value, "arkose_har_file", translate("HAR file path"), translate("About the browser HAR file path requested by ChatGPT ArkoseLabs"))
+o = s:option(Value, "preauth_api", translate("PreAuth API"), translate("PreAuth Cookie API URL"))
+
+o = s:option(Value, "arkose_chat_har_file", translate("ChatGPT HAR file path"), translate("About the browser HAR file path requested by ChatGPT ArkoseLabs"))
+
+o = s:option(Value, "arkose_auth_har_file", translate("Auth HAR file path"), translate("About the browser HAR file path requested by Auth ArkoseLabs"))
+
+o = s:option(Value, "arkose_platform_har_file", translate("Platform HAR file path"), translate("About the browser HAR file path requested by Platform ArkoseLabs"))
 
 o = s:option(Value, "arkose_har_upload_key", translate("HAR Auth Key"), translate("HAR file upload authenticate key"))
 
