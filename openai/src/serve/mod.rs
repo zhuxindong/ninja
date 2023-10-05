@@ -87,6 +87,8 @@ pub struct Launcher {
     puid_mfa: Option<String>,
     /// Web UI api prefix
     api_prefix: Option<String>,
+    /// PreAuth Cookie API URL
+    preauth_api: Option<String>,
     /// Arkose endpoint
     arkose_endpoint: Option<String>,
     /// Get arkose token endpoint
@@ -167,6 +169,7 @@ impl Launcher {
             .arkose_endpoint(self.arkose_endpoint.clone())
             .arkose_chat_har_file(self.arkose_chat_har_file.clone())
             .arkose_auth_har_file(self.arkose_auth_har_file.clone())
+            .preauth_api(self.preauth_api.clone())
             .arkose_platform_har_file(self.arkose_platform_har_file.clone())
             .arkose_har_upload_key(self.arkose_har_upload_key.clone())
             .arkose_token_endpoint(self.arkose_token_endpoint.clone())
