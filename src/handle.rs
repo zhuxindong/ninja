@@ -47,6 +47,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .proxies(args.proxies.unwrap_or_default())
         .disable_direct(args.disable_direct)
         .api_prefix(args.api_prefix)
+        .preauth_api(args.preauth_api)
         .arkose_endpoint(args.arkose_endpoint)
         .arkose_chat_har_file(args.arkose_chat_har_file)
         .arkose_auth_har_file(args.arkose_auth_har_file)
