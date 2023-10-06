@@ -43,7 +43,9 @@ use std::path::PathBuf;
 
 use crate::arkose::funcaptcha::{ArkoseSolver, Solver};
 use crate::arkose::Type;
-use crate::auth::model::{AccessToken, AuthAccount, AuthStrategy, RefreshToken};
+use crate::auth::model::{
+    AccessToken, AuthAccount, AuthAccountBuilder, AuthStrategy, RefreshToken,
+};
 use crate::auth::provide::AuthProvider;
 use crate::context::{self, ContextArgsBuilder};
 use crate::serve::router::toapi::chat_to_api;
@@ -83,8 +85,6 @@ pub struct Launcher {
     puid_password: Option<String>,
     /// Get the user mailbox of the PUID
     puid_email: Option<String>,
-    /// Get the mfa code of the PUID
-    puid_mfa: Option<String>,
     /// Web UI api prefix
     api_prefix: Option<String>,
     /// PreAuth Cookie API URL
@@ -272,7 +272,6 @@ impl Launcher {
             tokio::spawn(initialize_puid(
                 self.puid_email.clone(),
                 self.puid_password.clone(),
-                self.puid_mfa.clone(),
             ));
 
             let router = axum::Router::new()
@@ -707,18 +706,19 @@ async fn check_wan_address() {
     }
 }
 
-async fn initialize_puid(username: Option<String>, password: Option<String>, mfa: Option<String>) {
+async fn initialize_puid(username: Option<String>, password: Option<String>) {
     if username.is_none() || password.is_none() {
         return;
     }
     let mut interval = tokio::time::interval(Duration::from_secs(24 * 60 * 60)); // 24 hours
-    let mut account = AuthAccount {
-        username: username.expect("username is empty"),
-        password: password.expect("password is empty"),
-        mfa,
-        option: AuthStrategy::Apple,
-        cf_turnstile_response: None,
-    };
+
+    let mut account = AuthAccountBuilder::default()
+        .username(username.expect("username is empty"))
+        .password(password.expect("password is empty"))
+        .option(AuthStrategy::Apple)
+        .build()
+        .expect("build auth account error");
+
     let ctx = context::get_instance();
     loop {
         interval.tick().await;

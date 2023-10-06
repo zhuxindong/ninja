@@ -23,7 +23,7 @@ use tokio::sync::OnceCell;
 
 pub mod model;
 
-use crate::arkose::{self, Type};
+use crate::arkose::{self, ArkoseToken, Type};
 use crate::debug;
 use crate::error::AuthError;
 
@@ -255,16 +255,15 @@ impl AuthClient {
         Ok(refresh_token)
     }
 
-    async fn set_arkose_token(&self) -> AuthResult<()> {
-        let arkose_token = arkose::ArkoseToken::new_from_context(Type::Auth0)
-            .await
-            .map_err(AuthError::InvalidArkoseToken)?;
+    async fn set_arkose_token(&self, arkose_token: Option<&str>) -> AuthResult<()> {
+        let arkose_token = match arkose_token {
+            Some(arkose_token) => ArkoseToken::from(arkose_token),
+            None => arkose::ArkoseToken::new_from_context(Type::Auth0)
+                .await
+                .map_err(AuthError::InvalidArkoseToken)?,
+        };
 
         if arkose_token.success() {
-            // self.jar.add_cookie_str(
-            //     ,
-            //     &Url::parse(OPENAI_OAUTH_URL)?,
-            // );
             let mut header_value = HashSet::with_capacity(1);
             header_value.insert(HeaderValue::from_str(&format!(
                 "arkoseToken={};",
@@ -301,7 +300,8 @@ impl AuthProvider for AuthClient {
             bail!(AuthError::InvalidEmailOrPassword)
         }
 
-        self.set_arkose_token().await?;
+        self.set_arkose_token(account.arkose_token.as_deref())
+            .await?;
 
         for provider in self.providers.iter() {
             if provider.supports(&account.option) {
@@ -476,13 +476,14 @@ impl AuthClientBuilder {
 
         let mut providers: Vec<Box<dyn AuthProvider + Send + Sync>> = Vec::with_capacity(3);
 
-        providers.push(Box::new(AppleAuthProvider::new(
-            client.clone(),
-            self.preauth_api
-                .unwrap_or(Url::parse("https://ai.fakeopen.com/auth/preauth").unwrap()),
-        )));
         providers.push(Box::new(WebAuthProvider::new(client.clone())));
         providers.push(Box::new(PlatformAuthProvider::new(client.clone())));
+        if let Some(preauth_api) = self.preauth_api {
+            providers.push(Box::new(AppleAuthProvider::new(
+                client.clone(),
+                preauth_api,
+            )));
+        }
 
         AuthClient {
             inner: client,
