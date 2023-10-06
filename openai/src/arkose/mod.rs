@@ -79,6 +79,14 @@ pub struct ArkoseToken {
     token: String,
 }
 
+impl From<&str> for ArkoseToken {
+    fn from(value: &str) -> Self {
+        ArkoseToken {
+            token: value.to_owned(),
+        }
+    }
+}
+
 impl From<String> for ArkoseToken {
     fn from(value: String) -> Self {
         ArkoseToken { token: value }
@@ -329,11 +337,7 @@ async fn get_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<ArkoseToken> {
 async fn get_from_context(t: Type) -> anyhow::Result<ArkoseToken> {
     let valid_arkose_token = move |arkose_token: ArkoseToken| async {
         let get = move || async { Ok(arkose_token) };
-        if context::get_instance().arkose_solver().is_some() {
-            return submit_if_invalid(get).await;
-        } else {
-            return get().await;
-        }
+        return submit_if_invalid(get).await;
     };
 
     let ctx = context::get_instance();

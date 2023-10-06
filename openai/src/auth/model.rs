@@ -26,17 +26,18 @@ impl Display for AuthStrategy {
     }
 }
 
-#[derive(Deserialize, Builder)]
+#[derive(Deserialize, Builder, Default)]
 pub struct AuthAccount {
     pub username: String,
     pub password: String,
-    #[builder(setter(into, strip_option), default)]
+    #[builder(setter(into), default)]
     pub mfa: Option<String>,
     #[serde(default)]
-    #[builder(setter(into, strip_option), default)]
     pub option: AuthStrategy,
-    #[serde(rename = "cf-turnstile-response")]
     #[builder(setter(into, strip_option), default)]
+    pub arkose_token: Option<String>,
+    #[builder(setter(into, strip_option), default)]
+    #[serde(rename = "cf-turnstile-response")]
     pub cf_turnstile_response: Option<String>,
 }
 
