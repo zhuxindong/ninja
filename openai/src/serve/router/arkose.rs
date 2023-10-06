@@ -39,9 +39,14 @@ async fn proxy(
         .iter()
         .find(|(k, _v)| k.contains(uri.path()))
     {
+        let mime_type = if v.mime_type.eq("application/octet-stream") {
+            "text/html"
+        } else {
+            v.mime_type
+        };
         return Ok(Response::builder()
             .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, v.mime_type)
+            .header(header::CONTENT_TYPE, mime_type)
             .body(Body::from(v.data))
             .map_err(ResponseError::InternalServerError)?);
     }
