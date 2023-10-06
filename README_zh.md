@@ -208,7 +208,7 @@ Options:
       --puid <PUID>
           PUID cookie value of Plus account [env: PUID=]
       --puid-user <PUID_USER>
-          Obtain the PUID of the Plus account user, Example: `user:pass` or `user:pass:mfa`
+          Obtain the PUID of the Plus account user, Example: `user:pass`
       --api-prefix <API_PREFIX>
           WebUI api prefix [env: API_PREFIX=]
       --preauth-api <PREAUTH_API>

@@ -105,7 +105,7 @@ pub(super) struct ServeArgs {
     #[clap(long, env = "PUID")]
     pub(super) puid: Option<String>,
 
-    /// Obtain the PUID of the Plus account user, Example: `user:pass` or `user:pass:mfa`
+    /// Obtain the PUID of the Plus account user, Example: `user:pass`
     #[clap(long, value_parser = parse::parse_puid_user)]
     pub(super) puid_user: Option<(String, String)>,
 
