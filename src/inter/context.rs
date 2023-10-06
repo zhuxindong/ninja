@@ -118,6 +118,7 @@ impl Context {
                     .expect("Failed to read configuration");
                 AuthClientBuilder::builder()
                     .proxy(conf.proxy)
+                    .preauth_api(Some(conf.preauth_api))
                     .timeout(time::Duration::from_secs(conf.timeout as u64))
                     .connect_timeout(time::Duration::from_secs(conf.connect_timeout as u64))
                     .tcp_keepalive(time::Duration::from_secs(conf.tcp_keepalive as u64))

@@ -3,7 +3,7 @@ use inquire::{min_length, required, Select, Text};
 use crate::inter::{context::Context, render_config, standard};
 use inquire::{Password, PasswordDisplayMode};
 use openai::auth::{
-    model::{AccessToken, AuthAccount, AuthStrategy},
+    model::{AccessToken, AuthAccountBuilder, AuthStrategy},
     provide::AuthProvider,
 };
 
@@ -92,13 +92,12 @@ pub async fn login_prompt(auth_strategy: Option<AuthStrategy>) -> anyhow::Result
         })
         .unwrap_or(None);
 
-    let auth_account = AuthAccount {
-        username,
-        password,
-        mfa: mfa_code,
-        option: auth_strategy,
-        cf_turnstile_response: None,
-    };
+    let auth_account = AuthAccountBuilder::default()
+        .username(username)
+        .password(password)
+        .mfa(mfa_code)
+        .option(auth_strategy)
+        .build()?;
 
     let pb = new_spinner("Authenticating...");
     let access_token = Context::get_auth_client()

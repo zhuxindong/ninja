@@ -19,6 +19,9 @@ use super::{
     RefreshTokenDataBuilder, RevokeTokenDataBuilder,
 };
 
+const STATE: &str = "TMf_R7zSeBRzTs86WAfQJh9Q_AbDh3382e7Y-pae1wQ";
+const APP_VERSION: &str = "7657";
+const AUTH0_CLIENT: &str = "eyJlbnYiOnsiaU9TIjoiMTYuNSIsInN3aWZ0IjoiNS54In0sInZlcnNpb24iOiIyLjUuMCIsIm5hbWUiOiJBdXRoMC5zd2lmdCJ9";
 const APPLE_CLIENT_ID: &str = "pdlLIX2Y72MIl2rhLhTE9VV9bN905kBh";
 const OPENAI_OAUTH_APPLE_CALLBACK_URL: &str =
     "com.openai.chat://auth0.openai.com/ios/com.openai.chat/callback";
@@ -35,7 +38,7 @@ impl AppleAuthProvider {
 
     async fn get_authorized_url(&self, code_challenge: &str) -> AuthResult<Url> {
         let preauth_cookie = self.get_preauth_cookie().await?;
-        let url = format!("{OPENAI_OAUTH_URL}/authorize?state=4DJBNv86mezKHDv-i2wMuDBea2-rHAo5nA_ZT4zJeak&ios_app_version=1744&client_id={APPLE_CLIENT_ID}&redirect_uri={OPENAI_OAUTH_APPLE_CALLBACK_URL}&code_challenge={code_challenge}&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write&prompt=login&preauth_cookie={preauth_cookie}&audience=https://api.openai.com/v1&code_challenge_method=S256&response_type=code&auth0Client=eyJ2ZXJzaW9uIjoiMi4zLjIiLCJuYW1lIjoiQXV0aDAuc3dpZnQiLCJlbnYiOnsic3dpZnQiOiI1LngiLCJpT1MiOiIxNi4yIn19");
+        let url = format!("{OPENAI_OAUTH_URL}/authorize?state={STATE}&ios_app_version={APP_VERSION}&client_id={APPLE_CLIENT_ID}&redirect_uri={OPENAI_OAUTH_APPLE_CALLBACK_URL}&code_challenge={code_challenge}&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write&prompt=login&preauth_cookie={preauth_cookie}&audience=https://api.openai.com/v1&code_challenge_method=S256&response_type=code&auth0Client={AUTH0_CLIENT}");
         let resp = self
             .inner
             .get(&url)

@@ -71,13 +71,12 @@ pub fn parse_file_path(s: &str) -> anyhow::Result<PathBuf> {
 }
 
 // parse account，support split: ':', '-', '--', '---'....
-pub fn parse_puid_user(s: &str) -> anyhow::Result<(String, String, Option<String>)> {
+pub fn parse_puid_user(s: &str) -> anyhow::Result<(String, String)> {
     #[inline]
-    fn handle_parts(mut parts: Vec<String>) -> anyhow::Result<(String, String, Option<String>)> {
+    fn handle_parts(mut parts: Vec<String>) -> anyhow::Result<(String, String)> {
         parts.reverse();
         match parts.len() {
-            2 => Ok((parts.pop().unwrap(), parts.pop().unwrap(), None)),
-            3 => Ok((parts.pop().unwrap(), parts.pop().unwrap(), parts.pop())),
+            2 => Ok((parts.pop().unwrap(), parts.pop().unwrap())),
             _ => anyhow::bail!("Input format is invalid!"),
         }
     }

@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use inquire::{min_length, required, MultiSelect, Password, PasswordDisplayMode, Select, Text};
-use openai::auth::model::{AuthAccount, AuthStrategy};
+use openai::auth::model::{AuthAccountBuilder, AuthStrategy};
 use openai::auth::provide::AuthProvider;
 use openai::model::AuthenticateToken;
 
@@ -89,32 +89,31 @@ async fn sign_in() -> anyhow::Result<()> {
     let client = Context::get_auth_client().await;
 
     if let Some(multi_strategy) = multi_strategy {
-        for strategy in multi_strategy {
-            let auth_account = AuthAccount {
-                username: username.clone(),
-                password: password.clone(),
-                mfa: mfa_code.clone(),
-                option: strategy.clone(),
-                cf_turnstile_response: None,
-            };
-
+        for auth_strategy in multi_strategy {
             let pb = new_spinner("Authenticating...");
+            
+            let auth_account = AuthAccountBuilder::default()
+                .username(username.clone())
+                .password(password.clone())
+                .mfa(mfa_code.clone())
+                .option(auth_strategy.clone())
+                .build()?;
 
             match client.do_access_token(&auth_account).await {
                 Ok(access_token) => {
                     pb.finish_and_clear();
-                    println!("{} Login Success", strategy);
+                    println!("{} Login Success", auth_strategy);
                     let token = AuthenticateToken::try_from(access_token)?;
                     let mut account = store
                         .read(Account::new(token.email()))?
                         .unwrap_or(Account::new(token.email()));
                     Context::set_using_user(Some(token.email().to_owned())).await?;
-                    account.push_state(strategy, token);
+                    account.push_state(auth_strategy, token);
                     store.store(account)?;
                 }
                 Err(err) => {
                     pb.finish_and_clear();
-                    println!("{strategy} Error: {}", err);
+                    println!("{auth_strategy} Error: {}", err);
                 }
             }
 
