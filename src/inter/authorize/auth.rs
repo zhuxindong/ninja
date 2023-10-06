@@ -91,7 +91,7 @@ async fn sign_in() -> anyhow::Result<()> {
     if let Some(multi_strategy) = multi_strategy {
         for auth_strategy in multi_strategy {
             let pb = new_spinner("Authenticating...");
-            
+
             let auth_account = AuthAccountBuilder::default()
                 .username(username.clone())
                 .password(password.clone())
