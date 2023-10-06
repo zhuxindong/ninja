@@ -40,15 +40,11 @@ pub async fn prompt() -> anyhow::Result<()> {
         }
     };
 
-    let mut preauth_api = Text::new("PreAuth API ›")
+    let preauth_api = Text::new("PreAuth API ›")
         .with_render_config(render_config())
         .with_help_message("Example: https://example.com/auth/preauth")
-        .with_validator(valid_url);
-    if let Some(content) = conf.preauth_api.as_deref() {
-        if !content.is_empty() {
-            preauth_api = preauth_api.with_initial_value(content)
-        }
-    };
+        .with_validator(valid_url)
+        .with_default(&conf.preauth_api);
 
     let mut proxy = Text::new("Proxy ›")
         .with_render_config(render_config())
@@ -108,6 +104,15 @@ pub async fn prompt() -> anyhow::Result<()> {
         arkose_token_endpoint = arkose_token_endpoint.with_initial_value(content)
     };
 
+    conf.proxy = proxy
+        .prompt_skippable()?
+        .map(|ok| if ok.is_empty() { None } else { Some(ok) })
+        .unwrap_or(conf.proxy);
+
+    if let Some(preauth_api) = preauth_api.prompt_skippable()? {
+        conf.preauth_api = preauth_api;
+    }
+
     conf.official_api = official_api
         .prompt_skippable()?
         .map(|ok| if ok.is_empty() { None } else { Some(ok) })
@@ -117,16 +122,6 @@ pub async fn prompt() -> anyhow::Result<()> {
         .prompt_skippable()?
         .map(|ok| if ok.is_empty() { None } else { Some(ok) })
         .unwrap_or(conf.unofficial_api);
-
-    conf.preauth_api = preauth_api
-        .prompt_skippable()?
-        .map(|ok| if ok.is_empty() { None } else { Some(ok) })
-        .unwrap_or(conf.preauth_api);
-
-    conf.proxy = proxy
-        .prompt_skippable()?
-        .map(|ok| if ok.is_empty() { None } else { Some(ok) })
-        .unwrap_or(conf.proxy);
 
     conf.arkose_chat_har_path = arkose_chat_har_file
         .prompt_skippable()?

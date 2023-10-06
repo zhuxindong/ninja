@@ -20,9 +20,9 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
     }
 
     let puid_user = if let Some(puid_user) = args.puid_user {
-        (Some(puid_user.0), Some(puid_user.1), puid_user.2)
+        (Some(puid_user.0), Some(puid_user.1))
     } else {
-        (None, None, None)
+        (None, None)
     };
 
     // disable_direct and proxies are mutually exclusive
@@ -67,8 +67,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .puid_email(puid_user.0)
         .puid_password(puid_user.1)
         .arkose_solver(args.arkose_solver)
-        .arkose_solver_key(args.arkose_solver_key)
-        .puid_mfa(puid_user.2);
+        .arkose_solver_key(args.arkose_solver_key);
 
     #[cfg(feature = "limit")]
     let builder = builder

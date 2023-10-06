@@ -107,14 +107,14 @@ pub(super) struct ServeArgs {
 
     /// Obtain the PUID of the Plus account user, Example: `user:pass` or `user:pass:mfa`
     #[clap(long, value_parser = parse::parse_puid_user)]
-    pub(super) puid_user: Option<(String, String, Option<String>)>,
+    pub(super) puid_user: Option<(String, String)>,
 
     /// WebUI api prefix
     #[clap(long, env = "API_PREFIX", value_parser = parse::parse_url)]
     pub(super) api_prefix: Option<String>,
 
     /// PreAuth Cookie API URL
-    #[clap(long, env = "PREAUTH_API", value_parser = parse::parse_url)]
+    #[clap(long, env = "PREAUTH_API", value_parser = parse::parse_url, default_value = "https://ai.fakeopen.com/auth/preauth")]
     pub(super) preauth_api: Option<String>,
 
     /// Arkose endpoint, Example: https://client-api.arkoselabs.com
