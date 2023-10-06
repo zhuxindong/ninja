@@ -49,7 +49,7 @@ use super::get_static_resource;
 const DEFAULT_INDEX: &str = "/";
 const LOGIN_INDEX: &str = "/auth/login";
 const SESSION_ID: &str = "ninja_session";
-const BUILD_ID: &str = "oDTsXIohP85MnLZj7TlaB";
+const BUILD_ID: &str = "cdCfIN9NUpAX8XOZwcgjh";
 const TEMP_404: &str = "404.htm";
 const TEMP_AUTH: &str = "auth.htm";
 const TEMP_CHAT: &str = "chat.htm";
@@ -158,6 +158,7 @@ pub(super) fn config(router: Router, args: &Launcher) -> Router {
                         .expect("An error occurred while redirecting")
                 }),
             )
+            .route("/share/e/:share_id", get(get_share_chat))
             .route("/share/:share_id", get(get_share_chat))
             .route("/share/:share_id/continue", get(get_share_chat_continue))
             .route(
@@ -505,7 +506,7 @@ async fn get_chat_info(jar: CookieJar) -> Result<Response<Body>, ResponseError> 
 }
 
 async fn get_share_chat(
-    headers: HeaderMap,
+    mut headers: HeaderMap,
     jar: CookieJar,
     share_id: Path<String>,
 ) -> Result<Response<Body>, ResponseError> {
@@ -513,13 +514,13 @@ async fn get_share_chat(
     if let Some(cookie) = jar.get(SESSION_ID) {
         return match extract_session(cookie.value()) {
             Ok(session) => {
+                set_auth_header(&mut headers, &session.access_token)?;
                 let ctx = context::get_instance();
                 let url = get_url();
                 let resp = ctx
                     .client()
                     .get(format!("{url}/backend-api/share/{share_id}"))
                     .headers(header_convert(&headers, &jar).await?)
-                    .bearer_auth(session.access_token)
                     .send()
                     .await
                     .map_err(ResponseError::InternalServerError)?;
@@ -612,20 +613,20 @@ async fn get_share_chat(
 }
 
 async fn get_share_chat_info(
-    headers: HeaderMap,
+    mut headers: HeaderMap,
     jar: CookieJar,
     share_id: Path<String>,
 ) -> Result<Response<Body>, ResponseError> {
     let share_id = share_id.0.replace(".json", "");
     if let Some(cookie) = jar.get(SESSION_ID) {
         if let Ok(session) = extract_session(cookie.value()) {
+            set_auth_header(&mut headers, &session.access_token)?;
             let ctx = context::get_instance();
             let url = get_url();
             let resp = ctx
                 .client()
                 .get(format!("{url}/backend-api/share/{share_id}"))
                 .headers(header_convert(&headers, &jar).await?)
-                .bearer_auth(session.access_token)
                 .send()
                 .await
                 .map_err(ResponseError::InternalServerError)?;
@@ -697,20 +698,20 @@ async fn get_share_chat_continue(share_id: Path<String>) -> Result<Response<Body
 }
 
 async fn get_share_chat_continue_info(
-    headers: HeaderMap,
+    mut headers: HeaderMap,
     jar: CookieJar,
     share_id: Path<String>,
 ) -> Result<Response<Body>, ResponseError> {
     if let Some(cookie) = jar.get(SESSION_ID) {
         return match extract_session(cookie.value()) {
             Ok(session) => {
+                set_auth_header(&mut headers, &session.access_token)?;
                 let ctx = context::get_instance();
                 let url = get_url();
                 let resp = ctx
                     .client()
                     .get(format!("{url}/backend-api/share/{}", share_id.0))
                     .headers(header_convert(&headers, &jar).await?)
-                    .bearer_auth(session.access_token)
                     .send()
                     .await
                     .map_err(ResponseError::InternalServerError)?;
@@ -905,6 +906,16 @@ fn get_url() -> &'static str {
         None => URL_CHATGPT_API,
     }
 }
+
+fn set_auth_header(headers: &mut HeaderMap, access_token: &str) -> Result<(), ResponseError> {
+    headers.insert(
+        header::AUTHORIZATION,
+        header::HeaderValue::from_str(&format!("Bearer {access_token}"))
+            .map_err(|err| ResponseError::BadRequest(anyhow!(err)))?,
+    );
+    Ok(())
+}
+
 #[allow(dead_code)]
 #[derive(serde::Deserialize)]
 struct ImageQuery {
