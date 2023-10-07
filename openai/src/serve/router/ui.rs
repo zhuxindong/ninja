@@ -440,6 +440,7 @@ async fn get_chat(
                     "page": "/[[...default]]",
                     "query": query.0,
                     "buildId": BUILD_ID,
+                    "assetPrefix": "https://cdn.oaistatic.com",
                     "isFallback": false,
                     "gssp": true,
                     "scriptLoader": []
@@ -559,6 +560,7 @@ async fn get_share_chat(
                                         "shareParams": vec![share_id]
                                     },
                                     "buildId": BUILD_ID,
+                                    "assetPrefix": "https://cdn.oaistatic.com",
                                     "isFallback": false,
                                     "gssp": true,
                                     "scriptLoader": []
@@ -581,6 +583,7 @@ async fn get_share_chat(
                             "page": "/_error",
                             "query": {},
                             "buildId": BUILD_ID,
+                            "assetPrefix": "https://cdn.oaistatic.com",
                             "nextExport": true,
                             "isFallback": false,
                             "gip": true,
@@ -837,6 +840,7 @@ async fn error_404() -> Result<Response<Body>, ResponseError> {
             "page": "/_error",
             "query": {},
             "buildId": BUILD_ID,
+            "assetPrefix": "https://cdn.oaistatic.com",
             "nextExport": true,
             "isFallback": false,
             "gip": false,
