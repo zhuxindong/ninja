@@ -420,18 +420,17 @@ async fn official_proxy(
     method: Method,
     headers: HeaderMap,
     jar: CookieJar,
-    body: Option<Json<Value>>,
+    mut body: Option<Json<Value>>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let url = match uri.query() {
-        None => {
-            format!("{URL_PLATFORM_API}{}", uri.path())
-        }
-        Some(query) => {
-            format!("{URL_PLATFORM_API}{}?{}", uri.path(), query)
-        }
+    let url = if let Some(query) = uri.query() {
+        format!("{URL_PLATFORM_API}{}?{query}", uri.path())
+    } else {
+        format!("{URL_PLATFORM_API}{}", uri.path())
     };
-    let ctx = context::get_instance();
-    let builder = ctx
+
+    handle_dashboard_body(&url, &method, &mut body).await?;
+
+    let builder = context::get_instance()
         .client()
         .request(method, &url)
         .headers(header_convert(&headers, &jar).await?);
@@ -464,15 +463,14 @@ async fn unofficial_proxy(
     mut body: Option<Json<Value>>,
 ) -> Result<impl IntoResponse, ResponseError> {
     let url = if let Some(query) = uri.query() {
-        format!("{URL_CHATGPT_API}{}?{}", uri.path(), query)
+        format!("{URL_CHATGPT_API}{}?{query}", uri.path())
     } else {
         format!("{URL_CHATGPT_API}{}", uri.path())
     };
 
     handle_body(&url, &method, &mut headers, &mut body).await?;
 
-    let ctx = context::get_instance();
-    let builder = ctx
+    let builder = context::get_instance()
         .client()
         .request(method, url)
         .headers(header_convert(&headers, &jar).await?);
@@ -588,6 +586,28 @@ fn response_convert(
         .map_err(ResponseError::InternalServerError)?)
 }
 
+async fn handle_dashboard_body(
+    url: &str,
+    method: &Method,
+    body: &mut Option<Json<Value>>,
+) -> Result<(), ResponseError> {
+    if !url.contains("/dashboard/user/api_keys") || !method.eq("POST") {
+        return Ok(());
+    }
+
+    let body = match body.as_mut().and_then(|b| b.as_object_mut()) {
+        Some(body) => body,
+        None => return Ok(()),
+    };
+
+    if body.get("arkose_token").is_none() {
+        let arkose_token = arkose::ArkoseToken::new_from_context(Type::Platform).await?;
+        body.insert("arkose_token".to_owned(), json!(arkose_token));
+    }
+
+    Ok(())
+}
+
 async fn handle_body(
     url: &str,
     method: &Method,
@@ -608,12 +628,11 @@ async fn handle_body(
         None => return Ok(()),
     };
 
-    if arkose::GPT4Model::from_str(model).is_err() {
-        return Ok(());
-    }
-
-    if body.get("arkose_token").is_some() {
-        return Ok(());
+    if arkose::GPT4Model::from_str(model).is_ok() {
+        if body.get("arkose_token").is_none() {
+            let arkose_token = arkose::ArkoseToken::new_from_context(Type::Chat).await?;
+            body.insert("arkose_token".to_owned(), json!(arkose_token));
+        }
     }
 
     let authorization = headers
@@ -643,10 +662,6 @@ async fn handle_body(
             }
             Err(err) => return Err(ResponseError::InternalServerError(err)),
         }
-    }
-
-    if let Ok(arkose_token) = arkose::ArkoseToken::new_from_context(Type::Chat).await {
-        let _ = body.insert("arkose_token".to_owned(), json!(arkose_token));
     }
 
     Ok(())
