@@ -334,31 +334,8 @@ async fn post_access_token(
     mut account: axum::Form<AuthAccount>,
 ) -> Result<Json<AccessToken>, ResponseError> {
     turnstile::cf_turnstile_check(&addr.ip(), account.cf_turnstile_response.as_deref()).await?;
-
-    let ctx = context::get_instance();
-    let mut result = Err(ResponseError::InternalServerError(anyhow!(
-        "There was an error logging in to the Body"
-    )));
-
-    for _ in 0..2 {
-        match ctx.auth_client().do_access_token(&account.0).await {
-            Ok(access_token) => {
-                result = Ok(Json(access_token));
-                break;
-            }
-            Err(err) => {
-                debug!("Error: {err}");
-                account.0.option = match account.0.option {
-                    AuthStrategy::Web => AuthStrategy::Apple,
-                    AuthStrategy::Apple => AuthStrategy::Web,
-                    _ => break,
-                };
-                result = Err(ResponseError::BadRequest(err));
-            }
-        }
-    }
-
-    result
+    let res: AccessToken = retry_login(&mut account).await?;
+    Ok(Json(res))
 }
 
 async fn post_refresh_token(
@@ -584,6 +561,34 @@ fn response_convert(
     Ok(builder
         .body(StreamBody::new(resp.bytes_stream()))
         .map_err(ResponseError::InternalServerError)?)
+}
+
+pub(crate) async fn retry_login(
+    account: &mut axum::Form<AuthAccount>,
+) -> anyhow::Result<AccessToken> {
+    let mut result = Err(anyhow!("There was an error logging in to the Body"));
+
+    let ctx = context::get_instance();
+
+    for _ in 0..2 {
+        match ctx.auth_client().do_access_token(&account.0).await {
+            Ok(access_token) => {
+                result = Ok(access_token);
+                break;
+            }
+            Err(err) => {
+                crate::debug!("Error: {err}");
+                account.0.option = match account.0.option {
+                    AuthStrategy::Web => AuthStrategy::Apple,
+                    AuthStrategy::Apple => AuthStrategy::Web,
+                    _ => break,
+                };
+                result = Err(err);
+            }
+        }
+    }
+
+    result
 }
 
 async fn handle_dashboard_body(

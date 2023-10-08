@@ -31,6 +31,7 @@ use time::format_description::well_known::Rfc3339;
 use crate::context;
 use crate::info;
 use crate::now_duration;
+use crate::serve;
 use crate::serve::err::ResponseError;
 use crate::serve::header_convert;
 use crate::serve::response_convert;
@@ -210,14 +211,11 @@ async fn get_login() -> Result<Response<Body>, ResponseError> {
 
 async fn post_login(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    account: axum::Form<AuthAccount>,
+    mut account: axum::Form<AuthAccount>,
 ) -> Result<Response<Body>, ResponseError> {
     turnstile::cf_turnstile_check(&addr.ip(), account.cf_turnstile_response.as_deref()).await?;
-    match context::get_instance()
-        .auth_client()
-        .do_access_token(&account.0)
-        .await
-    {
+
+    match serve::retry_login(&mut account).await {
         Ok(access_token) => {
             let authentication_token = AuthenticateToken::try_from(access_token)
                 .map_err(ResponseError::InternalServerError)?;
