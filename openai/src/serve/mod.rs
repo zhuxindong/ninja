@@ -69,6 +69,8 @@ pub struct Launcher {
     concurrent_limit: usize,
     /// Server proxies
     proxies: Vec<String>,
+    /// Enabled Cookie Store
+    cookie_store: bool,
     /// Disable direct connection
     disable_direct: bool,
     /// TCP keepalive (second)
@@ -79,8 +81,6 @@ pub struct Launcher {
     connect_timeout: usize,
     /// TLS keypair
     tls_keypair: Option<(PathBuf, PathBuf)>,
-    /// Account Plus puid cookie value
-    puid: Option<String>,
     /// Get the user password of the PUID
     puid_password: Option<String>,
     /// Get the user mailbox of the PUID
@@ -153,6 +153,7 @@ impl Launcher {
         info!("Keepalive {} seconds", self.tcp_keepalive);
         info!("Timeout {} seconds", self.timeout);
         info!("Connect timeout {} seconds", self.connect_timeout);
+        info!("Enabled cookie store: {}", self.cookie_store);
         if self.disable_direct {
             info!("Disable direct connection");
         }
@@ -165,6 +166,7 @@ impl Launcher {
             None => None,
         };
         let args = ContextArgsBuilder::default()
+            .cookie_store(self.cookie_store)
             .api_prefix(self.api_prefix.clone())
             .arkose_endpoint(self.arkose_endpoint.clone())
             .arkose_chat_har_file(self.arkose_chat_har_file.clone())
@@ -174,7 +176,6 @@ impl Launcher {
             .arkose_har_upload_key(self.arkose_har_upload_key.clone())
             .arkose_token_endpoint(self.arkose_token_endpoint.clone())
             .arkose_solver(arkose_sovler)
-            .puid(self.puid.clone())
             .proxies(self.proxies.clone())
             .disable_direct(self.disable_direct)
             .timeout(self.timeout.clone())
