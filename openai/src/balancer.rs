@@ -62,6 +62,10 @@ impl<T: Clone> ClientLoadBalancer<T> {
                 client_builder = client_builder.proxy(proxy)
             }
 
+            if args.cookie_store {
+                client_builder = client_builder.cookie_store(true);
+            }
+
             // api client
             let client = client_builder
                 .user_agent(HEADER_UA)
@@ -69,7 +73,6 @@ impl<T: Clone> ClientLoadBalancer<T> {
                 .tcp_keepalive(Some(Duration::from_secs((args.tcp_keepalive + 1) as u64)))
                 .timeout(Duration::from_secs((args.timeout + 1) as u64))
                 .connect_timeout(Duration::from_secs((args.connect_timeout + 1) as u64))
-                .cookie_store(true)
                 .build()
                 .expect("Failed to build API client");
             client

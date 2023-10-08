@@ -1,7 +1,7 @@
 use std::{ops::Not, path::PathBuf};
 
 use clap::CommandFactory;
-use openai::{arkose::funcaptcha::Solver, serve::tokenbucket::Strategy};
+use openai::serve::tokenbucket::Strategy;
 
 use crate::{
     args::{self, ServeArgs},
@@ -46,6 +46,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .port(args.port.unwrap_or(7999))
         .proxies(args.proxies.unwrap_or_default())
         .disable_direct(args.disable_direct)
+        .cookie_store(args.cookie_store)
         .api_prefix(args.api_prefix)
         .preauth_api(args.preauth_api)
         .arkose_endpoint(args.arkose_endpoint)
@@ -63,7 +64,6 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .cf_site_key(args.cf_site_key)
         .cf_secret_key(args.cf_secret_key)
         .disable_ui(args.disable_webui)
-        .puid(args.puid)
         .puid_email(puid_user.0)
         .puid_password(puid_user.1)
         .arkose_solver(args.arkose_solver)
@@ -243,40 +243,21 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
     };
 
     let args = args::ServeArgs {
-        config: None,
         host: Some("0.0.0.0".parse()?),
         port: Some(7999),
         workers: 1,
         concurrent_limit: 65535,
-        proxies: None,
         timeout: 600,
         connect_timeout: 60,
         tcp_keepalive: 60,
-        tls_cert: None,
-        tls_key: None,
-        api_prefix: None,
-        arkose_endpoint: None,
-        arkose_token_endpoint: None,
-        sign_secret_key: None,
-        tb_enable: false,
         tb_store_strategy: Strategy::Mem,
         tb_redis_url: "redis://127.0.0.1:6379".to_string(),
+        tb_enable: false,
         tb_capacity: 60,
         tb_fill_rate: 1,
         tb_expired: 86400,
-        cf_site_key: None,
-        cf_secret_key: None,
-        disable_webui: false,
-        puid_user: None,
-        puid: None,
-        arkose_chat_har_file: None,
-        arkose_har_upload_key: None,
-        disable_direct: false,
-        arkose_solver: Solver::Yescaptcha,
-        arkose_solver_key: None,
-        arkose_platform_har_file: None,
-        arkose_auth_har_file: None,
-        preauth_api: None,
+        cookie_store: true,
+        ..args::ServeArgs::default()
     };
 
     let write = |out: PathBuf, args: ServeArgs| -> anyhow::Result<()> {

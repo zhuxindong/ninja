@@ -81,6 +81,10 @@ pub(super) struct ServeArgs {
     #[clap(long, env = "DISABLE_DIRECT")]
     pub(super) disable_direct: bool,
 
+    /// Enabled Cookie Store
+    #[clap(long, env = "COOKIE_STORE")]
+    pub(super) cookie_store: bool,
+
     /// Client timeout (seconds)
     #[clap(long, default_value = "600")]
     pub(super) timeout: usize,
@@ -100,10 +104,6 @@ pub(super) struct ServeArgs {
     /// TLS private key file path (EC/PKCS8/RSA)
     #[clap(long, env = "TLS_KEY", requires = "tls_cert")]
     pub(super) tls_key: Option<PathBuf>,
-
-    /// PUID cookie value of Plus account
-    #[clap(long, env = "PUID")]
-    pub(super) puid: Option<String>,
 
     /// Obtain the PUID of the Plus account user, Example: `user:pass`
     #[clap(long, value_parser = parse::parse_puid_user)]
