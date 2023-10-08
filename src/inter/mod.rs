@@ -108,7 +108,7 @@ pub async fn check_authorization() -> anyhow::Result<()> {
         for (k, token) in state.iter_mut() {
             if let AuthStrategy::Platform | AuthStrategy::Apple = k {
                 let time_left = token.expires() - current_time;
-                let difference = token.expires_in() / 2;
+                let difference = token.expires_in() / 10;
                 if time_left < difference {
                     if let Some(refresh_token) = token.refresh_token() {
                         let pb = new_spinner("Initializing login...");
@@ -120,9 +120,8 @@ pub async fn check_authorization() -> anyhow::Result<()> {
                                 pb.finish_and_clear();
                                 tokio::time::sleep(Duration::from_secs(3)).await;
                             }
-                            Err(err) => {
+                            Err(_) => {
                                 pb.finish_and_clear();
-                                println!("[{}-{k}] Error refreshing token: {}", token.email(), err)
                             }
                         };
                     }
