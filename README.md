@@ -33,7 +33,6 @@ Reverse engineered `ChatGPT` proxy (bypass Cloudflare 403 Access Denied)
 Here `IP limit` refers to `OpenAI`'s request rate limit for `single IP`. You need to understand what `puid` is. The default request models interface returns `puid cookie`.
 In addition, the `GPT-4` session must be sent with `puid`. When using a third-party client to send a `GPT-4` conversation, the `puid` may not be saved or obtained. You need to handle it on the server side:
 
-- Use the startup parameter `--puid` to set up shared use separately. This method does not support updates.
 - Use the startup parameter `--puid-user` to set the `Account Plus` account to obtain the `puid`, and it will be updated regularly
 
 ### ArkoseLabs
@@ -99,8 +98,8 @@ Sending a `GPT4` conversation requires `Arkose Token` to be sent as a parameter,
 Making [Releases](https://github.com/gngpp/ninja/releases/latest) has a precompiled deb package, binaries, in Ubuntu, for example:
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.6.2/ninja-0.6.2-x86_64-unknown-linux-musl.deb
-dpkg -i ninja-0.6.2-x86_64-unknown-linux-musl.deb
+wget https://github.com/gngpp/ninja/releases/download/v0.6.3/ninja-0.6.3-x86_64-unknown-linux-musl.deb
+dpkg -i ninja-0.6.3-x86_64-unknown-linux-musl.deb
 ninja serve run
 ```
 
@@ -109,11 +108,11 @@ ninja serve run
 There are pre-compiled ipk files in GitHub [Releases](https://github.com/gngpp/ninja/releases/latest), which currently provide versions of aarch64/x86_64 and other architectures. After downloading, use opkg to install, and use nanopi r4s as example:
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.6.2/ninja_0.6.2_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.6.2/luci-app-ninja_1.0.9-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.6.2/luci-i18n-ninja-zh-cn_1.0.9-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.6.3/ninja_0.6.3_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.6.3/luci-app-ninja_1.0.9-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.6.3/luci-i18n-ninja-zh-cn_1.0.9-1_all.ipk
 
-opkg install ninja_0.6.2_aarch64_generic.ipk
+opkg install ninja_0.6.3_aarch64_generic.ipk
 opkg install luci-app-ninja_1.0.9-1_all.ipk
 opkg install luci-i18n-ninja-zh-cn_1.0.9-1_all.ipk
 ```
@@ -196,6 +195,8 @@ Options:
           Server proxies pool, Example: protocol://user:pass@ip:port [env: PROXIES=]
       --disable-direct
           Disable direct connection [env: DISABLE_DIRECT=]
+      --cookie-store
+          Enabled Cookie Store [env: COOKIE_STORE=]
       --timeout <TIMEOUT>
           Client timeout (seconds) [default: 600]
       --connect-timeout <CONNECT_TIMEOUT>
@@ -206,14 +207,12 @@ Options:
           TLS certificate file path [env: TLS_CERT=]
       --tls-key <TLS_KEY>
           TLS private key file path (EC/PKCS8/RSA) [env: TLS_KEY=]
-      --puid <PUID>
-          PUID cookie value of Plus account [env: PUID=]
       --puid-user <PUID_USER>
           Obtain the PUID of the Plus account user, Example: `user:pass`
       --api-prefix <API_PREFIX>
           WebUI api prefix [env: API_PREFIX=]
       --preauth-api <PREAUTH_API>
-          PreAuth Cookie API URL [env: PREAUTH_API=]
+          PreAuth Cookie API URL [env: PREAUTH_API=] [default: https://ai.fakeopen.com/auth/preauth]
       --arkose-endpoint <ARKOSE_ENDPOINT>
           Arkose endpoint, Example: https://client-api.arkoselabs.com
   -A, --arkose-token-endpoint <ARKOSE_TOKEN_ENDPOINT>

@@ -33,7 +33,6 @@
 这里`IP限制`是指`OpenAI`对`单IP`请求速率限制，你需要了解什么是`puid`，默认请求models接口返回`puid cookie`。
 另外，`GPT-4`会话必须带上`puid`发送，在使用第三方客户端发送`GPT-4`会话时可能不会保存也不会获取`puid`，你需要在服务端处理:
 
-- 使用启动参数`--puid`单独设置共享使用，此方式不支持更新
 - 使用启动参数`--puid-user`，设置`Account Plus`账号来获取`puid`，并且会定时更新
 
 ### ArkoseLabs
@@ -98,8 +97,8 @@
   GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 deb包，二进制文件，以Ubuntu为例：
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.6.2/ninja-0.6.2-x86_64-unknown-linux-musl.deb
-dpkg -i ninja-0.6.2-x86_64-unknown-linux-musl.deb
+wget https://github.com/gngpp/ninja/releases/download/v0.6.3/ninja-0.6.3-x86_64-unknown-linux-musl.deb
+dpkg -i ninja-0.6.3-x86_64-unknown-linux-musl.deb
 ninja serve run
 ```
 
@@ -108,11 +107,11 @@ ninja serve run
 GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 ipk 文件， 目前提供了 aarch64/x86_64 等架构的版本，下载后使用 opkg 安装，以 nanopi r4s 为例：
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.6.2/ninja_0.6.2_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.6.2/luci-app-ninja_1.0.9-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.6.2/luci-i18n-ninja-zh-cn_1.0.9-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.6.3/ninja_0.6.3_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.6.3/luci-app-ninja_1.0.9-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.6.3/luci-i18n-ninja-zh-cn_1.0.9-1_all.ipk
 
-opkg install ninja_0.6.2_aarch64_generic.ipk
+opkg install ninja_0.6.3_aarch64_generic.ipk
 opkg install luci-app-ninja_1.0.9-1_all.ipk
 opkg install luci-i18n-ninja-zh-cn_1.0.9-1_all.ipk
 ```
@@ -195,6 +194,8 @@ Options:
           Server proxies pool, Example: protocol://user:pass@ip:port [env: PROXIES=]
       --disable-direct
           Disable direct connection [env: DISABLE_DIRECT=]
+      --cookie-store
+          Enabled Cookie Store [env: COOKIE_STORE=]
       --timeout <TIMEOUT>
           Client timeout (seconds) [default: 600]
       --connect-timeout <CONNECT_TIMEOUT>
@@ -205,14 +206,12 @@ Options:
           TLS certificate file path [env: TLS_CERT=]
       --tls-key <TLS_KEY>
           TLS private key file path (EC/PKCS8/RSA) [env: TLS_KEY=]
-      --puid <PUID>
-          PUID cookie value of Plus account [env: PUID=]
       --puid-user <PUID_USER>
           Obtain the PUID of the Plus account user, Example: `user:pass`
       --api-prefix <API_PREFIX>
           WebUI api prefix [env: API_PREFIX=]
       --preauth-api <PREAUTH_API>
-          PreAuth Cookie API URL [env: PREAUTH_API=]
+          PreAuth Cookie API URL [env: PREAUTH_API=] [default: https://ai.fakeopen.com/auth/preauth]
       --arkose-endpoint <ARKOSE_ENDPOINT>
           Arkose endpoint, Example: https://client-api.arkoselabs.com
   -A, --arkose-token-endpoint <ARKOSE_TOKEN_ENDPOINT>

@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{anyhow, bail};
+use anyhow::bail;
 use regex::Regex;
 use reqwest::cookie::{self, CookieStore, Jar};
 use reqwest::header::{HeaderMap, HeaderValue};
@@ -263,20 +263,15 @@ impl AuthClient {
                 .map_err(AuthError::InvalidArkoseToken)?,
         };
 
-        if arkose_token.success() {
-            let mut header_value = HashSet::with_capacity(1);
-            header_value.insert(HeaderValue::from_str(&format!(
-                "arkoseToken={};",
-                arkose_token.value()
-            ))?);
+        let mut header_value = HashSet::with_capacity(1);
+        header_value.insert(HeaderValue::from_str(&format!(
+            "arkoseToken={};",
+            arkose_token.value()
+        ))?);
 
-            self.cookie_store
-                .set_cookies(&mut header_value.iter(), &Url::parse(OPENAI_OAUTH_URL)?);
-            return Ok(());
-        }
-        bail!(AuthError::InvalidArkoseToken(anyhow!(
-            "Arkose token failed"
-        )))
+        self.cookie_store
+            .set_cookies(&mut header_value.iter(), &Url::parse(OPENAI_OAUTH_URL)?);
+        return Ok(());
     }
 }
 

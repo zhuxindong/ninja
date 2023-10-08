@@ -39,6 +39,8 @@ pub struct ContextArgs {
     /// Disable direct connection
     #[builder(default = "false")]
     pub(crate) disable_direct: bool,
+    /// Enabled Cookie Store
+    pub(crate) cookie_store: bool,
     /// TCP keepalive (second)
     #[builder(setter(into), default = "75")]
     pub(crate) tcp_keepalive: usize,
