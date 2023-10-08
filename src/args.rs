@@ -82,7 +82,7 @@ pub(super) struct ServeArgs {
     pub(super) disable_direct: bool,
 
     /// Enabled Cookie Store
-    #[clap(long, env = "COOKIE_STORE", default_value = "true")]
+    #[clap(long, env = "COOKIE_STORE")]
     pub(super) cookie_store: bool,
 
     /// Client timeout (seconds)
