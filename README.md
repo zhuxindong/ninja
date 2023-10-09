@@ -272,26 +272,8 @@ Options:
 - Linux compile, Ubuntu machine for example:
 
 ```shell
-
-sudo apt update -y && sudo apt install rename
-
-# Native compilation
 git clone https://github.com/gngpp/ninja.git && cd ninja
-./build.sh
-
-# Cross-platform compilation, relying on docker (if you can solve cross-platform compilation dependencies on your own)
-# Default using docker build linux/windows platform 
-./build_cross.sh
-# The MacOS platform is built on MacOS by default
-os=macos ./build_cross.sh 
-
-# Compile a single platform binary, take aarch64-unknown-linux-musl as an example: 
-docker run --rm -it --user=$UID:$(id -g $USER) \
-  -v $(pwd):/home/rust/src \
-  -v $HOME/.cargo/registry:/root/.cargo/registry \
-  -v $HOME/.cargo/git:/root/.cargo/git \
-  ghcr.io/gngpp/ninja-builder:x86_64-unknown-linux-musl \
-  cargo build --release
+cargo build --release
 ```
 
 - OpenWrt Compile
@@ -303,6 +285,12 @@ cd -
 make menuconfig # choose LUCI->Applications->luci-app-ninja  
 make V=s
 ```
+
+### Instructions
+
+- Open source projects can be modified, but please keep the original author information to avoid losing technical support.
+- Project is standing on the shoulders of other giants, thanks!
+- Submit an issue if there are errors, bugs, etc., and I will fix them.
 
 ### Preview
 
