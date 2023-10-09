@@ -6,7 +6,7 @@ ARG TARGETPLATFORM
 RUN if [ "${TARGETPLATFORM}" = "linux/arm64" ]; then \
         echo "aarch64" > arch; \
     elif [ "${TARGETPLATFORM}" = "linux/amd64" ]; then \
-        echo "_x86_64" > arch; \
+        echo "x86_64" > arch; \
     fi
 RUN apk update && apk add wget
 RUN wget https://github.com/zhuxindong/ninja/releases/download/v${VERSION}/ninja-${VERSION}_$(cat arch).tar.gz
