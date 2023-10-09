@@ -2,8 +2,8 @@
 
 [![CI](https://github.com/gngpp/ninja/actions/workflows/CI.yml/badge.svg)](https://github.com/gngpp/ninja/actions/workflows/CI.yml)
 [![CI](https://github.com/gngpp/ninja/actions/workflows/Release.yml/badge.svg)](https://github.com/gngpp/ninja/actions/workflows/Release.yml)
- <a target="_blank" href="https://github.com/gngpp/vdns/blob/main/LICENSE">
-  <img src="https://img.shields.io/badge/license-MIT-blue.svg"/>
+ <a target="_blank" href="https://github.com/gngpp/ninja/blob/main/LICENSE">
+  <img src="https://img.shields.io/badge/license-GPL3.0-blue.svg"/>
  </a>
   <a href="https://github.com/gngpp/ninja/releases">
     <img src="https://img.shields.io/github/release/gngpp/ninja.svg?style=flat">
@@ -98,8 +98,8 @@ Sending a `GPT4` conversation requires `Arkose Token` to be sent as a parameter,
 Making [Releases](https://github.com/gngpp/ninja/releases/latest) has a precompiled deb package, binaries, in Ubuntu, for example:
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.6.3/ninja-0.6.3-x86_64-unknown-linux-musl.deb
-dpkg -i ninja-0.6.3-x86_64-unknown-linux-musl.deb
+wget https://github.com/gngpp/ninja/releases/download/v0.6.4/ninja-0.6.4-x86_64-unknown-linux-musl.deb
+dpkg -i ninja-0.6.4-x86_64-unknown-linux-musl.deb
 ninja serve run
 ```
 
@@ -108,13 +108,13 @@ ninja serve run
 There are pre-compiled ipk files in GitHub [Releases](https://github.com/gngpp/ninja/releases/latest), which currently provide versions of aarch64/x86_64 and other architectures. After downloading, use opkg to install, and use nanopi r4s as example:
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.6.3/ninja_0.6.3_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.6.3/luci-app-ninja_1.0.9-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.6.3/luci-i18n-ninja-zh-cn_1.0.9-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.6.4/ninja_0.6.4_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.6.4/luci-app-ninja_1.1.2-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.6.4/luci-i18n-ninja-zh-cn_1.1.2-1_all.ipk
 
-opkg install ninja_0.6.3_aarch64_generic.ipk
-opkg install luci-app-ninja_1.0.9-1_all.ipk
-opkg install luci-i18n-ninja-zh-cn_1.0.9-1_all.ipk
+opkg install ninja_0.6.4_aarch64_generic.ipk
+opkg install luci-app-ninja_1.1.2-1_all.ipk
+opkg install luci-i18n-ninja-zh-cn_1.1.2-1_all.ipk
 ```
 
 - #### Docker
