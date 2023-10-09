@@ -24,7 +24,6 @@ async-trait = "0.1.73"
 derive_builder = "0.12.0"
 jsonwebtokens = "1.2.0"
 sha2 = "0.10.7"
-hmac = { version = "0.12.1", optional = true }
 futures-core = { version = "0.3.28", optional = true}
 tera = { version = "1.19.1", default-features = false, optional = true }
 hotwatch = "0.5.0"
@@ -72,14 +71,13 @@ features = ["Win32_System_Com_CallObj", "Win32_Foundation", "Win32_Globalization
 static-files = "0.2.3"
 
 [features]
-default = ["serve", "limit", "sign", "ninja", "platform", "stream", "template"]
+default = ["serve", "limit", "ninja", "platform", "stream", "template"]
 serve = ["dep:async-stream", "dep:tracing", "dep:tracing-subscriber", "dep:tower-http", "dep:tower", "dep:bytes", "dep:time", "dep:axum-server", "dep:axum-extra", "dep:axum", "dep:static-files", "dep:futures-core", "dep:tera"]
 ninja = []
 platform = ["dep:tokio-util"]
 stream = ["dep:futures", "dep:tokio-stream", "dep:eventsource-stream", "dep:futures-core", "dep:pin-project-lite", "dep:nom", "dep:mime", "dep:futures-timer"]
 remote-token = []
 limit = ["dep:redis", "dep:redis-macros"]
-sign = ["hmac"]
 template = []
 
 [lib]

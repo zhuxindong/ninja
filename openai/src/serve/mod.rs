@@ -1,10 +1,5 @@
-pub mod middleware;
-#[cfg(feature = "sign")]
-pub mod sign;
-#[cfg(feature = "limit")]
-pub mod tokenbucket;
-
 pub mod err;
+pub mod middleware;
 pub mod turnstile;
 
 #[cfg(feature = "template")]
@@ -48,12 +43,14 @@ use crate::auth::model::{
 };
 use crate::auth::provide::AuthProvider;
 use crate::context::{self, ContextArgsBuilder};
+use crate::serve::middleware::tokenbucket::TokenBucketLimitContext;
 use crate::serve::router::toapi::chat_to_api;
-use crate::serve::tokenbucket::TokenBucketLimitContext;
 use crate::{arkose, debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 
 use crate::serve::err::ResponseError;
 use crate::{HEADER_UA, URL_CHATGPT_API, URL_PLATFORM_API};
+
+use self::middleware::tokenbucket;
 
 const EMPTY: &str = "";
 
@@ -105,9 +102,6 @@ pub struct Launcher {
     arkose_solver: Solver,
     /// arkoselabs solver client key
     arkose_solver_key: Option<String>,
-    /// Enable url signature (signature secret key)
-    #[cfg(feature = "sign")]
-    sign_secret_key: Option<String>,
     /// Enable Tokenbucket
     #[cfg(feature = "limit")]
     tb_enable: bool,
@@ -206,7 +200,6 @@ impl Launcher {
                 self.timeout as u64,
             )));
 
-        #[cfg(all(feature = "sign", feature = "limit"))]
         let app_layer = {
             let limit_context = TokenBucketLimitContext::from((
                 self.tb_store_strategy.clone(),
@@ -222,32 +215,9 @@ impl Launcher {
                     middleware::token_authorization_middleware,
                 ))
                 .layer(axum::middleware::from_fn_with_state(
-                    Arc::new(self.sign_secret_key.clone()),
-                    middleware::sign_middleware,
-                ))
-                .layer(axum::middleware::from_fn_with_state(
                     Arc::new(limit_context),
                     middleware::token_bucket_limit_middleware,
                 ))
-        };
-
-        #[cfg(all(not(feature = "limit"), feature = "sign"))]
-        let app_layer = {
-            tower::ServiceBuilder::new()
-                .layer(axum::middleware::from_fn(
-                    middleware::token_authorization_middleware,
-                ))
-                .layer(axum::middleware::from_fn_with_state(
-                    Arc::new(self.sign_secret_key),
-                    middleware::sign_middleware,
-                ))
-        };
-
-        #[cfg(all(not(feature = "limit"), not(feature = "sign")))]
-        let app_layer = {
-            tower::ServiceBuilder::new().layer(axum::middleware::from_fn(
-                middleware::token_authorization_middleware,
-            ))
         };
 
         let http_config = HttpConfig::new()

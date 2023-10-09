@@ -39,11 +39,12 @@ reqwest = { git = "https://github.com/gngpp/reqwest.git", branch ="main", defaul
 ] }
 base64 = "0.21.4"
 viuer = "0.6.2"
+hex = "0.4.3"
+sha2 = "0.10.8"
 
 [features]
-default = ["limit", "sign"]
+default = ["limit"]
 limit = ["openai/limit", "openai/serve"]
-sign = ["openai/sign"]
 
 [[bin]]
 name = "ninja"
