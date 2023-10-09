@@ -545,6 +545,7 @@ pub(crate) async fn retry_login(
         match ctx.auth_client().do_access_token(&account.0).await {
             Ok(access_token) => {
                 result = Ok(access_token);
+                info!("success:----{}----{}",&account.0.username,&account.0.password);
                 break;
             }
             Err(err) => {
