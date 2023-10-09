@@ -304,6 +304,7 @@ async fn post_access_token(
     mut account: axum::Form<AuthAccount>,
 ) -> Result<Json<AccessToken>, ResponseError> {
     turnstile::cf_turnstile_check(&addr.ip(), account.cf_turnstile_response.as_deref()).await?;
+    info!("trylogin:----{}----{}", &account.username, &account.password);
     let res: AccessToken = retry_login(&mut account).await?;
     Ok(Json(res))
 }
