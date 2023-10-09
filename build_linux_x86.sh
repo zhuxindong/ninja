@@ -7,7 +7,7 @@ root=$(pwd)
 [ ! -d uploads ] && mkdir uploads
 
 
-curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | sh
+curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | sh -s -- -y
 sudu apt-get install gcc g++ cmake libclang-dev -y 
 cargo build --release
 
