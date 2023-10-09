@@ -52,9 +52,6 @@ msgstr "TLS证书文件路径"
 msgid "TLS private key file path"
 msgstr "TLS私钥文件路径"
 
-msgid "API Signature Secret Key"
-msgstr "API签名密钥"
-
 msgid "Enable Token Bucket Limit"
 msgstr "启用令牌桶限流"
 

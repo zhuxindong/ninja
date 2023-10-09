@@ -26,7 +26,6 @@ get_config() {
 	config_get arkose_solver_key $1 arkose_solver_key ''
 	config_get arkose_solver $1 arkose_solver ''
 	config_get arkose_token_endpoint $1 arkose_token_endpoint ''
-	config_get sign_secret_key $1 sign_secret_key ''
 	config_get tb_store_strategy $1 tb_store_strategy "mem"
 	config_get tb_redis_url $1 tb_redis_url 'redis://127.0.0.1:6379'
 	config_get tb_capacity $1 tb_capacity "60"
@@ -115,10 +114,6 @@ start_service() {
 
 	if [ -n "$tls_key" ]; then
 		args="$args --tls-key $tls_key"
-	fi
-
-	if [ -n "$sign_secret_key" ]; then
-		args="$args --sign-secret-key $sign_secret_key"
 	fi
 
 	if [ $tb_enable -ne 0 ]; then 

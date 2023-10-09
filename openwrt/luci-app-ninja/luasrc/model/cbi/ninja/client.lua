@@ -65,8 +65,6 @@ o = s:option(Value, "tls_cert", translate("TLS certificate file path"), translat
 
 o = s:option(Value, "tls_key", translate("TLS private key file path"), translate("Supports EC/PKCS8/RSA type formats"))
 
-o = s:option(Value, "sign_secret_key", translate("API Signature Secret Key"), translate("Enable API signature"))
-
 o = s:option(Flag, "tb_enable", translate("Enable Token Bucket Limit"))
 o.rmempty = false
 
