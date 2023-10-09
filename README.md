@@ -288,7 +288,7 @@ make V=s
 
 ### Instructions
 
-- Open source projects can be modified, but please keep the original author information. If you really need to remove it, please contact the author to avoid losing technical support.
+- Open source projects can be modified, but please keep the original author information to avoid losing technical support.
 - Project is standing on the shoulders of other giants, thanks!
 - Submit an issue if there are errors, bugs, etc., and I will fix them.
 
