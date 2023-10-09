@@ -271,23 +271,8 @@ Options:
 - Linux编译，Ubuntu机器为例:
 
 ```shell
-# 本机编译
 git clone https://github.com/gngpp/ninja.git && cd ninja
-./build.sh
-
-# 跨平台编译，依赖于docker(如果您可以自己解决跨平台编译依赖)，默认使用docker构建linux/windows平台
-./build_cross.sh 
-
-# 默认在Macos上构建Macos平台
-os=macos ./build_cross.sh
-
-# 编译单个平台二进制，以 aarch64-unknown-linux-musl 为例:
-docker run --rm -it --user=$UID:$(id -g $USER) \
-  -v $(pwd):/home/rust/src \
-  -v $HOME/.cargo/registry:/root/.cargo/registry \
-  -v $HOME/.cargo/git:/root/.cargo/git \
-  ghcr.io/gngpp/ninja-builder:x86_64-unknown-linux-musl \
-  cargo build --release
+cargo build --release
 ```
 
 - OpenWrt 编译
@@ -299,6 +284,12 @@ cd -
 make menuconfig # choose LUCI->Applications->luci-app-ninja  
 make V=s
 ```
+
+### other instructions
+
+- Open source projects can be modified, but please keep the original author information. If you really need to remove it, please contact the author to avoid losing technical support.
+- Project is standing on the shoulders of other giants, thanks!
+- Submit an issue if there are errors, bugs, etc., and I will fix them.
 
 ### 预览
 
