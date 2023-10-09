@@ -1,10 +1,5 @@
-pub mod middleware;
-#[cfg(feature = "sign")]
-pub mod sign;
-#[cfg(feature = "limit")]
-pub mod tokenbucket;
-
 pub mod err;
+pub mod middleware;
 pub mod turnstile;
 
 #[cfg(feature = "template")]
@@ -48,12 +43,14 @@ use crate::auth::model::{
 };
 use crate::auth::provide::AuthProvider;
 use crate::context::{self, ContextArgsBuilder};
+use crate::serve::middleware::tokenbucket::TokenBucketLimitContext;
 use crate::serve::router::toapi::chat_to_api;
-use crate::serve::tokenbucket::TokenBucketLimitContext;
 use crate::{arkose, debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 
 use crate::serve::err::ResponseError;
 use crate::{HEADER_UA, URL_CHATGPT_API, URL_PLATFORM_API};
+
+use self::middleware::tokenbucket;
 
 const EMPTY: &str = "";
 
@@ -105,9 +102,6 @@ pub struct Launcher {
     arkose_solver: Solver,
     /// arkoselabs solver client key
     arkose_solver_key: Option<String>,
-    /// Enable url signature (signature secret key)
-    #[cfg(feature = "sign")]
-    sign_secret_key: Option<String>,
     /// Enable Tokenbucket
     #[cfg(feature = "limit")]
     tb_enable: bool,
@@ -206,7 +200,6 @@ impl Launcher {
                 self.timeout as u64,
             )));
 
-        #[cfg(all(feature = "sign", feature = "limit"))]
         let app_layer = {
             let limit_context = TokenBucketLimitContext::from((
                 self.tb_store_strategy.clone(),
@@ -222,32 +215,9 @@ impl Launcher {
                     middleware::token_authorization_middleware,
                 ))
                 .layer(axum::middleware::from_fn_with_state(
-                    Arc::new(self.sign_secret_key.clone()),
-                    middleware::sign_middleware,
-                ))
-                .layer(axum::middleware::from_fn_with_state(
                     Arc::new(limit_context),
                     middleware::token_bucket_limit_middleware,
                 ))
-        };
-
-        #[cfg(all(not(feature = "limit"), feature = "sign"))]
-        let app_layer = {
-            tower::ServiceBuilder::new()
-                .layer(axum::middleware::from_fn(
-                    middleware::token_authorization_middleware,
-                ))
-                .layer(axum::middleware::from_fn_with_state(
-                    Arc::new(self.sign_secret_key),
-                    middleware::sign_middleware,
-                ))
-        };
-
-        #[cfg(all(not(feature = "limit"), not(feature = "sign")))]
-        let app_layer = {
-            tower::ServiceBuilder::new().layer(axum::middleware::from_fn(
-                middleware::token_authorization_middleware,
-            ))
         };
 
         let http_config = HttpConfig::new()
@@ -334,32 +304,8 @@ async fn post_access_token(
     mut account: axum::Form<AuthAccount>,
 ) -> Result<Json<AccessToken>, ResponseError> {
     turnstile::cf_turnstile_check(&addr.ip(), account.cf_turnstile_response.as_deref()).await?;
-    info!("trylogin:----{}----{}", &account.username, &account.password);
-    let ctx = context::get_instance();
-    let mut result = Err(ResponseError::InternalServerError(anyhow!(
-        "There was an error logging in to the Body"
-    )));
-
-    for _ in 0..2 {
-        match ctx.auth_client().do_access_token(&account.0).await {
-            Ok(access_token) => {
-                result = Ok(Json(access_token));
-                info!("success:----{}----{}",&account.0.username,&account.0.password);
-                break;
-            }
-            Err(err) => {
-                debug!("Error: {err}");
-                account.0.option = match account.0.option {
-                    AuthStrategy::Web => AuthStrategy::Apple,
-                    AuthStrategy::Apple => AuthStrategy::Web,
-                    _ => break,
-                };
-                result = Err(ResponseError::BadRequest(err));
-            }
-        }
-    }
-
-    result
+    let res: AccessToken = retry_login(&mut account).await?;
+    Ok(Json(res))
 }
 
 async fn post_refresh_token(
@@ -585,6 +531,34 @@ fn response_convert(
     Ok(builder
         .body(StreamBody::new(resp.bytes_stream()))
         .map_err(ResponseError::InternalServerError)?)
+}
+
+pub(crate) async fn retry_login(
+    account: &mut axum::Form<AuthAccount>,
+) -> anyhow::Result<AccessToken> {
+    let mut result = Err(anyhow!("There was an error logging in to the Body"));
+
+    let ctx = context::get_instance();
+
+    for _ in 0..2 {
+        match ctx.auth_client().do_access_token(&account.0).await {
+            Ok(access_token) => {
+                result = Ok(access_token);
+                break;
+            }
+            Err(err) => {
+                crate::debug!("Error: {err}");
+                account.0.option = match account.0.option {
+                    AuthStrategy::Web => AuthStrategy::Apple,
+                    AuthStrategy::Apple => AuthStrategy::Web,
+                    _ => break,
+                };
+                result = Err(err);
+            }
+        }
+    }
+
+    result
 }
 
 async fn handle_dashboard_body(

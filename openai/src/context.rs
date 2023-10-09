@@ -40,6 +40,7 @@ pub struct ContextArgs {
     #[builder(default = "false")]
     pub(crate) disable_direct: bool,
     /// Enabled Cookie Store
+    #[builder(default = "false")]
     pub(crate) cookie_store: bool,
     /// TCP keepalive (second)
     #[builder(setter(into), default = "75")]

@@ -125,10 +125,10 @@ pub struct TokenProfile {
 }
 
 impl FromStr for TokenProfile {
-    type Err = serde_json::Error;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        serde_json::from_str(s)
+        Ok(check_info(s, PUBLIC_KEY, AlgorithmID::RS256)?)
     }
 }
 

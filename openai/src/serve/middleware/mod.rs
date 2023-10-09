@@ -1,3 +1,6 @@
+#[cfg(feature = "limit")]
+pub mod tokenbucket;
+
 use anyhow::anyhow;
 use axum::http::header;
 use axum::{http::Request, middleware::Next, response::Response};
@@ -28,7 +31,7 @@ pub(super) async fn token_authorization_middleware<B>(
 }
 
 #[cfg(feature = "limit")]
-use super::tokenbucket::{TokenBucket, TokenBucketLimitContext};
+use tokenbucket::{TokenBucket, TokenBucketLimitContext};
 
 #[cfg(feature = "limit")]
 pub(super) async fn token_bucket_limit_middleware<B>(
@@ -44,23 +47,5 @@ pub(super) async fn token_bucket_limit_middleware<B>(
             false => Err(ResponseError::TooManyRequests(anyhow!("Too Many Requests"))),
         },
         Err(err) => Err(ResponseError::InternalServerError(err)),
-    }
-}
-
-#[cfg(feature = "sign")]
-use super::sign::Sign;
-
-#[cfg(feature = "sign")]
-pub(super) async fn sign_middleware<B>(
-    axum::extract::State(key): axum::extract::State<std::sync::Arc<Option<String>>>,
-    req: Request<B>,
-    next: Next<B>,
-) -> Result<Response, ResponseError> {
-    match key.as_ref() {
-        Some(key) => match Sign::handle_request::<B>(&req, key) {
-            Ok(_) => Ok(next.run(req).await),
-            Err(err) => Err(ResponseError::Unauthorized(anyhow!(err))),
-        },
-        None => Ok(next.run(req).await),
     }
 }

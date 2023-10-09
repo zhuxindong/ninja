@@ -1,7 +1,7 @@
 use std::{ops::Not, path::PathBuf};
 
 use clap::CommandFactory;
-use openai::serve::tokenbucket::Strategy;
+use openai::serve::middleware::tokenbucket::Strategy;
 
 use crate::{
     args::{self, ServeArgs},
@@ -70,16 +70,13 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .arkose_solver_key(args.arkose_solver_key);
 
     #[cfg(feature = "limit")]
-    let builder = builder
+    let mut builder = builder
         .tb_enable(args.tb_enable)
         .tb_store_strategy(args.tb_store_strategy)
         .tb_redis_url(args.tb_redis_url)
         .tb_capacity(args.tb_capacity)
         .tb_fill_rate(args.tb_fill_rate)
         .tb_expired(args.tb_expired);
-
-    #[cfg(feature = "sign")]
-    let mut builder = builder.sign_secret_key(args.sign_secret_key);
 
     if args.tls_key.is_some() && args.tls_cert.is_some() {
         builder = builder.tls_keypair(Some((

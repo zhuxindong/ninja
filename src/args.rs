@@ -1,6 +1,6 @@
 use crate::parse;
 use clap::{Args, Parser, Subcommand};
-use openai::{arkose::funcaptcha::Solver, serve::tokenbucket::Strategy};
+use openai::{arkose::funcaptcha::Solver, serve::middleware::tokenbucket::Strategy};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -153,11 +153,6 @@ pub(super) struct ServeArgs {
     #[clap(short = 'k', long)]
     /// About the solver client key by ArkoseLabs
     pub(super) arkose_solver_key: Option<String>,
-
-    /// Enable url signature (signature secret key)
-    #[clap(short = 'S', long)]
-    #[cfg(feature = "sign")]
-    pub(super) sign_secret_key: Option<String>,
 
     /// Enable token bucket flow limitation
     #[clap(short = 'T', long)]
