@@ -421,7 +421,6 @@ async fn unofficial_proxy(
     let builder = context::get_instance()
         .client()
         .request(method, url)
-        .header(header::CONNECTION, "close")
         .headers(header_convert(&headers, &jar).await?);
     let resp = match body {
         Some(body) => builder.json(&body.0).send().await,
@@ -461,8 +460,7 @@ pub(super) async fn header_convert(
     headers.insert("sec-fetch-site", HeaderValue::from_static("same-origin"));
     headers.insert("sec-gpc", HeaderValue::from_static("1"));
     headers.insert("Pragma", HeaderValue::from_static("no-cache"));
-    // headers.remove(header::CONNECTION);
-    headers.insert(header::CONNECTION, HeaderValue::from_static("close"));
+    headers.remove(header::CONNECTION);
 
     let mut cookie = String::new();
 

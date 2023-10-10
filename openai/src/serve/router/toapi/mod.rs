@@ -8,7 +8,6 @@ use eventsource_stream::{EventStream, Eventsource};
 use futures::StreamExt;
 use futures_core::Stream;
 use reqwest::StatusCode;
-use reqwest::header;
 use serde_json::Value;
 use std::{convert::Infallible, str::FromStr};
 
@@ -92,7 +91,6 @@ pub(crate) async fn chat_to_api(
     let resp = client
         .post(format!("{URL_CHATGPT_API}/backend-api/conversation"))
         .headers(new_headers)
-        .header(header::CONNECTION, "close")
         .json(&req)
         .send()
         .await
