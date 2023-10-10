@@ -14,3 +14,4 @@ tb_capacity = 60
 tb_fill_rate = 1
 tb_expired = 86400
 disable_webui = false
+cookie_store = false
