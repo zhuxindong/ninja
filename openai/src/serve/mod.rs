@@ -421,6 +421,7 @@ async fn unofficial_proxy(
     let builder = context::get_instance()
         .client()
         .request(method, url)
+        .header(header::CONNECTION, "close")
         .headers(header_convert(&headers, &jar).await?);
     let resp = match body {
         Some(body) => builder.json(&body.0).send().await,

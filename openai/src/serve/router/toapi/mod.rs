@@ -91,6 +91,7 @@ pub(crate) async fn chat_to_api(
     let resp = client
         .post(format!("{URL_CHATGPT_API}/backend-api/conversation"))
         .headers(new_headers)
+        .header(header::CONNECTION, "close")
         .json(&req)
         .send()
         .await
