@@ -26,7 +26,6 @@ use axum_server::tls_rustls::RustlsConfig;
 use axum_server::HttpConfig;
 use derive_builder::Builder;
 use reqwest::header::{HeaderMap, HeaderValue};
-use reqwest::header;
 use serde_json::{json, Value};
 use std::str::FromStr;
 use std::sync::Arc;
