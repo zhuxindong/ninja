@@ -8,6 +8,7 @@ use eventsource_stream::{EventStream, Eventsource};
 use futures::StreamExt;
 use futures_core::Stream;
 use reqwest::StatusCode;
+use reqwest::header;
 use serde_json::Value;
 use std::{convert::Infallible, str::FromStr};
 
