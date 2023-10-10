@@ -462,7 +462,7 @@ pub(super) async fn header_convert(
     headers.insert("sec-gpc", HeaderValue::from_static("1"));
     headers.insert("Pragma", HeaderValue::from_static("no-cache"));
     // headers.remove(header::CONNECTION);
-    headers.insert(header::CONNECTION, "close");
+    headers.insert(header::CONNECTION, HeaderValue::from_static("close"));
 
     let mut cookie = String::new();
 
