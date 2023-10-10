@@ -1,4 +1,4 @@
-FROM alpine:3.16.6 as builder
+FROM ubuntu:latest as builder
 
 ARG VERSION
 ARG TARGETPLATFORM
@@ -12,7 +12,7 @@ RUN apk update && apk add wget
 RUN wget https://github.com/zhuxindong/ninja/releases/download/v${VERSION}/ninja-${VERSION}-$(cat arch).tar.gz
 RUN tar -xvf ninja-${VERSION}-$(cat arch).tar.gz
 
-FROM alpine:3.16.6
+FROM ubuntu:latest
 
 LABEL org.opencontainers.image.authors "zhuxindong <zhuxindong1995@gmail.com>"
 LABEL org.opencontainers.image.source https://github.com/zhuxindong/ninja

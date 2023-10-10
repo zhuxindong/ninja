@@ -16,6 +16,7 @@ cargo build --release
 
 sudo chmod -R 777 target
 cd target/release
+upx --best --lzma ninja
 tar czvf ninja-$tag-linux_x86_64.tar.gz ninja
 shasum -a 256 ninja-$tag-linux_x86_64.tar.gz >ninja-$tag-linux_x86_64.tar.gz.sha256
 mv ninja-$tag-linux_x86_64.tar.gz $root/uploads/
