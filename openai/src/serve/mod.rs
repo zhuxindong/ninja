@@ -461,7 +461,8 @@ pub(super) async fn header_convert(
     headers.insert("sec-fetch-site", HeaderValue::from_static("same-origin"));
     headers.insert("sec-gpc", HeaderValue::from_static("1"));
     headers.insert("Pragma", HeaderValue::from_static("no-cache"));
-    headers.remove(header::CONNECTION);
+    // headers.remove(header::CONNECTION);
+    headers.insert(header::CONNECTION, "close");
 
     let mut cookie = String::new();
 
