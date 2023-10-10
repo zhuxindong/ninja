@@ -1,4 +1,4 @@
-FROM ubuntu:latest as builder
+FROM ubuntu as builder
 
 ARG VERSION
 ARG TARGETPLATFORM
@@ -8,11 +8,11 @@ RUN if [ "${TARGETPLATFORM}" = "linux/arm64" ]; then \
     elif [ "${TARGETPLATFORM}" = "linux/amd64" ]; then \
         echo "linux_x86_64" > arch; \
     fi
-RUN apk update && apk add wget
+RUN apt-get update && apt-get install wget -y
 RUN wget https://github.com/zhuxindong/ninja/releases/download/v${VERSION}/ninja-${VERSION}-$(cat arch).tar.gz
 RUN tar -xvf ninja-${VERSION}-$(cat arch).tar.gz
 
-FROM ubuntu:latest
+FROM ubuntu
 
 LABEL org.opencontainers.image.authors "zhuxindong <zhuxindong1995@gmail.com>"
 LABEL org.opencontainers.image.source https://github.com/zhuxindong/ninja
