@@ -13,7 +13,7 @@ get_config() {
 	config_get workers $1 workers '1'
 	config_get proxies $1 proxies ''
 	config_get preauth_api $1 preauth_api ''
-	config_get disable_direct $1 disable_direct ''
+	config_get_bool disable_direct $1 disable_direct 1
 	config_get timeout $1 timeout '600'
 	config_get connect_timeout $1 connect_timeout '60'
 	config_get tcp_keepalive $1 tcp_keepalive "5"
@@ -31,6 +31,13 @@ get_config() {
 	config_get tb_capacity $1 tb_capacity "60"
 	config_get tb_fill_rate $1 tb_fill_rate "1"
 	config_get tb_expired $1 tb_expired "86400"
+	config_get puid_user $1 puid_user ""
+	config_get api_prefix $1 api_prefix ""
+	config_get_bool cookie_store $1 cookie_store 0
+	config_get concurrent_limit $1 concurrent_limit ""
+	config_get_bool disable_webui $1 disable_webui 0
+	config_get cf_site_key $1 cf_site_key ""
+	config_get cf_secret_key $1 cf_secret_key ""
 }
 
 start_service() {
@@ -64,7 +71,7 @@ start_service() {
 		args="$args --preauth-api $preauth_api"
 	fi
 
-	if [ -n "$disable_direct" ]; then
+	if [ $disable_direct -ne 0 ]; then
 		args="$args --disable-direct"
 	fi
 
@@ -134,7 +141,35 @@ start_service() {
 		    args="$args --tb-expired $tb_expired"
         fi
 	fi
+
+	if [ -n "$puid_user" ]; then
+		args="$args --puid-user $puid_user"
+	fi
+
+	if [ -n "$api_prefix" ]; then
+		args="$args --api-prefix $api_prefix"
+	fi
+
+	if [ $cookie_store -ne 0 ]; then 
+		args="$args --cookie-store"
+	fi
+
+	if [ -n "$concurrent_limit" ]; then
+		args="$args --concurrent-limit $concurrent_limit"
+	fi
 	
+	if [ $disable_webui -ne 0 ]; then 
+		args="$args --disable-webui"
+	fi
+
+	if [ -n "$cf_site_key" ]; then
+		args="$args --cf-site-key $cf_site_key"
+	fi
+
+	if [ -n "$cf_secret_key" ]; then
+		args="$args --cf-secret-key $cf_secret_key"
+	fi
+
 	procd_open_instance
 	procd_set_param command /bin/sh -c "$PROG serve run $args >>/var/log/ninja.log 2>&1"
 	procd_set_param stdout 0
