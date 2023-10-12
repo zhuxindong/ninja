@@ -1,6 +1,6 @@
 [package]
 name = "ninja"
-version = "0.6.4"
+version = "0.6.5"
 edition = "2021"
 description = "Reverse engineered ChatGPT proxy"
 license = "MIT"
@@ -34,7 +34,7 @@ tikv-jemallocator = "0.5.4"
 
 [dev-dependencies]
 futures-util = "0.3.28"
-reqwest = { git = "https://github.com/gngpp/reqwest.git", branch ="main", default-features = false, features = [
+reqwest = { package = "reqwest-impersonate", version ="0.11.13", default-features = false, features = [
     "boring-tls", "impersonate","json", "cookies", "stream", "multipart", "socks", "blocking"
 ] }
 base64 = "0.21.4"
