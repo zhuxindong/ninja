@@ -1,6 +1,5 @@
 use crate::auth::provide::{AuthenticateDataBuilder, AuthorizationCodeDataBuilder, GrantType};
 use crate::auth::AuthClient;
-use crate::debug;
 use crate::{
     auth::{
         model::{self, AuthStrategy},
@@ -15,8 +14,8 @@ use reqwest::Client;
 use url::Url;
 
 use super::{
-    AuthProvider, AuthResult, AuthenticateMfaDataBuilder, IdentifierDataBuilder,
-    RefreshTokenDataBuilder, RevokeTokenDataBuilder,
+    AuthContext, AuthProvider, AuthResult, AuthenticateMfaDataBuilder, IdentifierDataBuilder,
+    RefreshTokenDataBuilder, RequestBuilderExt, ResponseExt, RevokeTokenDataBuilder,
 };
 
 const STATE: &str = "TMf_R7zSeBRzTs86WAfQJh9Q_AbDh3382e7Y-pae1wQ";
@@ -36,7 +35,8 @@ impl AppleAuthProvider {
         Self { inner, preauth_api }
     }
 
-    async fn get_authorized_url(&self, code_challenge: &str) -> AuthResult<Url> {
+    async fn authorize(&self, ctx: &mut AuthContext<'_>) -> AuthResult<()> {
+        let code_challenge = ctx.code_challenge.as_str();
         let preauth_cookie = self.get_preauth_cookie().await?;
         let url = format!("{OPENAI_OAUTH_URL}/authorize?state={STATE}&ios_app_version={APP_VERSION}&client_id={APPLE_CLIENT_ID}&redirect_uri={OPENAI_OAUTH_APPLE_CALLBACK_URL}&code_challenge={code_challenge}&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write&prompt=login&preauth_cookie={preauth_cookie}&audience=https://api.openai.com/v1&code_challenge_method=S256&response_type=code&auth0Client={AUTH0_CLIENT}");
         let resp = self
@@ -48,44 +48,47 @@ impl AppleAuthProvider {
             )
             .send()
             .await
-            .map_err(AuthError::FailedRequest)?;
+            .map_err(AuthError::FailedRequest)?
+            .ext_context(ctx);
 
-        let url = resp.url().clone();
-
-        AuthClient::response_handle_unit(resp)
+        let identifier_location = AuthClient::get_location_path(resp.headers())?;
+        let resp = self
+            .inner
+            .get(format!("{OPENAI_OAUTH_URL}{identifier_location}"))
+            .ext_cookie(ctx)
+            .send()
             .await
-            .map_err(|e| AuthError::InvalidLoginUrl(e.to_string()))?;
+            .map_err(AuthError::FailedRequest)?
+            .ext_context(ctx);
 
-        Ok(url.clone())
+        let state = AuthClient::get_callback_state(&resp.url());
+        ctx.set_state(state.as_str());
+
+        Ok(AuthClient::response_handle_unit(resp)
+            .await
+            .map_err(|e| AuthError::InvalidLoginUrl(e.to_string()))?)
     }
 
-    async fn authenticate_username(
-        &self,
-        state: &str,
-        account: &model::AuthAccount,
-    ) -> AuthResult<()> {
-        let url = format!("{OPENAI_OAUTH_URL}/u/login/identifier?state={state}");
+    async fn authenticate_username(&self, ctx: &mut AuthContext<'_>) -> AuthResult<()> {
+        let url = format!("{OPENAI_OAUTH_URL}/u/login/identifier?state={}", ctx.state);
         let resp = self
             .inner
             .post(&url)
-            .header(reqwest::header::REFERER, HeaderValue::from_str(&url)?)
-            .header(
-                reqwest::header::ORIGIN,
-                HeaderValue::from_static(OPENAI_OAUTH_URL),
-            )
-            .json(
+            .ext_cookie(ctx)
+            .form(
                 &IdentifierDataBuilder::default()
                     .action("default")
-                    .state(&state)
-                    .username(&account.username)
+                    .state(&ctx.state)
+                    .username(&ctx.account.username)
                     .js_available(true)
                     .webauthn_available(true)
                     .is_brave(false)
-                    .webauthn_platform_available(false)
+                    .webauthn_platform_available(true)
                     .build()?,
             )
             .send()
-            .await?;
+            .await?
+            .ext_context(ctx);
 
         AuthClient::response_handle_unit(resp)
             .await
@@ -94,132 +97,118 @@ impl AppleAuthProvider {
 
     async fn authenticate_password(
         &self,
-        code_verifier: &str,
-        state: &str,
-        account: &model::AuthAccount,
+        ctx: &mut AuthContext<'_>,
     ) -> AuthResult<model::AccessToken> {
-        debug!("authenticate_password state: {state}");
-        let data = AuthenticateDataBuilder::default()
-            .action("default")
-            .state(state)
-            .username(&account.username)
-            .password(&account.password)
-            .build()?;
+        ctx.load_arkose_token().await?;
 
         let resp = self
             .inner
-            .post(format!("{OPENAI_OAUTH_URL}/u/login/password?state={state}"))
-            .json(&data)
+            .post(format!(
+                "{OPENAI_OAUTH_URL}/u/login/password?state={}",
+                ctx.state
+            ))
+            .ext_cookie(ctx)
+            .form(
+                &AuthenticateDataBuilder::default()
+                    .action("default")
+                    .state(&ctx.state)
+                    .username(&ctx.account.username)
+                    .password(&ctx.account.password)
+                    .build()?,
+            )
             .send()
             .await
-            .map_err(AuthError::FailedRequest)?;
+            .map_err(AuthError::FailedRequest)?
+            .ext_context(ctx);
 
-        let headers = resp.headers().clone();
-        AuthClient::response_handle_unit(resp)
-            .await
+        let location = AuthClient::get_location_path(&resp.headers())
             .map_err(|_| AuthError::InvalidEmailOrPassword)?;
 
-        let location = AuthClient::get_location_path(&headers)?;
-        debug!("authenticate_password location path: {location}");
         if location.starts_with("/authorize/resume?") {
-            return self
-                .authenticate_resume(code_verifier, location, account)
-                .await;
+            return self.authenticate_resume(ctx, location).await;
         }
         bail!(AuthError::FailedLogin)
     }
 
     async fn authenticate_resume(
         &self,
-        code_verifier: &str,
+        ctx: &mut AuthContext<'_>,
         location: &str,
-        account: &model::AuthAccount,
     ) -> AuthResult<model::AccessToken> {
         let resp = self
             .inner
             .get(&format!("{OPENAI_OAUTH_URL}{location}"))
+            .ext_cookie(ctx)
             .send()
             .await
-            .map_err(AuthError::FailedRequest)?;
+            .map_err(AuthError::FailedRequest)?
+            .ext_context(ctx);
 
-        let headers = resp.headers().clone();
-
-        AuthClient::response_handle_unit(resp)
-            .await
+        let location: &str = AuthClient::get_location_path(&resp.headers())
             .map_err(|_| AuthError::InvalidLocation)?;
 
-        let location: &str = AuthClient::get_location_path(&headers)?;
-        debug!("authenticate_resume location path: {location}");
         if location.starts_with("/u/mfa-otp-challenge?") {
-            let mfa = account.mfa.clone().ok_or(AuthError::MFARequired)?;
-            self.authenticate_mfa(&mfa, code_verifier, location, account)
-                .await
+            let mfa_code = ctx.account.mfa.clone().ok_or(AuthError::MFARequired)?;
+            self.authenticate_mfa(ctx, &mfa_code, location).await
         } else if !location.starts_with(OPENAI_OAUTH_APPLE_CALLBACK_URL) {
             bail!(AuthError::FailedCallbackURL)
         } else {
-            self.authorization_code(code_verifier, location).await
+            self.authorization_code(ctx, location).await
         }
     }
 
     #[async_recursion]
     async fn authenticate_mfa(
         &self,
+        ctx: &mut AuthContext<'_>,
         mfa_code: &str,
-        code_verifier: &str,
         location: &str,
-        account: &model::AuthAccount,
     ) -> AuthResult<model::AccessToken> {
         let url = format!("{OPENAI_OAUTH_URL}{}", location);
         let state = AuthClient::get_callback_state(&Url::parse(&url)?);
-        let data = AuthenticateMfaDataBuilder::default()
-            .action("default")
-            .state(&state)
-            .code(mfa_code)
-            .build()?;
 
         let resp = self
             .inner
             .post(&url)
-            .json(&data)
-            .header(reqwest::header::REFERER, HeaderValue::from_str(&url)?)
-            .header(
-                reqwest::header::ORIGIN,
-                HeaderValue::from_static(OPENAI_OAUTH_URL),
+            .json(
+                &AuthenticateMfaDataBuilder::default()
+                    .action("default")
+                    .state(&state)
+                    .code(mfa_code)
+                    .build()?,
             )
+            .ext_cookie(ctx)
             .send()
             .await
-            .map_err(AuthError::FailedRequest)?;
-        let headers = resp.headers().clone();
+            .map_err(AuthError::FailedRequest)?
+            .ext_context(ctx);
 
-        AuthClient::response_handle_unit(resp).await?;
-
-        let location: &str = AuthClient::get_location_path(&headers)?;
-        if location.starts_with("/authorize/resume?") && account.mfa.is_none() {
+        let location: &str = AuthClient::get_location_path(&resp.headers())?;
+        if location.starts_with("/authorize/resume?") && ctx.account.mfa.is_none() {
             bail!(AuthError::MFAFailed)
         }
-        self.authenticate_resume(code_verifier, location, &account)
-            .await
+        self.authenticate_resume(ctx, location).await
     }
 
     async fn authorization_code(
         &self,
-        code_verifier: &str,
+        ctx: &mut AuthContext<'_>,
         location: &str,
     ) -> AuthResult<model::AccessToken> {
-        debug!("authorization_code location path: {location}");
         let code = AuthClient::get_callback_code(&Url::parse(location)?)?;
-        let data = AuthorizationCodeDataBuilder::default()
-            .redirect_uri(OPENAI_OAUTH_APPLE_CALLBACK_URL)
-            .grant_type(GrantType::AuthorizationCode)
-            .client_id(APPLE_CLIENT_ID)
-            .code(&code)
-            .code_verifier(Some(code_verifier))
-            .build()?;
-
         let resp = self
             .inner
             .post(OPENAI_OAUTH_TOKEN_URL)
-            .json(&data)
+            .ext_cookie(ctx)
+            .json(
+                &AuthorizationCodeDataBuilder::default()
+                    .redirect_uri(OPENAI_OAUTH_APPLE_CALLBACK_URL)
+                    .grant_type(GrantType::AuthorizationCode)
+                    .client_id(APPLE_CLIENT_ID)
+                    .code(&code)
+                    .code_verifier(Some(&ctx.code_verifier))
+                    .build()?,
+            )
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
@@ -266,15 +255,18 @@ impl AuthProvider for AppleAuthProvider {
         let code_verifier = AuthClient::generate_code_verifier();
         let code_challenge = AuthClient::generate_code_challenge(&code_verifier);
 
-        let url = self.get_authorized_url(&code_challenge).await?;
-        let state = AuthClient::get_callback_state(&url);
+        let mut ctx = AuthContext::new(account);
+        ctx.set_code_verifier(code_verifier);
+        ctx.set_code_challenge(code_challenge);
+
+        // authorize
+        self.authorize(&mut ctx).await?;
 
         // check username
-        self.authenticate_username(&state, account).await?;
+        self.authenticate_username(&mut ctx).await?;
 
         // check password and username
-        self.authenticate_password(&code_verifier, &state, account)
-            .await
+        self.authenticate_password(&mut ctx).await
     }
 
     async fn do_refresh_token(&self, refresh_token: &str) -> AuthResult<model::RefreshToken> {

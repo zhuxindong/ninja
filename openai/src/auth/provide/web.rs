@@ -1,19 +1,21 @@
 use crate::{
     auth::{
         model::{self, AuthStrategy},
-        provide::{AuthenticateDataBuilder, GetAuthorizedUrlDataBuilder},
+        provide::{AuthenticateDataBuilder, GetAuthorizedUrlDataBuilder, RequestBuilderExt},
         AuthClient, OPENAI_OAUTH_URL,
     },
     error::AuthError,
 };
 use crate::{debug, warn, URL_CHATGPT_API};
 use anyhow::{bail, Context};
-use axum::http::HeaderValue;
 use reqwest::{Client, StatusCode};
 use serde_json::Value;
 use url::Url;
 
-use super::{AuthProvider, AuthResult, AuthenticateMfaDataBuilder, IdentifierDataBuilder};
+use super::{
+    AuthContext, AuthProvider, AuthResult, AuthenticateMfaDataBuilder, IdentifierDataBuilder,
+    ResponseExt,
+};
 
 pub(crate) struct WebAuthProvider {
     inner: Client,
@@ -24,50 +26,14 @@ impl WebAuthProvider {
         Self { inner }
     }
 
-    async fn get_state(&self, authorized_url: String) -> AuthResult<String> {
-        let resp = self
-            .inner
-            .get(authorized_url)
-            .send()
-            .await
-            .map_err(AuthError::FailedRequest)?;
-
-        if resp.status().is_success() {
-            let html = resp.text().await?;
-            let tag_start = "<input";
-            let attribute_name = "name=\"state\"";
-            let value_start = "value=\"";
-            let mut remaining = html.as_str();
-
-            while let Some(tag_start_index) = remaining.find(tag_start) {
-                remaining = &remaining[tag_start_index..];
-
-                if let Some(attribute_index) = remaining.find(attribute_name) {
-                    remaining = &remaining[attribute_index..];
-
-                    if let Some(value_start_index) = remaining.find(value_start) {
-                        remaining = &remaining[value_start_index + value_start.len()..];
-
-                        if let Some(value_end_index) = remaining.find("\"") {
-                            let value = &remaining[..value_end_index];
-                            return Ok(value.trim().to_string());
-                        }
-                    }
-                }
-                remaining = &remaining[tag_start.len()..];
-            }
-        }
-
-        bail!(AuthError::FailedState)
-    }
-
-    async fn get_csrf_token(&self) -> AuthResult<String> {
+    async fn csrf_token(&self, ctx: &mut AuthContext<'_>) -> AuthResult<()> {
         let resp = self
             .inner
             .get(format!("{URL_CHATGPT_API}/api/auth/csrf"))
             .send()
             .await
-            .map_err(AuthError::FailedRequest)?;
+            .map_err(AuthError::FailedRequest)?
+            .ext_context(ctx);
 
         match resp.error_for_status_ref() {
             Ok(_) => {
@@ -77,7 +43,8 @@ impl WebAuthProvider {
                     .and_then(|obj| obj.get("csrfToken"))
                     .and_then(|csrf| csrf.as_str())
                     .context(AuthError::FailedCsrfToken)?;
-                return Ok(csrf_token.to_string());
+                ctx.set_csrf_token(csrf_token);
+                return Ok(());
             }
             Err(err) => {
                 warn!("{err}");
@@ -86,56 +53,82 @@ impl WebAuthProvider {
         }
     }
 
-    async fn get_authorized_url(&self, csrf_token: String) -> AuthResult<String> {
-        let form = GetAuthorizedUrlDataBuilder::default()
-            .callback_url("/")
-            .csrf_token(&csrf_token)
-            .json("true")
-            .build()?;
+    async fn authorized_url(&self, ctx: &mut AuthContext<'_>) -> AuthResult<()> {
         let resp = self
             .inner
             .post(format!(
                 "{URL_CHATGPT_API}/api/auth/signin/auth0?prompt=login"
             ))
-            .form(&form)
+            .ext_cookie(ctx)
+            .form(
+                &GetAuthorizedUrlDataBuilder::default()
+                    .callback_url("/")
+                    .csrf_token(&ctx.csrf_token)
+                    .json("true")
+                    .build()?,
+            )
+            .send()
+            .await
+            .map_err(AuthError::FailedRequest)?
+            .ext_context(ctx);
+
+        match resp.error_for_status() {
+            Ok(resp) => {
+                let res = resp.json::<Value>().await?;
+                let url = res
+                    .as_object()
+                    .and_then(|v| v.get("url"))
+                    .and_then(|v| v.as_str())
+                    .context(AuthError::FailedAuthorizedUrl)?
+                    .to_owned();
+                ctx.set_auth_url(&url);
+                return Ok(());
+            }
+            Err(err) => {
+                debug!("WebAuthHandle authorized url error: {err}");
+                bail!(AuthError::FailedAuthorizedUrl)
+            }
+        }
+    }
+
+    async fn state(&self, ctx: &mut AuthContext<'_>) -> AuthResult<()> {
+        let resp = self
+            .inner
+            .get(&ctx.auth_url)
+            .ext_cookie(ctx)
+            .send()
+            .await
+            .map_err(AuthError::FailedRequest)?
+            .ext_context(ctx);
+
+        let identifier_location = AuthClient::get_location_path(resp.headers())?;
+        let resp = self
+            .inner
+            .get(format!("{OPENAI_OAUTH_URL}{identifier_location}"))
+            .ext_cookie(ctx)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
 
-        if resp.status().is_success() {
-            let res = resp.json::<Value>().await?;
-            let url = res
-                .as_object()
-                .and_then(|v| v.get("url"))
-                .and_then(|v| v.as_str())
-                .context(AuthError::FailedAuthorizedUrl)?
-                .to_owned();
-            debug!("WebAuthHandle authorized url: {url}");
-            return Ok(url);
-        }
+        let state = AuthClient::get_callback_state(&resp.url());
+        ctx.set_state(state.as_str());
 
-        bail!(AuthError::FailedAuthorizedUrl)
+        Ok(AuthClient::response_handle_unit(resp)
+            .await
+            .map_err(|_| AuthError::FailedState)?)
     }
 
-    async fn authenticate_username(
-        &self,
-        state: &str,
-        account: &model::AuthAccount,
-    ) -> AuthResult<()> {
-        let url = format!("{OPENAI_OAUTH_URL}/u/login/identifier?state={state}");
+    async fn authenticate_username(&self, ctx: &mut AuthContext<'_>) -> AuthResult<()> {
+        let url = format!("{OPENAI_OAUTH_URL}/u/login/identifier?state={}", ctx.state);
         let resp = self
             .inner
             .post(&url)
-            .header(reqwest::header::REFERER, HeaderValue::from_str(&url)?)
-            .header(
-                reqwest::header::ORIGIN,
-                HeaderValue::from_static(OPENAI_OAUTH_URL),
-            )
-            .json(
+            .ext_cookie(ctx)
+            .form(
                 &IdentifierDataBuilder::default()
                     .action("default")
-                    .state(&state)
-                    .username(&account.username)
+                    .state(&ctx.state)
+                    .username(&ctx.account.username)
                     .js_available(true)
                     .webauthn_available(true)
                     .is_brave(false)
@@ -143,7 +136,8 @@ impl WebAuthProvider {
                     .build()?,
             )
             .send()
-            .await?;
+            .await?
+            .ext_context(ctx);
 
         AuthClient::response_handle_unit(resp)
             .await
@@ -152,54 +146,59 @@ impl WebAuthProvider {
 
     async fn authenticate_password(
         &self,
-        state: &str,
-        account: &model::AuthAccount,
+        ctx: &mut AuthContext<'_>,
     ) -> AuthResult<model::AccessToken> {
-        let data = AuthenticateDataBuilder::default()
-            .action("default")
-            .state(state)
-            .username(&account.username)
-            .password(&account.password)
-            .build()?;
+        ctx.load_arkose_token().await?;
 
         let resp = self
             .inner
-            .post(format!("{OPENAI_OAUTH_URL}/u/login/password?state={state}"))
-            .json(&data)
+            .post(format!(
+                "{OPENAI_OAUTH_URL}/u/login/password?state={}",
+                ctx.state
+            ))
+            .ext_cookie(ctx)
+            .form(
+                &AuthenticateDataBuilder::default()
+                    .action("default")
+                    .state(&ctx.state)
+                    .username(&ctx.account.username)
+                    .password(&ctx.account.password)
+                    .build()?,
+            )
             .send()
             .await
-            .map_err(AuthError::FailedRequest)?;
+            .map_err(AuthError::FailedRequest)?
+            .ext_context(ctx);
 
-        let headers = resp.headers().clone();
-        let status = resp.status();
-
-        AuthClient::response_handle_unit(resp)
-            .await
-            .map_err(|_| AuthError::InvalidEmailOrPassword)?;
-
-        if status.is_redirection() {
-            let location = AuthClient::get_location_path(&headers)?;
+        if resp.status().is_redirection() {
+            let location = AuthClient::get_location_path(&resp.headers())?;
             let resp = self
                 .inner
                 .get(format!("{OPENAI_OAUTH_URL}{location}"))
+                .ext_cookie(ctx)
                 .send()
                 .await
-                .map_err(AuthError::FailedRequest)?;
+                .map_err(AuthError::FailedRequest)?
+                .ext_context(ctx);
+
             if resp.status().is_redirection() {
                 let location = AuthClient::get_location_path(resp.headers())?;
                 if location.starts_with("/u/mfa-otp-challenge") {
-                    let mfa = account.mfa.clone().ok_or(AuthError::MFARequired)?;
-                    return self.authenticate_mfa(&mfa, location, &account).await;
+                    let mfa = ctx.account.mfa.clone().ok_or(AuthError::MFARequired)?;
+                    return self.authenticate_mfa(ctx, &mfa, location).await;
                 }
+
                 let resp = self
                     .inner
                     .get(location)
+                    .ext_cookie(ctx)
                     .send()
                     .await
-                    .map_err(AuthError::FailedRequest)?;
+                    .map_err(AuthError::FailedRequest)?
+                    .ext_context(ctx);
 
                 return match resp.status() {
-                    StatusCode::FOUND => self.get_access_token().await,
+                    StatusCode::FOUND => self.get_access_token(ctx).await,
                     StatusCode::TEMPORARY_REDIRECT => {
                         bail!(AuthError::InvalidEmailOrPassword)
                     }
@@ -214,9 +213,9 @@ impl WebAuthProvider {
 
     async fn authenticate_mfa(
         &self,
+        ctx: &mut AuthContext<'_>,
         mfa_code: &str,
         location: &str,
-        account: &model::AuthAccount,
     ) -> AuthResult<model::AccessToken> {
         let url = format!("{OPENAI_OAUTH_URL}{}", location);
         let state = AuthClient::get_callback_state(&Url::parse(&url)?);
@@ -229,30 +228,25 @@ impl WebAuthProvider {
         let resp = self
             .inner
             .post(&url)
+            .ext_cookie(ctx)
             .json(&data)
-            .header(reqwest::header::REFERER, HeaderValue::from_str(&url)?)
-            .header(
-                reqwest::header::ORIGIN,
-                HeaderValue::from_static(OPENAI_OAUTH_URL),
-            )
             .send()
             .await
-            .map_err(AuthError::FailedRequest)?;
-        let headers = resp.headers().clone();
+            .map_err(AuthError::FailedRequest)?
+            .ext_context(ctx);
 
-        AuthClient::response_handle_unit(resp).await?;
-
-        let location: &str = AuthClient::get_location_path(&headers)?;
-        if location.starts_with("/authorize/resume?") && account.mfa.is_none() {
+        let location: &str = AuthClient::get_location_path(resp.headers())?;
+        if location.starts_with("/authorize/resume?") && ctx.account.mfa.is_none() {
             bail!(AuthError::MFAFailed)
         }
-        self.get_access_token().await
+        self.get_access_token(ctx).await
     }
 
-    async fn get_access_token(&self) -> AuthResult<model::AccessToken> {
+    async fn get_access_token(&self, ctx: &mut AuthContext<'_>) -> AuthResult<model::AccessToken> {
         let resp = self
             .inner
             .get(format!("{URL_CHATGPT_API}/api/auth/session"))
+            .ext_cookie(ctx)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
@@ -280,20 +274,21 @@ impl AuthProvider for WebAuthProvider {
         &self,
         account: &model::AuthAccount,
     ) -> AuthResult<model::AccessToken> {
-        // get csrf token
-        let csrf_token = self.get_csrf_token().await?;
+        let mut ctx = AuthContext::new(account);
+        // csrf token
+        self.csrf_token(&mut ctx).await?;
 
         // authorized url
-        let authorized_url = self.get_authorized_url(csrf_token).await?;
+        self.authorized_url(&mut ctx).await?;
 
         // state code
-        let state = self.get_state(authorized_url).await?;
+        self.state(&mut ctx).await?;
 
         // check username
-        self.authenticate_username(&state, &account).await?;
+        self.authenticate_username(&mut ctx).await?;
 
         // check password and username
-        self.authenticate_password(&state, &account).await
+        self.authenticate_password(&mut ctx).await
     }
 
     async fn do_refresh_token(&self, _refresh_token: &str) -> AuthResult<model::RefreshToken> {
