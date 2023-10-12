@@ -38,6 +38,7 @@ get_config() {
 	config_get_bool disable_webui $1 disable_webui 0
 	config_get cf_site_key $1 cf_site_key ""
 	config_get cf_secret_key $1 cf_secret_key ""
+	config_get pool_idle_timeout $1 pool_idle_timeout "90"
 }
 
 start_service() {
@@ -168,6 +169,10 @@ start_service() {
 
 	if [ -n "$cf_secret_key" ]; then
 		args="$args --cf-secret-key $cf_secret_key"
+	fi
+
+	if [ -n "$pool_idle_timeout" ]; then
+		args="$args --pool-idle-timeout $pool_idle_timeout"
 	fi
 
 	procd_open_instance

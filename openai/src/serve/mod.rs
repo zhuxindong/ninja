@@ -72,6 +72,8 @@ pub struct Launcher {
     disable_direct: bool,
     /// TCP keepalive (second)
     tcp_keepalive: usize,
+    /// Set an optional timeout for idle sockets being kept-alive
+    pool_idle_timeout: usize,
     /// Client timeout
     timeout: usize,
     /// Client connect timeout
@@ -175,6 +177,7 @@ impl Launcher {
             .timeout(self.timeout.clone())
             .connect_timeout(self.connect_timeout)
             .tcp_keepalive(self.tcp_keepalive)
+            .pool_idle_timeout(self.pool_idle_timeout)
             .cf_secret_key(self.cf_secret_key.clone())
             .cf_site_key(self.cf_site_key.clone())
             .build()?;

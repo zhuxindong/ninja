@@ -198,3 +198,9 @@ msgstr "Cloudflare turnstile 验证码 site key"
 
 msgid "Cloudflare turnstile captcha secret key"
 msgstr "Cloudflare turnstile 验证码 secret key"
+
+msgid "Pool idle timeout"
+msgstr "连接池空闲超时"
+
+msgid "Set an optional timeout for idle sockets being kept-alive"
+msgstr "设置保持活动的空闲套接字的可选超时"

@@ -44,6 +44,9 @@ o.default = "60"
 o = s:option(Value, "tcp_keepalive", translate("TCP Keep-Alive"), translate("Default 60 seconds"))
 o.default = "60"
 
+o = s:option(Value, "pool_idle_timeout", translate("Pool idle timeout"), translate("Set an optional timeout for idle sockets being kept-alive"))
+o.default = "90"
+
 o = s:option(Flag, "cookie_store", translate("Enable Cookie Store"))
 o.rmempty = false
 
