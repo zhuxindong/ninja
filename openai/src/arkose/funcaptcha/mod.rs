@@ -208,11 +208,16 @@ impl Session {
         .await?;
 
         // Build concise challenge
-        let (challenge_type, challenge_urls, key) = match challenge.game_data.game_type {
+        let (game_type, challenge_urls, key) = match challenge.game_data.game_type {
             4 => (
                 "image",
                 challenge.game_data.custom_gui.challenge_imgs.clone(),
                 format!("4.instructions-{}", challenge.game_data.instruction_string),
+            ),
+            3 => (
+                "image",
+                challenge.game_data.custom_gui.challenge_imgs.clone(),
+                format!("3.instructions-{}", challenge.game_data.instruction_string),
             ),
             101 => (
                 "audio",
@@ -223,7 +228,7 @@ impl Session {
                 ),
             ),
             _ => {
-                warn!("challenge string_table: {:#?}", &challenge.string_table);
+                warn!("challenge: {:#?}", &challenge);
                 bail!("unknown challenge type")
             }
         };
@@ -233,11 +238,16 @@ impl Session {
             re.replace_all(input, "").to_string()
         };
 
+        let html_instructions = challenge
+            .string_table
+            .get(&key)
+            .context(format!("invalid instructions key: {key}"))?;
+
         let concise_challenge = ConciseChallenge {
-            game_type: challenge_type.to_string(),
-            urls: challenge_urls.clone(),
+            game_type: game_type.to_owned(),
+            urls: challenge_urls,
             game_variant: challenge.game_data.instruction_string.clone(),
-            instructions: remove_html_tags(&challenge.string_table[&key]),
+            instructions: remove_html_tags(html_instructions),
         };
         self.challenge = Some(challenge);
 
