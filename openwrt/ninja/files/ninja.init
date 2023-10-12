@@ -71,7 +71,7 @@ start_service() {
 		args="$args --preauth-api $preauth_api"
 	fi
 
-	if [ -n "$disable_direct" ]; then
+	if [ $disable_direct -ne 0 ]; then
 		args="$args --disable-direct"
 	fi
 
