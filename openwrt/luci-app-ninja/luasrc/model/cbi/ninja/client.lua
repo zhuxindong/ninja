@@ -14,10 +14,8 @@ o.rmempty = false
 
 o = s:option(Value, "proxies", translate("Proxies"), translate("Supports http/https/socks5, format: protocol://user:pass@ip:port"))
 
-o = s:option(ListValue, "disable_direct", translate("Turn off direct connection"), translate("Turn off direct connection using proxy"))
-o:value("false", "false");
-o:value("true", "true");
-o.default = "true"
+o = s:option(Flag, "disable_direct", translate("Turn off direct connection"), translate("Turn off direct connection using proxy"))
+o.rmempty = false
 
 o = s:option(Value, "level", translate("Log Level"), translate("info/debug/warn/trace/error"))
 o.default = "info"
