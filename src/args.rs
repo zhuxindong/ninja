@@ -97,6 +97,10 @@ pub(super) struct ServeArgs {
     #[clap(long, default_value = "60")]
     pub(super) tcp_keepalive: usize,
 
+    /// Set an optional timeout for idle sockets being kept-alive
+    #[clap(long, default_value = "90")]
+    pub(super) pool_idle_timeout: usize,
+
     /// TLS certificate file path
     #[clap(long, env = "TLS_CERT", requires = "tls_key")]
     pub(super) tls_cert: Option<PathBuf>,
