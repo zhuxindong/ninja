@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::bail;
+use anyhow::{bail, Context};
 use regex::Regex;
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::impersonate::Impersonate;
@@ -282,35 +282,32 @@ impl AuthProvider for AuthClient {
     }
 
     async fn do_revoke_token(&self, refresh_token: &str) -> AuthResult<()> {
-        let mut res: Option<AuthResult<()>> = None;
-
         for handle in self.providers.iter() {
-            if handle.supports(&AuthStrategy::Platform) || handle.supports(&AuthStrategy::Apple) {
-                res = Some(handle.do_revoke_token(refresh_token).await)
+            if handle.supports(&AuthStrategy::Apple) || handle.supports(&AuthStrategy::Platform) {
+                let res = handle.do_revoke_token(refresh_token).await;
+                if res.is_ok() {
+                    return Ok(());
+                }
             }
         }
 
-        if let Some(res) = res {
-            return res;
-        }
-
-        bail!("Refresh token implementation is not supported")
+        bail!(AuthError::NotSupportedImplementation)
     }
 
     async fn do_refresh_token(&self, refresh_token: &str) -> AuthResult<model::RefreshToken> {
-        let mut res: Option<AuthResult<model::RefreshToken>> = None;
+        let mut result: Option<AuthResult<model::RefreshToken>> = None;
 
         for handle in self.providers.iter() {
-            if handle.supports(&AuthStrategy::Platform) || handle.supports(&AuthStrategy::Apple) {
-                res = Some(handle.do_refresh_token(refresh_token).await)
+            if handle.supports(&AuthStrategy::Apple) || handle.supports(&AuthStrategy::Platform) {
+                let res = handle.do_refresh_token(refresh_token).await;
+                if res.is_ok() {
+                    result = Some(res);
+                    break;
+                }
             }
         }
 
-        if let Some(res) = res {
-            return res;
-        }
-
-        bail!("Refresh token implementation is not supported")
+        result.context(AuthError::NotSupportedImplementation)?
     }
 }
 

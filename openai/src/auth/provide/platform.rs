@@ -16,7 +16,7 @@ use url::Url;
 
 use super::{
     AuthContext, AuthProvider, AuthResult, AuthenticateMfaDataBuilder, IdentifierDataBuilder,
-    RefreshTokenDataBuilder, RequestBuilderExt, ResponseExt, RevokeTokenDataBuilder,
+    RefreshTokenDataBuilder, RequestExt, RevokeTokenDataBuilder,
 };
 
 const PLATFORM_CLIENT_ID: &str = "DRivsnm2Mu42T3KOpqdtwB3NYviHYzwD";
@@ -39,17 +39,17 @@ impl PlatformAuthProvider {
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_context(ctx);
+            .ext_request(ctx);
 
         let identifier_location = AuthClient::get_location_path(resp.headers())?;
         let resp = self
             .inner
             .get(format!("{OPENAI_OAUTH_URL}{identifier_location}"))
-            .ext_cookie(ctx)
+            .ext_request(ctx)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_context(ctx);
+            .ext_request(ctx);
 
         let state = AuthClient::get_callback_state(&resp.url());
         ctx.set_state(state.as_str());
@@ -64,7 +64,7 @@ impl PlatformAuthProvider {
         let resp = self
             .inner
             .post(&url)
-            .ext_cookie(ctx)
+            .ext_request(ctx)
             .json(
                 &IdentifierDataBuilder::default()
                     .action("default")
@@ -78,7 +78,7 @@ impl PlatformAuthProvider {
             )
             .send()
             .await?
-            .ext_context(ctx);
+            .ext_request(ctx);
 
         AuthClient::response_handle_unit(resp)
             .await
@@ -96,7 +96,7 @@ impl PlatformAuthProvider {
                 "{OPENAI_OAUTH_URL}/u/login/password?state={}",
                 ctx.state
             ))
-            .ext_cookie(ctx)
+            .ext_request(ctx)
             .json(
                 &AuthenticateDataBuilder::default()
                     .action("default")
@@ -108,7 +108,7 @@ impl PlatformAuthProvider {
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_context(ctx);
+            .ext_request(ctx);
 
         let location = AuthClient::get_location_path(&resp.headers())
             .map_err(|_| AuthError::InvalidEmailOrPassword)?;
@@ -127,11 +127,11 @@ impl PlatformAuthProvider {
         let resp = self
             .inner
             .get(&format!("{OPENAI_OAUTH_URL}{location}"))
-            .ext_cookie(ctx)
+            .ext_request(ctx)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_context(ctx);
+            .ext_request(ctx);
 
         let location: &str = AuthClient::get_location_path(&resp.headers())
             .map_err(|_| AuthError::InvalidLocation)?;
@@ -163,7 +163,7 @@ impl PlatformAuthProvider {
         let resp = self
             .inner
             .post(&url)
-            .ext_cookie(ctx)
+            .ext_request(ctx)
             .json(&data)
             .header(reqwest::header::REFERER, HeaderValue::from_str(&url)?)
             .header(
@@ -173,7 +173,7 @@ impl PlatformAuthProvider {
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_context(ctx);
+            .ext_request(ctx);
 
         let location: &str = AuthClient::get_location_path(&resp.headers())?;
         if location.starts_with("/authorize/resume?") && ctx.account.mfa.is_none() {

@@ -50,6 +50,8 @@ pub enum AuthError {
     MFARequired,
     #[error("json deserialize error (error {0:?})")]
     DeserializeError(String),
+    #[error("implementation is not supported")]
+    NotSupportedImplementation,
 }
 
 #[derive(thiserror::Error, Debug)]
