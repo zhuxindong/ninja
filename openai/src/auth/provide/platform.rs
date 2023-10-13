@@ -15,8 +15,8 @@ use reqwest::Client;
 use url::Url;
 
 use super::{
-    AuthContext, AuthProvider, AuthResult, AuthenticateMfaDataBuilder, IdentifierDataBuilder,
-    RefreshTokenDataBuilder, RequestExt, RevokeTokenDataBuilder,
+    AuthProvider, AuthResult, AuthenticateMfaDataBuilder, IdentifierDataBuilder,
+    RefreshTokenDataBuilder, RequestContext, RequestContextExt, RevokeTokenDataBuilder,
 };
 
 const PLATFORM_CLIENT_ID: &str = "DRivsnm2Mu42T3KOpqdtwB3NYviHYzwD";
@@ -31,7 +31,7 @@ impl PlatformAuthProvider {
         Self { inner }
     }
 
-    async fn authorize(&self, ctx: &mut AuthContext<'_>) -> AuthResult<()> {
+    async fn authorize(&self, ctx: &mut RequestContext<'_>) -> AuthResult<()> {
         let url = format!("{OPENAI_OAUTH_URL}/authorize?client_id={PLATFORM_CLIENT_ID}&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write&audience=https://api.openai.com/v1&redirect_uri=https://platform.openai.com/auth/callback&response_type=code");
         let resp = self
             .inner
@@ -39,17 +39,17 @@ impl PlatformAuthProvider {
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_request(ctx);
+            .ext_context(ctx);
 
         let identifier_location = AuthClient::get_location_path(resp.headers())?;
         let resp = self
             .inner
             .get(format!("{OPENAI_OAUTH_URL}{identifier_location}"))
-            .ext_request(ctx)
+            .ext_context(ctx)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_request(ctx);
+            .ext_context(ctx);
 
         let state = AuthClient::get_callback_state(&resp.url());
         ctx.set_state(state.as_str());
@@ -59,12 +59,12 @@ impl PlatformAuthProvider {
             .map_err(|e| AuthError::InvalidLoginUrl(e.to_string()))?)
     }
 
-    async fn authenticate_username(&self, ctx: &mut AuthContext<'_>) -> AuthResult<()> {
+    async fn authenticate_username(&self, ctx: &mut RequestContext<'_>) -> AuthResult<()> {
         let url = format!("{OPENAI_OAUTH_URL}/u/login/identifier?state={}", ctx.state);
         let resp = self
             .inner
             .post(&url)
-            .ext_request(ctx)
+            .ext_context(ctx)
             .json(
                 &IdentifierDataBuilder::default()
                     .action("default")
@@ -78,7 +78,7 @@ impl PlatformAuthProvider {
             )
             .send()
             .await?
-            .ext_request(ctx);
+            .ext_context(ctx);
 
         AuthClient::response_handle_unit(resp)
             .await
@@ -87,7 +87,7 @@ impl PlatformAuthProvider {
 
     async fn authenticate_password(
         &self,
-        ctx: &mut AuthContext<'_>,
+        ctx: &mut RequestContext<'_>,
     ) -> AuthResult<model::AccessToken> {
         ctx.load_arkose_token().await?;
         let resp = self
@@ -96,7 +96,7 @@ impl PlatformAuthProvider {
                 "{OPENAI_OAUTH_URL}/u/login/password?state={}",
                 ctx.state
             ))
-            .ext_request(ctx)
+            .ext_context(ctx)
             .json(
                 &AuthenticateDataBuilder::default()
                     .action("default")
@@ -108,7 +108,7 @@ impl PlatformAuthProvider {
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_request(ctx);
+            .ext_context(ctx);
 
         let location = AuthClient::get_location_path(&resp.headers())
             .map_err(|_| AuthError::InvalidEmailOrPassword)?;
@@ -121,17 +121,17 @@ impl PlatformAuthProvider {
 
     async fn authenticate_resume(
         &self,
-        ctx: &mut AuthContext<'_>,
+        ctx: &mut RequestContext<'_>,
         location: &str,
     ) -> AuthResult<model::AccessToken> {
         let resp = self
             .inner
             .get(&format!("{OPENAI_OAUTH_URL}{location}"))
-            .ext_request(ctx)
+            .ext_context(ctx)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_request(ctx);
+            .ext_context(ctx);
 
         let location: &str = AuthClient::get_location_path(&resp.headers())
             .map_err(|_| AuthError::InvalidLocation)?;
@@ -148,7 +148,7 @@ impl PlatformAuthProvider {
     #[async_recursion]
     async fn authenticate_mfa(
         &self,
-        ctx: &mut AuthContext<'_>,
+        ctx: &mut RequestContext<'_>,
         location: &str,
     ) -> AuthResult<model::AccessToken> {
         let mfa_code = &ctx.account.mfa.clone().ok_or(AuthError::MFARequired)?;
@@ -163,7 +163,7 @@ impl PlatformAuthProvider {
         let resp = self
             .inner
             .post(&url)
-            .ext_request(ctx)
+            .ext_context(ctx)
             .json(&data)
             .header(reqwest::header::REFERER, HeaderValue::from_str(&url)?)
             .header(
@@ -173,7 +173,7 @@ impl PlatformAuthProvider {
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_request(ctx);
+            .ext_context(ctx);
 
         let location: &str = AuthClient::get_location_path(&resp.headers())?;
         if location.starts_with("/authorize/resume?") && ctx.account.mfa.is_none() {
@@ -216,7 +216,7 @@ impl AuthProvider for PlatformAuthProvider {
         &self,
         account: &model::AuthAccount,
     ) -> AuthResult<model::AccessToken> {
-        let mut ctx = AuthContext::new(account);
+        let mut ctx = RequestContext::new(account);
         // authorized
         self.authorize(&mut ctx).await?;
 
