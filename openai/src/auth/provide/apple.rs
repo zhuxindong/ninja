@@ -15,7 +15,7 @@ use url::Url;
 
 use super::{
     AuthContext, AuthProvider, AuthResult, AuthenticateMfaDataBuilder, IdentifierDataBuilder,
-    RefreshTokenDataBuilder, RequestBuilderExt, ResponseExt, RevokeTokenDataBuilder,
+    RefreshTokenDataBuilder, RequestExt, RevokeTokenDataBuilder,
 };
 
 const STATE: &str = "TMf_R7zSeBRzTs86WAfQJh9Q_AbDh3382e7Y-pae1wQ";
@@ -49,17 +49,17 @@ impl AppleAuthProvider {
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_context(ctx);
+            .ext_request(ctx);
 
         let identifier_location = AuthClient::get_location_path(resp.headers())?;
         let resp = self
             .inner
             .get(format!("{OPENAI_OAUTH_URL}{identifier_location}"))
-            .ext_cookie(ctx)
+            .ext_request(ctx)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_context(ctx);
+            .ext_request(ctx);
 
         let state = AuthClient::get_callback_state(&resp.url());
         ctx.set_state(state.as_str());
@@ -74,7 +74,7 @@ impl AppleAuthProvider {
         let resp = self
             .inner
             .post(&url)
-            .ext_cookie(ctx)
+            .ext_request(ctx)
             .form(
                 &IdentifierDataBuilder::default()
                     .action("default")
@@ -88,7 +88,7 @@ impl AppleAuthProvider {
             )
             .send()
             .await?
-            .ext_context(ctx);
+            .ext_request(ctx);
 
         AuthClient::response_handle_unit(resp)
             .await
@@ -107,7 +107,7 @@ impl AppleAuthProvider {
                 "{OPENAI_OAUTH_URL}/u/login/password?state={}",
                 ctx.state
             ))
-            .ext_cookie(ctx)
+            .ext_request(ctx)
             .form(
                 &AuthenticateDataBuilder::default()
                     .action("default")
@@ -119,7 +119,7 @@ impl AppleAuthProvider {
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_context(ctx);
+            .ext_request(ctx);
 
         let location = AuthClient::get_location_path(&resp.headers())
             .map_err(|_| AuthError::InvalidEmailOrPassword)?;
@@ -138,11 +138,11 @@ impl AppleAuthProvider {
         let resp = self
             .inner
             .get(&format!("{OPENAI_OAUTH_URL}{location}"))
-            .ext_cookie(ctx)
+            .ext_request(ctx)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_context(ctx);
+            .ext_request(ctx);
 
         let location: &str = AuthClient::get_location_path(&resp.headers())
             .map_err(|_| AuthError::InvalidLocation)?;
@@ -177,11 +177,11 @@ impl AppleAuthProvider {
                     .code(mfa_code)
                     .build()?,
             )
-            .ext_cookie(ctx)
+            .ext_request(ctx)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_context(ctx);
+            .ext_request(ctx);
 
         let location: &str = AuthClient::get_location_path(&resp.headers())?;
         if location.starts_with("/authorize/resume?") && ctx.account.mfa.is_none() {
@@ -199,7 +199,7 @@ impl AppleAuthProvider {
         let resp = self
             .inner
             .post(OPENAI_OAUTH_TOKEN_URL)
-            .ext_cookie(ctx)
+            .ext_request(ctx)
             .json(
                 &AuthorizationCodeDataBuilder::default()
                     .redirect_uri(OPENAI_OAUTH_APPLE_CALLBACK_URL)

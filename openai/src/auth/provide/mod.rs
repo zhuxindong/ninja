@@ -28,23 +28,22 @@ pub trait AuthProvider: Send + Sync {
     fn supports(&self, t: &AuthStrategy) -> bool;
 }
 
-trait ResponseExt {
-    fn ext_context(self, ctx: &mut AuthContext) -> reqwest::Response;
+trait RequestExt {
+    type Target;
+    fn ext_request(self, ctx: &mut AuthContext) -> Self::Target;
 }
 
-impl ResponseExt for reqwest::Response {
-    fn ext_context(self, ctx: &mut AuthContext) -> reqwest::Response {
+impl RequestExt for reqwest::Response {
+    type Target = reqwest::Response;
+    fn ext_request(self, ctx: &mut AuthContext) -> Self::Target {
         ctx.add_cookie(self.cookies());
         self
     }
 }
 
-trait RequestBuilderExt {
-    fn ext_cookie(self, ctx: &mut AuthContext) -> reqwest::RequestBuilder;
-}
-
-impl RequestBuilderExt for reqwest::RequestBuilder {
-    fn ext_cookie(self, ctx: &mut AuthContext) -> reqwest::RequestBuilder {
+impl RequestExt for reqwest::RequestBuilder {
+    type Target = reqwest::RequestBuilder;
+    fn ext_request(self, ctx: &mut AuthContext) -> Self::Target {
         self.header(header::COOKIE, ctx.get_cookie())
     }
 }
@@ -72,48 +71,45 @@ impl<'a> AuthContext<'a> {
         }
     }
 
-    pub(super) fn add_cookie<'b>(
-        &mut self,
-        c: impl Iterator<Item = reqwest::cookie::Cookie<'b>> + 'b,
-    ) {
+    fn add_cookie<'b>(&mut self, c: impl Iterator<Item = reqwest::cookie::Cookie<'b>> + 'b) {
         c.for_each(|v| {
             let _ = self.cookie.insert(format!("{}={}", v.name(), v.value()));
         });
     }
 
-    pub(super) fn get_cookie(&self) -> String {
+    fn get_cookie(&self) -> String {
         self.cookie.iter().cloned().collect::<Vec<_>>().join("; ")
     }
 
-    pub(super) fn set_csrf_token(&mut self, csrf_token: &str) {
+    fn set_csrf_token(&mut self, csrf_token: &str) {
         self.csrf_token = csrf_token.to_owned();
     }
 
-    pub(super) fn set_auth_url(&mut self, auth_url: &str) {
+    fn set_auth_url(&mut self, auth_url: &str) {
         if self.auth_url.is_empty() {
             self.auth_url.push_str(auth_url);
         }
     }
 
-    pub(super) fn set_state(&mut self, state: &str) {
+    fn set_state(&mut self, state: &str) {
         if self.state.is_empty() {
             self.state.push_str(state);
         }
     }
 
-    pub(super) fn set_code_verifier(&mut self, code_verifier: String) {
+    fn set_code_verifier(&mut self, code_verifier: String) {
         if self.code_verifier.is_empty() {
             self.code_verifier.push_str(&code_verifier);
         }
     }
 
-    pub(super) fn set_code_challenge(&mut self, code_challenge: String) {
+    fn set_code_challenge(&mut self, code_challenge: String) {
         if self.code_challenge.is_empty() {
             self.code_challenge.push_str(&code_challenge);
         }
     }
 
-    pub(super) async fn load_arkose_token(&mut self) -> AuthResult<()> {
+    async fn load_arkose_token(&mut self) -> AuthResult<()> {
         let arkose_token = match self.account.arkose_token.as_deref() {
             Some(arkose_token) => ArkoseToken::from(arkose_token),
             None => arkose::ArkoseToken::new_from_context(Type::Auth0)
@@ -128,7 +124,7 @@ impl<'a> AuthContext<'a> {
 }
 
 #[derive(Serialize, Builder)]
-pub(super) struct IdentifierData<'a> {
+struct IdentifierData<'a> {
     state: &'a str,
     username: &'a str,
     #[serde(rename = "js-available")]
@@ -143,7 +139,7 @@ pub(super) struct IdentifierData<'a> {
 }
 
 #[derive(Clone)]
-pub(super) enum GrantType {
+enum GrantType {
     AuthorizationCode,
     RefreshToken,
 }
@@ -161,7 +157,7 @@ impl Serialize for GrantType {
 }
 
 #[derive(Serialize, Builder)]
-pub(super) struct AuthenticateData<'a> {
+struct AuthenticateData<'a> {
     state: &'a str,
     username: &'a str,
     password: &'a str,
@@ -169,14 +165,14 @@ pub(super) struct AuthenticateData<'a> {
 }
 
 #[derive(Serialize, Builder)]
-pub(super) struct AuthenticateMfaData<'a> {
+struct AuthenticateMfaData<'a> {
     state: &'a str,
     code: &'a str,
     action: &'a str,
 }
 
 #[derive(Serialize, Builder)]
-pub(super) struct AuthorizationCodeData<'a> {
+struct AuthorizationCodeData<'a> {
     redirect_uri: &'a str,
     grant_type: GrantType,
     client_id: &'a str,
@@ -185,13 +181,13 @@ pub(super) struct AuthorizationCodeData<'a> {
 }
 
 #[derive(Serialize, Builder)]
-pub(super) struct RevokeTokenData<'a> {
+struct RevokeTokenData<'a> {
     client_id: &'a str,
     token: &'a str,
 }
 
 #[derive(Serialize, Builder)]
-pub(super) struct RefreshTokenData<'a> {
+struct RefreshTokenData<'a> {
     redirect_uri: &'a str,
     grant_type: GrantType,
     client_id: &'a str,
@@ -199,7 +195,7 @@ pub(super) struct RefreshTokenData<'a> {
 }
 
 #[derive(Serialize, Builder)]
-pub(super) struct GetAuthorizedUrlData<'a> {
+struct GetAuthorizedUrlData<'a> {
     #[serde(rename = "callbackUrl")]
     callback_url: &'a str,
     #[serde(rename = "csrfToken")]
