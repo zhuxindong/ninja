@@ -57,6 +57,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .arkose_token_endpoint(args.arkose_token_endpoint)
         .tls_keypair(None)
         .tcp_keepalive(args.tcp_keepalive)
+        .pool_idle_timeout(args.pool_idle_timeout)
         .timeout(args.timeout)
         .connect_timeout(args.connect_timeout)
         .workers(args.workers)
@@ -254,6 +255,7 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
         tb_fill_rate: 1,
         tb_expired: 86400,
         cookie_store: true,
+        pool_idle_timeout: 90,
         ..args::ServeArgs::default()
     };
 

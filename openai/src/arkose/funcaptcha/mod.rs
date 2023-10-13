@@ -208,24 +208,15 @@ impl Session {
         .await?;
 
         // Build concise challenge
-        let (challenge_type, challenge_urls, key) = match challenge.game_data.game_type {
-            4 => (
+        let (game_type, challenge_urls, key) = {
+            (
                 "image",
                 challenge.game_data.custom_gui.challenge_imgs.clone(),
-                format!("4.instructions-{}", challenge.game_data.instruction_string),
-            ),
-            101 => (
-                "audio",
-                challenge.audio_challenge_urls.clone().unwrap_or_default(),
                 format!(
-                    "audio_game.instructions-{}",
-                    challenge.game_data.game_variant
+                    "{}.instructions-{}",
+                    challenge.game_data.game_type, challenge.game_data.instruction_string
                 ),
-            ),
-            _ => {
-                warn!("challenge string_table: {:#?}", &challenge.string_table);
-                bail!("unknown challenge type")
-            }
+            )
         };
 
         let remove_html_tags = |input: &str| {
@@ -233,15 +224,22 @@ impl Session {
             re.replace_all(input, "").to_string()
         };
 
-        let concise_challenge = ConciseChallenge {
-            game_type: challenge_type.to_string(),
-            urls: challenge_urls.clone(),
-            game_variant: challenge.game_data.instruction_string.clone(),
-            instructions: remove_html_tags(&challenge.string_table[&key]),
-        };
-        self.challenge = Some(challenge);
-
-        Ok(concise_challenge)
+        match challenge.string_table.get(&key) {
+            Some(html_instructions) => {
+                let concise_challenge = ConciseChallenge {
+                    game_type,
+                    urls: challenge_urls,
+                    game_variant: challenge.game_data.instruction_string.clone(),
+                    instructions: remove_html_tags(html_instructions),
+                };
+                self.challenge = Some(challenge);
+                Ok(concise_challenge)
+            }
+            None => {
+                warn!("unknown challenge type: {challenge:#?}");
+                bail!("unknown challenge type: {key}")
+            }
+        }
     }
 
     pub async fn submit_answer(mut self, answers: Vec<i32>) -> anyhow::Result<()> {
@@ -385,7 +383,7 @@ struct CustomGUI {
 #[derive(Debug, Default)]
 #[allow(dead_code)]
 struct ConciseChallenge {
-    game_type: String,
+    game_type: &'static str,
     urls: Vec<String>,
     instructions: String,
     game_variant: String,

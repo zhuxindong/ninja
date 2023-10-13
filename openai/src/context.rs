@@ -45,6 +45,9 @@ pub struct ContextArgs {
     /// TCP keepalive (second)
     #[builder(setter(into), default = "75")]
     pub(crate) tcp_keepalive: usize,
+    /// Set an optional timeout for idle sockets being kept-alive
+    #[builder(setter(into), default = "90")]
+    pub(crate) pool_idle_timeout: usize,
     /// Client timeout
     #[builder(setter(into), default = "600")]
     pub(crate) timeout: usize,

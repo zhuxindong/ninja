@@ -14,10 +14,8 @@ o.rmempty = false
 
 o = s:option(Value, "proxies", translate("Proxies"), translate("Supports http/https/socks5, format: protocol://user:pass@ip:port"))
 
-o = s:option(ListValue, "disable_direct", translate("Turn off direct connection"), translate("Turn off direct connection using proxy"))
-o:value("false", "false");
-o:value("true", "true");
-o.default = "true"
+o = s:option(Flag, "disable_direct", translate("Turn off direct connection"), translate("Turn off direct connection using proxy"))
+o.rmempty = false
 
 o = s:option(Value, "level", translate("Log Level"), translate("info/debug/warn/trace/error"))
 o.default = "info"
@@ -34,6 +32,9 @@ o.rmempty = false
 o = s:option(Value, "workers", translate("Workers"), translate("Default 1 worker thread"))
 o.default = "1"
 
+o = s:option(Value, "concurrent_limit", translate("Concurrent Limit"), translate("Default 100 concurrent connections"))
+o.default = "100"
+
 o = s:option(Value, "timeout", translate("Timeout"), translate("Client timeout (secends), default 600 secends"))
 o.default = "600"
 
@@ -43,7 +44,26 @@ o.default = "60"
 o = s:option(Value, "tcp_keepalive", translate("TCP Keep-Alive"), translate("Default 60 seconds"))
 o.default = "60"
 
+o = s:option(Value, "pool_idle_timeout", translate("Pool idle timeout"), translate("Set an optional timeout for idle sockets being kept-alive"))
+o.default = "90"
+
+o = s:option(Flag, "cookie_store", translate("Enable Cookie Store"))
+o.rmempty = false
+
+o = s:option(Flag, "disable_webui", translate("Disable WebUI"))
+o.rmempty = false
+
 o = s:option(Value, "preauth_api", translate("PreAuth API"), translate("PreAuth Cookie API URL"))
+
+o = s:option(Value, "api_prefix", translate("WebUI API prefix"))
+
+o = s:option(Value, "puid_user", translate("PUID Account"), translate("Obtain the PUID of the Plus account user, Example: `user:pass`"))
+o.password = true
+
+o = s:option(Value, "cf_site_key", translate("CF Site Key"), translate("Cloudflare turnstile captcha site key"))
+
+o = s:option(Value, "cf_secret_key", translate("CF Secret Key"), translate("Cloudflare turnstile captcha secret key"))
+o.password = true
 
 o = s:option(Value, "arkose_chat_har_file", translate("ChatGPT HAR file path"), translate("About the browser HAR file path requested by ChatGPT ArkoseLabs"))
 

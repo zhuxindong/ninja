@@ -2,13 +2,12 @@ pub mod provide;
 
 extern crate regex;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::bail;
 use regex::Regex;
-use reqwest::cookie::{self, CookieStore, Jar};
 use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::impersonate::Impersonate;
 use reqwest::redirect::Policy;
@@ -23,7 +22,6 @@ use tokio::sync::OnceCell;
 
 pub mod model;
 
-use crate::arkose::{self, ArkoseToken, Type};
 use crate::debug;
 use crate::error::AuthError;
 
@@ -47,7 +45,6 @@ static EMAIL_REGEX: OnceCell<Regex> = OnceCell::const_new();
 #[derive(Clone)]
 pub struct AuthClient {
     inner: Client,
-    cookie_store: Arc<dyn cookie::CookieStore>,
     providers: Arc<Vec<Box<dyn AuthProvider + Send + Sync>>>,
 }
 
@@ -254,25 +251,6 @@ impl AuthClient {
         }
         Ok(refresh_token)
     }
-
-    async fn set_arkose_token(&self, arkose_token: Option<&str>) -> AuthResult<()> {
-        let arkose_token = match arkose_token {
-            Some(arkose_token) => ArkoseToken::from(arkose_token),
-            None => arkose::ArkoseToken::new_from_context(Type::Auth0)
-                .await
-                .map_err(AuthError::InvalidArkoseToken)?,
-        };
-
-        let mut header_value = HashSet::with_capacity(1);
-        header_value.insert(HeaderValue::from_str(&format!(
-            "arkoseToken={};",
-            arkose_token.value()
-        ))?);
-
-        self.cookie_store
-            .set_cookies(&mut header_value.iter(), &Url::parse(OPENAI_OAUTH_URL)?);
-        return Ok(());
-    }
 }
 
 #[async_trait::async_trait]
@@ -294,9 +272,6 @@ impl AuthProvider for AuthClient {
         if !regex.is_match(&account.username) || account.password.is_empty() {
             bail!(AuthError::InvalidEmailOrPassword)
         }
-
-        self.set_arkose_token(account.arkose_token.as_deref())
-            .await?;
 
         for provider in self.providers.iter() {
             if provider.supports(&account.option) {
@@ -341,7 +316,6 @@ impl AuthProvider for AuthClient {
 
 pub struct AuthClientBuilder {
     preauth_api: Option<Url>,
-    cookie_store: Option<Arc<dyn cookie::CookieStore>>,
     inner: reqwest::ClientBuilder,
 }
 
@@ -436,41 +410,10 @@ impl AuthClientBuilder {
         self
     }
 
-    /// Set the persistent cookie store for the client.
-    ///
-    /// Cookies received in responses will be passed to this store, and
-    /// additional requests will query this store for cookies.
-    ///
-    /// By default, no cookie store is used.
-    ///
-    /// # Optional
-    ///
-    /// This requires the optional `cookies` feature to be enabled.
-    pub fn cookie_provider<C: cookie::CookieStore + 'static>(
-        mut self,
-        cookie_store: Arc<C>,
-    ) -> Self {
-        self.cookie_store = Some(cookie_store.clone());
-        self.inner = self.inner.cookie_provider(cookie_store);
-        self
-    }
-
     pub fn build(self) -> AuthClient {
-        let (client, jar) = match self.cookie_store {
-            Some(jar) => (self.inner.build().expect("ClientBuilder::build()"), jar),
-            None => {
-                let jar = Arc::new(Jar::default());
-                let client = self
-                    .inner
-                    .cookie_provider(jar.clone())
-                    .build()
-                    .expect("ClientBuilder::build()");
-                (client, jar as Arc<dyn CookieStore>)
-            }
-        };
+        let client = self.inner.build().expect("ClientBuilder::build()");
 
         let mut providers: Vec<Box<dyn AuthProvider + Send + Sync>> = Vec::with_capacity(3);
-
         providers.push(Box::new(WebAuthProvider::new(client.clone())));
         providers.push(Box::new(PlatformAuthProvider::new(client.clone())));
         if let Some(preauth_api) = self.preauth_api {
@@ -482,28 +425,16 @@ impl AuthClientBuilder {
 
         AuthClient {
             inner: client,
-            cookie_store: jar,
             providers: Arc::new(providers),
         }
     }
 
     pub fn builder() -> AuthClientBuilder {
-        let client_builder = Client::builder()
-            .impersonate(Impersonate::OkHttpAndroid13)
-            .connect_timeout(Duration::from_secs(30))
-            .redirect(Policy::custom(|attempt| {
-                let url = attempt.url().to_string();
-                if url.contains("https://auth0.openai.com/u/login/identifier")
-                    || url.contains("https://auth0.openai.com/auth/login?callbackUrl")
-                {
-                    attempt.follow()
-                } else {
-                    attempt.stop()
-                }
-            }));
         AuthClientBuilder {
-            inner: client_builder,
-            cookie_store: None,
+            inner: Client::builder()
+                .impersonate(Impersonate::OkHttpAndroid13)
+                .connect_timeout(Duration::from_secs(30))
+                .redirect(Policy::none()),
             preauth_api: None,
         }
     }

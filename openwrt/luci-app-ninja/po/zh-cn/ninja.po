@@ -165,3 +165,42 @@ msgstr "PreAuth 接口"
 
 msgid "PreAuth Cookie API URL"
 msgstr "获取 PreAuth Cookie 的接口"
+
+msgid "Concurrent Limit"
+msgstr "并发限制"
+
+msgid "Default 100 concurrent connections"
+msgstr "默认 100 并发连接"
+
+msgid "Enable Cookie Store"
+msgstr "启用 Cookie 存储"
+
+msgid "Disable WebUI"
+msgstr "禁用 WebUI"
+
+msgid "WebUI API prefix"
+msgstr "WebUI API 前缀"
+
+msgid "PUID Account"
+msgstr "PUID 账号"
+
+msgid "Obtain the PUID of the Plus account user, Example: `user:pass`"
+msgstr "获取 Plus 用户账号的 PUID，示例: `user:pass`"
+
+msgid "CF Site Key"
+msgstr "CF Site Key"
+
+msgid "CF Secret Key"
+msgstr "CF Secret Key"
+
+msgid "Cloudflare turnstile captcha site key"
+msgstr "Cloudflare turnstile 验证码 site key"
+
+msgid "Cloudflare turnstile captcha secret key"
+msgstr "Cloudflare turnstile 验证码 secret key"
+
+msgid "Pool idle timeout"
+msgstr "连接池空闲超时"
+
+msgid "Set an optional timeout for idle sockets being kept-alive"
+msgstr "设置保持活动的空闲套接字的可选超时"
