@@ -215,7 +215,7 @@ async fn post_login(
 ) -> Result<Response<Body>, ResponseError> {
     turnstile::cf_turnstile_check(&addr.ip(), account.cf_turnstile_response.as_deref()).await?;
 
-    match serve::retry_login(&mut account).await {
+    match serve::try_login(&mut account).await {
         Ok(access_token) => {
             let authentication_token = AuthenticateToken::try_from(access_token)
                 .map_err(ResponseError::InternalServerError)?;

@@ -208,8 +208,8 @@ impl Session {
         .await?;
 
         // Build concise challenge
-        let (game_type, challenge_urls, key) = {
-            let instruction_or_variant = if challenge.game_data.instruction_string.is_empty() {
+        let (game_type, challenge_urls, key, game_variant) = {
+            let game_variant = if challenge.game_data.instruction_string.is_empty() {
                 &challenge.game_data.game_variant
             } else {
                 &challenge.game_data.instruction_string
@@ -219,9 +219,10 @@ impl Session {
                 "image",
                 &challenge.game_data.custom_gui.challenge_imgs,
                 format!(
-                    "{}.instructions-{}",
-                    challenge.game_data.game_type, instruction_or_variant
+                    "{}.instructions-{game_variant}",
+                    challenge.game_data.game_type
                 ),
+                game_variant.to_owned(),
             )
         };
 
@@ -234,8 +235,8 @@ impl Session {
             Some(html_instructions) => {
                 let concise_challenge = ConciseChallenge {
                     game_type,
+                    game_variant,
                     urls: challenge_urls.to_vec(),
-                    game_variant: challenge.game_data.instruction_string.clone(),
                     instructions: remove_html_tags(html_instructions),
                 };
                 self.challenge = Some(challenge);
@@ -283,7 +284,7 @@ impl Session {
             .send()
             .await?;
 
-        #[derive(Deserialize, Default)]
+        #[derive(Deserialize, Default, Debug)]
         #[serde(default)]
         struct Response {
             response: Option<String>,

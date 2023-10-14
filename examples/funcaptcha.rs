@@ -26,7 +26,8 @@ async fn main() -> anyhow::Result<()> {
     // start time
     let now = Instant::now();
 
-    let arkose_token = ArkoseToken::new(openai::arkose::Type::Platform).await?;
+    let arkose_token =
+        ArkoseToken::new_from_har("/Users/gngpp/VSCode/ninja/login.chat.openai.com.har").await?;
 
     parse(arkose_token, solver, key).await?;
 
