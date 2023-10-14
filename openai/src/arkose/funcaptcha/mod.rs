@@ -209,12 +209,18 @@ impl Session {
 
         // Build concise challenge
         let (game_type, challenge_urls, key) = {
+            let instruction_or_variant = if challenge.game_data.instruction_string.is_empty() {
+                &challenge.game_data.game_variant
+            } else {
+                &challenge.game_data.instruction_string
+            };
+
             (
                 "image",
-                challenge.game_data.custom_gui.challenge_imgs.clone(),
+                &challenge.game_data.custom_gui.challenge_imgs,
                 format!(
                     "{}.instructions-{}",
-                    challenge.game_data.game_type, challenge.game_data.instruction_string
+                    challenge.game_data.game_type, instruction_or_variant
                 ),
             )
         };
