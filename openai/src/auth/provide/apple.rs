@@ -14,8 +14,8 @@ use reqwest::Client;
 use url::Url;
 
 use super::{
-    AuthContext, AuthProvider, AuthResult, AuthenticateMfaDataBuilder, IdentifierDataBuilder,
-    RefreshTokenDataBuilder, RequestExt, RevokeTokenDataBuilder,
+    AuthProvider, AuthResult, AuthenticateMfaDataBuilder, IdentifierDataBuilder,
+    RefreshTokenDataBuilder, RequestContext, RequestContextExt, RevokeTokenDataBuilder,
 };
 
 const STATE: &str = "TMf_R7zSeBRzTs86WAfQJh9Q_AbDh3382e7Y-pae1wQ";
@@ -35,7 +35,7 @@ impl AppleAuthProvider {
         Self { inner, preauth_api }
     }
 
-    async fn authorize(&self, ctx: &mut AuthContext<'_>) -> AuthResult<()> {
+    async fn authorize(&self, ctx: &mut RequestContext<'_>) -> AuthResult<()> {
         let code_challenge = ctx.code_challenge.as_str();
         let preauth_cookie = self.get_preauth_cookie().await?;
         let url = format!("{OPENAI_OAUTH_URL}/authorize?state={STATE}&ios_app_version={APP_VERSION}&client_id={APPLE_CLIENT_ID}&redirect_uri={OPENAI_OAUTH_APPLE_CALLBACK_URL}&code_challenge={code_challenge}&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write&prompt=login&preauth_cookie={preauth_cookie}&audience=https://api.openai.com/v1&code_challenge_method=S256&response_type=code&auth0Client={AUTH0_CLIENT}");
@@ -49,17 +49,17 @@ impl AppleAuthProvider {
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_request(ctx);
+            .ext_context(ctx);
 
         let identifier_location = AuthClient::get_location_path(resp.headers())?;
         let resp = self
             .inner
             .get(format!("{OPENAI_OAUTH_URL}{identifier_location}"))
-            .ext_request(ctx)
+            .ext_context(ctx)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_request(ctx);
+            .ext_context(ctx);
 
         let state = AuthClient::get_callback_state(&resp.url());
         ctx.set_state(state.as_str());
@@ -69,12 +69,12 @@ impl AppleAuthProvider {
             .map_err(|e| AuthError::InvalidLoginUrl(e.to_string()))?)
     }
 
-    async fn authenticate_username(&self, ctx: &mut AuthContext<'_>) -> AuthResult<()> {
+    async fn authenticate_username(&self, ctx: &mut RequestContext<'_>) -> AuthResult<()> {
         let url = format!("{OPENAI_OAUTH_URL}/u/login/identifier?state={}", ctx.state);
         let resp = self
             .inner
             .post(&url)
-            .ext_request(ctx)
+            .ext_context(ctx)
             .form(
                 &IdentifierDataBuilder::default()
                     .action("default")
@@ -88,7 +88,7 @@ impl AppleAuthProvider {
             )
             .send()
             .await?
-            .ext_request(ctx);
+            .ext_context(ctx);
 
         AuthClient::response_handle_unit(resp)
             .await
@@ -97,7 +97,7 @@ impl AppleAuthProvider {
 
     async fn authenticate_password(
         &self,
-        ctx: &mut AuthContext<'_>,
+        ctx: &mut RequestContext<'_>,
     ) -> AuthResult<model::AccessToken> {
         ctx.load_arkose_token().await?;
 
@@ -107,7 +107,7 @@ impl AppleAuthProvider {
                 "{OPENAI_OAUTH_URL}/u/login/password?state={}",
                 ctx.state
             ))
-            .ext_request(ctx)
+            .ext_context(ctx)
             .form(
                 &AuthenticateDataBuilder::default()
                     .action("default")
@@ -119,7 +119,7 @@ impl AppleAuthProvider {
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_request(ctx);
+            .ext_context(ctx);
 
         let location = AuthClient::get_location_path(&resp.headers())
             .map_err(|_| AuthError::InvalidEmailOrPassword)?;
@@ -132,17 +132,17 @@ impl AppleAuthProvider {
 
     async fn authenticate_resume(
         &self,
-        ctx: &mut AuthContext<'_>,
+        ctx: &mut RequestContext<'_>,
         location: &str,
     ) -> AuthResult<model::AccessToken> {
         let resp = self
             .inner
             .get(&format!("{OPENAI_OAUTH_URL}{location}"))
-            .ext_request(ctx)
+            .ext_context(ctx)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_request(ctx);
+            .ext_context(ctx);
 
         let location: &str = AuthClient::get_location_path(&resp.headers())
             .map_err(|_| AuthError::InvalidLocation)?;
@@ -160,7 +160,7 @@ impl AppleAuthProvider {
     #[async_recursion]
     async fn authenticate_mfa(
         &self,
-        ctx: &mut AuthContext<'_>,
+        ctx: &mut RequestContext<'_>,
         mfa_code: &str,
         location: &str,
     ) -> AuthResult<model::AccessToken> {
@@ -177,11 +177,11 @@ impl AppleAuthProvider {
                     .code(mfa_code)
                     .build()?,
             )
-            .ext_request(ctx)
+            .ext_context(ctx)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_request(ctx);
+            .ext_context(ctx);
 
         let location: &str = AuthClient::get_location_path(&resp.headers())?;
         if location.starts_with("/authorize/resume?") && ctx.account.mfa.is_none() {
@@ -192,14 +192,14 @@ impl AppleAuthProvider {
 
     async fn authorization_code(
         &self,
-        ctx: &mut AuthContext<'_>,
+        ctx: &mut RequestContext<'_>,
         location: &str,
     ) -> AuthResult<model::AccessToken> {
         let code = AuthClient::get_callback_code(&Url::parse(location)?)?;
         let resp = self
             .inner
             .post(OPENAI_OAUTH_TOKEN_URL)
-            .ext_request(ctx)
+            .ext_context(ctx)
             .json(
                 &AuthorizationCodeDataBuilder::default()
                     .redirect_uri(OPENAI_OAUTH_APPLE_CALLBACK_URL)
@@ -255,7 +255,7 @@ impl AuthProvider for AppleAuthProvider {
         let code_verifier = AuthClient::generate_code_verifier();
         let code_challenge = AuthClient::generate_code_challenge(&code_verifier);
 
-        let mut ctx = AuthContext::new(account);
+        let mut ctx = RequestContext::new(account);
         ctx.set_code_verifier(code_verifier);
         ctx.set_code_challenge(code_challenge);
 

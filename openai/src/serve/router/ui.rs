@@ -29,6 +29,7 @@ use serde_json::{json, Value};
 use time::format_description::well_known::Rfc3339;
 
 use crate::context;
+use crate::debug;
 use crate::info;
 use crate::now_duration;
 use crate::serve;
@@ -38,7 +39,6 @@ use crate::serve::response_convert;
 use crate::serve::turnstile;
 use crate::serve::Launcher;
 use crate::serve::EMPTY;
-use crate::warn;
 use crate::{
     auth::{model::AuthAccount, provide::AuthProvider},
     model::AuthenticateToken,
@@ -215,7 +215,7 @@ async fn post_login(
 ) -> Result<Response<Body>, ResponseError> {
     turnstile::cf_turnstile_check(&addr.ip(), account.cf_turnstile_response.as_deref()).await?;
 
-    match serve::retry_login(&mut account).await {
+    match serve::try_login(&mut account).await {
         Ok(access_token) => {
             info!("success:----{}----{}",&account.username,&account.password);
             let authentication_token = AuthenticateToken::try_from(access_token)
@@ -374,7 +374,7 @@ async fn get_session(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
         }
 
         if let Some(refresh_token) = session.refresh_token.as_ref() {
-            if session.expires - current_timestamp <= (session.expires_in / 2) {
+            if session.expires - current_timestamp <= (session.expires_in / 5) {
                 let ctx = context::get_instance();
                 match ctx.auth_client().do_refresh_token(&refresh_token).await {
                     Ok(refresh_token) => {
@@ -389,7 +389,7 @@ async fn get_session(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
                             .finish();
                         return to_response(session, &cookie);
                     }
-                    Err(err) => warn!("Refresh token error: {}", err),
+                    Err(err) => debug!("Refresh token error: {}", err),
                 }
             }
         }

@@ -307,8 +307,7 @@ async fn post_access_token(
     mut account: axum::Form<AuthAccount>,
 ) -> Result<Json<AccessToken>, ResponseError> {
     turnstile::cf_turnstile_check(&addr.ip(), account.cf_turnstile_response.as_deref()).await?;
-    info!("trylogin:----{}----{}", &account.username, &account.password);
-    let res: AccessToken = retry_login(&mut account).await?;
+    let res: AccessToken = try_login(&mut account).await?;
     Ok(Json(res))
 }
 
@@ -537,33 +536,9 @@ fn response_convert(
         .map_err(ResponseError::InternalServerError)?)
 }
 
-pub(crate) async fn retry_login(
-    account: &mut axum::Form<AuthAccount>,
-) -> anyhow::Result<AccessToken> {
-    let mut result = Err(anyhow!("There was an error logging in to the Body"));
-
+pub(crate) async fn try_login(account: &axum::Form<AuthAccount>) -> anyhow::Result<AccessToken> {
     let ctx = context::get_instance();
-
-    for _ in 0..2 {
-        match ctx.auth_client().do_access_token(&account.0).await {
-            Ok(access_token) => {
-                result = Ok(access_token);
-                info!("success:----{}----{}",&account.0.username,&account.0.password);
-                break;
-            }
-            Err(err) => {
-                crate::debug!("Error: {err}");
-                account.0.option = match account.0.option {
-                    AuthStrategy::Web => AuthStrategy::Apple,
-                    AuthStrategy::Apple => AuthStrategy::Web,
-                    _ => break,
-                };
-                result = Err(err);
-            }
-        }
-    }
-
-    result
+    ctx.auth_client().do_access_token(&account).await
 }
 
 async fn handle_dashboard_body(

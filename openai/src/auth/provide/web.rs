@@ -13,8 +13,8 @@ use serde_json::Value;
 use url::Url;
 
 use super::{
-    AuthContext, AuthProvider, AuthResult, AuthenticateMfaDataBuilder, IdentifierDataBuilder,
-    RequestExt,
+    AuthProvider, AuthResult, AuthenticateMfaDataBuilder, IdentifierDataBuilder, RequestContext,
+    RequestContextExt,
 };
 
 pub(crate) struct WebAuthProvider {
@@ -26,14 +26,14 @@ impl WebAuthProvider {
         Self { inner }
     }
 
-    async fn csrf_token(&self, ctx: &mut AuthContext<'_>) -> AuthResult<()> {
+    async fn csrf_token(&self, ctx: &mut RequestContext<'_>) -> AuthResult<()> {
         let resp = self
             .inner
             .get(format!("{URL_CHATGPT_API}/api/auth/csrf"))
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_request(ctx);
+            .ext_context(ctx);
 
         match resp.error_for_status_ref() {
             Ok(_) => {
@@ -53,13 +53,13 @@ impl WebAuthProvider {
         }
     }
 
-    async fn authorized(&self, ctx: &mut AuthContext<'_>) -> AuthResult<()> {
+    async fn authorized(&self, ctx: &mut RequestContext<'_>) -> AuthResult<()> {
         let resp = self
             .inner
             .post(format!(
                 "{URL_CHATGPT_API}/api/auth/signin/auth0?prompt=login"
             ))
-            .ext_request(ctx)
+            .ext_context(ctx)
             .form(
                 &GetAuthorizedUrlDataBuilder::default()
                     .callback_url("/")
@@ -70,7 +70,7 @@ impl WebAuthProvider {
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_request(ctx);
+            .ext_context(ctx);
 
         match resp.error_for_status() {
             Ok(resp) => {
@@ -79,10 +79,8 @@ impl WebAuthProvider {
                     .as_object()
                     .and_then(|v| v.get("url"))
                     .and_then(|v| v.as_str())
-                    .context(AuthError::FailedAuthorizedUrl)?
-                    .to_owned();
-                ctx.set_auth_url(&url);
-                return self.state(ctx).await;
+                    .context(AuthError::FailedAuthorizedUrl)?;
+                return self.state(url, ctx).await;
             }
             Err(err) => {
                 debug!("WebAuthHandle authorized url error: {err}");
@@ -91,21 +89,21 @@ impl WebAuthProvider {
         }
     }
 
-    async fn state(&self, ctx: &mut AuthContext<'_>) -> AuthResult<()> {
+    async fn state(&self, url: &str, ctx: &mut RequestContext<'_>) -> AuthResult<()> {
         let resp = self
             .inner
-            .get(&ctx.auth_url)
-            .ext_request(ctx)
+            .get(url)
+            .ext_context(ctx)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_request(ctx);
+            .ext_context(ctx);
 
         let identifier_location = AuthClient::get_location_path(resp.headers())?;
         let resp = self
             .inner
             .get(format!("{OPENAI_OAUTH_URL}{identifier_location}"))
-            .ext_request(ctx)
+            .ext_context(ctx)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
@@ -118,12 +116,12 @@ impl WebAuthProvider {
             .map_err(|_| AuthError::FailedState)?)
     }
 
-    async fn authenticate_username(&self, ctx: &mut AuthContext<'_>) -> AuthResult<()> {
+    async fn authenticate_username(&self, ctx: &mut RequestContext<'_>) -> AuthResult<()> {
         let url = format!("{OPENAI_OAUTH_URL}/u/login/identifier?state={}", ctx.state);
         let resp = self
             .inner
             .post(&url)
-            .ext_request(ctx)
+            .ext_context(ctx)
             .form(
                 &IdentifierDataBuilder::default()
                     .action("default")
@@ -137,7 +135,7 @@ impl WebAuthProvider {
             )
             .send()
             .await?
-            .ext_request(ctx);
+            .ext_context(ctx);
 
         AuthClient::response_handle_unit(resp)
             .await
@@ -146,7 +144,7 @@ impl WebAuthProvider {
 
     async fn authenticate_password(
         &self,
-        ctx: &mut AuthContext<'_>,
+        ctx: &mut RequestContext<'_>,
     ) -> AuthResult<model::AccessToken> {
         ctx.load_arkose_token().await?;
 
@@ -156,7 +154,7 @@ impl WebAuthProvider {
                 "{OPENAI_OAUTH_URL}/u/login/password?state={}",
                 ctx.state
             ))
-            .ext_request(ctx)
+            .ext_context(ctx)
             .form(
                 &AuthenticateDataBuilder::default()
                     .action("default")
@@ -168,18 +166,18 @@ impl WebAuthProvider {
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_request(ctx);
+            .ext_context(ctx);
 
         if resp.status().is_redirection() {
             let location = AuthClient::get_location_path(&resp.headers())?;
             let resp = self
                 .inner
                 .get(format!("{OPENAI_OAUTH_URL}{location}"))
-                .ext_request(ctx)
+                .ext_context(ctx)
                 .send()
                 .await
                 .map_err(AuthError::FailedRequest)?
-                .ext_request(ctx);
+                .ext_context(ctx);
 
             if resp.status().is_redirection() {
                 let location = AuthClient::get_location_path(resp.headers())?;
@@ -191,11 +189,11 @@ impl WebAuthProvider {
                 let resp = self
                     .inner
                     .get(location)
-                    .ext_request(ctx)
+                    .ext_context(ctx)
                     .send()
                     .await
                     .map_err(AuthError::FailedRequest)?
-                    .ext_request(ctx);
+                    .ext_context(ctx);
 
                 return match resp.status() {
                     StatusCode::FOUND => self.get_access_token(ctx).await,
@@ -213,7 +211,7 @@ impl WebAuthProvider {
 
     async fn authenticate_mfa(
         &self,
-        ctx: &mut AuthContext<'_>,
+        ctx: &mut RequestContext<'_>,
         mfa_code: &str,
         location: &str,
     ) -> AuthResult<model::AccessToken> {
@@ -228,12 +226,12 @@ impl WebAuthProvider {
         let resp = self
             .inner
             .post(&url)
-            .ext_request(ctx)
+            .ext_context(ctx)
             .json(&data)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
-            .ext_request(ctx);
+            .ext_context(ctx);
 
         let location: &str = AuthClient::get_location_path(resp.headers())?;
         if location.starts_with("/authorize/resume?") && ctx.account.mfa.is_none() {
@@ -242,11 +240,14 @@ impl WebAuthProvider {
         self.get_access_token(ctx).await
     }
 
-    async fn get_access_token(&self, ctx: &mut AuthContext<'_>) -> AuthResult<model::AccessToken> {
+    async fn get_access_token(
+        &self,
+        ctx: &mut RequestContext<'_>,
+    ) -> AuthResult<model::AccessToken> {
         let resp = self
             .inner
             .get(format!("{URL_CHATGPT_API}/api/auth/session"))
-            .ext_request(ctx)
+            .ext_context(ctx)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
@@ -274,7 +275,7 @@ impl AuthProvider for WebAuthProvider {
         &self,
         account: &model::AuthAccount,
     ) -> AuthResult<model::AccessToken> {
-        let mut ctx = AuthContext::new(account);
+        let mut ctx = RequestContext::new(account);
         // csrf token
         self.csrf_token(&mut ctx).await?;
 

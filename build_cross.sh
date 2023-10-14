@@ -5,7 +5,7 @@ set -e
 root=$(pwd)
 : ${tag=latest}
 : ${rmi=false}
-: ${os=linux} # linux(and window) or macos
+: ${os=linux}
 [ ! -d uploads ] && mkdir uploads
 
 cargo update

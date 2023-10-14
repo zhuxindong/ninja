@@ -282,16 +282,23 @@ impl AuthProvider for AuthClient {
     }
 
     async fn do_revoke_token(&self, refresh_token: &str) -> AuthResult<()> {
+        let mut result: Option<AuthResult<()>> = None;
         for handle in self.providers.iter() {
             if handle.supports(&AuthStrategy::Apple) || handle.supports(&AuthStrategy::Platform) {
                 let res = handle.do_revoke_token(refresh_token).await;
-                if res.is_ok() {
-                    return Ok(());
+                match res {
+                    Ok(ok) => {
+                        result = Some(Ok(ok));
+                        break;
+                    }
+                    Err(err) => {
+                        result = Some(Err(err));
+                    }
                 }
             }
         }
 
-        bail!(AuthError::NotSupportedImplementation)
+        result.context(AuthError::NotSupportedImplementation)?
     }
 
     async fn do_refresh_token(&self, refresh_token: &str) -> AuthResult<model::RefreshToken> {
@@ -300,9 +307,14 @@ impl AuthProvider for AuthClient {
         for handle in self.providers.iter() {
             if handle.supports(&AuthStrategy::Apple) || handle.supports(&AuthStrategy::Platform) {
                 let res = handle.do_refresh_token(refresh_token).await;
-                if res.is_ok() {
-                    result = Some(res);
-                    break;
+                match res {
+                    Ok(ok) => {
+                        result = Some(Ok(ok));
+                        break;
+                    }
+                    Err(err) => {
+                        result = Some(Err(err));
+                    }
                 }
             }
         }

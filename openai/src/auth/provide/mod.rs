@@ -28,43 +28,41 @@ pub trait AuthProvider: Send + Sync {
     fn supports(&self, t: &AuthStrategy) -> bool;
 }
 
-trait RequestExt {
+trait RequestContextExt {
     type Target;
-    fn ext_request(self, ctx: &mut AuthContext) -> Self::Target;
+    fn ext_context(self, ctx: &mut RequestContext) -> Self::Target;
 }
 
-impl RequestExt for reqwest::Response {
+impl RequestContextExt for reqwest::Response {
     type Target = reqwest::Response;
-    fn ext_request(self, ctx: &mut AuthContext) -> Self::Target {
+    fn ext_context(self, ctx: &mut RequestContext) -> Self::Target {
         ctx.add_cookie(self.cookies());
         self
     }
 }
 
-impl RequestExt for reqwest::RequestBuilder {
+impl RequestContextExt for reqwest::RequestBuilder {
     type Target = reqwest::RequestBuilder;
-    fn ext_request(self, ctx: &mut AuthContext) -> Self::Target {
+    fn ext_context(self, ctx: &mut RequestContext) -> Self::Target {
         self.header(header::COOKIE, ctx.get_cookie())
     }
 }
 
-struct AuthContext<'a> {
+struct RequestContext<'a> {
     account: &'a model::AuthAccount,
     cookie: HashSet<String>,
     csrf_token: String,
-    auth_url: String,
     state: String,
     code_verifier: String,
     code_challenge: String,
 }
 
-impl<'a> AuthContext<'a> {
-    pub(super) fn new(account: &'a model::AuthAccount) -> AuthContext<'_> {
+impl<'a> RequestContext<'a> {
+    pub(super) fn new(account: &'a model::AuthAccount) -> RequestContext<'_> {
         Self {
             account,
             cookie: HashSet::new(),
             csrf_token: String::new(),
-            auth_url: String::new(),
             state: String::new(),
             code_verifier: String::new(),
             code_challenge: String::new(),
@@ -83,12 +81,6 @@ impl<'a> AuthContext<'a> {
 
     fn set_csrf_token(&mut self, csrf_token: &str) {
         self.csrf_token = csrf_token.to_owned();
-    }
-
-    fn set_auth_url(&mut self, auth_url: &str) {
-        if self.auth_url.is_empty() {
-            self.auth_url.push_str(auth_url);
-        }
     }
 
     fn set_state(&mut self, state: &str) {
