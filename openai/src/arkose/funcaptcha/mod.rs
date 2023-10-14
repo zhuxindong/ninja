@@ -234,7 +234,7 @@ impl Session {
             Some(html_instructions) => {
                 let concise_challenge = ConciseChallenge {
                     game_type,
-                    urls: challenge_urls,
+                    urls: challenge_urls.to_vec(),
                     game_variant: challenge.game_data.instruction_string.clone(),
                     instructions: remove_html_tags(html_instructions),
                 };
