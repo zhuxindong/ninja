@@ -50,6 +50,7 @@ use super::get_static_resource;
 const DEFAULT_INDEX: &str = "/";
 const LOGIN_INDEX: &str = "/auth/login";
 const SESSION_ID: &str = "ninja_session";
+const PUID_ID: &str = "_puid";
 const BUILD_ID: &str = "cdCfIN9NUpAX8XOZwcgjh";
 const TEMP_404: &str = "404.htm";
 const TEMP_AUTH: &str = "auth.htm";
@@ -314,7 +315,15 @@ async fn get_logout(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
             Err(_) => {}
         }
     }
-    let cookie = cookie::Cookie::build(SESSION_ID, EMPTY)
+    let session_cookie = cookie::Cookie::build(SESSION_ID, EMPTY)
+        .path(DEFAULT_INDEX)
+        .same_site(cookie::SameSite::Lax)
+        .max_age(time::Duration::seconds(0))
+        .secure(false)
+        .http_only(false)
+        .finish();
+
+    let puid_cookie = cookie::Cookie::build(PUID_ID, EMPTY)
         .path(DEFAULT_INDEX)
         .same_site(cookie::SameSite::Lax)
         .max_age(time::Duration::seconds(0))
@@ -325,7 +334,8 @@ async fn get_logout(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
     Ok(Response::builder()
         .status(StatusCode::FOUND)
         .header(header::LOCATION, LOGIN_INDEX)
-        .header(header::SET_COOKIE, cookie.to_string())
+        .header(header::SET_COOKIE, session_cookie.to_string())
+        .header(header::SET_COOKIE, puid_cookie.to_string())
         .body(Body::empty())
         .map_err(ResponseError::InternalServerError)?)
 }
