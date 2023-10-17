@@ -38,6 +38,15 @@ pub fn parse_url(s: &str) -> anyhow::Result<String> {
     }
 }
 
+pub fn parse_ipv6_subnet(s: &str) -> anyhow::Result<(std::net::Ipv6Addr, u8)> {
+    match s.parse::<cidr::Ipv6Cidr>() {
+        Ok(cidr) => Ok((cidr.first_address(), cidr.network_length())),
+        Err(_) => {
+            anyhow::bail!(format!("`{}` isn't a ipv6 subnet", s))
+        }
+    }
+}
+
 // proxy proto
 pub fn parse_proxies_url(s: &str) -> anyhow::Result<Vec<String>> {
     let split = s.split(',');

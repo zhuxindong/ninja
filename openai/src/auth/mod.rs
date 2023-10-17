@@ -3,6 +3,7 @@ pub mod provide;
 extern crate regex;
 
 use std::collections::HashMap;
+use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -416,6 +417,15 @@ impl AuthClientBuilder {
         if let Some(preauth_api) = preauth_api {
             self.preauth_api = Some(Url::parse(&preauth_api).expect("invalid preauth_api url"));
         }
+        self
+    }
+
+    /// Bind to a local IP Address.
+    pub fn local_address<T>(mut self, addr: T) -> Self
+    where
+        T: Into<Option<IpAddr>>,
+    {
+        self.inner = self.inner.local_address(addr);
         self
     }
 

@@ -74,8 +74,16 @@ pub(super) struct ServeArgs {
     pub(super) concurrent_limit: usize,
 
     /// Server proxies pool, Example: protocol://user:pass@ip:port
-    #[clap(short = 'x',long, env = "PROXIES", value_parser = parse::parse_proxies_url)]
+    #[clap(short = 'x',long, env = "PROXIES", value_parser = parse::parse_proxies_url, group = "proxy")]
     pub(super) proxies: Option<std::vec::Vec<String>>,
+
+    /// Bind address for outgoing connections
+    #[clap(short = 'i', long, env = "INTERFACE", value_parser = parse::parse_host)]
+    pub(super) interface: Option<std::net::IpAddr>,
+
+    /// IPv6 subnet, Example: 2001:19f0:6001:48e4::/64
+    #[clap(long, short = 'I', env = "IPV4_SUBNET", value_parser = parse::parse_ipv6_subnet, group = "proxy")]
+    pub(super) ipv6_subnet: Option<(std::net::Ipv6Addr, u8)>,
 
     /// Disable direct connection
     #[clap(long, env = "DISABLE_DIRECT")]
@@ -120,6 +128,18 @@ pub(super) struct ServeArgs {
     /// PreAuth Cookie API URL
     #[clap(long, env = "PREAUTH_API", value_parser = parse::parse_url, default_value = "https://ai.fakeopen.com/auth/preauth")]
     pub(super) preauth_api: Option<String>,
+
+    /// Disable WebUI
+    #[clap(short = 'D', long, env = "DISABLE_WEBUI")]
+    pub(super) disable_webui: bool,
+
+    /// Cloudflare turnstile captcha site key
+    #[clap(long, env = "CF_SECRET_KEY", requires = "cf_secret_key")]
+    pub(super) cf_site_key: Option<String>,
+
+    /// Cloudflare turnstile captcha secret key
+    #[clap(long, env = "CF_SITE_KEY", requires = "cf_site_key")]
+    pub(super) cf_secret_key: Option<String>,
 
     /// Arkose endpoint, Example: https://client-api.arkoselabs.com
     #[clap(long, value_parser = parse::parse_url)]
@@ -187,16 +207,4 @@ pub(super) struct ServeArgs {
     #[clap(long, default_value = "86400", requires = "tb_enable")]
     #[cfg(feature = "limit")]
     pub(super) tb_expired: u32,
-
-    /// Cloudflare turnstile captcha site key
-    #[clap(long, env = "CF_SECRET_KEY", requires = "cf_secret_key")]
-    pub(super) cf_site_key: Option<String>,
-
-    /// Cloudflare turnstile captcha secret key
-    #[clap(long, env = "CF_SITE_KEY", requires = "cf_site_key")]
-    pub(super) cf_secret_key: Option<String>,
-
-    /// Disable WebUI
-    #[clap(short = 'D', long, env = "DISABLE_WEBUI")]
-    pub(super) disable_webui: bool,
 }

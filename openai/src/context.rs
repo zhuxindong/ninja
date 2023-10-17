@@ -6,7 +6,9 @@ use crate::{
     balancer::ClientLoadBalancer,
     error,
     homedir::home_dir,
-    info, warn,
+    info,
+    serve::middleware::tokenbucket,
+    warn,
 };
 use derive_builder::Builder;
 use reqwest::Client;
@@ -33,63 +35,154 @@ pub fn get_instance() -> &'static Context {
 
 #[derive(Builder, Clone, Default)]
 pub struct ContextArgs {
-    /// Server proxies
-    #[builder(setter(into), default)]
-    pub(crate) proxies: Vec<String>,
+    /// Listen addres
+    #[builder(setter(into), default = "String::from(\"0.0.0.0\")")]
+    pub(crate) host: String,
+
+    /// Listen port
+    #[builder(setter(into), default = "7999")]
+    pub(crate) port: u16,
+
+    /// Machine worker pool
+    #[builder(setter(into), default = "1")]
+    pub(crate) workers: usize,
+
+    /// Concurrent limit (Enforces a limit on the concurrent number of requests the underlying)
+    #[builder(setter(into), default = "65535")]
+    pub(crate) concurrent_limit: usize,
+
     /// Disable direct connection
     #[builder(default = "false")]
     pub(crate) disable_direct: bool,
+
     /// Enabled Cookie Store
     #[builder(default = "false")]
     pub(crate) cookie_store: bool,
+
     /// TCP keepalive (second)
     #[builder(setter(into), default = "75")]
     pub(crate) tcp_keepalive: usize,
+
     /// Set an optional timeout for idle sockets being kept-alive
     #[builder(setter(into), default = "90")]
     pub(crate) pool_idle_timeout: usize,
+
     /// Client timeout
     #[builder(setter(into), default = "600")]
     pub(crate) timeout: usize,
+
     /// Client connect timeout
     #[builder(setter(into), default = "60")]
     pub(crate) connect_timeout: usize,
+
+    /// Server proxies
+    #[builder(setter(into), default)]
+    pub(crate) proxies: Vec<String>,
+
+    /// Bind address for outgoing connections
+    #[builder(setter(into), default)]
+    pub(crate) interface: Option<std::net::IpAddr>,
+
+    /// Ipv6 Subnet
+    #[builder(setter(into), default)]
+    pub(crate) ipv6_subnet: Option<(std::net::Ipv6Addr, u8)>,
+
     /// Web UI api prefix
     #[builder(setter(into), default)]
     pub(crate) api_prefix: Option<String>,
+
     /// PreAuth Cookie API URL
     #[builder(setter(into), default)]
     pub(crate) preauth_api: Option<String>,
-    /// Arkose endpoint
+
+    /// TLS keypair
     #[builder(setter(into), default)]
-    pub(crate) arkose_endpoint: Option<String>,
-    /// ChatGPT Arkoselabs HAR record file path
+    pub(crate) tls_keypair: Option<(PathBuf, PathBuf)>,
+
+    /// Get the user password of the PUID
     #[builder(setter(into), default)]
-    pub(crate) arkose_chat_har_file: Option<PathBuf>,
-    /// Auth Arkoselabs HAR record file path
+    pub(crate) puid_password: Option<String>,
+
+    /// Get the user mailbox of the PUID
     #[builder(setter(into), default)]
-    pub(crate) arkose_auth_har_file: Option<PathBuf>,
-    /// Platform Arkoselabs HAR record file path
-    #[builder(setter(into), default)]
-    pub(crate) arkose_platform_har_file: Option<PathBuf>,
-    /// HAR file upload authenticate key
-    #[builder(setter(into), default)]
-    pub(crate) arkose_har_upload_key: Option<String>,
-    /// get arkose-token endpoint
-    #[builder(setter(into), default)]
-    pub(crate) arkose_token_endpoint: Option<String>,
-    /// arkoselabs solver
-    #[builder(setter(into), default)]
-    pub(crate) arkose_solver: Option<ArkoseSolver>,
+    pub(crate) puid_email: Option<String>,
+
     /// Account Plus puid cookie value
     #[builder(setter(into), default)]
-    pub(crate) puid: Option<String>,
+    puid: Option<String>,
+
+    /// Disable web ui
+    #[builder(setter(into), default = "false")]
+    pub(crate) disable_ui: bool,
+
     /// Cloudflare captcha site key
     #[builder(setter(into), default)]
     pub(crate) cf_site_key: Option<String>,
+
     /// Cloudflare captcha secret key
     #[builder(setter(into), default)]
     pub(crate) cf_secret_key: Option<String>,
+
+    /// Arkose endpoint
+    #[builder(setter(into), default)]
+    pub(crate) arkose_endpoint: Option<String>,
+
+    /// ChatGPT Arkoselabs HAR record file path
+    #[builder(setter(into), default)]
+    pub(crate) arkose_chat_har_file: Option<PathBuf>,
+
+    /// Auth Arkoselabs HAR record file path
+    #[builder(setter(into), default)]
+    pub(crate) arkose_auth_har_file: Option<PathBuf>,
+
+    /// Platform Arkoselabs HAR record file path
+    #[builder(setter(into), default)]
+    pub(crate) arkose_platform_har_file: Option<PathBuf>,
+
+    /// HAR file upload authenticate key
+    #[builder(setter(into), default)]
+    pub(crate) arkose_har_upload_key: Option<String>,
+
+    /// get arkose-token endpoint
+    #[builder(setter(into), default)]
+    pub(crate) arkose_token_endpoint: Option<String>,
+
+    /// arkoselabs solver
+    #[builder(setter(into), default)]
+    pub(crate) arkose_solver: Option<ArkoseSolver>,
+
+    /// Enable Tokenbucket
+    #[cfg(feature = "limit")]
+    #[builder(setter(into), default = "false")]
+    pub(crate) tb_enable: bool,
+
+    /// Tokenbucket store strategy
+    #[cfg(feature = "limit")]
+    #[builder(
+        setter(into),
+        default = "crate::serve::middleware::tokenbucket::Strategy::Mem"
+    )]
+    pub(crate) tb_store_strategy: tokenbucket::Strategy,
+
+    /// Tokenbucket redis url
+    #[cfg(feature = "limit")]
+    #[builder(setter(into), default = "String::from(\"redis://127.0.0.1:6379\")")]
+    pub(crate) tb_redis_url: String,
+
+    /// Tokenbucket capacity
+    #[cfg(feature = "limit")]
+    #[builder(setter(into), default = "60")]
+    pub(crate) tb_capacity: u32,
+
+    /// Tokenbucket fill rate
+    #[cfg(feature = "limit")]
+    #[builder(setter(into), default = "1")]
+    pub(crate) tb_fill_rate: u32,
+
+    /// Tokenbucket expired (second)
+    #[cfg(feature = "limit")]
+    #[builder(setter(into), default = "86400")]
+    pub(crate) tb_expired: u32,
 }
 
 #[derive(Debug)]

@@ -29,6 +29,7 @@ use serde_json::{json, Value};
 use time::format_description::well_known::Rfc3339;
 
 use crate::context;
+use crate::context::ContextArgs;
 use crate::debug;
 use crate::info;
 use crate::now_duration;
@@ -37,7 +38,6 @@ use crate::serve::err::ResponseError;
 use crate::serve::header_convert;
 use crate::serve::response_convert;
 use crate::serve::turnstile;
-use crate::serve::Launcher;
 use crate::serve::EMPTY;
 use crate::{
     auth::{model::AuthAccount, provide::AuthProvider},
@@ -106,7 +106,7 @@ impl From<AuthenticateToken> for Session {
 }
 
 // this function could be located in a different module
-pub(super) fn config(router: Router, args: &Launcher) -> Router {
+pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
     if !args.disable_ui {
         let ctx = context::get_instance();
         if let Some(url) = ctx.api_prefix() {
