@@ -93,13 +93,13 @@ impl ClientLoadBalancer {
         build_fn: F,
     ) -> anyhow::Result<Self>
     where
-        F: Fn(&Inner, Option<IpAddr>, Option<&String>) -> T,
+        F: Fn(&Inner, Option<IpAddr>, Option<&String>, bool) -> T,
     {
         let inner = Inner::from(args);
         let mut clients = Vec::with_capacity(inner.proxies.len() + 1);
 
         let mut add_client = |proxy: Option<&String>| {
-            let client = build_fn(&inner, args.interface, proxy);
+            let client = build_fn(&inner, args.interface, proxy, false);
             clients.push(client_type(client));
         };
 
@@ -135,10 +135,10 @@ impl ClientLoadBalancer {
         let bind_addr = self.inner.ipv6_subnet.as_ref().unwrap().get_random_ipv6();
         match client {
             ClientType::Auth(_) => {
-                ClientType::Auth(build_auth_client(&self.inner, Some(bind_addr), None))
+                ClientType::Auth(build_auth_client(&self.inner, Some(bind_addr), None, true))
             }
             ClientType::Regular(_) => {
-                ClientType::Regular(build_client(&self.inner, Some(bind_addr), None))
+                ClientType::Regular(build_client(&self.inner, Some(bind_addr), None, true))
             }
         }
     }
@@ -174,24 +174,31 @@ impl ClientLoadBalancer {
     }
 }
 
-fn build_client(inner: &Inner, bind_addr: Option<IpAddr>, proxy_url: Option<&String>) -> Client {
-    let mut client_builder = Client::builder();
+fn build_client(
+    inner: &Inner,
+    bind_addr: Option<IpAddr>,
+    proxy_url: Option<&String>,
+    disable_keep_alive: bool,
+) -> Client {
+    let mut builder = Client::builder();
     if let Some(url) = proxy_url {
         info!("[Client] Add proxy: {url}");
         let proxy = reqwest::Proxy::all(url).expect("Failed to build proxy");
-        client_builder = client_builder.proxy(proxy)
+        builder = builder.proxy(proxy)
     }
 
     if inner.cookie_store {
-        client_builder = client_builder.cookie_store(true);
+        builder = builder.cookie_store(true);
     }
 
-    // api client
-    let client = client_builder
+    if !disable_keep_alive {
+        builder = builder
+            .tcp_keepalive(inner.tcp_keepalive)
+            .pool_idle_timeout(inner.pool_idle_timeout);
+    }
+    let client = builder
         .user_agent(HEADER_UA)
         .impersonate(Impersonate::OkHttpAndroid13)
-        .tcp_keepalive(inner.tcp_keepalive.clone())
-        .pool_idle_timeout(inner.pool_idle_timeout.clone())
         .timeout(inner.timeout.clone())
         .connect_timeout(inner.connect_timeout.clone())
         .local_address(bind_addr)
@@ -204,13 +211,16 @@ fn build_auth_client(
     inner: &Inner,
     bind_addr: Option<IpAddr>,
     proxy_url: Option<&String>,
+    disable_keep_alive: bool,
 ) -> AuthClient {
     proxy_url.map(|url| info!("[AuthClient] Add proxy: {url}"));
-    auth::AuthClientBuilder::builder()
+    let mut builder = auth::AuthClientBuilder::builder();
+    if !disable_keep_alive {
+        builder = builder.tcp_keepalive(None).pool_idle_timeout(None);
+    }
+    builder
         .user_agent(HEADER_UA)
         .impersonate(Impersonate::OkHttpAndroid13)
-        .tcp_keepalive(inner.tcp_keepalive.clone())
-        .pool_idle_timeout(inner.pool_idle_timeout.clone())
         .timeout(inner.timeout.clone())
         .connect_timeout(inner.connect_timeout.clone())
         .proxy(proxy_url.cloned())
