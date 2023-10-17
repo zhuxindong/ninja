@@ -204,3 +204,15 @@ msgstr "连接池空闲超时"
 
 msgid "Set an optional timeout for idle sockets being kept-alive"
 msgstr "设置保持活动的空闲套接字的可选超时"
+
+msgid "Interface"
+msgstr "绑定网卡"
+
+msgid "Bind address for outgoing connections"
+msgstr "出站连接绑定地址"
+
+msgid "Ipv6 Subnet"
+msgstr "IPv6 子网"
+
+msgid "IPv6 subnet, Example: 2001:19f0:6001:48e4::/64"
+msgstr "IPv6 子网，示例: 2001:19f0:6001:48e4::/64"
