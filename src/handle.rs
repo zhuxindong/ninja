@@ -1,7 +1,11 @@
 use std::{ops::Not, path::PathBuf};
 
 use clap::CommandFactory;
-use openai::serve::middleware::tokenbucket::Strategy;
+use openai::{
+    arkose::funcaptcha::ArkoseSolver,
+    context::ContextArgsBuilder,
+    serve::{middleware::tokenbucket::Strategy, Launcher},
+};
 
 use crate::{
     args::{self, ServeArgs},
@@ -37,13 +41,22 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         }
     }
 
-    let mut builder = openai::serve::LauncherBuilder::default();
+    let arkose_sovler = match args.arkose_solver_key.as_ref() {
+        Some(key) => Some(ArkoseSolver::new(args.arkose_solver.clone(), key.clone())),
+        None => None,
+    };
+
+    let mut builder = ContextArgsBuilder::default();
+
     let builder = builder
         .host(
             args.host
-                .unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0))),
+                .unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)))
+                .to_string(),
         )
         .port(args.port.unwrap_or(7999))
+        .interface(args.interface)
+        .ipv6_subnet(args.ipv6_subnet)
         .proxies(args.proxies.unwrap_or_default())
         .disable_direct(args.disable_direct)
         .cookie_store(args.cookie_store)
@@ -67,8 +80,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .disable_ui(args.disable_webui)
         .puid_email(puid_user.0)
         .puid_password(puid_user.1)
-        .arkose_solver(args.arkose_solver)
-        .arkose_solver_key(args.arkose_solver_key);
+        .arkose_solver(arkose_sovler);
 
     #[cfg(feature = "limit")]
     let mut builder = builder
@@ -85,7 +97,8 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
             args.tls_key.expect("tls_key not init"),
         )));
     }
-    builder.build()?.run()
+    let args = builder.build()?;
+    Launcher::new(args).run()
 }
 
 #[cfg(target_family = "unix")]

@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
-use crate::context;
-use crate::serve::{err::ResponseError, Launcher};
+use crate::context::{self, ContextArgs};
+use crate::serve::err::ResponseError;
 use crate::{arkose, debug};
 use anyhow::anyhow;
 use axum::extract::Multipart;
@@ -16,7 +16,7 @@ const ERROR_PAGE: &'static str = include_str!("../../../ui/har/error.html");
 const UPLOAD_PAGE: &'static str = include_str!("../../../ui/har/upload.html");
 const SUCCESS_PAGE: &'static str = include_str!("../../../ui/har/success.html");
 
-pub(super) fn config(router: Router, _: &Launcher) -> Router {
+pub(super) fn config(router: Router, _: &ContextArgs) -> Router {
     router.route(
         "/har/upload",
         get(upload)

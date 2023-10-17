@@ -1,9 +1,9 @@
 use crate::arkose::ArkoseToken;
 use crate::arkose::Type;
 use crate::context;
+use crate::context::ContextArgs;
 use crate::serve::err::ResponseError;
 use crate::serve::router::STATIC_FILES;
-use crate::serve::Launcher;
 use axum::body::Body;
 use axum::http::header;
 use axum::http::method::Method;
@@ -17,7 +17,7 @@ use axum::{
 };
 use std::collections::HashMap;
 
-pub(super) fn config(router: Router, args: &Launcher) -> Router {
+pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
     if args.arkose_endpoint.is_none() {
         return router
             .route("/cdn/*path", any(proxy))

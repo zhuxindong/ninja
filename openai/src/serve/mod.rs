@@ -24,7 +24,6 @@ use axum_extra::extract::cookie::Cookie;
 use axum_extra::extract::{cookie, CookieJar};
 use axum_server::tls_rustls::RustlsConfig;
 use axum_server::HttpConfig;
-use derive_builder::Builder;
 use reqwest::header::{HeaderMap, HeaderValue};
 use serde_json::{json, Value};
 use std::str::FromStr;
@@ -34,15 +33,13 @@ use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
 use std::net::{IpAddr, SocketAddr};
-use std::path::PathBuf;
 
-use crate::arkose::funcaptcha::{ArkoseSolver, Solver};
 use crate::arkose::Type;
 use crate::auth::model::{
     AccessToken, AuthAccount, AuthAccountBuilder, AuthStrategy, RefreshToken,
 };
 use crate::auth::provide::AuthProvider;
-use crate::context::{self, ContextArgsBuilder};
+use crate::context::{self, ContextArgs};
 use crate::serve::middleware::tokenbucket::TokenBucketLimitContext;
 use crate::serve::router::toapi::chat_to_api;
 use crate::{arkose, debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
@@ -50,86 +47,17 @@ use crate::{arkose, debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 use crate::serve::err::ResponseError;
 use crate::{HEADER_UA, URL_CHATGPT_API, URL_PLATFORM_API};
 
-use self::middleware::tokenbucket;
-
 const EMPTY: &str = "";
 
-#[derive(Builder, Clone)]
 pub struct Launcher {
-    /// Listen addres
-    host: IpAddr,
-    /// Listen port
-    port: u16,
-    /// Machine worker pool
-    workers: usize,
-    /// Concurrent limit (Enforces a limit on the concurrent number of requests the underlying)
-    concurrent_limit: usize,
-    /// Server proxies
-    proxies: Vec<String>,
-    /// Enabled Cookie Store
-    cookie_store: bool,
-    /// Disable direct connection
-    disable_direct: bool,
-    /// TCP keepalive (second)
-    tcp_keepalive: usize,
-    /// Set an optional timeout for idle sockets being kept-alive
-    pool_idle_timeout: usize,
-    /// Client timeout
-    timeout: usize,
-    /// Client connect timeout
-    connect_timeout: usize,
-    /// TLS keypair
-    tls_keypair: Option<(PathBuf, PathBuf)>,
-    /// Get the user password of the PUID
-    puid_password: Option<String>,
-    /// Get the user mailbox of the PUID
-    puid_email: Option<String>,
-    /// Web UI api prefix
-    api_prefix: Option<String>,
-    /// PreAuth Cookie API URL
-    preauth_api: Option<String>,
-    /// Arkose endpoint
-    arkose_endpoint: Option<String>,
-    /// Get arkose token endpoint
-    arkose_token_endpoint: Option<String>,
-    /// ChatGPT Arkoselabs HAR record file path
-    arkose_chat_har_file: Option<PathBuf>,
-    /// Platform Arkoselabs HAR record file path
-    arkose_platform_har_file: Option<PathBuf>,
-    /// Auth Arkoselabs HAR record file path
-    arkose_auth_har_file: Option<PathBuf>,
-    /// HAR file upload authenticate key
-    arkose_har_upload_key: Option<String>,
-    /// arkoselabs solver
-    arkose_solver: Solver,
-    /// arkoselabs solver client key
-    arkose_solver_key: Option<String>,
-    /// Enable Tokenbucket
-    #[cfg(feature = "limit")]
-    tb_enable: bool,
-    /// Tokenbucket store strategy
-    #[cfg(feature = "limit")]
-    tb_store_strategy: tokenbucket::Strategy,
-    /// Tokenbucket redis url
-    tb_redis_url: String,
-    /// Tokenbucket capacity
-    #[cfg(feature = "limit")]
-    tb_capacity: u32,
-    /// Tokenbucket fill rate
-    #[cfg(feature = "limit")]
-    tb_fill_rate: u32,
-    /// Tokenbucket expired (second)
-    #[cfg(feature = "limit")]
-    tb_expired: u32,
-    /// Cloudflare turnstile captcha site key
-    cf_site_key: Option<String>,
-    /// Cloudflare turnstile captcha secret key
-    cf_secret_key: Option<String>,
-    /// Disable web ui
-    disable_ui: bool,
+    inner: ContextArgs,
 }
 
 impl Launcher {
+    pub fn new(inner: ContextArgs) -> Self {
+        Self { inner }
+    }
+
     pub fn run(self) -> anyhow::Result<()> {
         tracing_subscriber::registry()
             .with(
@@ -139,55 +67,39 @@ impl Launcher {
             .with(tracing_subscriber::fmt::layer())
             .init();
 
-        let host = match self.host.is_ipv4() {
-            true => self.host.to_string(),
-            false => format!("[{}]", self.host),
+        let host = match self.inner.host.parse::<IpAddr>()?.is_ipv4() {
+            true => self.inner.host.to_string(),
+            false => format!("[{}]", self.inner.host),
         };
-        info!("Starting HTTP(S) server at http(s)://{host}:{}", self.port);
-        info!("Starting {} workers", self.workers);
-        info!("Concurrent limit {}", self.concurrent_limit);
-        info!("Keepalive {} seconds", self.tcp_keepalive);
-        info!("Timeout {} seconds", self.timeout);
-        info!("Connect timeout {} seconds", self.connect_timeout);
-        info!("Enabled cookie store: {}", self.cookie_store);
-        if self.disable_direct {
-            info!("Disable direct connection");
+        info!(
+            "Starting HTTP(S) server at http(s)://{host}:{}",
+            self.inner.port
+        );
+        info!("Starting {} workers", self.inner.workers);
+        info!("Concurrent limit {}", self.inner.concurrent_limit);
+        info!("Enabled cookie store: {}", self.inner.cookie_store);
+
+        if let Some((ref ipv6, len)) = self.inner.ipv6_subnet {
+            info!("Ipv6 subnet: {ipv6}/{len}");
+        } else {
+            info!("Keepalive {} seconds", self.inner.tcp_keepalive);
+            if self.inner.disable_direct {
+                info!("Disable direct connection");
+            }
+            info!("Timeout {} seconds", self.inner.timeout);
+            info!("Connect timeout {} seconds", self.inner.connect_timeout);
         }
 
-        let arkose_sovler = match self.arkose_solver_key.as_ref() {
-            Some(key) => {
-                info!("ArkoseLabs solver: {:?}", self.arkose_solver);
-                Some(ArkoseSolver::new(self.arkose_solver.clone(), key.clone()))
-            }
-            None => None,
-        };
-        let args = ContextArgsBuilder::default()
-            .cookie_store(self.cookie_store)
-            .api_prefix(self.api_prefix.clone())
-            .arkose_endpoint(self.arkose_endpoint.clone())
-            .arkose_chat_har_file(self.arkose_chat_har_file.clone())
-            .arkose_auth_har_file(self.arkose_auth_har_file.clone())
-            .preauth_api(self.preauth_api.clone())
-            .arkose_platform_har_file(self.arkose_platform_har_file.clone())
-            .arkose_har_upload_key(self.arkose_har_upload_key.clone())
-            .arkose_token_endpoint(self.arkose_token_endpoint.clone())
-            .arkose_solver(arkose_sovler)
-            .proxies(self.proxies.clone())
-            .disable_direct(self.disable_direct)
-            .timeout(self.timeout.clone())
-            .connect_timeout(self.connect_timeout)
-            .tcp_keepalive(self.tcp_keepalive)
-            .pool_idle_timeout(self.pool_idle_timeout)
-            .cf_secret_key(self.cf_secret_key.clone())
-            .cf_site_key(self.cf_site_key.clone())
-            .build()?;
+        if let Some(ref solver) = self.inner.arkose_solver {
+            info!("ArkoseLabs solver: {:?}", solver.solver);
+        }
 
-        context::init(args);
+        context::init(self.inner.clone());
 
         let global_layer = tower::ServiceBuilder::new()
             .layer(tower_http::trace::TraceLayer::new_for_http())
             .layer(tower::limit::ConcurrencyLimitLayer::new(
-                self.concurrent_limit,
+                self.inner.concurrent_limit,
             ))
             .layer(
                 tower_http::cors::CorsLayer::new()
@@ -200,17 +112,17 @@ impl Launcher {
                 |_: axum::BoxError| async { axum::http::StatusCode::REQUEST_TIMEOUT },
             ))
             .layer(tower::timeout::TimeoutLayer::new(Duration::from_secs(
-                self.timeout as u64,
+                self.inner.timeout as u64,
             )));
 
         let app_layer = {
             let limit_context = TokenBucketLimitContext::from((
-                self.tb_store_strategy.clone(),
-                self.tb_enable,
-                self.tb_capacity,
-                self.tb_fill_rate,
-                self.tb_expired,
-                self.tb_redis_url.clone(),
+                self.inner.tb_store_strategy.clone(),
+                self.inner.tb_enable,
+                self.inner.tb_capacity,
+                self.inner.tb_fill_rate,
+                self.inner.tb_expired,
+                self.inner.tb_redis_url.clone(),
             ));
 
             tower::ServiceBuilder::new()
@@ -225,27 +137,27 @@ impl Launcher {
 
         let http_config = HttpConfig::new()
             .http1_keep_alive(true)
-            .http1_header_read_timeout(Duration::from_secs(self.tcp_keepalive as u64))
-            .http2_keep_alive_timeout(Duration::from_secs(self.tcp_keepalive as u64))
-            .http2_keep_alive_interval(Some(Duration::from_secs(self.tcp_keepalive as u64)))
+            .http1_header_read_timeout(Duration::from_secs(self.inner.tcp_keepalive as u64))
+            .http2_keep_alive_timeout(Duration::from_secs(self.inner.tcp_keepalive as u64))
+            .http2_keep_alive_interval(Some(Duration::from_secs(self.inner.tcp_keepalive as u64)))
             .build();
 
         let incoming_config = AddrIncomingConfig::new()
             .tcp_sleep_on_accept_errors(true)
-            .tcp_keepalive_interval(Some(Duration::from_secs(self.tcp_keepalive as u64)))
-            .tcp_keepalive(Some(Duration::from_secs(self.tcp_keepalive as u64)))
+            .tcp_keepalive_interval(Some(Duration::from_secs(self.inner.tcp_keepalive as u64)))
+            .tcp_keepalive(Some(Duration::from_secs(self.inner.tcp_keepalive as u64)))
             .build();
 
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
-            .worker_threads(self.workers)
+            .worker_threads(self.inner.workers)
             .build()?;
 
         runtime.block_on(async {
             tokio::spawn(check_wan_address());
             tokio::spawn(initialize_puid(
-                self.puid_email.clone(),
-                self.puid_password.clone(),
+                self.inner.puid_email.clone(),
+                self.inner.puid_password.clone(),
             ));
 
             let router = axum::Router::new()
@@ -264,19 +176,22 @@ impl Launcher {
                 .route("/auth/refresh_token", post(post_refresh_token))
                 .route("/auth/revoke_token", post(post_revoke_token));
 
-            let router = router::config(router, &self).layer(global_layer);
+            let router = router::config(router, &self.inner).layer(global_layer);
 
             let handle = Handle::new();
 
             // Spawn a task to gracefully shutdown server.
             tokio::spawn(signal::graceful_shutdown(handle.clone()));
 
-            match self.tls_keypair {
+            match self.inner.tls_keypair {
                 Some(keypair) => {
                     let tls_config = RustlsConfig::from_pem_file(keypair.0, keypair.1)
                         .await
                         .expect("Failed to load TLS keypair");
-                    let socket = std::net::SocketAddr::new(self.host, self.port);
+                    let socket = std::net::SocketAddr::new(
+                        self.inner.host.parse::<IpAddr>().unwrap(),
+                        self.inner.port,
+                    );
                     axum_server::bind_rustls(socket, tls_config)
                         .handle(handle)
                         .addr_incoming_config(incoming_config)
@@ -286,7 +201,10 @@ impl Launcher {
                         .expect("openai server failed")
                 }
                 None => {
-                    let socket = std::net::SocketAddr::new(self.host, self.port);
+                    let socket = std::net::SocketAddr::new(
+                        self.inner.host.parse::<IpAddr>().unwrap(),
+                        self.inner.port,
+                    );
                     axum_server::bind(socket)
                         .handle(handle)
                         .addr_incoming_config(incoming_config)

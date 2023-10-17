@@ -5,7 +5,9 @@ use axum::http::header;
 use axum::http::StatusCode;
 use axum::{body::Body, extract::Path, http::Response, Router};
 
-use super::{err::ResponseError, Launcher};
+use crate::context::ContextArgs;
+
+use super::err::ResponseError;
 
 mod arkose;
 mod har;
@@ -16,7 +18,7 @@ include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
 static STATIC_FILES: OnceLock<HashMap<&'static str, static_files::Resource>> = OnceLock::new();
 
-pub(super) fn config(router: Router, args: &Launcher) -> Router {
+pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
     init_static_files();
     let router = ui::config(router, args);
     let router = arkose::config(router, args);
