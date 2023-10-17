@@ -213,8 +213,8 @@ static CTX: OnceLock<Context> = OnceLock::new();
 static HAR: OnceLock<RwLock<HashMap<arkose::Type, Har>>> = OnceLock::new();
 
 pub struct Context {
-    client_load: Option<ClientLoadBalancer<Client>>,
-    auth_client_load: Option<ClientLoadBalancer<AuthClient>>,
+    client_load: Option<ClientLoadBalancer>,
+    auth_client_load: Option<ClientLoadBalancer>,
     /// Account Plus puid cookie value
     share_puid: RwLock<String>,
     /// arkoselabs solver
@@ -258,11 +258,11 @@ impl Context {
 
         Context {
             client_load: Some(
-                ClientLoadBalancer::<Client>::new_client(&args)
+                ClientLoadBalancer::new_client(&args)
                     .expect("Failed to initialize the requesting client"),
             ),
             auth_client_load: Some(
-                ClientLoadBalancer::<AuthClient>::new_auth_client(&args)
+                ClientLoadBalancer::new_auth_client(&args)
                     .expect("Failed to initialize the requesting oauth client"),
             ),
             arkose_endpoint: args.arkose_endpoint,
@@ -286,6 +286,7 @@ impl Context {
             .as_ref()
             .expect("The load balancer client is not initialized")
             .next()
+            .into()
     }
 
     /// Get the reqwest auth client
@@ -294,6 +295,7 @@ impl Context {
             .as_ref()
             .expect("The load balancer auth client is not initialized")
             .next()
+            .into()
     }
 
     pub fn get_share_puid(&self) -> std::sync::RwLockReadGuard<'_, String> {

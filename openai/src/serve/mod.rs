@@ -83,16 +83,21 @@ impl Launcher {
             info!("Ipv6 subnet: {ipv6}/{len}");
         } else {
             info!("Keepalive {} seconds", self.inner.tcp_keepalive);
+            info!("Timeout {} seconds", self.inner.timeout);
+            info!("Connect timeout {} seconds", self.inner.connect_timeout);
             if self.inner.disable_direct {
                 info!("Disable direct connection");
             }
-            info!("Timeout {} seconds", self.inner.timeout);
-            info!("Connect timeout {} seconds", self.inner.connect_timeout);
         }
 
-        if let Some(ref solver) = self.inner.arkose_solver {
+        self.inner.arkose_solver.as_ref().map(|solver| {
             info!("ArkoseLabs solver: {:?}", solver.solver);
-        }
+        });
+
+        self.inner
+            .interface
+            .as_ref()
+            .map(|i| info!("Bind address: {i} for outgoing connection"));
 
         context::init(self.inner.clone());
 
