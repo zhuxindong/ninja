@@ -59,7 +59,7 @@ async fn keys() -> TokenResult<KeyResult> {
 
 fn check_info(token: &str, pub_key: &[u8], alg: AlgorithmID) -> TokenResult<TokenProfile> {
     let alg = Algorithm::new_rsa_pem_verifier(alg, pub_key)?;
-    let verifier = Verifier::create().build()?;
+    let verifier = Verifier::create().ignore_iat().build()?;
     let claims = verifier.verify(token, &alg)?;
     let claims_str = claims.to_string();
     if claims_str.contains("https://openai.openai.auth0app.com/userinfo")
