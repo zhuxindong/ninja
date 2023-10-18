@@ -17,7 +17,6 @@ use serde::de::DeserializeOwned;
 use base64::{engine::general_purpose, Engine as _};
 use rand::Rng;
 use reqwest::{Client, Proxy, StatusCode, Url};
-use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tokio::sync::OnceCell;
 
@@ -50,28 +49,6 @@ pub struct AuthClient {
 }
 
 impl AuthClient {
-    pub async fn do_get_user_picture(&self, access_token: &str) -> AuthResult<Option<String>> {
-        let access_token = access_token.replace("Bearer ", "");
-        let resp = self
-            .inner
-            .get(format!("https://openai.openai.auth0app.com/userinfo"))
-            .bearer_auth(access_token)
-            .send()
-            .await
-            .map_err(AuthError::FailedRequest)?;
-
-        match resp.error_for_status_ref() {
-            Ok(_) => Ok(resp
-                .json::<Value>()
-                .await?
-                .as_object()
-                .and_then(|v| v.get("picture"))
-                .and_then(|v| v.as_str())
-                .and_then(|v| Some(v.to_string()))),
-            Err(_) => bail!(AuthError::InvalidRequest(resp.text().await?)),
-        }
-    }
-
     pub async fn do_dashboard_login(&self, access_token: &str) -> AuthResult<model::DashSession> {
         let access_token = access_token.replace("Bearer ", "");
         let resp = self
