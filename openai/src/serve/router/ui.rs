@@ -13,7 +13,6 @@ use axum::headers::Authorization;
 use axum::http::header;
 use axum::http::HeaderMap;
 use axum::http::Response;
-use axum::response::IntoResponse;
 use axum::routing::any;
 use axum::routing::{get, post};
 use axum::Router;
@@ -36,7 +35,6 @@ use crate::now_duration;
 use crate::serve;
 use crate::serve::err::ResponseError;
 use crate::serve::header_convert;
-use crate::serve::response_convert;
 use crate::serve::turnstile;
 use crate::serve::EMPTY;
 use crate::{
@@ -67,7 +65,6 @@ struct Session {
     access_token: String,
     user_id: String,
     email: String,
-    picture: Option<String>,
     expires_in: i64,
     expires: i64,
 }
@@ -96,7 +93,6 @@ impl From<AuthenticateToken> for Session {
         Session {
             user_id: value.user_id().to_owned(),
             email: value.email().to_owned(),
-            picture: Some(value.picture().to_owned()),
             access_token: value.access_token().to_owned(),
             expires_in: value.expires_in(),
             expires: value.expires(),
@@ -181,8 +177,6 @@ pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
                 &format!("/_next/data/{BUILD_ID}/share/:share_id/continue.json"),
                 get(get_share_chat_continue_info),
             )
-            // user picture
-            .route("/_next/image", get(get_image))
             // static resource endpoints
             .route("/resources/*path", get(get_static_resource))
             .route("/_next/static/*path", get(get_static_resource))
@@ -261,29 +255,13 @@ async fn post_login_token(
             "Get Profile Erorr"
         )))?;
 
-    let session = match context::get_instance()
-        .auth_client()
-        .do_get_user_picture(access_token)
-        .await
-    {
-        Ok(picture) => Session {
-            refresh_token: None,
-            access_token: access_token.to_owned(),
-            user_id: profile.user_id().to_owned(),
-            email: profile.email().to_owned(),
-            picture,
-            expires_in: profile.expires_in(),
-            expires: profile.expires(),
-        },
-        Err(_) => Session {
-            user_id: profile.user_id().to_owned(),
-            email: profile.email().to_owned(),
-            picture: None,
-            access_token: access_token.to_owned(),
-            expires_in: profile.expires_in(),
-            expires: profile.expires(),
-            refresh_token: None,
-        },
+    let session = Session {
+        refresh_token: None,
+        access_token: access_token.to_owned(),
+        user_id: profile.user_id().to_owned(),
+        email: profile.email().to_owned(),
+        expires_in: profile.expires_in(),
+        expires: profile.expires(),
     };
 
     let cookie = cookie::Cookie::build(SESSION_ID, session.to_string())
@@ -358,8 +336,8 @@ async fn get_session(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
                     "id": session.user_id,
                     "name": session.email,
                     "email": session.email,
-                    "image": session.picture,
-                    "picture": session.picture,
+                    "image": null,
+                    "picture": null,
                     "groups": [],
                 },
                 "expires" : expires,
@@ -430,8 +408,8 @@ async fn get_chat(
                                 "id": session.user_id,
                                 "name": session.email,
                                 "email": session.email,
-                                "image": session.picture,
-                                "picture": session.picture,
+                                "image": null,
+                                "picture": null,
                                 "groups": [],
                             },
                             "serviceStatus": {},
@@ -477,8 +455,8 @@ async fn get_chat_info(jar: CookieJar) -> Result<Response<Body>, ResponseError> 
                             "id": session.user_id,
                             "name": session.email,
                             "email": session.email,
-                            "image": session.picture,
-                            "picture": session.picture,
+                            "image": null,
+                            "picture": null,
                             "groups": [],
                         },
                         "serviceStatus": {},
@@ -746,8 +724,8 @@ async fn get_share_chat_continue_info(
                                     "id": session.user_id,
                                     "name": session.email,
                                     "email": session.email,
-                                    "image": session.picture,
-                                    "picture": session.picture,
+                                    "image": null,
+                                    "picture": null,
                                     "groups": [],
                                 },
                                 "serviceStatus": {},
@@ -770,8 +748,8 @@ async fn get_share_chat_continue_info(
                                         "id": session.user_id,
                                         "name": session.email,
                                         "email": session.email,
-                                        "image": session.picture,
-                                        "picture": session.picture,
+                                        "image": null,
+                                        "picture": null,
                                         "groups": [],
                                     },
                                     "serviceStatus": {},
@@ -822,20 +800,6 @@ async fn get_share_chat_continue_info(
         };
     }
     redirect_login()
-}
-
-async fn get_image(
-    params: Option<axum::extract::Query<ImageQuery>>,
-) -> Result<impl IntoResponse, ResponseError> {
-    let query = params.ok_or(ResponseError::BadRequest(anyhow::anyhow!(
-        "Missing URL parameter"
-    )))?;
-    let resp = context::get_instance()
-        .client()
-        .get(&query.url)
-        .send()
-        .await;
-    response_convert(resp)
 }
 
 async fn error_404() -> Result<Response<Body>, ResponseError> {
