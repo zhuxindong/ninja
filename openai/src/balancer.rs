@@ -50,10 +50,10 @@ impl Ipv6Subnet {
 struct Inner {
     disable_direct: bool,
     cookie_store: bool,
-    timeout: Duration,
-    connect_timeout: Duration,
-    pool_idle_timeout: Duration,
-    tcp_keepalive: Option<Duration>,
+    timeout: u64,
+    connect_timeout: u64,
+    pool_idle_timeout: u64,
+    tcp_keepalive: u64,
     preauth_api: Option<String>,
     proxies: Vec<String>,
     ipv6_subnet: Option<Ipv6Subnet>,
@@ -69,10 +69,10 @@ impl From<&context::ContextArgs> for Inner {
         Inner {
             disable_direct: args.disable_direct,
             cookie_store: args.cookie_store,
-            timeout: Duration::from_secs(args.timeout as u64),
-            connect_timeout: Duration::from_secs(args.connect_timeout as u64),
-            tcp_keepalive: Some(Duration::from_secs(args.tcp_keepalive as u64)),
-            pool_idle_timeout: Duration::from_secs(args.pool_idle_timeout as u64),
+            timeout: args.timeout as u64,
+            connect_timeout: args.connect_timeout as u64,
+            tcp_keepalive: args.tcp_keepalive as u64,
+            pool_idle_timeout: args.pool_idle_timeout as u64,
             preauth_api: args.preauth_api.clone(),
             proxies: args.proxies.clone(),
             ipv6_subnet,
@@ -191,16 +191,19 @@ fn build_client(
         builder = builder.cookie_store(true);
     }
 
-    if !disable_keep_alive {
+    if disable_keep_alive {
+        builder = builder.tcp_keepalive(None);
+    } else {
         builder = builder
-            .tcp_keepalive(inner.tcp_keepalive)
-            .pool_idle_timeout(inner.pool_idle_timeout);
+            .tcp_keepalive(Duration::from_secs(inner.tcp_keepalive))
+            .pool_idle_timeout(Duration::from_secs(inner.pool_idle_timeout));
     }
+
     let client = builder
         .user_agent(HEADER_UA)
         .impersonate(Impersonate::OkHttpAndroid13)
-        .timeout(inner.timeout.clone())
-        .connect_timeout(inner.connect_timeout.clone())
+        .connect_timeout(Duration::from_secs(inner.connect_timeout))
+        .timeout(Duration::from_secs(inner.timeout))
         .local_address(bind_addr)
         .build()
         .expect("Failed to build API client");
@@ -214,15 +217,22 @@ fn build_auth_client(
     disable_keep_alive: bool,
 ) -> AuthClient {
     proxy_url.map(|url| info!("[AuthClient] Add proxy: {url}"));
+
     let mut builder = auth::AuthClientBuilder::builder();
-    if !disable_keep_alive {
-        builder = builder.tcp_keepalive(None).pool_idle_timeout(None);
+
+    if disable_keep_alive {
+        builder = builder.tcp_keepalive(None);
+    } else {
+        builder = builder
+            .tcp_keepalive(Duration::from_secs(inner.tcp_keepalive))
+            .pool_idle_timeout(Duration::from_secs(inner.pool_idle_timeout));
     }
+
     builder
         .user_agent(HEADER_UA)
         .impersonate(Impersonate::OkHttpAndroid13)
-        .timeout(inner.timeout.clone())
-        .connect_timeout(inner.connect_timeout.clone())
+        .timeout(Duration::from_secs(inner.timeout))
+        .connect_timeout(Duration::from_secs(inner.connect_timeout))
         .proxy(proxy_url.cloned())
         .local_address(bind_addr)
         .preauth_api(inner.preauth_api.clone())
