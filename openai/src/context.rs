@@ -23,6 +23,7 @@ pub fn init(args: ContextArgs) {
     };
 }
 
+/// Get the program context
 pub fn get_instance() -> &'static Context {
     CTX.get_or_init(|| {
         Context::new(

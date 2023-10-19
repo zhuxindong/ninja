@@ -6,8 +6,11 @@ use std::{
     time::Duration,
 };
 
-use crate::{auth, info, HEADER_UA};
 use crate::{auth::AuthClient, context};
+use crate::{
+    auth::{self},
+    info, HEADER_UA,
+};
 
 #[derive(Clone)]
 pub enum ClientType {
@@ -56,6 +59,7 @@ struct Inner {
     tcp_keepalive: u64,
     preauth_api: Option<String>,
     proxies: Vec<String>,
+    interface: Option<IpAddr>,
     ipv6_subnet: Option<Ipv6Subnet>,
 }
 
@@ -75,6 +79,7 @@ impl From<&context::ContextArgs> for Inner {
             pool_idle_timeout: args.pool_idle_timeout as u64,
             preauth_api: args.preauth_api.clone(),
             proxies: args.proxies.clone(),
+            interface: args.interface,
             ipv6_subnet,
         }
     }
@@ -93,13 +98,13 @@ impl ClientLoadBalancer {
         build_fn: F,
     ) -> anyhow::Result<Self>
     where
-        F: Fn(&Inner, Option<IpAddr>, Option<&String>, bool) -> T,
+        F: Fn(&Inner, Option<IpAddr>, Option<IpAddr>, Option<&String>, bool) -> T,
     {
         let inner = Inner::from(args);
         let mut clients = Vec::with_capacity(inner.proxies.len() + 1);
 
         let mut add_client = |proxy: Option<&String>| {
-            let client = build_fn(&inner, args.interface, proxy, false);
+            let client = build_fn(&inner, args.interface, None, proxy, false);
             clients.push(client_type(client));
         };
 
@@ -134,12 +139,20 @@ impl ClientLoadBalancer {
     fn rebuild_client_with_ipv6(&self, client: &ClientType) -> ClientType {
         let bind_addr = self.inner.ipv6_subnet.as_ref().unwrap().get_random_ipv6();
         match client {
-            ClientType::Auth(_) => {
-                ClientType::Auth(build_auth_client(&self.inner, Some(bind_addr), None, true))
-            }
-            ClientType::Regular(_) => {
-                ClientType::Regular(build_client(&self.inner, Some(bind_addr), None, true))
-            }
+            ClientType::Auth(_) => ClientType::Auth(build_auth_client(
+                &self.inner,
+                Some(bind_addr),
+                self.inner.interface,
+                None,
+                true,
+            )),
+            ClientType::Regular(_) => ClientType::Regular(build_client(
+                &self.inner,
+                Some(bind_addr),
+                self.inner.interface,
+                None,
+                true,
+            )),
         }
     }
 
@@ -176,7 +189,8 @@ impl ClientLoadBalancer {
 
 fn build_client(
     inner: &Inner,
-    bind_addr: Option<IpAddr>,
+    preferred_addrs: Option<IpAddr>,
+    fallback_addrs: Option<IpAddr>,
     proxy_url: Option<&String>,
     disable_keep_alive: bool,
 ) -> Client {
@@ -199,12 +213,20 @@ fn build_client(
             .pool_idle_timeout(Duration::from_secs(inner.pool_idle_timeout));
     }
 
+    match (preferred_addrs, fallback_addrs) {
+        (None, Some(_)) => builder = builder.local_address(fallback_addrs),
+        (Some(_), None) => builder = builder.local_address(preferred_addrs),
+        (Some(IpAddr::V4(v4)), Some(IpAddr::V6(v6)))
+        | (Some(IpAddr::V6(v6)), Some(IpAddr::V4(v4))) => builder = builder.local_addresses(v4, v6),
+        _ => {}
+    }
+
     let client = builder
         .user_agent(HEADER_UA)
         .impersonate(Impersonate::OkHttpAndroid13)
+        .danger_accept_invalid_certs(true)
         .connect_timeout(Duration::from_secs(inner.connect_timeout))
         .timeout(Duration::from_secs(inner.timeout))
-        .local_address(bind_addr)
         .build()
         .expect("Failed to build API client");
     client
@@ -212,7 +234,8 @@ fn build_client(
 
 fn build_auth_client(
     inner: &Inner,
-    bind_addr: Option<IpAddr>,
+    preferred_addrs: Option<IpAddr>,
+    fallback_addrs: Option<IpAddr>,
     proxy_url: Option<&String>,
     disable_keep_alive: bool,
 ) -> AuthClient {
@@ -228,13 +251,20 @@ fn build_auth_client(
             .pool_idle_timeout(Duration::from_secs(inner.pool_idle_timeout));
     }
 
+    match (preferred_addrs, fallback_addrs) {
+        (None, Some(_)) => builder = builder.local_address(fallback_addrs),
+        (Some(_), None) => builder = builder.local_address(preferred_addrs),
+        (Some(IpAddr::V4(v4)), Some(IpAddr::V6(v6)))
+        | (Some(IpAddr::V6(v6)), Some(IpAddr::V4(v4))) => builder = builder.local_addresses(v4, v6),
+        _ => {}
+    }
+
     builder
         .user_agent(HEADER_UA)
         .impersonate(Impersonate::OkHttpAndroid13)
         .timeout(Duration::from_secs(inner.timeout))
         .connect_timeout(Duration::from_secs(inner.connect_timeout))
         .proxy(proxy_url.cloned())
-        .local_address(bind_addr)
         .preauth_api(inner.preauth_api.clone())
         .build()
 }

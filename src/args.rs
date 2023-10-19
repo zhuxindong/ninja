@@ -77,7 +77,7 @@ pub(super) struct ServeArgs {
     #[clap(short = 'x',long, env = "PROXIES", value_parser = parse::parse_proxies_url, group = "proxy")]
     pub(super) proxies: Option<std::vec::Vec<String>>,
 
-    /// Bind address for outgoing connections
+    /// Bind address for outgoing connections (or IPv6 subnet fallback to Ipv4)
     #[clap(short = 'i', long, env = "INTERFACE", value_parser = parse::parse_host)]
     pub(super) interface: Option<std::net::IpAddr>,
 
