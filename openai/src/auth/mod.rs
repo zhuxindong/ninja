@@ -3,7 +3,7 @@ pub mod provide;
 extern crate regex;
 
 use std::collections::HashMap;
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -406,6 +406,13 @@ impl AuthClientBuilder {
         self
     }
 
+    /// Set that all sockets are bound to the configured IPv4 or IPv6 address (depending on host's
+    /// preferences) before connection.
+    pub fn local_addresses(mut self, addr_ipv4: Ipv4Addr, addr_ipv6: Ipv6Addr) -> Self {
+        self.inner = self.inner.local_addresses(addr_ipv4, addr_ipv6);
+        self
+    }
+
     pub fn build(self) -> AuthClient {
         let client = self.inner.build().expect("ClientBuilder::build()");
 
@@ -429,6 +436,7 @@ impl AuthClientBuilder {
         AuthClientBuilder {
             inner: Client::builder()
                 .impersonate(Impersonate::OkHttpAndroid13)
+                .danger_accept_invalid_certs(true)
                 .connect_timeout(Duration::from_secs(30))
                 .redirect(Policy::none()),
             preauth_api: None,
