@@ -51,11 +51,23 @@ async fn proxy(
             .map_err(ResponseError::InternalServerError)?);
     }
 
-    if uri
-        .path()
-        .eq("/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147")
-    {
-        if let Ok(arkose_token) = ArkoseToken::new_from_context(Type::Chat).await {
+    let req_path = uri.path();
+
+    if req_path.contains("/fc/gt2/public_key/") {
+        let arkose_res = match req_path {
+            s if s.contains("35536E1E-65B4-4D96-9D97-6ADB7EFF8147") => {
+                ArkoseToken::new_from_context(Type::Chat).await
+            }
+            s if s.contains("0A1D34FC-659D-4E23-B17B-694DCFCF6A6C") => {
+                ArkoseToken::new_from_context(Type::Auth0).await
+            }
+            s if s.contains("23AAD243-4799-4A9E-B01D-1166C5DE02DF") => {
+                ArkoseToken::new_from_context(Type::Platform).await
+            }
+            _ => Err(anyhow::anyhow!("Invalid public key: {req_path}")),
+        };
+        
+        if let Ok(arkose_token) = arkose_res {
             if arkose_token.success() {
                 let target = serde_json::json!({
                     "token": arkose_token,
