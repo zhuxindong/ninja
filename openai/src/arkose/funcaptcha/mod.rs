@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::{collections::HashMap, str::FromStr};
 
-const INIT_HEX: &str = "cd12da708fe6cbe6e068918c38de2ad9";
+const INIT_HEX: &str = "fbfc14b0d793c6ef8359e0e4b4a91f67";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -80,7 +80,7 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
         client: ctx.client(),
     };
 
-    session.headers.insert(header::REFERER, format!("https://client-api.arkoselabs.com/fc/assets/ec-game-core/game-core/1.13.0/standard/index.html?session={}", arkose_token.replace("|", "&")).parse()?);
+    session.headers.insert(header::REFERER, format!("https://client-api.arkoselabs.com/fc/assets/ec-game-core/game-core/1.15.0/standard/index.html?session={}", arkose_token.replace("|", "&")).parse()?);
     session
         .headers
         .insert(header::DNT, header::HeaderValue::from_static("1"));
@@ -90,7 +90,7 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
             "",
             0,
             "Site URL",
-            format!("https://client-api.arkoselabs.com/v2/1.5.2/enforcement.{INIT_HEX}.html",),
+            format!("https://client-api.arkoselabs.com/v2/1.5.5/enforcement.{INIT_HEX}.html",),
         )
         .await?;
 
@@ -104,6 +104,10 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
     debug!("game_variant: {:#?}", concise_challenge.game_variant);
     debug!("images: {:#?}", concise_challenge.urls);
 
+    if concise_challenge.urls.len() >= 5 {
+        warn!("funcaptcha images count >= 10, please use `solver: capsolver`");
+    }
+
     let funcaptcha_list = images
         .into_iter()
         .map(|image| FunCaptcha {
@@ -112,7 +116,7 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
             game_variant: concise_challenge.game_variant.clone(),
         })
         .collect::<Vec<FunCaptcha>>();
-
+    
     session.funcaptcha = Some(Arc::new(funcaptcha_list));
 
     Ok(session)
