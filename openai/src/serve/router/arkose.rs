@@ -66,7 +66,7 @@ async fn proxy(
             }
             _ => Err(anyhow::anyhow!("Invalid public key: {req_path}")),
         };
-        
+
         if let Ok(arkose_token) = arkose_res {
             if arkose_token.success() {
                 let target = serde_json::json!({

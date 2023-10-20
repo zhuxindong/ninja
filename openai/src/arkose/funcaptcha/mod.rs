@@ -116,7 +116,7 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
             game_variant: concise_challenge.game_variant.clone(),
         })
         .collect::<Vec<FunCaptcha>>();
-    
+
     session.funcaptcha = Some(Arc::new(funcaptcha_list));
 
     Ok(session)
