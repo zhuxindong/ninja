@@ -19,6 +19,40 @@ pub(crate) fn check_root() {
     }
 }
 
+#[cfg(target_os = "linux")]
+pub(crate) fn sysctl_ipv6_no_local_bind(enable: bool) {
+    if !enable {
+        return;
+    }
+
+    use nix::unistd::Uid;
+
+    if !Uid::effective().is_root() {
+        return;
+    }
+
+    use sysctl::Sysctl;
+    const CTLNAME: &str = "net.ipv6.ip_nonlocal_bind";
+
+    let ctl = <sysctl::Ctl as Sysctl>::new(CTLNAME)
+        .expect(&format!("could not get sysctl '{}'", CTLNAME));
+    let _ = ctl.name().expect("could not get sysctl name");
+
+    let old_value = ctl.value_string().expect("could not get sysctl value");
+
+    let target_value = match old_value.as_ref() {
+        "0" => "1",
+        "1" | _ => &old_value,
+    };
+
+    ctl.set_value_string(target_value).unwrap_or_else(|e| {
+        panic!(
+            "could not set sysctl '{}' to '{}': {}",
+            CTLNAME, target_value, e
+        )
+    });
+}
+
 #[cfg(target_family = "unix")]
 pub(crate) fn get_pid() -> Option<String> {
     if let Ok(data) = std::fs::read(PID_PATH) {

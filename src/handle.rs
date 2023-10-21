@@ -23,6 +23,9 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         args = toml::from_str::<ServeArgs>(&data)?;
     }
 
+    #[cfg(target_os = "linux")]
+    crate::env::sysctl_ipv6_no_local_bind(args.ipv6_subnet.is_some());
+
     // disable_direct and proxies are mutually exclusive
     if args.disable_direct {
         if args.proxies.is_none() || args.proxies.clone().is_some_and(|x| x.is_empty()) {
@@ -92,6 +95,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         )));
     }
     let args = builder.build()?;
+
     Launcher::new(args).run()
 }
 
@@ -105,6 +109,8 @@ pub(super) fn serve_start(mut args: ServeArgs) -> anyhow::Result<()> {
     };
 
     check_root();
+    #[cfg(target_os = "linux")]
+    crate::env::sysctl_ipv6_no_local_bind(args.ipv6_subnet.is_some());
 
     if let Some(pid) = get_pid() {
         println!("Ninja is already running with pid: {}", pid);
