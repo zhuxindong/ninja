@@ -39,7 +39,7 @@ use crate::serve::turnstile;
 use crate::serve::EMPTY;
 use crate::{
     auth::{model::AuthAccount, provide::AuthProvider},
-    model::AuthenticateToken,
+    token::model::AuthenticateToken,
     URL_CHATGPT_API,
 };
 

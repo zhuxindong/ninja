@@ -172,18 +172,37 @@ services:
 ### 命令手册
 
 ```shell
-$ ninja serve --help
-Start the http server
+$ ninja --help
+Reverse engineered ChatGPT proxy
 
-Usage: ninja serve run [OPTIONS]
+Usage: ninja [COMMAND]
+
+Commands:
+  run      Run the HTTP server
+  stop     Stop the HTTP server daemon
+  start    Start the HTTP server daemon
+  restart  Restart the HTTP server daemon
+  status   Status of the Http server daemon process
+  log      Show the Http server daemon log
+  gt       Generate config template file (toml format file)
+  help     Print this message or the help of the given subcommand(s)
 
 Options:
+  -h, --help     Print help
+  -V, --version  Print version
+
+$ ninja run --help
+Run the HTTP server
+
+Usage: ninja run [OPTIONS]
+
+Options:
+  -L, --level <LEVEL>
+          Log level (info/debug/warn/trace/error) [env: LOG=] [default: info]
   -C, --config <CONFIG>
           Configuration file path (toml format file) [env: CONFIG=]
   -H, --host <HOST>
           Server Listen host [env: HOST=] [default: 0.0.0.0]
-  -L, --level <LEVEL>
-          Log level (info/debug/warn/trace/error) [env: LOG=] [default: info]
   -P, --port <PORT>
           Server Listen port [env: PORT=] [default: 7999]
   -W, --workers <WORKERS>
@@ -193,7 +212,7 @@ Options:
   -x, --proxies <PROXIES>
           Server proxies pool, Example: protocol://user:pass@ip:port [env: PROXIES=]
   -i, --interface <INTERFACE>
-          Bind address for outgoing connections [env: INTERFACE=]
+          Bind address for outgoing connections (or IPv6 subnet fallback to Ipv4) [env: INTERFACE=]
   -I, --ipv6-subnet <IPV6_SUBNET>
           IPv6 subnet, Example: 2001:19f0:6001:48e4::/64 [env: IPV4_SUBNET=]
       --disable-direct

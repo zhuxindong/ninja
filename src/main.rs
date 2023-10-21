@@ -11,22 +11,42 @@ use tikv_jemallocator::Jemalloc;
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc;
 
-use args::SubCommands;
 use clap::Parser;
-use tokio::runtime;
+
+#[cfg(feature = "terminal")]
+pub mod inter;
+#[cfg(feature = "terminal")]
+pub mod store;
 
 pub mod args;
 pub mod env;
 pub mod handle;
-pub mod inter;
 pub mod parse;
-pub mod store;
 
 fn main() -> anyhow::Result<()> {
-    let opt = args::Opt::parse();
-    std::env::set_var("RUST_LOG", opt.level);
+    let opt = args::cmd::Opt::parse();
 
+    #[cfg(all(feature = "serve", not(feature = "terminal")))]
     if let Some(command) = opt.command {
+        match command {
+            args::ServeSubcommand::Run(args) => handle::serve(args, false)?,
+            #[cfg(target_family = "unix")]
+            args::ServeSubcommand::Stop => handle::serve_stop()?,
+            #[cfg(target_family = "unix")]
+            args::ServeSubcommand::Start(args) => handle::serve_start(args)?,
+            #[cfg(target_family = "unix")]
+            args::ServeSubcommand::Restart(args) => handle::serve_restart(args)?,
+            #[cfg(target_family = "unix")]
+            args::ServeSubcommand::Status => handle::serve_status()?,
+            #[cfg(target_family = "unix")]
+            args::ServeSubcommand::Log => handle::serve_log()?,
+            args::ServeSubcommand::GT { out } => handle::generate_template(out)?,
+        }
+    }
+
+    #[cfg(all(feature = "serve", feature = "terminal"))]
+    if let Some(command) = opt.command {
+        use args::cmd::SubCommands;
         match command {
             SubCommands::Serve(commands) => match commands {
                 args::ServeSubcommand::Run(args) => handle::serve(args, true)?,
@@ -43,7 +63,7 @@ fn main() -> anyhow::Result<()> {
                 args::ServeSubcommand::GT { out } => handle::generate_template(out)?,
             },
             SubCommands::Terminal => {
-                let runtime = runtime::Builder::new_multi_thread()
+                let runtime = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .worker_threads(1)
                     .max_blocking_threads(1)

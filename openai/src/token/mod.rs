@@ -1,9 +1,9 @@
-use std::str::FromStr;
+pub mod model;
 
 use crate::now_duration;
-
 use jsonwebtokens::{Algorithm, AlgorithmID, Verifier};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 pub const PUBLIC_KEY: &[u8] = "-----BEGIN PUBLIC KEY-----\n\
 MIIC+zCCAeOgAwIBAgIJLlfMWYK8snRdMA0GCSqGSIb3DQEBCwUAMBsxGTAXBgNVBAM\n\

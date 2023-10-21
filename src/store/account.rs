@@ -1,6 +1,6 @@
 use super::{Store, StoreId, StoreResult};
 use openai::homedir::home_dir;
-use openai::{auth::model::AuthStrategy, model::AuthenticateToken};
+use openai::{auth::model::AuthStrategy, token::model::AuthenticateToken};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, ops::Not, path::PathBuf};
 

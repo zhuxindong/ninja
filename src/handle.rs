@@ -32,7 +32,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
     // disable_direct and proxies are mutually exclusive
     if args.disable_direct {
         if args.proxies.is_none() || args.proxies.clone().is_some_and(|x| x.is_empty()) {
-            let mut cmd = args::Opt::command();
+            let mut cmd = args::cmd::Opt::command();
             cmd.error(
                 clap::error::ErrorKind::ArgumentConflict,
                 "Cannot disable direct connection and not set proxies",
@@ -46,8 +46,10 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         None => None,
     };
 
-    let mut builder = ContextArgsBuilder::default();
+    // Set the log level
+    std::env::set_var("RUST_LOG", args.level);
 
+    let mut builder = ContextArgsBuilder::default();
     let builder = builder
         .host(
             args.host
@@ -62,12 +64,6 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .cookie_store(args.cookie_store)
         .api_prefix(args.api_prefix)
         .preauth_api(args.preauth_api)
-        .arkose_endpoint(args.arkose_endpoint)
-        .arkose_chat_har_file(args.arkose_chat_har_file)
-        .arkose_auth_har_file(args.arkose_auth_har_file)
-        .arkose_platform_har_file(args.arkose_platform_har_file)
-        .arkose_har_upload_key(args.arkose_har_upload_key)
-        .arkose_token_endpoint(args.arkose_token_endpoint)
         .tls_keypair(None)
         .tcp_keepalive(args.tcp_keepalive)
         .pool_idle_timeout(args.pool_idle_timeout)
@@ -80,6 +76,12 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .disable_ui(args.disable_webui)
         .puid_email(puid_user.0)
         .puid_password(puid_user.1)
+        .arkose_endpoint(args.arkose_endpoint)
+        .arkose_chat_har_file(args.arkose_chat_har_file)
+        .arkose_auth_har_file(args.arkose_auth_har_file)
+        .arkose_platform_har_file(args.arkose_platform_har_file)
+        .arkose_har_upload_key(args.arkose_har_upload_key)
+        .arkose_token_endpoint(args.arkose_token_endpoint)
         .arkose_solver(arkose_sovler);
 
     #[cfg(feature = "limit")]

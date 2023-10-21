@@ -3,7 +3,7 @@ use std::time::Duration;
 use inquire::{min_length, required, MultiSelect, Password, PasswordDisplayMode, Select, Text};
 use openai::auth::model::{AuthAccountBuilder, AuthStrategy};
 use openai::auth::provide::AuthProvider;
-use openai::model::AuthenticateToken;
+use openai::token::model::AuthenticateToken;
 
 use crate::inter::standard::Auth;
 use crate::inter::{json_to_table, new_spinner, render_config};

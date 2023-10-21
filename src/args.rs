@@ -1,31 +1,46 @@
 use crate::parse;
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Subcommand};
 use openai::{arkose::funcaptcha::Solver, serve::middleware::tokenbucket::Strategy};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Parser)]
-#[clap(author, version, about, arg_required_else_help = true)]
-pub(super) struct Opt {
-    #[clap(subcommand)]
-    pub(super) command: Option<SubCommands>,
-    /// Log level (info/debug/warn/trace/error)
-    #[clap(short = 'L', long, global = true, env = "LOG", default_value = "info")]
-    pub(super) level: String,
+#[cfg(all(feature = "serve", not(feature = "terminal")))]
+pub mod cmd {
+    use super::ServeSubcommand;
+    use clap::Parser;
+
+    #[derive(Parser)]
+    #[clap(author, version, about, arg_required_else_help = true)]
+    pub struct Opt {
+        #[clap(subcommand)]
+        pub command: Option<ServeSubcommand>,
+    }
 }
 
-#[allow(clippy::large_enum_variant)]
-#[derive(Subcommand)]
-pub(super) enum SubCommands {
-    /// Start the http server
-    #[clap(subcommand)]
-    Serve(ServeSubcommand),
-    /// Terminal interaction
-    Terminal,
+#[cfg(all(feature = "serve", feature = "terminal"))]
+pub mod cmd {
+    use super::{ServeSubcommand, Subcommand};
+    use clap::Parser;
+    #[derive(Parser)]
+    #[clap(author, version, about, arg_required_else_help = true)]
+    pub struct Opt {
+        #[clap(subcommand)]
+        pub command: Option<SubCommands>,
+    }
+
+    #[allow(clippy::large_enum_variant)]
+    #[derive(Subcommand)]
+    pub enum SubCommands {
+        /// Start the http server
+        #[clap(subcommand)]
+        Serve(ServeSubcommand),
+        /// Terminal interaction
+        Terminal,
+    }
 }
 
 #[derive(Subcommand)]
-pub(super) enum ServeSubcommand {
+pub enum ServeSubcommand {
     /// Run the HTTP server
     Run(ServeArgs),
     /// Stop the HTTP server daemon
@@ -52,7 +67,11 @@ pub(super) enum ServeSubcommand {
 }
 
 #[derive(Args, Debug, Default, Serialize, Deserialize)]
-pub(super) struct ServeArgs {
+pub struct ServeArgs {
+    /// Log level (info/debug/warn/trace/error)
+    #[clap(short = 'L', long, global = true, env = "LOG", default_value = "info")]
+    pub(super) level: String,
+
     /// Configuration file path (toml format file)
     #[clap(short = 'C', long, env = "CONFIG", value_parser = parse::parse_file_path)]
     pub(super) config: Option<PathBuf>,

@@ -5,6 +5,8 @@ use std::time::Duration;
 pub mod arkose;
 pub mod auth;
 pub mod balancer;
+
+#[cfg(feature = "api")]
 pub mod chatgpt;
 pub mod context;
 pub mod error;
@@ -12,7 +14,7 @@ pub mod error;
 pub mod eventsource;
 pub mod homedir;
 pub mod log;
-pub mod model;
+#[cfg(feature = "api")]
 pub mod platform;
 pub mod unescape;
 pub mod urldecoding;

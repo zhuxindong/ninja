@@ -32,7 +32,7 @@ async fn main() -> anyhow::Result<()> {
                 .build()?,
         )
         .await?;
-    let auth_token = openai::model::AuthenticateToken::try_from(token)?;
+    let auth_token = openai::token::model::AuthenticateToken::try_from(token)?;
     println!("AuthenticationToken: {:#?}", auth_token);
     println!("AccessToken: {}", auth_token.access_token());
 

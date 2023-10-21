@@ -13,18 +13,19 @@ readme = "README.md"
 [dependencies]
 anyhow = "1.0.75"
 clap = { version = "4.4.3", features = ["derive", "env"] }
-tokio = { version = "1.32.0", default-features = false, features = ["rt"] }
 serde = {version = "1.0.188", features = ["derive"] }
-serde_json = "1.0.107"
+openai = { path = "openai" }
+cidr = "0.2.2"
 toml = "0.8.0"
 url = "2.4.1"
-openai = { path = "openai" }
-inquire = "0.6.2"
-colored_json = "3.2.0"
-indicatif = "0.17.6"
-json_to_table = "0.6.0"
-tabled = "0.12.2"
-cidr = "0.2.2"
+
+tokio = { version = "1.32.0", default-features = false, features = ["rt"], optional = true }
+serde_json = { version = "1.0.107", optional = true }
+inquire = { version = "0.6.2", optional =  true }
+colored_json = { version = "3.2.0", optional = true }
+indicatif = { version = "0.17.6", optional = true }
+json_to_table = { version = "0.6.0", optional = true }
+tabled = { version = "0.12.2", optional = true }
 
 [target.'cfg(target_family = "unix")'.dependencies]
 daemonize = "0.5.0"
@@ -35,6 +36,7 @@ tikv-jemallocator = "0.5.4"
 
 [dev-dependencies]
 futures-util = "0.3.28"
+tokio = { version = "1.32.0", default-features = false, features = ["rt"] }
 reqwest = { package = "reqwest-impersonate", version ="0.11.27", default-features = false, features = [
     "boring-tls", "impersonate","json", "cookies", "stream", "multipart", "socks", "blocking"
 ] }
@@ -44,7 +46,17 @@ hex = "0.4.3"
 sha2 = "0.10.8"
 
 [features]
-default = ["limit"]
+default = ["serve"]
+terminal = [
+    "dep:tokio", 
+    "dep:serde_json", 
+    "dep:inquire", 
+    "dep:colored_json", 
+    "dep:indicatif",
+    "dep:json_to_table",
+    "dep:tabled"
+    ]
+serve = ["limit"]
 limit = ["openai/limit", "openai/serve"]
 
 [[bin]]
