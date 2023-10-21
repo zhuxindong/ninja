@@ -181,12 +181,6 @@ msgstr "禁用 WebUI"
 msgid "WebUI API prefix"
 msgstr "WebUI API 前缀"
 
-msgid "PUID Account"
-msgstr "PUID 账号"
-
-msgid "Obtain the PUID of the Plus account user, Example: `user:pass`"
-msgstr "获取 Plus 用户账号的 PUID，示例: `user:pass`"
-
 msgid "CF Site Key"
 msgstr "CF Site Key"
 

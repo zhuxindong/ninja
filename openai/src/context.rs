@@ -100,18 +100,6 @@ pub struct ContextArgs {
     #[builder(setter(into), default)]
     pub(crate) tls_keypair: Option<(PathBuf, PathBuf)>,
 
-    /// Get the user password of the PUID
-    #[builder(setter(into), default)]
-    pub(crate) puid_password: Option<String>,
-
-    /// Get the user mailbox of the PUID
-    #[builder(setter(into), default)]
-    pub(crate) puid_email: Option<String>,
-
-    /// Account Plus puid cookie value
-    #[builder(setter(into), default)]
-    puid: Option<String>,
-
     /// Disable web ui
     #[builder(setter(into), default = "false")]
     pub(crate) disable_ui: bool,
@@ -216,8 +204,6 @@ static HAR: OnceLock<RwLock<HashMap<arkose::Type, Har>>> = OnceLock::new();
 pub struct Context {
     client_load: Option<ClientLoadBalancer>,
     auth_client_load: Option<ClientLoadBalancer>,
-    /// Account Plus puid cookie value
-    share_puid: RwLock<String>,
     /// arkoselabs solver
     arkose_solver: Option<ArkoseSolver>,
     /// get arkose-token endpoint
@@ -270,7 +256,6 @@ impl Context {
             arkose_solver: args.arkose_solver,
             arkose_token_endpoint: args.arkose_token_endpoint,
             arkose_har_upload_key: args.arkose_har_upload_key,
-            share_puid: RwLock::new(args.puid.unwrap_or_default()),
             cf_turnstile: args.cf_site_key.and_then(|site_key| {
                 args.cf_secret_key.map(|secret_key| CfTurnstile {
                     site_key,
@@ -297,17 +282,6 @@ impl Context {
             .expect("The load balancer auth client is not initialized")
             .next()
             .into()
-    }
-
-    pub fn get_share_puid(&self) -> std::sync::RwLockReadGuard<'_, String> {
-        self.share_puid.read().expect("Failed to get puid")
-    }
-
-    pub fn set_share_puid(&self, puid: &str) {
-        let mut lock = self.share_puid.write().expect("Failed to get puid");
-        lock.clear();
-        lock.push_str(puid);
-        drop(lock)
     }
 
     pub fn arkose_har_upload_key(&self) -> Option<&String> {
@@ -366,7 +340,7 @@ fn init_har(_type: arkose::Type, path: &Option<PathBuf>, default_filename: &str)
             !har_data.is_empty()
         }
         false => {
-            info!("Create default HAR file: {}", default_path.display());
+            info!("Create default HAR empty file: {}", default_path.display());
             let har_file = std::fs::File::create(&default_path).expect("Failed to create har file");
             drop(har_file);
             false

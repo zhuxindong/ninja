@@ -23,12 +23,6 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         args = toml::from_str::<ServeArgs>(&data)?;
     }
 
-    let puid_user = if let Some(puid_user) = args.puid_user {
-        (Some(puid_user.0), Some(puid_user.1))
-    } else {
-        (None, None)
-    };
-
     // disable_direct and proxies are mutually exclusive
     if args.disable_direct {
         if args.proxies.is_none() || args.proxies.clone().is_some_and(|x| x.is_empty()) {
@@ -74,8 +68,6 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .cf_site_key(args.cf_site_key)
         .cf_secret_key(args.cf_secret_key)
         .disable_ui(args.disable_webui)
-        .puid_email(puid_user.0)
-        .puid_password(puid_user.1)
         .arkose_endpoint(args.arkose_endpoint)
         .arkose_chat_har_file(args.arkose_chat_har_file)
         .arkose_auth_har_file(args.arkose_auth_har_file)
