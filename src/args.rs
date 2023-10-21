@@ -136,10 +136,6 @@ pub struct ServeArgs {
     #[clap(long, env = "TLS_KEY", requires = "tls_cert")]
     pub(super) tls_key: Option<PathBuf>,
 
-    /// Obtain the PUID of the Plus account user, Example: `user:pass`
-    #[clap(long, value_parser = parse::parse_puid_user)]
-    pub(super) puid_user: Option<(String, String)>,
-
     /// WebUI api prefix
     #[clap(long, env = "API_PREFIX", value_parser = parse::parse_url)]
     pub(super) api_prefix: Option<String>,

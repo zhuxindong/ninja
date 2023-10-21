@@ -35,9 +35,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use std::net::{IpAddr, SocketAddr};
 
 use crate::arkose::Type;
-use crate::auth::model::{
-    AccessToken, AuthAccount, AuthAccountBuilder, AuthStrategy, RefreshToken,
-};
+use crate::auth::model::{AccessToken, AuthAccount, RefreshToken};
 use crate::auth::provide::AuthProvider;
 use crate::context::{self, ContextArgs};
 use crate::serve::middleware::tokenbucket::TokenBucketLimitContext;
@@ -160,10 +158,6 @@ impl Launcher {
 
         runtime.block_on(async {
             tokio::spawn(check_wan_address());
-            tokio::spawn(initialize_puid(
-                self.inner.puid_email.clone(),
-                self.inner.puid_password.clone(),
-            ));
 
             let router = axum::Router::new()
                 // official dashboard api endpoint
@@ -225,6 +219,7 @@ impl Launcher {
     }
 }
 
+/// POST /auth/token
 async fn post_access_token(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     mut account: axum::Form<AuthAccount>,
@@ -234,6 +229,7 @@ async fn post_access_token(
     Ok(Json(res))
 }
 
+/// POST /auth/refresh_token
 async fn post_refresh_token(
     TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
 ) -> Result<Json<RefreshToken>, ResponseError> {
@@ -244,6 +240,7 @@ async fn post_refresh_token(
     }
 }
 
+/// POST /auth/revoke_token
 async fn post_revoke_token(
     TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
 ) -> Result<axum::http::StatusCode, ResponseError> {
@@ -394,23 +391,10 @@ pub(super) async fn header_convert(
         cookie.push_str(&format!("_puid={puid};"))
     }
 
-    match jar.get("_puid") {
-        Some(cookier) => {
-            let c = &format!("_puid={};", puid_cookie_encoded(cookier.value()));
-            cookie.push_str(c);
-            debug!("request cookie `puid`: {}", c);
-        }
-        None => {
-            if !has_puid(&headers)? {
-                let ctx = context::get_instance();
-                let puid = ctx.get_share_puid();
-                if !puid.is_empty() {
-                    let c = &format!("_puid={};", puid);
-                    cookie.push_str(c);
-                    debug!("Local `puid`: {}", c);
-                }
-            }
-        }
+    if let Some(cookier) = jar.get("_puid") {
+        let c = &format!("_puid={};", puid_cookie_encoded(cookier.value()));
+        cookie.push_str(c);
+        debug!("request cookie `puid`: {}", c);
     }
 
     // setting cookie
@@ -595,66 +579,6 @@ async fn check_wan_address() {
         },
         Err(err) => {
             warn!("Check IP request error: {}", err)
-        }
-    }
-}
-
-async fn initialize_puid(username: Option<String>, password: Option<String>) {
-    if username.is_none() || password.is_none() {
-        return;
-    }
-    let mut interval = tokio::time::interval(Duration::from_secs(24 * 60 * 60)); // 24 hours
-
-    let mut account = AuthAccountBuilder::default()
-        .username(username.expect("username is empty"))
-        .password(password.expect("password is empty"))
-        .option(AuthStrategy::Apple)
-        .build()
-        .expect("build auth account error");
-
-    let ctx = context::get_instance();
-    loop {
-        interval.tick().await;
-        for _ in 0..2 {
-            match ctx.auth_client().do_access_token(&account).await {
-                Ok(v) => {
-                    let access_token = match v {
-                        AccessToken::Session(access_token) => access_token.access_token,
-                        AccessToken::OAuth(access_token) => access_token.access_token,
-                    };
-                    match ctx
-                        .client()
-                        .get(format!("{URL_CHATGPT_API}/backend-api/models"))
-                        .bearer_auth(access_token)
-                        .send()
-                        .await
-                    {
-                        Ok(resp) => match resp.error_for_status() {
-                            Ok(v) => match v.cookies().into_iter().find(|v| v.name().eq("_puid")) {
-                                Some(cookie) => {
-                                    let puid = cookie.value();
-                                    info!("Update PUID: {puid}");
-                                    ctx.set_share_puid(puid);
-                                    break;
-                                }
-                                None => {
-                                    warn!("Your account may not be Plus")
-                                }
-                            },
-                            Err(err) => {
-                                warn!("failed to get puid error: {}", err)
-                            }
-                        },
-                        Err(err) => {
-                            warn!("[{}] Error: {err}", account.option);
-                        }
-                    }
-                }
-                Err(err) => {
-                    warn!("login error: {}", err);
-                    account.option = AuthStrategy::Web
-                }
-            }
         }
     }
 }

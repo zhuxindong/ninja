@@ -61,9 +61,6 @@ o = s:option(Value, "preauth_api", translate("PreAuth API"), translate("PreAuth 
 
 o = s:option(Value, "api_prefix", translate("WebUI API prefix"))
 
-o = s:option(Value, "puid_user", translate("PUID Account"), translate("Obtain the PUID of the Plus account user, Example: `user:pass`"))
-o.password = true
-
 o = s:option(Value, "cf_site_key", translate("CF Site Key"), translate("Cloudflare turnstile captcha site key"))
 
 o = s:option(Value, "cf_secret_key", translate("CF Secret Key"), translate("Cloudflare turnstile captcha secret key"))
