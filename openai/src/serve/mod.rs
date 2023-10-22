@@ -8,7 +8,6 @@ pub mod signal;
 
 use anyhow::anyhow;
 use axum::body::StreamBody;
-use axum::extract::ConnectInfo;
 use axum::headers::authorization::Bearer;
 use axum::headers::Authorization;
 use axum::http::Response;
@@ -221,10 +220,19 @@ impl Launcher {
 
 /// POST /auth/token
 async fn post_access_token(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    bearer: Option<TypedHeader<Authorization<Bearer>>>,
     mut account: axum::Form<AuthAccount>,
 ) -> Result<Json<AccessToken>, ResponseError> {
-    turnstile::cf_turnstile_check(&addr.ip(), account.cf_turnstile_response.as_deref()).await?;
+    if let Some(key) = context::get_instance().auth_key() {
+        let bearer = bearer.ok_or(ResponseError::Unauthorized(anyhow!(
+            "Login Authentication Key required!"
+        )))?;
+        if bearer.token().ne(key) {
+            return Err(ResponseError::Unauthorized(anyhow!(
+                "Authentication Key error!"
+            )));
+        }
+    }
     let res: AccessToken = try_login(&mut account).await?;
     Ok(Json(res))
 }

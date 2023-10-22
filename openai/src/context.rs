@@ -100,6 +100,10 @@ pub struct ContextArgs {
     #[builder(setter(into), default)]
     pub(crate) tls_keypair: Option<(PathBuf, PathBuf)>,
 
+    /// Login auth key
+    #[builder(setter(into), default)]
+    auth_key: Option<String>,
+
     /// Disable web ui
     #[builder(setter(into), default = "false")]
     pub(crate) disable_ui: bool,
@@ -210,6 +214,8 @@ pub struct Context {
     arkose_token_endpoint: Option<String>,
     /// HAR file upload authenticate key
     arkose_har_upload_key: Option<String>,
+    /// Login auth key
+    auth_key: Option<String>,
     /// Cloudflare Turnstile
     cf_turnstile: Option<CfTurnstile>,
     /// Web UI api prefix
@@ -263,6 +269,7 @@ impl Context {
                 })
             }),
             api_prefix: args.api_prefix,
+            auth_key: args.auth_key,
         }
     }
 
@@ -318,6 +325,10 @@ impl Context {
 
     pub fn arkose_endpoint(&self) -> Option<&String> {
         self.arkose_endpoint.as_ref()
+    }
+
+    pub fn auth_key(&self) -> Option<&String> {
+        self.auth_key.as_ref()
     }
 }
 

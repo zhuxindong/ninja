@@ -57,6 +57,9 @@ o.rmempty = false
 o = s:option(Flag, "disable_webui", translate("Disable WebUI"))
 o.rmempty = false
 
+o = s:option(Value, "auth_key", translate("Auth Key"), translate("Login Authentication Key"))
+o.password = true
+
 o = s:option(Value, "preauth_api", translate("PreAuth API"), translate("PreAuth Cookie API URL"))
 
 o = s:option(Value, "api_prefix", translate("WebUI API prefix"))
@@ -73,6 +76,7 @@ o = s:option(Value, "arkose_auth_har_file", translate("Auth HAR file path"), tra
 o = s:option(Value, "arkose_platform_har_file", translate("Platform HAR file path"), translate("About the browser HAR file path requested by Platform ArkoseLabs"))
 
 o = s:option(Value, "arkose_har_upload_key", translate("HAR Auth Key"), translate("HAR file upload authenticate key"))
+o.password = true
 
 o = s:option(Value, "arkose_solver", translate("Solver"), translate("About ArkoseLabs solver platform"))
 o:value("yescaptcha", "yescaptcha");
