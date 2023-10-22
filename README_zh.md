@@ -91,8 +91,8 @@
   GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 deb包，二进制文件，以Ubuntu为例：
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.7.0/ninja-0.7.0-x86_64-unknown-linux-musl.deb
-dpkg -i ninja-0.7.0-x86_64-unknown-linux-musl.deb
+wget https://github.com/gngpp/ninja/releases/download/v0.7.1/ninja-0.7.1-x86_64-unknown-linux-musl.deb
+dpkg -i ninja-0.7.1-x86_64-unknown-linux-musl.deb
 ninja serve run
 ```
 
@@ -101,11 +101,11 @@ ninja serve run
 GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 ipk 文件， 目前提供了 aarch64/x86_64 等架构的版本，下载后使用 opkg 安装，以 nanopi r4s 为例：
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.7.0/ninja_0.7.0_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.7.0/luci-app-ninja_1.1.3-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.7.0/luci-i18n-ninja-zh-cn_1.1.3-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.7.1/ninja_0.7.1_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.7.1/luci-app-ninja_1.1.3-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.7.1/luci-i18n-ninja-zh-cn_1.1.3-1_all.ipk
 
-opkg install ninja_0.7.0_aarch64_generic.ipk
+opkg install ninja_0.7.1_aarch64_generic.ipk
 opkg install luci-app-ninja_1.1.3-1_all.ipk
 opkg install luci-i18n-ninja-zh-cn_1.1.3-1_all.ipk
 ```
@@ -225,6 +225,8 @@ Options:
           TLS certificate file path [env: TLS_CERT=]
       --tls-key <TLS_KEY>
           TLS private key file path (EC/PKCS8/RSA) [env: TLS_KEY=]
+  -A, --auth-key <AUTH_KEY>
+          Login Authentication Key [env: AUTH_KEY=]
       --api-prefix <API_PREFIX>
           WebUI api prefix [env: API_PREFIX=]
       --preauth-api <PREAUTH_API>
@@ -237,7 +239,7 @@ Options:
           Cloudflare turnstile captcha secret key [env: CF_SITE_KEY=]
       --arkose-endpoint <ARKOSE_ENDPOINT>
           Arkose endpoint, Example: https://client-api.arkoselabs.com
-  -A, --arkose-token-endpoint <ARKOSE_TOKEN_ENDPOINT>
+      --arkose-token-endpoint <ARKOSE_TOKEN_ENDPOINT>
           Get arkose token endpoint
       --arkose-chat-har-file <ARKOSE_CHAT_HAR_FILE>
           About the browser HAR file path requested by ChatGPT ArkoseLabs
