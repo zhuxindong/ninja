@@ -94,10 +94,11 @@ pub async fn submit_task(submit_task: SubmitSolver<'_>) -> anyhow::Result<Vec<i3
                 anyhow::bail!(format!("solver task error: {error_description}"))
             }
             let target = task.solution.objects;
-            return match target.is_empty() {
-                true => Ok(vec![0]),
-                false => Ok(target),
-            };
+
+            if target.is_empty() {
+                anyhow::bail!(format!("solver task error: empty answer"))
+            }
+            Ok(target)
         }
         Err(err) => {
             let msg = resp.text().await?;
