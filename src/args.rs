@@ -136,6 +136,10 @@ pub struct ServeArgs {
     #[clap(long, env = "TLS_KEY", requires = "tls_cert")]
     pub(super) tls_key: Option<PathBuf>,
 
+    /// Login Authentication Key
+    #[clap(short = 'A', long, env = "AUTH_KEY")]
+    pub(super) auth_key: Option<String>,
+
     /// WebUI api prefix
     #[clap(long, env = "API_PREFIX", value_parser = parse::parse_url)]
     pub(super) api_prefix: Option<String>,
@@ -161,7 +165,7 @@ pub struct ServeArgs {
     pub(super) arkose_endpoint: Option<String>,
 
     /// Get arkose token endpoint
-    #[clap(short = 'A', long, value_parser = parse::parse_url)]
+    #[clap(long, value_parser = parse::parse_url)]
     pub(super) arkose_token_endpoint: Option<String>,
 
     /// About the browser HAR file path requested by ChatGPT ArkoseLabs

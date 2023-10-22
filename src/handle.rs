@@ -68,6 +68,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .connect_timeout(args.connect_timeout)
         .workers(args.workers)
         .concurrent_limit(args.concurrent_limit)
+        .auth_key(args.auth_key)
         .cf_site_key(args.cf_site_key)
         .cf_secret_key(args.cf_secret_key)
         .disable_ui(args.disable_webui)

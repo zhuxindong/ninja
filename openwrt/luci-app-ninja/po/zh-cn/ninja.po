@@ -210,3 +210,9 @@ msgstr "IPv6 子网"
 
 msgid "IPv6 subnet, Example: 2001:19f0:6001:48e4::/64"
 msgstr "IPv6 子网，示例: 2001:19f0:6001:48e4::/64"
+
+msgid "Auth Key"
+msgstr "认证Key"
+
+msgid "Login Authentication Key"
+msgstr "登录认证Key"
