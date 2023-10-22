@@ -193,7 +193,6 @@ impl Session {
     }
 
     pub async fn submit_answer(mut self, answers: Vec<i32>) -> anyhow::Result<()> {
-        println!("challenge: {:#?}", self.challenge);
         let mut answer_index = Vec::with_capacity(answers.len());
         let c_ui = &self
             .challenge
@@ -201,6 +200,7 @@ impl Session {
             .context("no challenge")?
             .game_data
             .custom_gui;
+
         for answer in answers {
             if c_ui.api_breaker_v2_enabled != 0 {
                 let answer = hanlde_answer(answer, &c_ui.api_breaker);
@@ -211,7 +211,6 @@ impl Session {
         }
 
         let answer = answer_index.join(",");
-
         let submit = SubmitChallenge {
                     session_token: &self.session_token,
                     sid: &self.sid,
