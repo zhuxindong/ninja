@@ -194,22 +194,23 @@ impl Session {
 
     pub async fn submit_answer(mut self, answers: Vec<i32>) -> anyhow::Result<()> {
         let mut answer_index = Vec::with_capacity(answers.len());
+        let c_ui = &self
+            .challenge
+            .as_ref()
+            .context("no challenge")?
+            .game_data
+            .custom_gui;
+
         for answer in answers {
-            let answer = hanlde_answer(
-                answer,
-                &self
-                    .challenge
-                    .as_ref()
-                    .context("no challenge")?
-                    .game_data
-                    .custom_gui
-                    .api_breaker,
-            );
-            answer_index.push(answer.to_string())
+            if c_ui.api_breaker_v2_enabled != 0 {
+                let answer = hanlde_answer(answer, &c_ui.api_breaker);
+                answer_index.push(answer.to_string())
+            } else {
+                answer_index.push(format!(r#"{{"index":{answer}}}"#))
+            }
         }
 
         let answer = answer_index.join(",");
-
         let submit = SubmitChallenge {
                     session_token: &self.session_token,
                     sid: &self.sid,

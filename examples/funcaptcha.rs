@@ -1,3 +1,4 @@
+use openai::arkose;
 use openai::arkose::funcaptcha::Solver;
 use openai::arkose::{
     funcaptcha::{self, solver::SubmitSolverBuilder, start_challenge},
@@ -9,6 +10,7 @@ use tokio::time::Instant;
 
 static KEY: OnceCell<String> = OnceCell::const_new();
 static SOLVER: OnceCell<Solver> = OnceCell::const_new();
+static SOLVER_TYPE: OnceCell<String> = OnceCell::const_new();
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -23,11 +25,21 @@ async fn main() -> anyhow::Result<()> {
         })
         .await;
 
+    let solver_type = SOLVER_TYPE
+        .get_or_init(|| async { std::env::var("SOLVER_TYPE").expect("Need solver type") })
+        .await;
+
+    let t = match solver_type.as_str() {
+        "auth" => arkose::Type::Auth0,
+        "platform" => arkose::Type::Platform,
+        "chat" => arkose::Type::Chat,
+        _ => anyhow::bail!("Not support solver type: {solver_type}"),
+    };
+
     // start time
     let now = Instant::now();
 
-    let arkose_token =
-        ArkoseToken::new_from_har("/Users/gngpp/VSCode/ninja/login.chat.openai.com.har").await?;
+    let arkose_token = ArkoseToken::new(t).await?;
 
     parse(arkose_token, solver, key).await?;
 
