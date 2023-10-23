@@ -52,6 +52,7 @@ env_logger = "0.10.0"
 [features]
 default = ["serve"]
 terminal = [
+    "openai/api",
     "dep:tokio", 
     "dep:serde_json", 
     "dep:inquire", 

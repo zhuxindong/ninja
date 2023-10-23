@@ -70,11 +70,10 @@ features = ["Win32_System_Com_CallObj", "Win32_Foundation", "Win32_Globalization
 static-files = "0.2.3"
 
 [features]
-default = ["serve", "limit", "platform", "template", "api"]
+default = ["serve", "limit", "template"]
 api = ["stream"]
-serve = ["dep:async-stream", "dep:tracing", "dep:tracing-subscriber", "dep:tower-http", "dep:tower", "dep:bytes", "dep:time", "dep:axum-server", "dep:axum-extra", "dep:axum", "dep:static-files", "dep:futures-core", "dep:tera"]
-platform = ["dep:tokio-util"]
-stream = ["dep:futures", "dep:tokio-stream", "dep:eventsource-stream", "dep:futures-core", "dep:pin-project-lite", "dep:nom", "dep:mime", "dep:futures-timer"]
+serve = ["stream", "dep:async-stream", "dep:tracing", "dep:tracing-subscriber", "dep:tower-http", "dep:tower", "dep:bytes", "dep:time", "dep:axum-server", "dep:axum-extra", "dep:axum", "dep:static-files", "dep:futures-core", "dep:tera"]
+stream = ["dep:tokio-util", "dep:futures", "dep:tokio-stream", "dep:eventsource-stream", "dep:futures-core", "dep:pin-project-lite", "dep:nom", "dep:mime", "dep:futures-timer"]
 remote-token = []
 limit = ["dep:redis", "dep:redis-macros"]
 template = []

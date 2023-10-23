@@ -3,8 +3,6 @@ use std::collections::HashMap;
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 
-use crate::chatgpt::Success;
-
 use super::{Author, Role};
 
 #[derive(Deserialize, Debug)]
@@ -22,12 +20,6 @@ pub struct GetAccountsCheckResponse {
     pub account_plan: AccountPlan,
     pub user_country: String,
     pub features: Vec<String>,
-}
-
-impl Success for GetAccountsCheckResponse {
-    fn ok(&self) -> bool {
-        !self.user_country.is_empty()
-    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -269,12 +261,6 @@ impl<'de> Deserialize<'de> for PostConvoResponse {
 pub struct PatchConvoResponse {
     #[serde(default)]
     pub success: bool,
-}
-
-impl Success for PatchConvoResponse {
-    fn ok(&self) -> bool {
-        self.success
-    }
 }
 
 #[derive(Deserialize, Debug)]

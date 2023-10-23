@@ -10,7 +10,7 @@ use tokio::io::AsyncWriteExt;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let access_token = std::env::var("TOKEN")?;
-    let api = openai::chatgpt::ChatGPTBuilder::builder()
+    let api = openai::chatgpt::api::ChatGPTBuilder::builder()
         .access_token(access_token)
         .cookie_store(true)
         .client_timeout(time::Duration::from_secs(1000))
