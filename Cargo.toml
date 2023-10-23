@@ -48,6 +48,7 @@ viuer = "0.6.2"
 hex = "0.4.3"
 sha2 = "0.10.8"
 env_logger = "0.10.0"
+openai = { path = "openai" }
 
 [features]
 default = ["serve"]
@@ -67,6 +68,10 @@ limit = ["openai/limit", "openai/serve"]
 [[bin]]
 name = "ninja"
 path = "src/main.rs"
+
+[[example]]
+name = "chatgpt"
+required-features = ["openai/api"]
 
 [profile.release]
 lto = true
