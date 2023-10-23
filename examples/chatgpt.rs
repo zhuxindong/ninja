@@ -22,12 +22,12 @@ async fn main() -> anyhow::Result<()> {
 
     let parent_message_id = openai::uuid::uuid();
     let message_id = openai::uuid::uuid();
-    let req = req::PostNextConvoRequestBuilder::default()
+    let req = req::PostNextConvoRequest::builder()
         .model(model[0])
         .message_id(&message_id)
         .parent_message_id(&parent_message_id)
         .prompt("Rust Example")
-        .build()?;
+        .build();
 
     let mut resp = api
         .post_conversation(PostConvoRequest::try_from(req)?)
@@ -76,36 +76,36 @@ async fn main() -> anyhow::Result<()> {
 
     if let Some(end) = end_turn {
         if end {
-            let req = req::PostConvoGenTitleRequestBuilder::default()
+            let req = req::PostConvoGenTitleRequest::builder()
                 .conversation_id(&conversation_id)
                 .message_id(&end_message_id)
-                .build()?;
+                .build();
             let resp = api.post_conversation_gen_title(req).await?;
             println!("\n{:?}", resp);
 
             // get conversation
-            let req = req::GetConvoRequestBuilder::default()
+            let req = req::GetConvoRequest::builder()
                 .conversation_id(conversation_id.as_ref())
-                .build()?;
+                .build();
             let resp = api.get_conversation(req).await?;
             println!("{:?}", resp);
             tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
 
             // // clart conversation
-            let req = req::PatchConvoRequestBuilder::default()
+            let req = req::PatchConvoRequest::builder()
                 .conversation_id(conversation_id.as_ref())
                 .is_visible(false)
-                .build()?;
+                .build();
             let resp = api.patch_conversation(req).await?;
             println!("{:?}", resp);
             tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
         }
     } else {
-        let req = req::PostContinueConvoRequestBuilder::default()
+        let req = req::PostContinueConvoRequest::builder()
             .model(model[0])
             .conversation_id(conversation_id.as_ref())
             .parent_message_id(end_message_id.as_ref())
-            .build()?;
+            .build();
 
         let mut resp = api
             .post_conversation(PostConvoRequest::try_from(req)?)
@@ -131,41 +131,5 @@ async fn main() -> anyhow::Result<()> {
             }
         }
     }
-
-    // get conversation list
-    // let req = req::GetConvoRequestBuilder::default()
-    //     .offset(0)
-    //     .limit(20)
-    //     .build()?;
-    // let resp = api.get_conversations(req).await?;
-    // println!("{:#?}", resp);
-    // tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-
-    // // clart conversation list
-    // let req = req::PatchConvoRequestBuilder::default()
-    //     .is_visible(false)
-    //     .build()?;
-    // let resp = api.patch_conversations(req).await?;
-    // println!("{:#?}", resp);
-    // tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-
-    // rename conversation title
-    // let req = req::PatchConvoRequestBuilder::default()
-    //     .conversation_id("78feb7c4-a864-4606-8665-cdb7a1cf4f6d".to_owned())
-    //     .title("fuck".to_owned())
-    //     .build()?;
-    // let resp = api.patch_conversation(req).await?;
-    // println!("{:#?}", resp);
-    // tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-
-    // // message feedback
-    // let req = req::MessageFeedbackRequestBuilder::default()
-    //     .message_id("463a23c4-0855-4c5b-976c-7697519335ad".to_owned())
-    //     .conversation_id("78feb7c4-a864-4606-8665-cdb7a1cf4f6d".to_owned())
-    //     .rating(req::Rating::ThumbsUp)
-    //     .build()?;
-    // let resp = api.message_feedback(req).await?;
-    // println!("{:#?}", resp);
-
     Ok(())
 }
