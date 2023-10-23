@@ -1,16 +1,15 @@
+mod api_breaker;
 pub mod model;
 pub mod solver;
 
-use self::model::{ApiBreaker, Challenge, ConciseChallenge, FunCaptcha, RequestChallenge};
+use self::model::{Challenge, ConciseChallenge, FunCaptcha, RequestChallenge};
 
 use super::crypto;
 use crate::arkose::funcaptcha::model::SubmitChallenge;
-use crate::{context, warn};
+use crate::{context, debug, warn};
 use anyhow::{bail, Context};
-use rand::Rng;
 use reqwest::header;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -71,6 +70,7 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
         funcaptcha: None,
         challenge: None,
         client: context::get_instance().client(),
+        game_type: 0,
     };
 
     session.headers.insert(header::REFERER, format!("https://client-api.arkoselabs.com/fc/assets/ec-game-core/game-core/1.15.0/standard/index.html?session={}", arkose_token.replace("|", "&")).parse()?);
@@ -85,7 +85,7 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
         .await?;
 
     if concise_challenge.urls.len() >= 5 {
-        warn!("funcaptcha images count >= 10, please use `solver: capsolver`");
+        warn!("funcaptcha images count >= 5, please use `solver: capsolver`");
     }
 
     let funcaptcha_list = images
@@ -111,6 +111,7 @@ pub struct Session {
     #[allow(dead_code)]
     challenge: Option<Challenge>,
     funcaptcha: Option<Arc<Vec<FunCaptcha>>>,
+    game_type: u32,
 }
 
 impl Session {
@@ -150,6 +151,10 @@ impl Session {
 
         let challenge = resp.json::<Challenge>().await?;
 
+        debug!("challenge: {:#?}", challenge);
+
+        self.game_type = challenge.game_data.game_type as u32;
+
         // Build concise challenge
         let (game_type, challenge_urls, key, game_variant) = {
             let game_variant = if challenge.game_data.instruction_string.is_empty() {
@@ -157,7 +162,6 @@ impl Session {
             } else {
                 &challenge.game_data.instruction_string
             };
-
             (
                 "image",
                 &challenge.game_data.custom_gui.challenge_imgs,
@@ -202,19 +206,21 @@ impl Session {
             .custom_gui;
 
         for answer in answers {
-            if c_ui.api_breaker_v2_enabled != 0 {
-                let answer = hanlde_answer(answer, &c_ui.api_breaker);
-                answer_index.push(answer.to_string())
-            } else {
-                answer_index.push(format!(r#"{{"index":{answer}}}"#))
-            }
+            let answer = api_breaker::hanlde_answer(
+                c_ui.api_breaker_v2_enabled != 0,
+                self.game_type,
+                &c_ui.api_breaker,
+                answer,
+            )?
+            .to_string();
+            answer_index.push(answer)
         }
 
         let answer = answer_index.join(",");
         let submit = SubmitChallenge {
                     session_token: &self.session_token,
                     sid: &self.sid,
-                    game_token: &self.challenge.context("no challenge")?.challenge_id,
+                    game_token: &self.challenge.as_ref().context("no challenge")?.challenge_id,
                     guess: &crypto::encrypt(&format!("[{answer}]"), &self.session_token)?,
                     render_type: "canvas",
                     analytics_tier: 40,
@@ -259,6 +265,7 @@ impl Session {
                 }
 
                 if !resp.solved {
+                    warn!("funcaptcha not solved: {:#?}", self.challenge);
                     anyhow::bail!(
                         "incorrect guess {}",
                         resp.incorrect_guess.unwrap_or_default()
@@ -290,78 +297,6 @@ impl Session {
 
         Ok(b64_imgs)
     }
-}
-
-fn hanlde_api_breaker_key(key: &str) -> Box<dyn Fn(i32) -> i32> {
-    match key {
-        "alpha" => Box::new(|answer| {
-            let y_value_str = answer.to_string();
-            let combined_str = y_value_str + &1.to_string();
-            let combined_int = combined_str.parse::<i32>().unwrap();
-            combined_int - 2
-        }),
-        "beta" => Box::new(|answer| -answer),
-        "gamma" => Box::new(|answer| 3 * (3 - answer)),
-        "delta" => Box::new(|answer| 7 * answer),
-        "epsilon" => Box::new(|answer| 2 * answer),
-        "zeta" => Box::new(|answer| if answer != 0 { 100 / answer } else { answer }),
-        _ => Box::new(|answer| answer),
-    }
-}
-
-fn hanlde_api_breaker_value(key: &str) -> Box<dyn Fn(i32) -> serde_json::Value> {
-    return match key {
-        "alpha" => Box::new(|answer| {
-            let v = [
-                rand::thread_rng().gen_range(0..100),
-                answer,
-                rand::thread_rng().gen_range(0..100),
-            ];
-            json!(v)
-        }),
-        "beta" => Box::new(|answer| {
-            json!({
-                "size": 50 - answer,
-                "id": answer,
-                "limit": 10 * answer,
-                "req_timestamp": get_time_stamp(),
-            })
-        }),
-        "delta" => Box::new(|answer| {
-            json!({
-                "index": answer,
-            })
-        }),
-        "epsilon" => Box::new(|answer| {
-            let array_len = rand::thread_rng().gen_range(0..5) + 1;
-            let rand_index = rand::thread_rng().gen_range(0..array_len);
-
-            let mut arr = Vec::with_capacity(array_len);
-            for i in 0..array_len {
-                if i == rand_index {
-                    arr[i] = answer;
-                } else {
-                    arr[i] = rand::thread_rng().gen_range(0..10);
-                }
-            }
-            arr.push(rand_index as i32);
-            json!(arr)
-        }),
-        "zeta" => Box::new(|answer| {
-            let array_len = rand::thread_rng().gen_range(0..5) + 1;
-            let mut vec = vec![0; array_len];
-            vec.push(answer);
-            json!(vec)
-        }),
-        "gamma" | _ => Box::new(|answer| json!(answer)),
-    };
-}
-
-fn hanlde_answer(mut answer: i32, api_breaker: &ApiBreaker) -> serde_json::Value {
-    for v in &api_breaker.value {
-        answer = hanlde_api_breaker_key(&v)(answer)
-    }
-    hanlde_api_breaker_value(&api_breaker.key)(answer)
 }
 
 fn get_time_stamp() -> String {
