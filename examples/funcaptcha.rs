@@ -14,6 +14,7 @@ static SOLVER_TYPE: OnceCell<String> = OnceCell::const_new();
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    env_logger::init();
     let key = KEY
         .get_or_init(|| async { std::env::var("KEY").expect("Need solver client key") })
         .await;
