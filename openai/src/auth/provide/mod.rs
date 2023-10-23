@@ -10,9 +10,9 @@ use crate::{
 };
 
 use super::model::{self, AuthStrategy};
-use derive_builder::Builder;
 use reqwest::header;
 use serde::Serialize;
+use typed_builder::TypedBuilder;
 
 pub type AuthResult<T, E = anyhow::Error> = anyhow::Result<T, E>;
 
@@ -115,7 +115,7 @@ impl<'a> RequestContext<'a> {
     }
 }
 
-#[derive(Serialize, Builder)]
+#[derive(Serialize, TypedBuilder)]
 struct IdentifierData<'a> {
     state: &'a str,
     username: &'a str,
@@ -148,7 +148,7 @@ impl Serialize for GrantType {
     }
 }
 
-#[derive(Serialize, Builder)]
+#[derive(Serialize, TypedBuilder)]
 struct AuthenticateData<'a> {
     state: &'a str,
     username: &'a str,
@@ -156,14 +156,14 @@ struct AuthenticateData<'a> {
     action: &'a str,
 }
 
-#[derive(Serialize, Builder)]
+#[derive(Serialize, TypedBuilder)]
 struct AuthenticateMfaData<'a> {
     state: &'a str,
     code: &'a str,
     action: &'a str,
 }
 
-#[derive(Serialize, Builder)]
+#[derive(Serialize, TypedBuilder)]
 struct AuthorizationCodeData<'a> {
     redirect_uri: &'a str,
     grant_type: GrantType,
@@ -172,13 +172,13 @@ struct AuthorizationCodeData<'a> {
     code: &'a str,
 }
 
-#[derive(Serialize, Builder)]
+#[derive(Serialize, TypedBuilder)]
 struct RevokeTokenData<'a> {
     client_id: &'a str,
     token: &'a str,
 }
 
-#[derive(Serialize, Builder)]
+#[derive(Serialize, TypedBuilder)]
 struct RefreshTokenData<'a> {
     redirect_uri: &'a str,
     grant_type: GrantType,
@@ -186,7 +186,7 @@ struct RefreshTokenData<'a> {
     refresh_token: &'a str,
 }
 
-#[derive(Serialize, Builder)]
+#[derive(Serialize, TypedBuilder)]
 struct GetAuthorizedUrlData<'a> {
     #[serde(rename = "callbackUrl")]
     callback_url: &'a str,

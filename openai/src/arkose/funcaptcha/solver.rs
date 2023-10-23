@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use typed_builder::TypedBuilder;
 
 use crate::context;
 
@@ -47,7 +48,7 @@ struct ReqTask<'a> {
     question: &'a str,
 }
 
-#[derive(derive_builder::Builder)]
+#[derive(TypedBuilder)]
 pub struct SubmitSolver<'a> {
     solved: &'a Solver,
     client_key: &'a str,

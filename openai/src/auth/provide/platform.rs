@@ -1,4 +1,4 @@
-use crate::auth::provide::{AuthenticateDataBuilder, AuthorizationCodeDataBuilder, GrantType};
+use crate::auth::provide::{AuthenticateData, GrantType};
 use crate::auth::AuthClient;
 use crate::debug;
 use crate::{
@@ -15,8 +15,8 @@ use reqwest::Client;
 use url::Url;
 
 use super::{
-    AuthProvider, AuthResult, AuthenticateMfaDataBuilder, IdentifierDataBuilder,
-    RefreshTokenDataBuilder, RequestContext, RequestContextExt, RevokeTokenDataBuilder,
+    AuthProvider, AuthResult, AuthenticateMfaData, AuthorizationCodeData, IdentifierData,
+    RefreshTokenData, RequestContext, RequestContextExt, RevokeTokenData,
 };
 
 const PLATFORM_CLIENT_ID: &str = "DRivsnm2Mu42T3KOpqdtwB3NYviHYzwD";
@@ -66,7 +66,7 @@ impl PlatformAuthProvider {
             .post(&url)
             .ext_context(ctx)
             .json(
-                &IdentifierDataBuilder::default()
+                &IdentifierData::builder()
                     .action("default")
                     .state(&ctx.state)
                     .username(&ctx.account.username)
@@ -74,7 +74,7 @@ impl PlatformAuthProvider {
                     .webauthn_available(true)
                     .is_brave(false)
                     .webauthn_platform_available(false)
-                    .build()?,
+                    .build(),
             )
             .send()
             .await?
@@ -98,12 +98,12 @@ impl PlatformAuthProvider {
             ))
             .ext_context(ctx)
             .json(
-                &AuthenticateDataBuilder::default()
+                &AuthenticateData::builder()
                     .action("default")
                     .state(&ctx.state)
                     .username(&ctx.account.username)
                     .password(&ctx.account.password)
-                    .build()?,
+                    .build(),
             )
             .send()
             .await
@@ -154,11 +154,11 @@ impl PlatformAuthProvider {
         let mfa_code = &ctx.account.mfa.clone().ok_or(AuthError::MFARequired)?;
         let url = format!("{OPENAI_OAUTH_URL}{}", location);
         let state = AuthClient::get_callback_state(&Url::parse(&url)?);
-        let data = AuthenticateMfaDataBuilder::default()
+        let data = AuthenticateMfaData::builder()
             .action("default")
             .state(&state)
             .code(mfa_code)
-            .build()?;
+            .build();
 
         let resp = self
             .inner
@@ -185,13 +185,13 @@ impl PlatformAuthProvider {
     async fn authorization_code(&self, location: &str) -> AuthResult<model::AccessToken> {
         debug!("authorization_code location path: {location}");
         let code = AuthClient::get_callback_code(&Url::parse(location)?)?;
-        let data = AuthorizationCodeDataBuilder::default()
+        let data = AuthorizationCodeData::builder()
             .redirect_uri(OPENAI_OAUTH_PLATFORM_CALLBACK_URL)
             .grant_type(GrantType::AuthorizationCode)
             .client_id(PLATFORM_CLIENT_ID)
             .code(&code)
             .code_verifier(None)
-            .build()?;
+            .build();
 
         let resp = self
             .inner
@@ -229,12 +229,12 @@ impl AuthProvider for PlatformAuthProvider {
 
     async fn do_refresh_token(&self, refresh_token: &str) -> AuthResult<model::RefreshToken> {
         let refresh_token = AuthClient::trim_bearer(refresh_token)?;
-        let data = RefreshTokenDataBuilder::default()
+        let data = RefreshTokenData::builder()
             .redirect_uri(OPENAI_OAUTH_PLATFORM_CALLBACK_URL)
             .grant_type(GrantType::RefreshToken)
             .client_id(PLATFORM_CLIENT_ID)
             .refresh_token(refresh_token)
-            .build()?;
+            .build();
 
         let resp = self
             .inner
@@ -250,10 +250,10 @@ impl AuthProvider for PlatformAuthProvider {
 
     async fn do_revoke_token(&self, refresh_token: &str) -> AuthResult<()> {
         let refresh_token = AuthClient::trim_bearer(refresh_token)?;
-        let data = RevokeTokenDataBuilder::default()
+        let data = RevokeTokenData::builder()
             .client_id(PLATFORM_CLIENT_ID)
             .token(refresh_token)
-            .build()?;
+            .build();
 
         let resp = self
             .inner

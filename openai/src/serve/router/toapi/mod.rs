@@ -13,7 +13,10 @@ use std::{convert::Infallible, str::FromStr};
 
 use crate::{
     arkose::{ArkoseToken, GPT4Model, Type},
-    chatgpt::model::resp::{ConvoResponse, PostConvoResponse},
+    chatgpt::model::{
+        req::{Content, Messages, PostConvoRequest},
+        resp::{ConvoResponse, PostConvoResponse},
+    },
     context,
     serve::{err::ResponseError, has_puid, header_convert},
 };
@@ -21,7 +24,7 @@ use crate::{chatgpt::model::Role, debug};
 
 use crate::{
     chatgpt::model::{
-        req::{Action, ContentBuilder, ContentText, MessagesBuilder, PostConvoRequestBuilder},
+        req::{Action, ContentText},
         Author,
     },
     uuid::uuid,
@@ -44,32 +47,29 @@ pub(crate) async fn chat_to_api(
         } else {
             body_msg.role
         };
-        let message = MessagesBuilder::default()
+        let message = Messages::builder()
             .id(uuid())
             .author(Author { role })
             .content(
-                ContentBuilder::default()
+                Content::builder()
                     .content_type(ContentText::Text)
                     .parts(vec![&body_msg.content])
-                    .build()
-                    .map_err(ResponseError::InternalServerError)?,
+                    .build(),
             )
-            .build()
-            .map_err(ResponseError::InternalServerError)?;
+            .build();
         messages.push(message)
     }
 
     let model_mapper = model_mapper(&body.model).await?;
     let parent_message_id = uuid();
-    let req = PostConvoRequestBuilder::default()
+    let req = PostConvoRequest::builder()
         .action(Action::Next)
         .parent_message_id(&parent_message_id)
         .messages(messages)
         .model(model_mapper.0)
         .history_and_training_disabled(true)
         .arkose_token(model_mapper.2.as_ref())
-        .build()
-        .map_err(ResponseError::InternalServerError)?;
+        .build();
 
     let client = context::get_instance().client();
     let new_headers = header_convert(&headers, &jar).await?;
@@ -184,29 +184,29 @@ async fn not_stream_handler(
     }
     drop(event_soure);
 
-    let message = resp::MessageBuilder::default()
+    let message = resp::Message::builder()
         .role(Role::Assistant.to_string())
         .content(previous_message)
-        .build()?;
+        .build();
 
-    let resp = resp::RespBuilder::default()
+    let resp = resp::Resp::builder()
         .id(&id)
         .object("chat.completion.chunk")
         .created(&timestamp)
         .model(&model)
-        .choices(vec![resp::ChoiceBuilder::default()
+        .choices(vec![resp::Choice::builder()
             .index(0)
             .message(Some(message))
             .finish_reason(finish_reason.as_deref())
-            .build()?])
+            .build()])
         .usage(Some(
-            resp::UsageBuilder::default()
+            resp::Usage::builder()
                 .prompt_tokens(0)
                 .completion_tokens(0)
                 .total_tokens(0)
-                .build()?,
+                .build(),
         ))
-        .build()?;
+        .build();
     let value = serde_json::to_value(&resp)?;
     Ok(Json(value))
 }
@@ -304,22 +304,22 @@ async fn event_convert_handler(
     previous_message.clear();
     previous_message.push_str(message);
 
-    let delta = resp::DeltaBuilder::default()
+    let delta = resp::Delta::builder()
         .role(role)
         .content(return_message)
-        .build()?;
+        .build();
 
-    let resp = resp::RespBuilder::default()
+    let resp = resp::Resp::builder()
         .id(&id)
         .object("chat.completion.chunk")
         .created(timestamp)
         .model(&model)
-        .choices(vec![resp::ChoiceBuilder::default()
+        .choices(vec![resp::Choice::builder()
             .index(0)
             .delta(Some(delta))
             .finish_reason(finish_reason)
-            .build()?])
-        .build()?;
+            .build()])
+        .build();
     let data = format!(" {}", serde_json::to_string(&resp)?);
     Ok(Event::default().data(data))
 }

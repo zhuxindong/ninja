@@ -181,9 +181,9 @@ impl Launcher {
             // Spawn a task to gracefully shutdown server.
             tokio::spawn(signal::graceful_shutdown(handle.clone()));
 
-            match self.inner.tls_keypair {
-                Some(keypair) => {
-                    let tls_config = RustlsConfig::from_pem_file(keypair.0, keypair.1)
+            match (self.inner.tls_cert, self.inner.tls_key) {
+                (Some(cert), Some(key)) => {
+                    let tls_config = RustlsConfig::from_pem_file(cert, key)
                         .await
                         .expect("Failed to load TLS keypair");
                     let socket = std::net::SocketAddr::new(
@@ -198,7 +198,7 @@ impl Launcher {
                         .await
                         .expect("openai server failed")
                 }
-                None => {
+                _ => {
                     let socket = std::net::SocketAddr::new(
                         self.inner.host.parse::<IpAddr>().unwrap(),
                         self.inner.port,

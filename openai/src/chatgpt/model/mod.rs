@@ -1,5 +1,5 @@
-use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
+use typed_builder::TypedBuilder;
 pub mod req;
 pub mod resp;
 
@@ -31,7 +31,7 @@ impl ToString for Role {
     }
 }
 
-#[derive(Serialize, Deserialize, Builder, Clone, Debug)]
+#[derive(Serialize, Deserialize, TypedBuilder, Clone, Debug)]
 pub struct Author {
     pub role: Role,
 }

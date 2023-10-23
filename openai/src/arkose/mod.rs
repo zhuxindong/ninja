@@ -24,7 +24,7 @@ use crate::generate_random_string;
 use crate::warn;
 use crate::HEADER_UA;
 
-use self::funcaptcha::solver::SubmitSolverBuilder;
+use self::funcaptcha::solver::SubmitSolver;
 use self::funcaptcha::Solver;
 
 #[derive(Hash, PartialEq, Eq, Debug)]
@@ -400,12 +400,12 @@ async fn submit_captcha(
         Solver::Yescaptcha => {
             let (tx, rx) = tokio::sync::mpsc::channel(funs.len());
             for (i, fun) in funs.iter().enumerate() {
-                let submit_task = SubmitSolverBuilder::default()
+                let submit_task = SubmitSolver::builder()
                     .solved(solver)
                     .client_key(key)
                     .question(fun.instructions.clone())
                     .image(fun.image.clone())
-                    .build()?;
+                    .build();
                 let sender = tx.clone();
                 tokio::spawn(async move {
                     let res = funcaptcha::solver::submit_task(submit_task).await;
@@ -435,12 +435,12 @@ async fn submit_captcha(
                     .into_iter()
                     .map(|item| item.image.clone())
                     .collect::<Vec<String>>();
-                let submit_task = SubmitSolverBuilder::default()
+                let submit_task = SubmitSolver::builder()
                     .solved(solver)
                     .client_key(key)
                     .question(data.0)
                     .images(images)
-                    .build()?;
+                    .build();
                 let sender = tx.clone();
                 tokio::spawn(async move {
                     let res = funcaptcha::solver::submit_task(submit_task).await;
