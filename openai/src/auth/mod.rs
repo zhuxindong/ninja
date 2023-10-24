@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use anyhow::{bail, Context};
 use regex::Regex;
-use reqwest::header::{HeaderMap, HeaderValue};
+use reqwest::header::{self, HeaderMap, HeaderValue};
 use reqwest::impersonate::Impersonate;
 use reqwest::redirect::Policy;
 use serde::de::DeserializeOwned;
@@ -24,6 +24,7 @@ pub mod model;
 
 use crate::debug;
 use crate::error::AuthError;
+use crate::URL_CHATGPT_API;
 
 use self::model::{ApiKeyData, AuthStrategy};
 use self::provide::apple::AppleAuthProvider;
@@ -35,6 +36,7 @@ const OPENAI_API_URL: &str = "https://api.openai.com";
 const OPENAI_OAUTH_URL: &str = "https://auth0.openai.com";
 const OPENAI_OAUTH_TOKEN_URL: &str = "https://auth0.openai.com/oauth/token";
 const OPENAI_OAUTH_REVOKE_URL: &str = "https://auth0.openai.com/oauth/revoke";
+pub(crate) const API_AUTH_SESSION_COOKIE_KEY: &str = "__Secure-next-auth.session-token";
 
 static EMAIL_REGEX: OnceCell<Regex> = OnceCell::const_new();
 
@@ -49,6 +51,33 @@ pub struct AuthClient {
 }
 
 impl AuthClient {
+    pub async fn do_session(&self, session: &str) -> AuthResult<model::SessionAccessToken> {
+        let resp = self
+            .inner
+            .get(format!("{URL_CHATGPT_API}/api/auth/session"))
+            .header(
+                header::COOKIE,
+                format!("{API_AUTH_SESSION_COOKIE_KEY}={session};"),
+            )
+            .send()
+            .await
+            .map_err(AuthError::FailedRequest)?;
+
+        let c = resp
+            .cookies()
+            .find(|c| c.name().eq(API_AUTH_SESSION_COOKIE_KEY))
+            .ok_or_else(|| AuthError::FailedAuthSessionCookie)?;
+
+        let session = model::Session {
+            value: c.value().to_owned(),
+            expires: c.expires(),
+        };
+
+        let mut session_access_token = resp.json::<model::SessionAccessToken>().await?;
+        session_access_token.session = Some(session);
+        Ok(session_access_token)
+    }
+
     pub async fn do_dashboard_login(&self, access_token: &str) -> AuthResult<model::DashSession> {
         let access_token = access_token.replace("Bearer ", "");
         let resp = self

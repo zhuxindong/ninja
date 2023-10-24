@@ -237,7 +237,8 @@ async fn state() -> anyhow::Result<()> {
             .into_iter()
             .map(|(k, v)| State {
                 _type: k.to_owned(),
-                expires: openai::format_time(v.expires()).expect("Failed to format time"),
+                expires: openai::format_time_to_rfc3399(v.expires())
+                    .expect("Failed to format time"),
             })
             .collect::<Vec<State>>();
         list.push(AccountState {

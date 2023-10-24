@@ -1,23 +1,17 @@
-use std::str::FromStr;
-
-use serde::{Deserialize, Serialize};
-
-use base64::{engine::general_purpose, Engine};
-
-use serde_json::Value;
-
 use crate::{
     auth::{self, model::AccessToken},
     now_duration,
-    token::TokenProfile,
 };
+use base64::{engine::general_purpose, Engine};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AuthenticateToken {
     access_token: String,
     refresh_token: Option<String>,
+    auth_session: Option<String>,
     expires: i64,
-    expires_in: i64,
     user_id: String,
     name: String,
     email: String,
@@ -57,8 +51,8 @@ impl AuthenticateToken {
         self.expires
     }
 
-    pub fn expires_in(&self) -> i64 {
-        self.expires_in
+    pub fn auth_session(&self) -> Option<&String> {
+        self.auth_session.as_ref()
     }
 }
 
@@ -68,12 +62,20 @@ impl TryFrom<auth::model::AccessToken> for AuthenticateToken {
     fn try_from(value: auth::model::AccessToken) -> Result<Self, Self::Error> {
         match value {
             AccessToken::Session(value) => {
-                let profile = TokenProfile::from_str(&value.access_token)?;
+                let expires_time = value
+                    .session
+                    .clone()
+                    .ok_or(anyhow::anyhow!("session is none"))?
+                    .expires
+                    .ok_or(anyhow::anyhow!("session expires is none"))?;
+
                 Ok(Self {
                     access_token: value.access_token,
                     refresh_token: None,
-                    expires: profile.expires(),
-                    expires_in: profile.expires_in(),
+                    auth_session: value.session.map(|s| s.value),
+                    expires: expires_time
+                        .duration_since(std::time::UNIX_EPOCH)?
+                        .as_secs() as i64,
                     user_id: value.user.id,
                     name: value.user.name,
                     email: value.user.email,
@@ -85,12 +87,12 @@ impl TryFrom<auth::model::AccessToken> for AuthenticateToken {
                 Ok(Self {
                     access_token: value.access_token,
                     refresh_token: Some(value.refresh_token),
-                    expires: now_duration()?.as_secs() as i64 + value.expires_in,
-                    expires_in: value.expires_in,
+                    expires: profile.exp,
                     user_id: profile.https_api_openai_com_auth.user_id,
                     name: profile.name,
                     email: profile.email,
                     picture: profile.picture,
+                    auth_session: None,
                 })
             }
         }
@@ -107,11 +109,11 @@ impl TryFrom<auth::model::RefreshToken> for AuthenticateToken {
             access_token: value.access_token,
             refresh_token: Some(value.refresh_token),
             expires,
-            expires_in: value.expires_in,
             user_id: profile.https_api_openai_com_auth.user_id,
             name: profile.name,
             email: profile.email,
             picture: profile.picture,
+            auth_session: None,
         })
     }
 }
