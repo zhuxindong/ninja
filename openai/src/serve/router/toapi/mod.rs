@@ -12,7 +12,7 @@ use serde_json::Value;
 use std::{convert::Infallible, str::FromStr};
 
 use crate::{
-    arkose::{ArkoseToken, GPT4Model, Type},
+    arkose::{ArkoseToken, GPTModel, Type},
     chatgpt::model::{
         req::{Content, Messages, PostConvoRequest},
         resp::{ConvoResponse, PostConvoResponse},
@@ -73,7 +73,7 @@ pub(crate) async fn chat_to_api(
 
     let client = context::get_instance().client();
     let new_headers = header_convert(&headers, &jar).await?;
-    if GPT4Model::from_str(model_mapper.0).is_ok() {
+    if GPTModel::from_str(model_mapper.0).is_ok() {
         if !has_puid(&new_headers)? {
             let result = client
                 .get(format!("{URL_CHATGPT_API}/backend-api/models"))
@@ -332,7 +332,7 @@ async fn model_mapper(model: &str) -> Result<(&str, &str, Option<ArkoseToken>), 
         model if model.starts_with("gpt-4") => Ok((
             "gpt-4",
             "gpt-4",
-            Some(ArkoseToken::new_from_context(Type::Chat).await?),
+            Some(ArkoseToken::new_from_context(Type::Chat3).await?),
         )),
         _ => Err(ResponseError::BadRequest(anyhow::anyhow!(
             "not support model: {model}"

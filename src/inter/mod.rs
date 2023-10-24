@@ -208,7 +208,7 @@ pub fn json_to_table<T: Serialize>(header: &str, value: T) {
 async fn get_chat_arkose_token(har_file: Option<&String>) -> anyhow::Result<ArkoseToken> {
     match har_file {
         None => {
-            let arkose_token = ArkoseToken::new_from_context(Type::Chat).await?;
+            let arkose_token = ArkoseToken::new_from_context(Type::Chat3).await?;
             arkose_challenge(&arkose_token).await;
             Ok(arkose_token)
         }

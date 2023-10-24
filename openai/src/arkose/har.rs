@@ -98,6 +98,7 @@ fn parse(har: Har) -> anyhow::Result<RequestEntry> {
             {
                 let cow = urldecoding::decode(&bda_param.value)?;
                 let bda = base64::engine::general_purpose::STANDARD.decode(cow.into_owned())?;
+                println!("{}", crypto::decrypt(bda.clone(), &format!("{bv}{bw}"))?);
                 let entry = RequestEntry {
                     url: entry.request.url,
                     method: entry.request.method,

@@ -498,9 +498,9 @@ async fn handle_body(
         None => return Ok(()),
     };
 
-    if arkose::GPT4Model::from_str(model).is_ok() {
+    if arkose::GPTModel::from_str(model).is_ok() {
         if body.get("arkose_token").is_none() {
-            let arkose_token = arkose::ArkoseToken::new_from_context(Type::Chat).await?;
+            let arkose_token = arkose::ArkoseToken::new_from_context(Type::Chat3).await?;
             body.insert("arkose_token".to_owned(), json!(arkose_token));
         }
     }

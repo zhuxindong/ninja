@@ -118,9 +118,13 @@ pub struct ContextArgs {
     #[builder(setter(into), default)]
     pub(crate) arkose_endpoint: Option<String>,
 
-    /// ChatGPT Arkoselabs HAR record file path
+    /// ChatGPT GPT-3.5 Arkoselabs HAR record file path
     #[builder(setter(into), default)]
-    pub(crate) arkose_chat_har_file: Option<PathBuf>,
+    pub(crate) arkose_chat3_har_file: Option<PathBuf>,
+
+    /// ChatGPT GPT-4 Arkoselabs HAR record file path
+    #[builder(setter(into), default)]
+    pub(crate) arkose_chat4_har_file: Option<PathBuf>,
 
     /// Auth Arkoselabs HAR record file path
     #[builder(setter(into), default)]
@@ -224,10 +228,15 @@ pub struct Context {
 
 impl Context {
     fn new(args: ContextArgs) -> Self {
-        let chat_har = init_har(
-            arkose::Type::Chat,
-            &args.arkose_chat_har_file,
-            ".chat.openai.com.har",
+        let chat3_har = init_har(
+            arkose::Type::Chat4,
+            &args.arkose_chat3_har_file,
+            ".chat3.openai.com.har",
+        );
+        let chat4_har = init_har(
+            arkose::Type::Chat4,
+            &args.arkose_chat4_har_file,
+            ".chat4.openai.com.har",
         );
         let auth_har = init_har(
             arkose::Type::Auth0,
@@ -241,7 +250,8 @@ impl Context {
         );
 
         let mut har_map = HashMap::with_capacity(3);
-        har_map.insert(arkose::Type::Chat, chat_har);
+        har_map.insert(arkose::Type::Chat3, chat3_har);
+        har_map.insert(arkose::Type::Chat4, chat4_har);
         har_map.insert(arkose::Type::Auth0, auth_har);
         har_map.insert(arkose::Type::Platform, platform_har);
         HAR.set(std::sync::RwLock::new(har_map))

@@ -241,8 +241,10 @@ Options:
           Arkose endpoint, Example: https://client-api.arkoselabs.com
       --arkose-token-endpoint <ARKOSE_TOKEN_ENDPOINT>
           Get arkose token endpoint
-      --arkose-chat-har-file <ARKOSE_CHAT_HAR_FILE>
-          About the browser HAR file path requested by ChatGPT ArkoseLabs
+      --arkose-chat3-har-file <ARKOSE_CHAT3_HAR_FILE>
+          About the browser HAR file path requested by ChatGPT GPT-3.5 ArkoseLabs
+      --arkose-chat4-har-file <ARKOSE_CHAT4_HAR_FILE>
+          About the browser HAR file path requested by ChatGPT GPT-4 ArkoseLabs
       --arkose-auth-har-file <ARKOSE_AUTH_HAR_FILE>
           About the browser HAR file path requested by Auth ArkoseLabs
       --arkose-platform-har-file <ARKOSE_PLATFORM_HAR_FILE>

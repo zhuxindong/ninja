@@ -34,7 +34,8 @@ async fn main() -> anyhow::Result<()> {
     let t = match solver_type.as_str() {
         "auth" => arkose::Type::Auth0,
         "platform" => arkose::Type::Platform,
-        "chat" => arkose::Type::Chat,
+        "chat3" => arkose::Type::Chat3,
+        "chat4" => arkose::Type::Chat4,
         _ => anyhow::bail!("Not support solver type: {solver_type}"),
     };
 

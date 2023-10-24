@@ -120,7 +120,8 @@ impl Header for PlatformType {
         E: Extend<HeaderValue>,
     {
         let s = match self {
-            PlatformType(arkose::Type::Chat) => "chat",
+            PlatformType(arkose::Type::Chat3) => "chat3",
+            PlatformType(arkose::Type::Chat4) => "chat4",
             PlatformType(arkose::Type::Platform) => "platform",
             PlatformType(arkose::Type::Auth0) => "auth0",
         };

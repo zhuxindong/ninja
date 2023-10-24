@@ -127,8 +127,11 @@ msgstr "关于 ArkoseLabs 的解析器客户端密钥"
 msgid "Get arkose token endpoint"
 msgstr "获取arkose token的端点"
 
-msgid "About the browser HAR file path requested by ChatGPT ArkoseLabs"
-msgstr "关于 ChatGPT 的ArkoseLabs请求的浏览器HAR文件路径"
+msgid "About the browser HAR file path requested by ChatGPT GPT-3.5 ArkoseLabs"
+msgstr "关于 ChatGPT GPT-3.5 的ArkoseLabs请求的浏览器HAR文件路径"
+
+msgid "About the browser HAR file path requested by ChatGPT GPT-4 ArkoseLabs"
+msgstr "关于 ChatGPT GPT-4 的ArkoseLabs请求的浏览器HAR文件路径"
 
 msgid "About the browser HAR file path requested by Auth ArkoseLabs"
 msgstr "关于 Auth 的ArkoseLabs请求的浏览器HAR文件路径"
@@ -136,8 +139,11 @@ msgstr "关于 Auth 的ArkoseLabs请求的浏览器HAR文件路径"
 msgid "About the browser HAR file path requested by Platform ArkoseLabs"
 msgstr "关于 Platform 的ArkoseLabs请求的浏览器HAR文件路径"
 
-msgid "ChatGPT HAR file path"
-msgstr "ChatGPT HAR 文件路径"
+msgid "ChatGPT GPT-3.5 HAR file path"
+msgstr "ChatGPT GPT-3.5 HAR 文件路径"
+
+msgid "ChatGPT GPT-4 HAR file path"
+msgstr "ChatGPT GPT-4 HAR 文件路径"
 
 msgid "Auth HAR file path"
 msgstr "Auth HAR 文件路径"
