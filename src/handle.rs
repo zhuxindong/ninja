@@ -257,6 +257,7 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
         tb_expired: 86400,
         cookie_store: true,
         pool_idle_timeout: 90,
+        level: "info".to_owned(),
         ..args::ServeArgs::default()
     };
 

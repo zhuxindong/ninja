@@ -12,7 +12,7 @@ use serde_json::Value;
 use std::{convert::Infallible, str::FromStr};
 
 use crate::{
-    arkose::{ArkoseToken, GPTModel, Type},
+    arkose::{ArkoseToken, GPTModel},
     chatgpt::model::{
         req::{Content, Messages, PostConvoRequest},
         resp::{ConvoResponse, PostConvoResponse},
@@ -60,26 +60,26 @@ pub(crate) async fn chat_to_api(
         messages.push(message)
     }
 
-    let model_mapper = model_mapper(&body.model).await?;
+    let (model, map_model, arkose_token) = model_mapper(&body.model).await?;
     let parent_message_id = uuid();
     let req = PostConvoRequest::builder()
         .action(Action::Next)
         .parent_message_id(&parent_message_id)
         .messages(messages)
-        .model(model_mapper.0)
+        .model(model)
         .history_and_training_disabled(true)
-        .arkose_token(model_mapper.2.as_ref())
+        .arkose_token(Some(&arkose_token))
         .build();
 
     let client = context::get_instance().client();
-    let new_headers = header_convert(&headers, &jar).await?;
+    let headers = header_convert(&headers, &jar).await?;
 
-    match GPTModel::from_str(model_mapper.0) {
+    match GPTModel::from_str(model) {
         Ok(GPTModel::Gpt4Other) | Ok(GPTModel::Gpt4model) => {
-            if !has_puid(&new_headers)? {
+            if !has_puid(&headers)? {
                 let result = client
                     .get(format!("{URL_CHATGPT_API}/backend-api/models"))
-                    .headers(new_headers.clone())
+                    .headers(headers.clone())
                     .send()
                     .await;
 
@@ -94,7 +94,7 @@ pub(crate) async fn chat_to_api(
 
     let resp = client
         .post(format!("{URL_CHATGPT_API}/backend-api/conversation"))
-        .headers(new_headers)
+        .headers(headers)
         .json(&req)
         .send()
         .await
@@ -105,11 +105,10 @@ pub(crate) async fn chat_to_api(
             let event_source = resp.bytes_stream().eventsource();
             match body.stream {
                 true => Ok(
-                    Sse::new(stream_handler(event_source, model_mapper.1.to_owned()))
-                        .into_response(),
+                    Sse::new(stream_handler(event_source, map_model.to_owned())).into_response()
                 ),
                 false => {
-                    let res = not_stream_handler(event_source, model_mapper.1.to_owned())
+                    let res = not_stream_handler(event_source, map_model.to_owned())
                         .await
                         .map_err(ResponseError::InternalServerError)?;
                     Ok(res.into_response())
@@ -328,16 +327,14 @@ async fn event_convert_handler(
     Ok(Event::default().data(data))
 }
 
-async fn model_mapper(model: &str) -> Result<(&str, &str, Option<ArkoseToken>), ResponseError> {
+async fn model_mapper(model: &str) -> Result<(&str, &str, ArkoseToken), ResponseError> {
+    let gpt_model = GPTModel::from_str(model)?;
+    let arkose_token = ArkoseToken::new_from_context(gpt_model.into()).await?;
     match model {
         model if model.starts_with("gpt-3.5") => {
-            Ok(("text-davinci-002-render-sha", "gpt-3.5-turbo", None))
+            Ok(("text-davinci-002-render-sha", "gpt-3.5-turbo", arkose_token))
         }
-        model if model.starts_with("gpt-4") => Ok((
-            "gpt-4",
-            "gpt-4",
-            Some(ArkoseToken::new_from_context(Type::Chat3).await?),
-        )),
+        model if model.starts_with("gpt-4") => Ok(("gpt-4", "gpt-4", arkose_token)),
         _ => Err(ResponseError::BadRequest(anyhow::anyhow!(
             "not support model: {model}"
         ))),
