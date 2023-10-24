@@ -1,7 +1,10 @@
 use crate::inter::get_platform_arkose_token;
 use inquire::{MultiSelect, Select, Text};
 use openai::{
-    auth::{model::ApiKeyAction, model::ApiKeyDataBuilder, AuthClient},
+    auth::{
+        model::{ApiKeyAction, ApiKeyData},
+        AuthClient,
+    },
     token::model::AuthenticateToken,
 };
 
@@ -117,11 +120,11 @@ async fn create_api_key(client: &AuthClient, token: &str) -> anyhow::Result<()> 
         let pb = new_spinner("Creating API key...");
         match get_platform_arkose_token(conf.arkose_platform_har_path.as_ref()).await {
             Ok(arkose_token) => {
-                let data = ApiKeyDataBuilder::default()
+                let data = ApiKeyData::builder()
                     .action(ApiKeyAction::Create)
                     .name(name.as_str())
                     .arkose_token(&arkose_token)
-                    .build()?;
+                    .build();
 
                 match client.do_api_key(token, data).await {
                     Ok(api_key) => {
@@ -172,12 +175,12 @@ async fn delete_api_key(client: &AuthClient, token: &str) -> anyhow::Result<()> 
                             .await
                         {
                             Ok(arkose_token) => {
-                                let data = ApiKeyDataBuilder::default()
+                                let data = ApiKeyData::builder()
                                     .action(ApiKeyAction::Delete)
                                     .created_at(key.created as u64)
                                     .redacted_key(key.sensitive_id.as_str())
                                     .arkose_token(&arkose_token)
-                                    .build()?;
+                                    .build();
 
                                 if let Err(err) = client.do_api_key(token, data).await {
                                     pb.finish_and_clear();

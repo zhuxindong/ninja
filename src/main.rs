@@ -63,7 +63,7 @@ fn main() -> anyhow::Result<()> {
                 args::ServeSubcommand::GT { out } => handle::generate_template(out)?,
             },
             SubCommands::Terminal => {
-                let runtime = tokio::runtime::TypedBuilder::new_multi_thread()
+                let runtime = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .worker_threads(1)
                     .max_blocking_threads(1)
