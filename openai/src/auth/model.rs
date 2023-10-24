@@ -1,8 +1,8 @@
 use std::fmt::{Display, Formatter};
 
-use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use typed_builder::TypedBuilder;
 
 use crate::arkose::ArkoseToken;
 
@@ -26,7 +26,7 @@ impl Display for AuthStrategy {
     }
 }
 
-#[derive(Deserialize, Builder, Default)]
+#[derive(Deserialize, TypedBuilder, Default)]
 pub struct AuthAccount {
     pub username: String,
     pub password: String,
@@ -211,7 +211,7 @@ pub struct Daum {
     pub expires_at: f64,
 }
 
-#[derive(Serialize, Builder)]
+#[derive(Serialize, TypedBuilder)]
 pub struct ApiKeyData<'a> {
     action: ApiKeyAction,
     #[builder(setter(into, strip_option), default)]

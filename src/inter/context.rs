@@ -40,9 +40,9 @@ impl Context {
 
         let proxies = conf.proxy.map(|p| vec![p]).unwrap_or(vec![]);
 
-        let args = openai::context::ContextArgsBuilder::default()
+        let args = openai::context::ContextArgs::builder()
             .arkose_endpoint(conf.arkose_token_endpoint)
-            .arkose_chat_har_file(arkose_chat_har_file)
+            .arkose_chat4_har_file(arkose_chat_har_file)
             .arkose_auth_har_file(arkose_auth_har_file)
             .arkose_platform_har_file(arkose_platform_har_file)
             .arkose_solver(arkose_solver)
@@ -50,7 +50,7 @@ impl Context {
             .connect_timeout(conf.connect_timeout)
             .tcp_keepalive(conf.tcp_keepalive)
             .proxies(proxies)
-            .build()?;
+            .build();
         openai::context::init(args);
         Ok(())
     }

@@ -10,9 +10,9 @@ use crate::{
     serve::middleware::tokenbucket,
     warn,
 };
-use derive_builder::Builder;
 use reqwest::Client;
 use std::sync::RwLock;
+use typed_builder::TypedBuilder;
 
 use hotwatch::{Event, EventKind, Hotwatch};
 
@@ -25,55 +25,49 @@ pub fn init(args: ContextArgs) {
 
 /// Get the program context
 pub fn get_instance() -> &'static Context {
-    CTX.get_or_init(|| {
-        Context::new(
-            ContextArgsBuilder::default()
-                .build()
-                .expect("Context arguments initialization build failed"),
-        )
-    })
+    CTX.get_or_init(|| Context::new(ContextArgs::builder().build()))
 }
 
-#[derive(Builder, Clone, Default)]
+#[derive(TypedBuilder, Clone, Default)]
 pub struct ContextArgs {
     /// Listen addres
-    #[builder(setter(into), default = "String::from(\"0.0.0.0\")")]
+    #[builder(setter(into), default = "0.0.0.0".to_string())]
     pub(crate) host: String,
 
     /// Listen port
-    #[builder(setter(into), default = "7999")]
+    #[builder(setter(into), default = 7999)]
     pub(crate) port: u16,
 
     /// Machine worker pool
-    #[builder(setter(into), default = "1")]
+    #[builder(setter(into), default = 1)]
     pub(crate) workers: usize,
 
     /// Concurrent limit (Enforces a limit on the concurrent number of requests the underlying)
-    #[builder(setter(into), default = "65535")]
+    #[builder(setter(into), default = 65535)]
     pub(crate) concurrent_limit: usize,
 
     /// Disable direct connection
-    #[builder(default = "false")]
+    #[builder(default = false)]
     pub(crate) disable_direct: bool,
 
     /// Enabled Cookie Store
-    #[builder(default = "false")]
+    #[builder(default = false)]
     pub(crate) cookie_store: bool,
 
     /// TCP keepalive (second)
-    #[builder(setter(into), default = "75")]
+    #[builder(setter(into), default = 75)]
     pub(crate) tcp_keepalive: usize,
 
     /// Set an optional timeout for idle sockets being kept-alive
-    #[builder(setter(into), default = "90")]
+    #[builder(setter(into), default = 90)]
     pub(crate) pool_idle_timeout: usize,
 
     /// Client timeout
-    #[builder(setter(into), default = "600")]
+    #[builder(setter(into), default = 600)]
     pub(crate) timeout: usize,
 
     /// Client connect timeout
-    #[builder(setter(into), default = "60")]
+    #[builder(setter(into), default = 60)]
     pub(crate) connect_timeout: usize,
 
     /// Server proxies
@@ -96,16 +90,20 @@ pub struct ContextArgs {
     #[builder(setter(into), default)]
     pub(crate) preauth_api: Option<String>,
 
-    /// TLS keypair
+    /// TLS cert
     #[builder(setter(into), default)]
-    pub(crate) tls_keypair: Option<(PathBuf, PathBuf)>,
+    pub(crate) tls_cert: Option<PathBuf>,
+
+    /// TLS key
+    #[builder(setter(into), default)]
+    pub(crate) tls_key: Option<PathBuf>,
 
     /// Login auth key
     #[builder(setter(into), default)]
     auth_key: Option<String>,
 
     /// Disable web ui
-    #[builder(setter(into), default = "false")]
+    #[builder(setter(into), default = false)]
     pub(crate) disable_ui: bool,
 
     /// Cloudflare captcha site key
@@ -120,9 +118,13 @@ pub struct ContextArgs {
     #[builder(setter(into), default)]
     pub(crate) arkose_endpoint: Option<String>,
 
-    /// ChatGPT Arkoselabs HAR record file path
+    /// ChatGPT GPT-3.5 Arkoselabs HAR record file path
     #[builder(setter(into), default)]
-    pub(crate) arkose_chat_har_file: Option<PathBuf>,
+    pub(crate) arkose_chat3_har_file: Option<PathBuf>,
+
+    /// ChatGPT GPT-4 Arkoselabs HAR record file path
+    #[builder(setter(into), default)]
+    pub(crate) arkose_chat4_har_file: Option<PathBuf>,
 
     /// Auth Arkoselabs HAR record file path
     #[builder(setter(into), default)]
@@ -146,35 +148,35 @@ pub struct ContextArgs {
 
     /// Enable Tokenbucket
     #[cfg(feature = "limit")]
-    #[builder(setter(into), default = "false")]
+    #[builder(setter(into), default = false)]
     pub(crate) tb_enable: bool,
 
     /// Tokenbucket store strategy
     #[cfg(feature = "limit")]
     #[builder(
         setter(into),
-        default = "crate::serve::middleware::tokenbucket::Strategy::Mem"
+        default = crate::serve::middleware::tokenbucket::Strategy::Mem
     )]
     pub(crate) tb_store_strategy: tokenbucket::Strategy,
 
     /// Tokenbucket redis url
     #[cfg(feature = "limit")]
-    #[builder(setter(into), default = "String::from(\"redis://127.0.0.1:6379\")")]
+    #[builder(setter(into), default = "redis://127.0.0.1:6379".to_string())]
     pub(crate) tb_redis_url: String,
 
     /// Tokenbucket capacity
     #[cfg(feature = "limit")]
-    #[builder(setter(into), default = "60")]
+    #[builder(setter(into), default = 60)]
     pub(crate) tb_capacity: u32,
 
     /// Tokenbucket fill rate
     #[cfg(feature = "limit")]
-    #[builder(setter(into), default = "1")]
+    #[builder(setter(into), default = 1)]
     pub(crate) tb_fill_rate: u32,
 
     /// Tokenbucket expired (second)
     #[cfg(feature = "limit")]
-    #[builder(setter(into), default = "86400")]
+    #[builder(setter(into), default = 86400)]
     pub(crate) tb_expired: u32,
 }
 
@@ -226,10 +228,15 @@ pub struct Context {
 
 impl Context {
     fn new(args: ContextArgs) -> Self {
-        let chat_har = init_har(
-            arkose::Type::Chat,
-            &args.arkose_chat_har_file,
-            ".chat.openai.com.har",
+        let chat3_har = init_har(
+            arkose::Type::Chat4,
+            &args.arkose_chat3_har_file,
+            ".chat3.openai.com.har",
+        );
+        let chat4_har = init_har(
+            arkose::Type::Chat4,
+            &args.arkose_chat4_har_file,
+            ".chat4.openai.com.har",
         );
         let auth_har = init_har(
             arkose::Type::Auth0,
@@ -243,7 +250,8 @@ impl Context {
         );
 
         let mut har_map = HashMap::with_capacity(3);
-        har_map.insert(arkose::Type::Chat, chat_har);
+        har_map.insert(arkose::Type::Chat3, chat3_har);
+        har_map.insert(arkose::Type::Chat4, chat4_har);
         har_map.insert(arkose::Type::Auth0, auth_har);
         har_map.insert(arkose::Type::Platform, platform_har);
         HAR.set(std::sync::RwLock::new(har_map))

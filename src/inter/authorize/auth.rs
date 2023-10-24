@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use inquire::{min_length, required, MultiSelect, Password, PasswordDisplayMode, Select, Text};
-use openai::auth::model::{AuthAccountBuilder, AuthStrategy};
+use openai::auth::model::{AuthAccount, AuthStrategy};
 use openai::auth::provide::AuthProvider;
 use openai::token::model::AuthenticateToken;
 
@@ -92,12 +92,12 @@ async fn sign_in() -> anyhow::Result<()> {
         for auth_strategy in multi_strategy {
             let pb = new_spinner("Authenticating...");
 
-            let auth_account = AuthAccountBuilder::default()
+            let auth_account = AuthAccount::builder()
                 .username(username.clone())
                 .password(password.clone())
                 .mfa(mfa_code.clone())
                 .option(auth_strategy.clone())
-                .build()?;
+                .build();
 
             match client.do_access_token(&auth_account).await {
                 Ok(access_token) => {

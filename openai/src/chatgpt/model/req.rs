@@ -1,11 +1,11 @@
-use derive_builder::Builder;
 use serde::Serialize;
+use typed_builder::TypedBuilder;
 
 use crate::arkose::ArkoseToken;
 
 use super::{Author, Role};
 
-#[derive(Serialize, Builder, Clone)]
+#[derive(Serialize, TypedBuilder, Clone)]
 pub struct Content<'a> {
     content_type: ContentText,
     parts: Vec<&'a str>,
@@ -17,7 +17,7 @@ pub enum ContentText {
     Text,
 }
 
-#[derive(Serialize, Builder, Clone)]
+#[derive(Serialize, TypedBuilder, Clone)]
 pub struct Messages<'a> {
     id: String,
     author: Author,
@@ -32,7 +32,7 @@ pub enum Action {
     Continue,
 }
 
-#[derive(Serialize, Builder)]
+#[derive(Serialize, TypedBuilder)]
 pub struct PatchConvoRequest<'a> {
     #[builder(setter(into, strip_option), default)]
     pub conversation_id: Option<&'a str>,
@@ -42,24 +42,24 @@ pub struct PatchConvoRequest<'a> {
     is_visible: Option<bool>,
 }
 
-#[derive(Builder)]
+#[derive(TypedBuilder)]
 pub struct GetConvoRequest<'a> {
     #[builder(setter(into, strip_option))]
     pub conversation_id: Option<&'a str>,
-    #[builder(default = "0")]
+    #[builder(default = 0)]
     pub offset: u32,
-    #[builder(default = "20")]
+    #[builder(default = 20)]
     pub limit: u32,
 }
 
-#[derive(Serialize, Builder)]
+#[derive(Serialize, TypedBuilder)]
 pub struct PostConvoGenTitleRequest<'a> {
     message_id: &'a str,
     #[serde(skip_serializing)]
     pub conversation_id: &'a str,
 }
 
-#[derive(Serialize, Builder)]
+#[derive(Serialize, TypedBuilder)]
 pub struct MessageFeedbackRequest<'a> {
     message_id: &'a str,
     rating: Rating,
@@ -81,89 +81,80 @@ impl ToString for Rating {
     }
 }
 
-#[derive(Serialize, Builder)]
+#[derive(Serialize, TypedBuilder)]
 pub struct PostConvoRequest<'a> {
     action: Action,
     messages: Vec<Messages<'a>>,
     parent_message_id: &'a str,
     model: &'a str,
-    #[builder(default = "-480")]
+    #[builder(default = -480)]
     timezone_offset_min: i64,
     #[builder(setter(into), default)]
     conversation_id: Option<&'a str>,
-    #[builder(default = "false")]
+    #[builder(default = false)]
     history_and_training_disabled: bool,
-    #[builder(default)]
+    #[builder(setter(into), default)]
     arkose_token: Option<&'a ArkoseToken>,
 }
 
-impl<'a> TryFrom<PostNextConvoRequest<'a>> for PostConvoRequest<'a> {
-    type Error = anyhow::Error;
-
-    fn try_from(value: PostNextConvoRequest<'a>) -> Result<Self, Self::Error> {
-        let body = PostConvoRequestBuilder::default()
+impl<'a> From<PostNextConvoRequest<'a>> for PostConvoRequest<'a> {
+    fn from(value: PostNextConvoRequest<'a>) -> Self {
+        PostConvoRequest::builder()
             .action(Action::Next)
             .parent_message_id(value.parent_message_id)
-            .messages(vec![MessagesBuilder::default()
+            .messages(vec![Messages::builder()
                 .id(value.message_id.to_owned())
                 .author(Author { role: Role::User })
                 .content(
-                    ContentBuilder::default()
+                    Content::builder()
                         .content_type(ContentText::Text)
                         .parts(vec![value.prompt])
-                        .build()?,
+                        .build(),
                 )
-                .build()?])
+                .build()])
             .model(value.model)
             .conversation_id(value.conversation_id)
             .arkose_token(value.arkose_token)
-            .build()?;
-        Ok(body)
+            .build()
     }
 }
 
-impl<'a> TryFrom<PostContinueConvoRequest<'a>> for PostConvoRequest<'a> {
-    type Error = anyhow::Error;
-
-    fn try_from(value: PostContinueConvoRequest<'a>) -> Result<Self, Self::Error> {
-        let body = PostConvoRequestBuilder::default()
+impl<'a> From<PostContinueConvoRequest<'a>> for PostConvoRequest<'a> {
+    fn from(value: PostContinueConvoRequest<'a>) -> Self {
+        PostConvoRequest::builder()
             .action(Action::Continue)
             .conversation_id(value.conversation_id)
             .parent_message_id(value.parent_message_id)
+            .messages(vec![])
             .model(value.model)
             .arkose_token(value.arkose_token)
-            .build()?;
-
-        Ok(body)
+            .build()
     }
 }
 
-impl<'a> TryFrom<PostVaraintConvoRequest<'a>> for PostConvoRequest<'a> {
-    type Error = anyhow::Error;
-
-    fn try_from(value: PostVaraintConvoRequest<'a>) -> Result<Self, Self::Error> {
-        let body = PostConvoRequestBuilder::default()
+impl<'a> From<PostVaraintConvoRequest<'a>> for PostConvoRequest<'a> {
+    fn from(value: PostVaraintConvoRequest<'a>) -> Self {
+        PostConvoRequest::builder()
             .action(Action::Variant)
             .conversation_id(value.conversation_id)
             .parent_message_id(value.parent_message_id)
-            .messages(vec![MessagesBuilder::default()
+            .messages(vec![Messages::builder()
                 .id(value.message_id.to_owned())
                 .author(Author { role: Role::User })
                 .content(
-                    ContentBuilder::default()
+                    Content::builder()
                         .content_type(ContentText::Text)
                         .parts(vec![value.prompt])
-                        .build()?,
+                        .build(),
                 )
-                .build()?])
+                .build()])
             .model(value.model)
             .arkose_token(value.arkose_token)
-            .build()?;
-        Ok(body)
+            .build()
     }
 }
 
-#[derive(Serialize, Builder)]
+#[derive(Serialize, TypedBuilder)]
 pub struct PostNextConvoRequest<'a> {
     /// The conversation uses a model that usually remains the same throughout the conversation
     model: &'a str,
@@ -181,7 +172,7 @@ pub struct PostNextConvoRequest<'a> {
     arkose_token: Option<&'a ArkoseToken>,
 }
 
-#[derive(Serialize, Builder)]
+#[derive(Serialize, TypedBuilder)]
 pub struct PostContinueConvoRequest<'a> {
     /// The conversation uses a model that usually remains the same throughout the conversation
     model: &'a str,
@@ -194,7 +185,7 @@ pub struct PostContinueConvoRequest<'a> {
     arkose_token: Option<&'a ArkoseToken>,
 }
 
-#[derive(Serialize, Builder)]
+#[derive(Serialize, TypedBuilder)]
 pub struct PostVaraintConvoRequest<'a> {
     /// The conversation uses a model that usually remains the same throughout the conversation
     model: &'a str,

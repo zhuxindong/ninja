@@ -69,7 +69,9 @@ o = s:option(Value, "cf_site_key", translate("CF Site Key"), translate("Cloudfla
 o = s:option(Value, "cf_secret_key", translate("CF Secret Key"), translate("Cloudflare turnstile captcha secret key"))
 o.password = true
 
-o = s:option(Value, "arkose_chat_har_file", translate("ChatGPT HAR file path"), translate("About the browser HAR file path requested by ChatGPT ArkoseLabs"))
+o = s:option(Value, "arkose_chat3_har_file", translate("ChatGPT GPT-3.5 HAR file path"), translate("About the browser HAR file path requested by ChatGPT GPT-3.5 ArkoseLabs"))
+
+o = s:option(Value, "arkose_chat4_har_file", translate("ChatGPT GPT-4 HAR file path"), translate("About the browser HAR file path requested by ChatGPT GPT-4 ArkoseLabs"))
 
 o = s:option(Value, "arkose_auth_har_file", translate("Auth HAR file path"), translate("About the browser HAR file path requested by Auth ArkoseLabs"))
 

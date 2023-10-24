@@ -1,4 +1,4 @@
-use crate::auth::provide::{AuthenticateDataBuilder, AuthorizationCodeDataBuilder, GrantType};
+use crate::auth::provide::{AuthenticateData, GrantType};
 use crate::auth::AuthClient;
 use crate::{
     auth::{
@@ -14,8 +14,8 @@ use reqwest::Client;
 use url::Url;
 
 use super::{
-    AuthProvider, AuthResult, AuthenticateMfaDataBuilder, IdentifierDataBuilder,
-    RefreshTokenDataBuilder, RequestContext, RequestContextExt, RevokeTokenDataBuilder,
+    AuthProvider, AuthResult, AuthenticateMfaData, AuthorizationCodeData, IdentifierData,
+    RefreshTokenData, RequestContext, RequestContextExt, RevokeTokenData,
 };
 
 const STATE: &str = "TMf_R7zSeBRzTs86WAfQJh9Q_AbDh3382e7Y-pae1wQ";
@@ -76,7 +76,7 @@ impl AppleAuthProvider {
             .post(&url)
             .ext_context(ctx)
             .form(
-                &IdentifierDataBuilder::default()
+                &IdentifierData::builder()
                     .action("default")
                     .state(&ctx.state)
                     .username(&ctx.account.username)
@@ -84,7 +84,7 @@ impl AppleAuthProvider {
                     .webauthn_available(true)
                     .is_brave(false)
                     .webauthn_platform_available(true)
-                    .build()?,
+                    .build(),
             )
             .send()
             .await?
@@ -109,12 +109,12 @@ impl AppleAuthProvider {
             ))
             .ext_context(ctx)
             .form(
-                &AuthenticateDataBuilder::default()
+                &AuthenticateData::builder()
                     .action("default")
                     .state(&ctx.state)
                     .username(&ctx.account.username)
                     .password(&ctx.account.password)
-                    .build()?,
+                    .build(),
             )
             .send()
             .await
@@ -171,11 +171,11 @@ impl AppleAuthProvider {
             .inner
             .post(&url)
             .json(
-                &AuthenticateMfaDataBuilder::default()
+                &AuthenticateMfaData::builder()
                     .action("default")
                     .state(&state)
                     .code(mfa_code)
-                    .build()?,
+                    .build(),
             )
             .ext_context(ctx)
             .send()
@@ -201,13 +201,13 @@ impl AppleAuthProvider {
             .post(OPENAI_OAUTH_TOKEN_URL)
             .ext_context(ctx)
             .json(
-                &AuthorizationCodeDataBuilder::default()
+                &AuthorizationCodeData::builder()
                     .redirect_uri(OPENAI_OAUTH_APPLE_CALLBACK_URL)
                     .grant_type(GrantType::AuthorizationCode)
                     .client_id(APPLE_CLIENT_ID)
                     .code(&code)
                     .code_verifier(Some(&ctx.code_verifier))
-                    .build()?,
+                    .build(),
             )
             .send()
             .await
@@ -271,12 +271,12 @@ impl AuthProvider for AppleAuthProvider {
 
     async fn do_refresh_token(&self, refresh_token: &str) -> AuthResult<model::RefreshToken> {
         let refresh_token = AuthClient::trim_bearer(refresh_token)?;
-        let data = RefreshTokenDataBuilder::default()
+        let data = RefreshTokenData::builder()
             .redirect_uri(OPENAI_OAUTH_APPLE_CALLBACK_URL)
             .grant_type(GrantType::RefreshToken)
             .client_id(APPLE_CLIENT_ID)
             .refresh_token(refresh_token)
-            .build()?;
+            .build();
 
         let resp = self
             .inner
@@ -292,10 +292,10 @@ impl AuthProvider for AppleAuthProvider {
 
     async fn do_revoke_token(&self, refresh_token: &str) -> AuthResult<()> {
         let refresh_token = AuthClient::trim_bearer(refresh_token)?;
-        let data = RevokeTokenDataBuilder::default()
+        let data = RevokeTokenData::builder()
             .client_id(APPLE_CLIENT_ID)
             .token(refresh_token)
-            .build()?;
+            .build();
 
         let resp = self
             .inner

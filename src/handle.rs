@@ -3,7 +3,7 @@ use std::{ops::Not, path::PathBuf};
 use clap::CommandFactory;
 use openai::{
     arkose::funcaptcha::ArkoseSolver,
-    context::ContextArgsBuilder,
+    context::ContextArgs,
     serve::{middleware::tokenbucket::Strategy, Launcher},
 };
 
@@ -46,8 +46,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
     // Set the log level
     std::env::set_var("RUST_LOG", args.level);
 
-    let mut builder = ContextArgsBuilder::default();
-    let builder = builder
+    let builder = ContextArgs::builder()
         .host(
             args.host
                 .unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)))
@@ -61,19 +60,21 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .cookie_store(args.cookie_store)
         .api_prefix(args.api_prefix)
         .preauth_api(args.preauth_api)
-        .tls_keypair(None)
         .tcp_keepalive(args.tcp_keepalive)
         .pool_idle_timeout(args.pool_idle_timeout)
         .timeout(args.timeout)
         .connect_timeout(args.connect_timeout)
         .workers(args.workers)
         .concurrent_limit(args.concurrent_limit)
+        .tls_cert(args.tls_cert)
+        .tls_key(args.tls_key)
         .auth_key(args.auth_key)
         .cf_site_key(args.cf_site_key)
         .cf_secret_key(args.cf_secret_key)
         .disable_ui(args.disable_webui)
         .arkose_endpoint(args.arkose_endpoint)
-        .arkose_chat_har_file(args.arkose_chat_har_file)
+        .arkose_chat3_har_file(args.arkose_chat3_har_file)
+        .arkose_chat4_har_file(args.arkose_chat4_har_file)
         .arkose_auth_har_file(args.arkose_auth_har_file)
         .arkose_platform_har_file(args.arkose_platform_har_file)
         .arkose_har_upload_key(args.arkose_har_upload_key)
@@ -81,7 +82,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .arkose_solver(arkose_sovler);
 
     #[cfg(feature = "limit")]
-    let mut builder = builder
+    let builder = builder
         .tb_enable(args.tb_enable)
         .tb_store_strategy(args.tb_store_strategy)
         .tb_redis_url(args.tb_redis_url)
@@ -89,15 +90,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .tb_fill_rate(args.tb_fill_rate)
         .tb_expired(args.tb_expired);
 
-    if args.tls_key.is_some() && args.tls_cert.is_some() {
-        builder = builder.tls_keypair(Some((
-            args.tls_cert.expect("tls_cert not init"),
-            args.tls_key.expect("tls_key not init"),
-        )));
-    }
-    let args = builder.build()?;
-
-    Launcher::new(args).run()
+    Launcher::new(builder.build()).run()
 }
 
 #[cfg(target_family = "unix")]

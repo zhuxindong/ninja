@@ -181,9 +181,9 @@ impl Launcher {
             // Spawn a task to gracefully shutdown server.
             tokio::spawn(signal::graceful_shutdown(handle.clone()));
 
-            match self.inner.tls_keypair {
-                Some(keypair) => {
-                    let tls_config = RustlsConfig::from_pem_file(keypair.0, keypair.1)
+            match (self.inner.tls_cert, self.inner.tls_key) {
+                (Some(cert), Some(key)) => {
+                    let tls_config = RustlsConfig::from_pem_file(cert, key)
                         .await
                         .expect("Failed to load TLS keypair");
                     let socket = std::net::SocketAddr::new(
@@ -198,7 +198,7 @@ impl Launcher {
                         .await
                         .expect("openai server failed")
                 }
-                None => {
+                _ => {
                     let socket = std::net::SocketAddr::new(
                         self.inner.host.parse::<IpAddr>().unwrap(),
                         self.inner.port,
@@ -498,10 +498,26 @@ async fn handle_body(
         None => return Ok(()),
     };
 
-    if arkose::GPT4Model::from_str(model).is_ok() {
-        if body.get("arkose_token").is_none() {
-            let arkose_token = arkose::ArkoseToken::new_from_context(Type::Chat).await?;
-            body.insert("arkose_token".to_owned(), json!(arkose_token));
+    match arkose::GPTModel::from_str(model) {
+        Ok(model) => {
+            let condition = match body.get("arkose_token") {
+                Some(s) => {
+                    let s = s.as_str().unwrap_or(EMPTY);
+                    s.is_empty() || s.eq("null")
+                }
+                None => true,
+            };
+
+            if condition {
+                let arkose_token = arkose::ArkoseToken::new_from_context(model.into()).await?;
+                body.insert("arkose_token".to_owned(), json!(arkose_token));
+            }
+        }
+        Err(err) => {
+            return Err(ResponseError::BadRequest(anyhow!(
+                "GPTModel parse error: {}",
+                err
+            )))
         }
     }
 
