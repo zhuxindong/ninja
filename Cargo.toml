@@ -39,6 +39,7 @@ tikv-jemallocator = "0.5.4"
 
 [dev-dependencies]
 futures-util = "0.3.28"
+serde_json = "1.0.107"
 tokio = { version = "1.32.0", default-features = false, features = ["rt"] }
 reqwest = { package = "reqwest-impersonate", version ="0.11.27", default-features = false, features = [
     "boring-tls", "impersonate","json", "cookies", "stream", "multipart", "socks", "blocking"

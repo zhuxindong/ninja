@@ -47,12 +47,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
     std::env::set_var("RUST_LOG", args.level);
 
     let builder = ContextArgs::builder()
-        .host(
-            args.host
-                .unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::new(0, 0, 0, 0)))
-                .to_string(),
-        )
-        .port(args.port.unwrap_or(7999))
+        .bind(args.bind)
         .interface(args.interface)
         .ipv6_subnet(args.ipv6_subnet)
         .proxies(args.proxies.unwrap_or_default())
@@ -248,8 +243,7 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
     };
 
     let args = args::ServeArgs {
-        host: Some("0.0.0.0".parse()?),
-        port: Some(7999),
+        bind: Some("0.0.0.0:7999".parse()?),
         workers: 1,
         concurrent_limit: 65535,
         timeout: 600,

@@ -27,6 +27,7 @@ thunder-tests
 ./ninja
 uploads
 ./vendor
+upgrade
 chat3.openai.com.har
 chat4.openai.com.har
 platform.openai.com.har

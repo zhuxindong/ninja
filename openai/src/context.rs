@@ -1,4 +1,9 @@
-use std::{collections::HashMap, path::PathBuf, sync::OnceLock};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    path::PathBuf,
+    sync::OnceLock,
+};
 
 use crate::{
     arkose::{self, funcaptcha::ArkoseSolver},
@@ -30,13 +35,9 @@ pub fn get_instance() -> &'static Context {
 
 #[derive(TypedBuilder, Clone, Default)]
 pub struct ContextArgs {
-    /// Listen addres
-    #[builder(setter(into), default = "0.0.0.0".to_string())]
-    pub(crate) host: String,
-
-    /// Listen port
-    #[builder(setter(into), default = 7999)]
-    pub(crate) port: u16,
+    /// Server bind address
+    #[builder(setter(into), default = Some(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 7999)))]
+    pub(crate) bind: Option<SocketAddr>,
 
     /// Machine worker pool
     #[builder(setter(into), default = 1)]

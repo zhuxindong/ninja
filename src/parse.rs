@@ -19,6 +19,14 @@ pub fn parse_port_in_range(s: &str) -> anyhow::Result<u16> {
     ))
 }
 
+// parse socket address
+pub fn parse_socket_addr(s: &str) -> anyhow::Result<std::net::SocketAddr> {
+    let addr = s
+        .parse::<std::net::SocketAddr>()
+        .map_err(|_| anyhow::anyhow!(format!("`{}` isn't a socket address", s)))?;
+    Ok(addr)
+}
+
 // address parse
 pub fn parse_host(s: &str) -> anyhow::Result<std::net::IpAddr> {
     let addr = s
