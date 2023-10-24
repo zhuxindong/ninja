@@ -28,6 +28,8 @@ pub enum AuthError {
     FailedState,
     #[error("failed get csrf token")]
     FailedCsrfToken,
+    #[error("failed to get auth session cookie")]
+    FailedAuthSessionCookie,
     #[error("invalid request login url (error {0:?})")]
     InvalidLoginUrl(String),
     #[error("invalid email or password")]

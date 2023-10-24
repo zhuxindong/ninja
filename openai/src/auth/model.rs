@@ -1,4 +1,7 @@
-use std::fmt::{Display, Formatter};
+use std::{
+    fmt::{Display, Formatter},
+    time::SystemTime,
+};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -50,12 +53,30 @@ pub struct OAuthAccessToken {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct SessionAccessToken {
+    pub user: WebUser,
+    pub expires: String,
+    #[serde(rename = "accessToken")]
+    pub access_token: String,
+    #[serde(rename = "authProvider")]
+    pub auth_provider: String,
+    #[serde(skip_serializing)]
+    pub session: Option<Session>,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct RefreshToken {
     pub access_token: String,
     #[serde(default)]
     pub refresh_token: String,
     pub id_token: String,
     pub expires_in: i64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Session {
+    pub value: String,
+    pub expires: Option<SystemTime>,
 }
 
 #[derive(Deserialize)]
@@ -144,17 +165,6 @@ pub struct Key {
     pub last_use: Value,
     pub publishable: bool,
 }
-
-#[derive(Serialize, Deserialize)]
-pub struct SessionAccessToken {
-    pub user: WebUser,
-    pub expires: String,
-    #[serde(rename = "accessToken")]
-    pub access_token: String,
-    #[serde(rename = "authProvider")]
-    pub auth_provider: String,
-}
-
 #[derive(Deserialize, Serialize)]
 pub struct WebUser {
     pub id: String,

@@ -108,7 +108,7 @@ pub async fn check_authorization() -> anyhow::Result<()> {
         for (k, token) in state.iter_mut() {
             if let AuthStrategy::Platform | AuthStrategy::Apple = k {
                 let time_left = token.expires() - current_time;
-                let difference = token.expires_in() / 10;
+                let difference = 14000;
                 if time_left < difference {
                     if let Some(refresh_token) = token.refresh_token() {
                         let pb = new_spinner("Initializing login...");

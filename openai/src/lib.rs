@@ -33,7 +33,7 @@ pub fn now_duration() -> anyhow::Result<Duration> {
     Ok(duration)
 }
 
-pub fn format_time(timestamp: i64) -> anyhow::Result<String> {
+pub fn format_time_to_rfc3399(timestamp: i64) -> anyhow::Result<String> {
     let time = time::OffsetDateTime::from_unix_timestamp(timestamp)?
         .format(&time::format_description::well_known::Rfc3339)?;
     Ok(time)

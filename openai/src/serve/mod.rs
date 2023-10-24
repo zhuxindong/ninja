@@ -7,12 +7,12 @@ pub mod router;
 pub mod signal;
 
 use anyhow::anyhow;
-use axum::body::StreamBody;
+use axum::body::{Body, StreamBody};
 use axum::headers::authorization::Bearer;
 use axum::headers::Authorization;
 use axum::http::Response;
 use axum::response::IntoResponse;
-use axum::routing::{any, post};
+use axum::routing::{any, get, post};
 use axum::{Json, TypedHeader};
 use axum_server::{AddrIncomingConfig, Handle};
 
@@ -27,15 +27,16 @@ use reqwest::header::{HeaderMap, HeaderValue};
 use serde_json::{json, Value};
 use std::str::FromStr;
 use std::sync::Arc;
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
 use std::net::{IpAddr, SocketAddr};
 
 use crate::arkose::Type;
-use crate::auth::model::{AccessToken, AuthAccount, RefreshToken};
+use crate::auth::model::{AccessToken, AuthAccount, RefreshToken, SessionAccessToken};
 use crate::auth::provide::AuthProvider;
+use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
 use crate::context::{self, ContextArgs};
 use crate::serve::middleware::tokenbucket::TokenBucketLimitContext;
 use crate::serve::router::toapi::chat_to_api;
@@ -172,7 +173,8 @@ impl Launcher {
                 .route("/public-api/*path", any(unofficial_proxy))
                 .route("/auth/token", post(post_access_token))
                 .route("/auth/refresh_token", post(post_refresh_token))
-                .route("/auth/revoke_token", post(post_revoke_token));
+                .route("/auth/revoke_token", post(post_revoke_token))
+                .route("/api/auth/session", get(get_session));
 
             let router = router::config(router, &self.inner).layer(global_layer);
 
@@ -218,11 +220,30 @@ impl Launcher {
     }
 }
 
+/// GET /api/auth/session
+async fn get_session(jar: CookieJar) -> Result<impl IntoResponse, ResponseError> {
+    match jar.get(API_AUTH_SESSION_COOKIE_KEY) {
+        Some(session) => {
+            let session_token = context::get_instance()
+                .auth_client()
+                .do_session(session.value())
+                .await
+                .map_err(ResponseError::BadRequest)?;
+
+            let resp: Response<Body> = session_token.try_into()?;
+            Ok(resp.into_response())
+        }
+        None => Err(ResponseError::Unauthorized(anyhow!(
+            "Session: {API_AUTH_SESSION_COOKIE_KEY} required!"
+        ))),
+    }
+}
+
 /// POST /auth/token
 async fn post_access_token(
     bearer: Option<TypedHeader<Authorization<Bearer>>>,
     mut account: axum::Form<AuthAccount>,
-) -> Result<Json<AccessToken>, ResponseError> {
+) -> Result<impl IntoResponse, ResponseError> {
     if let Some(key) = context::get_instance().auth_key() {
         let bearer = bearer.ok_or(ResponseError::Unauthorized(anyhow!(
             "Login Authentication Key required!"
@@ -233,8 +254,14 @@ async fn post_access_token(
             )));
         }
     }
-    let res: AccessToken = try_login(&mut account).await?;
-    Ok(Json(res))
+
+    match try_login(&mut account).await? {
+        AccessToken::Session(session_token) => {
+            let resp: Response<Body> = session_token.try_into()?;
+            Ok(resp.into_response())
+        }
+        AccessToken::OAuth(c) => Ok(Json(AccessToken::OAuth(c)).into_response()),
+    }
 }
 
 /// POST /auth/refresh_token
@@ -432,13 +459,13 @@ fn response_convert(
         key.eq("_puid") || key.eq("_account")
     }) {
         if let Some(expires) = c.expires() {
-            let timestamp_nanos = expires
+            let timestamp_secs = expires
                 .duration_since(UNIX_EPOCH)
                 .expect("Failed to get timestamp")
                 .as_secs_f64();
             let cookie = Cookie::build(c.name(), c.value())
                 .path("/")
-                .max_age(time::Duration::seconds_f64(timestamp_nanos))
+                .max_age(time::Duration::seconds_f64(timestamp_secs))
                 .same_site(cookie::SameSite::Lax)
                 .secure(false)
                 .http_only(false)
@@ -582,6 +609,43 @@ pub(super) fn has_puid(headers: &HeaderMap) -> Result<bool, ResponseError> {
         None => false,
     };
     Ok(res)
+}
+
+impl TryInto<Response<Body>> for SessionAccessToken {
+    type Error = ResponseError;
+
+    fn try_into(self) -> Result<Response<Body>, Self::Error> {
+        let s = self
+            .session
+            .clone()
+            .ok_or(ResponseError::InternalServerError(anyhow!(
+                "Session error!"
+            )))?;
+
+        let timestamp_secs = s
+            .expires
+            .unwrap_or_else(|| SystemTime::now())
+            .duration_since(UNIX_EPOCH)
+            .expect("Failed to get timestamp")
+            .as_secs_f64();
+
+        let cookie = cookie::Cookie::build(API_AUTH_SESSION_COOKIE_KEY, s.value)
+            .path("/")
+            .expires(time::OffsetDateTime::from_unix_timestamp(
+                timestamp_secs as i64,
+            )?)
+            .same_site(cookie::SameSite::Lax)
+            .secure(true)
+            .http_only(false)
+            .finish();
+
+        Ok(Response::builder()
+            .status(axum::http::StatusCode::OK)
+            .header(header::SET_COOKIE, cookie.to_string())
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(serde_json::to_string(&self)?))
+            .map_err(ResponseError::InternalServerError)?)
+    }
 }
 
 async fn check_wan_address() {
