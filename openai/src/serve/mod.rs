@@ -498,10 +498,26 @@ async fn handle_body(
         None => return Ok(()),
     };
 
-    if arkose::GPTModel::from_str(model).is_ok() {
-        if body.get("arkose_token").is_none() {
-            let arkose_token = arkose::ArkoseToken::new_from_context(Type::Chat3).await?;
-            body.insert("arkose_token".to_owned(), json!(arkose_token));
+    match arkose::GPTModel::from_str(model) {
+        Ok(model) => {
+            let condition = match body.get("arkose_token") {
+                Some(s) => {
+                    let s = s.as_str().unwrap_or(EMPTY);
+                    s.is_empty() || s.eq("null")
+                }
+                None => true,
+            };
+
+            if condition {
+                let arkose_token = arkose::ArkoseToken::new_from_context(model.into()).await?;
+                body.insert("arkose_token".to_owned(), json!(arkose_token));
+            }
+        }
+        Err(err) => {
+            return Err(ResponseError::BadRequest(anyhow!(
+                "GPTModel parse error: {}",
+                err
+            )))
         }
     }
 

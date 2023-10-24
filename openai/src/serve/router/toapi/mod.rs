@@ -73,19 +73,23 @@ pub(crate) async fn chat_to_api(
 
     let client = context::get_instance().client();
     let new_headers = header_convert(&headers, &jar).await?;
-    if GPTModel::from_str(model_mapper.0).is_ok() {
-        if !has_puid(&new_headers)? {
-            let result = client
-                .get(format!("{URL_CHATGPT_API}/backend-api/models"))
-                .headers(new_headers.clone())
-                .send()
-                .await;
 
-            result
-                .map_err(ResponseError::InternalServerError)?
-                .error_for_status()
-                .map_err(ResponseError::BadRequest)?;
+    match GPTModel::from_str(model_mapper.0) {
+        Ok(GPTModel::Gpt4Other) | Ok(GPTModel::Gpt4model) => {
+            if !has_puid(&new_headers)? {
+                let result = client
+                    .get(format!("{URL_CHATGPT_API}/backend-api/models"))
+                    .headers(new_headers.clone())
+                    .send()
+                    .await;
+
+                result
+                    .map_err(ResponseError::InternalServerError)?
+                    .error_for_status()
+                    .map_err(ResponseError::BadRequest)?;
+            }
         }
+        _ => {}
     }
 
     let resp = client

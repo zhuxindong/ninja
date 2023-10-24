@@ -57,6 +57,15 @@ pub enum GPTModel {
     Gpt4Other,
 }
 
+impl Into<Type> for GPTModel {
+    fn into(self) -> Type {
+        match self {
+            GPTModel::Gpt3Other | GPTModel::Gpt3model => Type::Chat3,
+            GPTModel::Gpt4Other | GPTModel::Gpt4model => Type::Chat4,
+        }
+    }
+}
+
 impl std::str::FromStr for GPTModel {
     type Err = anyhow::Error;
 
@@ -65,7 +74,9 @@ impl std::str::FromStr for GPTModel {
             "gpt-4" => Ok(GPTModel::Gpt4model),
             s if s.starts_with("gpt-4") || s.starts_with("gpt4") => Ok(GPTModel::Gpt4Other),
             "gpt-3.5" => Ok(GPTModel::Gpt3model),
-            s if s.starts_with("gpt-3") || s.starts_with("gpt3") => Ok(GPTModel::Gpt3Other),
+            s if s.starts_with("gpt-3.5") || s.starts_with("text-davinci") => {
+                Ok(GPTModel::Gpt3Other)
+            }
             _ => anyhow::bail!("Invalid GPT model"),
         }
     }

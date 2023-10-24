@@ -55,8 +55,11 @@ async fn proxy(
 
     if req_path.contains("/fc/gt2/public_key/") {
         let arkose_res = match req_path {
-            s if s.contains("35536E1E-65B4-4D96-9D97-6ADB7EFF8147") => {
+            s if s.contains("3D86FBBA-9D22-402A-B512-3420086BA6CC") => {
                 ArkoseToken::new_from_context(Type::Chat3).await
+            }
+            s if s.contains("35536E1E-65B4-4D96-9D97-6ADB7EFF8147") => {
+                ArkoseToken::new_from_context(Type::Chat4).await
             }
             s if s.contains("0A1D34FC-659D-4E23-B17B-694DCFCF6A6C") => {
                 ArkoseToken::new_from_context(Type::Auth0).await
