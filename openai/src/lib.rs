@@ -17,6 +17,9 @@ pub mod unescape;
 pub mod urldecoding;
 pub mod uuid;
 
+#[cfg(feature = "preauth")]
+pub mod preauth;
+
 #[cfg(feature = "serve")]
 pub mod serve;
 
