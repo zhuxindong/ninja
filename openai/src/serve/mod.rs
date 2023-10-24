@@ -31,7 +31,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 
 use crate::arkose::Type;
 use crate::auth::model::{AccessToken, AuthAccount, RefreshToken, SessionAccessToken};
@@ -65,13 +65,9 @@ impl Launcher {
             .with(tracing_subscriber::fmt::layer())
             .init();
 
-        let host = match self.inner.host.parse::<IpAddr>()?.is_ipv4() {
-            true => self.inner.host.to_string(),
-            false => format!("[{}]", self.inner.host),
-        };
         info!(
-            "Starting HTTP(S) server at http(s)://{host}:{}",
-            self.inner.port
+            "Starting HTTP(S) server at http(s)://{:?}",
+            self.inner.bind.expect("bind address required")
         );
         info!("Starting {} workers", self.inner.workers);
         info!("Concurrent limit {}", self.inner.concurrent_limit);
@@ -188,11 +184,8 @@ impl Launcher {
                     let tls_config = RustlsConfig::from_pem_file(cert, key)
                         .await
                         .expect("Failed to load TLS keypair");
-                    let socket = std::net::SocketAddr::new(
-                        self.inner.host.parse::<IpAddr>().unwrap(),
-                        self.inner.port,
-                    );
-                    axum_server::bind_rustls(socket, tls_config)
+
+                    axum_server::bind_rustls(self.inner.bind.unwrap(), tls_config)
                         .handle(handle)
                         .addr_incoming_config(incoming_config)
                         .http_config(http_config)
@@ -200,19 +193,13 @@ impl Launcher {
                         .await
                         .expect("openai server failed")
                 }
-                _ => {
-                    let socket = std::net::SocketAddr::new(
-                        self.inner.host.parse::<IpAddr>().unwrap(),
-                        self.inner.port,
-                    );
-                    axum_server::bind(socket)
-                        .handle(handle)
-                        .addr_incoming_config(incoming_config)
-                        .http_config(http_config)
-                        .serve(router.into_make_service_with_connect_info::<SocketAddr>())
-                        .await
-                        .expect("openai server failed")
-                }
+                _ => axum_server::bind(self.inner.bind.unwrap())
+                    .handle(handle)
+                    .addr_incoming_config(incoming_config)
+                    .http_config(http_config)
+                    .serve(router.into_make_service_with_connect_info::<SocketAddr>())
+                    .await
+                    .expect("openai server failed"),
             }
         });
 

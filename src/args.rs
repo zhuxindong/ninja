@@ -58,6 +58,8 @@ pub enum ServeSubcommand {
     /// Show the Http server daemon log
     #[cfg(target_family = "unix")]
     Log,
+    /// Generate MITM CA certificate
+    Genca,
     /// Generate config template file (toml format file)
     GT {
         /// Configuration template output to file (toml format file)
@@ -76,13 +78,9 @@ pub struct ServeArgs {
     #[clap(short = 'C', long, env = "CONFIG", value_parser = parse::parse_file_path)]
     pub(super) config: Option<PathBuf>,
 
-    /// Server Listen host
-    #[clap(short = 'H', long, env = "HOST", default_value = "0.0.0.0", value_parser = parse::parse_host)]
-    pub(super) host: Option<std::net::IpAddr>,
-
-    /// Server Listen port
-    #[clap(short = 'P', long, env = "PORT", default_value = "7999", value_parser = parse::parse_port_in_range)]
-    pub(super) port: Option<u16>,
+    /// Server Bind address
+    #[clap(short, long, env = "BIND", default_value = "0.0.0.0:7999", value_parser = parse::parse_socket_addr)]
+    pub(super) bind: Option<std::net::SocketAddr>,
 
     /// Server worker-pool size (Recommended number of CPU cores)
     #[clap(short = 'W', long, default_value = "1")]
@@ -230,4 +228,31 @@ pub struct ServeArgs {
     #[clap(long, default_value = "86400", requires = "tb_enable")]
     #[cfg(feature = "limit")]
     pub(super) tb_expired: u32,
+
+    /// Preauth MITM server bind address
+    #[clap(
+        short = 'B',
+        long,
+        env = "PREAUTH_BIND",
+        default_value = "0.0.0.0:8000",
+        value_parser = parse::parse_socket_addr
+    )]
+    pub(super) preauth_bind: Option<std::net::SocketAddr>,
+
+    /// Preauth MITM server upstream proxy
+    #[clap(
+        short = 'X',
+        long,
+        env = "PREAUTH_UPSTREAM",
+        value_parser = parse::parse_url
+    )]
+    pub(super) preauth_upstream: Option<String>,
+
+    /// Preauth MITM server CA certificate file path
+    #[clap(long, default_value = "ca/cert.crt")]
+    pub(super) preauth_cert: String,
+
+    /// Preauth MITM server CA private key file path
+    #[clap(long, default_value = "ca/key.pem")]
+    pub(super) preauth_key: String,
 }
