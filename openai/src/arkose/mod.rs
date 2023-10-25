@@ -437,24 +437,27 @@ async fn submit_captcha(
             let (tx, rx) = tokio::sync::mpsc::channel(classified_data.len());
 
             for (i, data) in classified_data.into_iter().enumerate() {
-                let images = data
+                let images_chunks = data
                     .1
-                    .into_iter()
-                    .map(|item| item.image.clone())
-                    .collect::<Vec<String>>();
-                let submit_task = SubmitSolver::builder()
-                    .solved(solver)
-                    .client_key(key)
-                    .question(data.0)
-                    .images(images)
-                    .build();
-                let sender = tx.clone();
-                tokio::spawn(async move {
-                    let res = funcaptcha::solver::submit_task(submit_task).await;
-                    if let Some(err) = sender.send((i, res)).await.err() {
-                        warn!("submit funcaptcha answer error: {err}")
-                    }
-                });
+                    .chunks(3)
+                    .map(|item| item.iter().map(|item| item.image.clone()).collect())
+                    .collect::<Vec<Vec<String>>>();
+
+                for images in images_chunks {
+                    let submit_task = SubmitSolver::builder()
+                        .solved(solver)
+                        .client_key(key)
+                        .question(data.0.clone())
+                        .images(images)
+                        .build();
+                    let sender = tx.clone();
+                    tokio::spawn(async move {
+                        let res = funcaptcha::solver::submit_task(submit_task).await;
+                        if let Some(err) = sender.send((i, res)).await.err() {
+                            println!("submit funcaptcha answer error: {err}")
+                        }
+                    });
+                }
             }
             rx
         }
