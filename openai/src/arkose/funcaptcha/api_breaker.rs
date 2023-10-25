@@ -110,18 +110,17 @@ fn handle_v2_game4_api_breaker_key(key: &str) -> Box<dyn Fn(i32) -> serde_json::
             })
         }),
         "epsilon" => Box::new(|answer| {
-            let array_len = rand::thread_rng().gen_range(0..5) + 1;
-            let rand_index = rand::thread_rng().gen_range(0..array_len);
-
-            let mut arr = Vec::with_capacity(array_len);
-            for i in 0..array_len {
-                if i == rand_index {
-                    arr[i] = answer;
+            let mut arr: Vec<i32> = Vec::new();
+            let len = rand::thread_rng().gen_range(1..=5);
+            let rand = rand::thread_rng().gen_range(0..=len);
+            for i in 0..len {
+                if i == rand {
+                    arr.push(answer);
                 } else {
-                    arr[i] = rand::thread_rng().gen_range(0..10);
+                    arr.push(rand::thread_rng().gen_range(0..=10));
                 }
             }
-            arr.push(rand_index as i32);
+            arr.push(rand);
             json!(arr)
         }),
         "zeta" => Box::new(|answer| {
