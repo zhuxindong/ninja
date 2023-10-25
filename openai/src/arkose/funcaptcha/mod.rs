@@ -85,7 +85,9 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
         .await?;
 
     if concise_challenge.urls.len() >= 5 {
-        warn!("funcaptcha images count >= 5, please use `solver: capsolver`");
+        warn!(
+            "Funcaptcha images count >= 5, your features are already in high risk control status"
+        );
     }
 
     let funcaptcha_list = images

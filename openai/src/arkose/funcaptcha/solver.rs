@@ -77,11 +77,11 @@ pub async fn submit_task(submit_task: SubmitSolver<'_>) -> anyhow::Result<Vec<i3
     match submit_task.solved {
         Solver::Yescaptcha => {
             body.soft_id = Some("26299");
-            url.push_str("https://api.yescaptcha.com/createTask")
+            url.push_str("https://global.yescaptcha.com/createTask")
         }
         Solver::Capsolver => {
             body.app_id = Some("60632CB0-8BE8-41D3-808F-60CC2442F16E");
-            url.push_str("https://global.yescaptcha.com/createTask")
+            url.push_str("https://api.capsolver.com/createTask")
         }
     }
 
