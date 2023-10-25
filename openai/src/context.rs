@@ -139,10 +139,6 @@ pub struct ContextArgs {
     #[builder(setter(into), default)]
     pub(crate) arkose_har_upload_key: Option<String>,
 
-    /// get arkose-token endpoint
-    #[builder(setter(into), default)]
-    pub(crate) arkose_token_endpoint: Option<String>,
-
     /// arkoselabs solver
     #[builder(setter(into), default)]
     pub(crate) arkose_solver: Option<ArkoseSolver>,
@@ -213,8 +209,6 @@ pub struct Context {
     auth_client_load: Option<ClientLoadBalancer>,
     /// arkoselabs solver
     arkose_solver: Option<ArkoseSolver>,
-    /// get arkose-token endpoint
-    arkose_token_endpoint: Option<String>,
     /// HAR file upload authenticate key
     arkose_har_upload_key: Option<String>,
     /// Login auth key
@@ -269,7 +263,6 @@ impl Context {
             ),
             arkose_endpoint: args.arkose_endpoint,
             arkose_solver: args.arkose_solver,
-            arkose_token_endpoint: args.arkose_token_endpoint,
             arkose_har_upload_key: args.arkose_har_upload_key,
             cf_turnstile: args.cf_site_key.and_then(|site_key| {
                 args.cf_secret_key.map(|secret_key| CfTurnstile {
@@ -302,10 +295,6 @@ impl Context {
 
     pub fn arkose_har_upload_key(&self) -> Option<&String> {
         self.arkose_har_upload_key.as_ref()
-    }
-
-    pub fn arkose_token_endpoint(&self) -> Option<&String> {
-        self.arkose_token_endpoint.as_ref()
     }
 
     pub fn arkose_solver(&self) -> Option<&ArkoseSolver> {
