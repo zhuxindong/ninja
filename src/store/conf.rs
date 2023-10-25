@@ -17,8 +17,6 @@ pub struct Conf {
     pub preauth_api: String,
     /// Client proxy. Format: protocol://user:pass@ip:port
     pub proxy: Option<String>,
-    /// Get arkose-token endpoint
-    pub arkose_token_endpoint: Option<String>,
     /// About the solver client by ArkoseLabs
     pub arkose_solver: Solver,
     /// About the solver client key by ArkoseLabs

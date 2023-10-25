@@ -41,7 +41,6 @@ impl Context {
         let proxies = conf.proxy.map(|p| vec![p]).unwrap_or(vec![]);
 
         let args = openai::context::ContextArgs::builder()
-            .arkose_endpoint(conf.arkose_token_endpoint)
             .arkose_chat4_har_file(arkose_chat_har_file)
             .arkose_auth_har_file(arkose_auth_har_file)
             .arkose_platform_har_file(arkose_platform_har_file)

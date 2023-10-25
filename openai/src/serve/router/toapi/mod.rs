@@ -75,7 +75,7 @@ pub(crate) async fn chat_to_api(
     let headers = header_convert(&headers, &jar).await?;
 
     match GPTModel::from_str(model) {
-        Ok(GPTModel::Gpt4Other) | Ok(GPTModel::Gpt4model) => {
+        Ok(GPTModel::Gpt4Other) | Ok(GPTModel::Gpt4Model) => {
             if !has_puid(&headers)? {
                 let result = client
                     .get(format!("{URL_CHATGPT_API}/backend-api/models"))

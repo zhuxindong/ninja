@@ -24,14 +24,8 @@ o.rmempty = false
 o = s:option(Value, "level", translate("Log Level"), translate("info/debug/warn/trace/error"))
 o.default = "info"
 
-o = s:option(Value, "host", translate("Host"), translate("Default listening address: 0.0.0.0"))
-o.default = "0.0.0.0"
-o.datatype = "ipaddr"
-
-o = s:option(Value, "port", translate("Port"), translate("Default listening port: 7999"))
-o.datatype = "and(port,min(1))"
-o.default = "7999"
-o.rmempty = false
+o = s:option(Value, "bind", translate("Bind Address"), translate("Default listening address: 0.0.0.0:7999"))
+o.default = "0.0.0.0:7999"
 
 o = s:option(Value, "workers", translate("Workers"), translate("Default 1 worker thread"))
 o.default = "1"
@@ -85,8 +79,6 @@ o:value("yescaptcha", "yescaptcha");
 o:value("capsolver", "capsolver");
 
 o = s:option(Value, "arkose_solver_key", translate("Solver Client Key"), translate("About the solver client key by ArkoseLabs"))
-
-o = s:option(Value, "arkose_token_endpoint", translate("Arkose token endpoint"), translate("Get arkose token endpoint"))
 
 o = s:option(Value, "tls_cert", translate("TLS certificate file path"), translate("Certificate in DER format"))
 
