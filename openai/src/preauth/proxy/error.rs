@@ -8,8 +8,6 @@ pub enum Error {
     Tls(#[from] RcgenError),
     #[error("network error")]
     HyperError(#[from] hyper::Error),
-    #[error("TlsConnector error")]
-    TlsConnectorError(#[from] hyper_tls::native_tls::Error),
     #[error("IO error")]
     IO(#[from] io::Error),
     #[error("unable to decode response body")]

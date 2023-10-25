@@ -4,15 +4,9 @@ use hyper_proxy::{Proxy as UpstreamProxy, ProxyConnector};
 use rustls::client::{ServerCertVerified, ServerCertVerifier};
 use std::time::SystemTime;
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "request-native-tls")] {
-        use hyper_tls::{HttpsConnector, native_tls::TlsConnector};
-    } else {
-        use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
-        use rustls::ClientConfig;
-        use std::sync::Arc;
-    }
-}
+use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
+use rustls::ClientConfig;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub enum HttpClient {
@@ -21,37 +15,21 @@ pub enum HttpClient {
 }
 
 pub fn gen_client(upstream_proxy: Option<UpstreamProxy>) -> Result<HttpClient, Error> {
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "request-native-tls")] {
-            let https = {
-                let tls = TlsConnector::builder()
-                    .danger_accept_invalid_certs(true)
-                    .danger_accept_invalid_hostnames(true)
-                    .disable_built_in_roots(true)
-                    .build()?;
-                let mut http = HttpConnector::new();
-                http.enforce_http(false);
-                HttpsConnector::from((http, tls.into()))
-            };
-        } else {
-            let https = {
-                let https_builder = HttpsConnectorBuilder::new()
-                    .with_tls_config({
-                        let cert_resolver = Arc::new(TrustAllCertVerifier::default());
-                        ClientConfig::builder()
-                            .with_safe_defaults()
-                            .with_custom_certificate_verifier(cert_resolver)
-                            .with_no_client_auth()
-                    })
-                    .https_or_http()
-                    .enable_http1();
-                #[cfg(feature = "h2")]
-                let https_builder = https_builder.enable_http2();
+    let https = {
+        let https_builder = HttpsConnectorBuilder::new()
+            .with_tls_config({
+                let cert_resolver = Arc::new(TrustAllCertVerifier::default());
+                ClientConfig::builder()
+                    .with_safe_defaults()
+                    .with_custom_certificate_verifier(cert_resolver)
+                    .with_no_client_auth()
+            })
+            .https_or_http()
+            .enable_http1()
+            .enable_http2();
 
-                https_builder.build()
-            };
-        }
-    }
+        https_builder.build()
+    };
 
     if let Some(proxy) = upstream_proxy {
         let connector = ProxyConnector::from_proxy(https, proxy)?;
