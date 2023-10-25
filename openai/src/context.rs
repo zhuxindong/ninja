@@ -224,7 +224,7 @@ pub struct Context {
 impl Context {
     fn new(args: ContextArgs) -> Self {
         let chat3_har = init_har(
-            arkose::Type::Chat4,
+            arkose::Type::Chat3,
             &args.arkose_chat3_har_file,
             ".chat3.openai.com.har",
         );
