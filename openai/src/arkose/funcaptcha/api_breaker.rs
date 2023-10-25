@@ -89,12 +89,11 @@ fn handle_v2_game3_api_breaker_key(key: &str) -> Box<dyn Fn(Loc) -> serde_json::
 fn handle_v2_game4_api_breaker_key(key: &str) -> Box<dyn Fn(i32) -> serde_json::Value> {
     match key {
         "alpha" => Box::new(|answer| {
-            let v = [
+            json!([
                 rand::thread_rng().gen_range(0..100),
                 answer,
-                rand::thread_rng().gen_range(0..100),
-            ];
-            json!(v)
+                rand::thread_rng().gen_range(0..100)
+            ])
         }),
         "beta" => Box::new(|answer| {
             json!({
@@ -104,20 +103,16 @@ fn handle_v2_game4_api_breaker_key(key: &str) -> Box<dyn Fn(i32) -> serde_json::
                 "req_timestamp": get_time_stamp(),
             })
         }),
-        "delta" => Box::new(|answer| {
-            json!({
-                "index": answer,
-            })
-        }),
+        "delta" => Box::new(|answer| json!({"index":answer})),
         "epsilon" => Box::new(|answer| {
             let mut arr: Vec<i32> = Vec::new();
-            let len = rand::thread_rng().gen_range(1..=5);
-            let rand = rand::thread_rng().gen_range(0..=len);
+            let len = rand::thread_rng().gen_range(0..5) + 1;
+            let rand = rand::thread_rng().gen_range(0..len);
             for i in 0..len {
                 if i == rand {
                     arr.push(answer);
                 } else {
-                    arr.push(rand::thread_rng().gen_range(0..=10));
+                    arr.push(rand::thread_rng().gen_range(0..10));
                 }
             }
             arr.push(rand);

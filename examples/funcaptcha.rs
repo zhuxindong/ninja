@@ -94,7 +94,7 @@ async fn parse(
 
                             let (tx, rx) = tokio::sync::mpsc::channel(classified_data.len());
 
-                            for (i, data) in classified_data.into_iter().enumerate() {
+                            for data in classified_data {
                                 let images_chunks = data
                                     .1
                                     .chunks(3)
@@ -103,7 +103,7 @@ async fn parse(
                                     })
                                     .collect::<Vec<Vec<String>>>();
 
-                                for images in images_chunks {
+                                for (i, images) in images_chunks.into_iter().enumerate() {
                                     let submit_task = SubmitSolver::builder()
                                         .solved(solver)
                                         .client_key(key)
@@ -126,27 +126,25 @@ async fn parse(
 
                     // Wait for all tasks to complete
                     let mut r = Vec::new();
-                    let mut need_soty = false;
+                    let mut mr = Vec::new();
 
                     while let Some((i, res)) = rx.recv().await {
                         let answers = res?;
                         println!("index: {i}, answers: {:?}", answers);
                         if answers.len() == 1 {
                             r.push((i, answers[0]));
-                            need_soty = true;
                         } else {
-                            r.extend(
-                                answers
-                                    .into_iter()
-                                    .enumerate()
-                                    .map(|(i, answer)| (i, answer)),
-                            );
+                            mr.push((i, answers));
                         }
                     }
 
-                    if need_soty {
-                        r.sort_by_key(|&(i, _)| i);
+                    mr.sort_by_key(|&(i, _)| i);
+                    for (_, answers) in mr {
+                        for answer in answers {
+                            r.push((0, answer));
+                        }
                     }
+                    r.sort_by_key(|&(i, _)| i);
 
                     let answers = r
                         .into_iter()
