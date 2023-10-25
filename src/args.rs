@@ -78,7 +78,7 @@ pub struct ServeArgs {
     #[clap(short = 'C', long, env = "CONFIG", value_parser = parse::parse_file_path)]
     pub(super) config: Option<PathBuf>,
 
-    /// Server Bind address
+    /// Server bind address
     #[clap(short, long, env = "BIND", default_value = "0.0.0.0:7999", value_parser = parse::parse_socket_addr)]
     pub(super) bind: Option<std::net::SocketAddr>,
 
