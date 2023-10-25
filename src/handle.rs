@@ -73,7 +73,6 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .arkose_auth_har_file(args.arkose_auth_har_file)
         .arkose_platform_har_file(args.arkose_platform_har_file)
         .arkose_har_upload_key(args.arkose_har_upload_key)
-        .arkose_token_endpoint(args.arkose_token_endpoint)
         .arkose_solver(arkose_sovler);
 
     #[cfg(feature = "limit")]

@@ -96,14 +96,6 @@ pub async fn prompt() -> anyhow::Result<()> {
         arkose_solver_key = arkose_solver_key.with_initial_value(content)
     };
 
-    let mut arkose_token_endpoint = Text::new("Arkose token endpoint ›")
-        .with_render_config(render_config())
-        .with_help_message("Example: https://example.com")
-        .with_validator(valid_url);
-    if let Some(content) = conf.arkose_token_endpoint.as_deref() {
-        arkose_token_endpoint = arkose_token_endpoint.with_initial_value(content)
-    };
-
     conf.proxy = proxy
         .prompt_skippable()?
         .map(|ok| if ok.is_empty() { None } else { Some(ok) })
@@ -144,11 +136,6 @@ pub async fn prompt() -> anyhow::Result<()> {
         .prompt_skippable()?
         .map(|ok| if ok.is_empty() { None } else { Some(ok) })
         .unwrap_or(conf.arkose_solver_key);
-
-    conf.arkose_token_endpoint = arkose_token_endpoint
-        .prompt_skippable()?
-        .map(|ok| if ok.is_empty() { None } else { Some(ok) })
-        .unwrap_or(conf.arkose_token_endpoint);
 
     let timeout = CustomType::<usize>::new("Client timeout (seconds) ›")
         .with_render_config(render_config())
