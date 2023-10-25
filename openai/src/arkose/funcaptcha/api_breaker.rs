@@ -160,9 +160,13 @@ pub(super) fn hanlde_answer(
     api_breaker: &ApiBreaker,
     mut answer: i32,
 ) -> anyhow::Result<serde_json::Value> {
-    if !v2 && (game_type == 3 || game_type == 4) {
+    if !v2 && game_type == 3 {
         let loc = tile_to_loc(answer);
         return Ok(json!(loc));
+    }
+
+    if !v2 && game_type == 4 {
+        return Ok(json!({"index": answer}));
     }
 
     if v2 && game_type == 3 {
