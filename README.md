@@ -74,8 +74,7 @@ Sending a `GPT4` conversation requires `Arkose Token` to be sent as a parameter,
 
 - Parameter Description
   - `--level`, environment variable `LOG`, log level: default info
-  - `--host`, environment variable `HOST`, service listening address: default 0.0.0.0,
-  - `--port`, environment variable `PORT`, listening port: default 7999
+  - `--bind`, environment variable `BIND`, service listening address: default 0.0.0.0:7999,
   - `--tls-cert`, environment variable `TLS_CERT`', TLS certificate public key. Supported format: EC/PKCS8/RSA
   - `--tls-key`, environment variable `TLS_KEY`, TLS certificate private key
   - `--proxies`, Proxy, supports proxy pool, multiple proxies are separated by `,`, format: protocol://user:pass@ip:port, if the local IP is banned, you need to turn off the use of direct IP when using the proxy pool, `-- disable-direct` turns off direct connection, otherwise your banned local IP will be used according to load balancing
@@ -188,7 +187,7 @@ Options:
   -C, --config <CONFIG>
           Configuration file path (toml format file) [env: CONFIG=]
   -b, --bind <BIND>
-          Server Bind address [env: BIND=] [default: 0.0.0.0:7999]
+          Server bind address [env: BIND=] [default: 0.0.0.0:7999]
   -W, --workers <WORKERS>
           Server worker-pool size (Recommended number of CPU cores) [default: 1]
       --concurrent-limit <CONCURRENT_LIMIT>
