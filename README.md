@@ -80,7 +80,7 @@ Sending `GPT4/GPT-3.5 (already grayscale)/Creating API-Key` dialog requires send
 - `--bind`, environment variable `BIND`, service listening address: default 0.0.0.0:7999,
 - `--tls-cert`, environment variable `TLS_CERT`', TLS certificate public key. Supported format: EC/PKCS8/RSA
 - `--tls-key`, environment variable `TLS_KEY`, TLS certificate private key
-- `--proxies`, Proxy, supports proxy pool, multiple proxies are separated by `,`, format: protocol://user:pass@ip:port, if the local IP is banned, you need to turn off the use of direct IP when using the proxy pool, `-- disable-direct` turns off direct connection, otherwise your banned local IP will be used according to load balancing
+- `--proxies`, Proxy, supports proxy pool, multiple proxies are separated by `,`, format: protocol://user:pass@ip:port, if the local IP is banned, you need to turn off the use of direct IP when using the proxy pool, `--disable-direct` turns off direct connection, otherwise your banned local IP will be used according to load balancing
 - `--workers`, worker threads: default 1
 - `--disable-webui`, if you don’t want to use the default built-in WebUI, use this parameter to turn it off
 
