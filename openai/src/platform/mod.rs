@@ -353,4 +353,5 @@
 //! }
 //! ```
 
+#[cfg(feature = "api")]
 pub mod v1;

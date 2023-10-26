@@ -1,6 +1,8 @@
+use openai::arkose;
+use openai::arkose::funcaptcha::solver::SubmitSolver;
 use openai::arkose::funcaptcha::Solver;
 use openai::arkose::{
-    funcaptcha::{self, solver::SubmitSolverBuilder, start_challenge},
+    funcaptcha::{self, start_challenge},
     ArkoseToken,
 };
 use std::str::FromStr;
@@ -9,9 +11,11 @@ use tokio::time::Instant;
 
 static KEY: OnceCell<String> = OnceCell::const_new();
 static SOLVER: OnceCell<Solver> = OnceCell::const_new();
+static SOLVER_TYPE: OnceCell<String> = OnceCell::const_new();
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    env_logger::init();
     let key = KEY
         .get_or_init(|| async { std::env::var("KEY").expect("Need solver client key") })
         .await;
@@ -23,11 +27,22 @@ async fn main() -> anyhow::Result<()> {
         })
         .await;
 
+    let solver_type = SOLVER_TYPE
+        .get_or_init(|| async { std::env::var("SOLVER_TYPE").expect("Need solver type") })
+        .await;
+
+    let t = match solver_type.as_str() {
+        "auth" => arkose::Type::Auth0,
+        "platform" => arkose::Type::Platform,
+        "chat3" => arkose::Type::Chat3,
+        "chat4" => arkose::Type::Chat4,
+        _ => anyhow::bail!("Not support solver type: {solver_type}"),
+    };
+
     // start time
     let now = Instant::now();
 
-    let arkose_token =
-        ArkoseToken::new_from_har("/Users/gngpp/VSCode/ninja/login.chat.openai.com.har").await?;
+    let arkose_token = ArkoseToken::new(t).await?;
 
     parse(arkose_token, solver, key).await?;
 
@@ -51,12 +66,12 @@ async fn parse(
                             let (tx, rx) = tokio::sync::mpsc::channel(funs.len());
                             for (i, fun) in funs.iter().enumerate() {
                                 let sender = tx.clone();
-                                let submit_task = SubmitSolverBuilder::default()
+                                let submit_task = SubmitSolver::builder()
                                     .solved(solver)
                                     .client_key(key)
                                     .question(fun.instructions.clone())
                                     .image(fun.image.clone())
-                                    .build()?;
+                                    .build();
                                 tokio::spawn(async move {
                                     let res = funcaptcha::solver::submit_task(submit_task).await;
                                     if let Some(err) = sender.send((i, res)).await.err() {
@@ -79,25 +94,31 @@ async fn parse(
 
                             let (tx, rx) = tokio::sync::mpsc::channel(classified_data.len());
 
-                            for (i, data) in classified_data.into_iter().enumerate() {
-                                let images = data
+                            for data in classified_data {
+                                let images_chunks = data
                                     .1
-                                    .into_iter()
-                                    .map(|item| item.image.clone())
-                                    .collect::<Vec<String>>();
-                                let submit_task = SubmitSolverBuilder::default()
-                                    .solved(solver)
-                                    .client_key(key)
-                                    .question(data.0)
-                                    .images(images)
-                                    .build()?;
-                                let sender = tx.clone();
-                                tokio::spawn(async move {
-                                    let res = funcaptcha::solver::submit_task(submit_task).await;
-                                    if let Some(err) = sender.send((i, res)).await.err() {
-                                        println!("submit funcaptcha answer error: {err}")
-                                    }
-                                });
+                                    .chunks(3)
+                                    .map(|item| {
+                                        item.iter().map(|item| item.image.clone()).collect()
+                                    })
+                                    .collect::<Vec<Vec<String>>>();
+
+                                for (i, images) in images_chunks.into_iter().enumerate() {
+                                    let submit_task = SubmitSolver::builder()
+                                        .solved(solver)
+                                        .client_key(key)
+                                        .question(data.0.clone())
+                                        .images(images)
+                                        .build();
+                                    let sender = tx.clone();
+                                    tokio::spawn(async move {
+                                        let res =
+                                            funcaptcha::solver::submit_task(submit_task).await;
+                                        if let Some(err) = sender.send((i, res)).await.err() {
+                                            println!("submit funcaptcha answer error: {err}")
+                                        }
+                                    });
+                                }
                             }
                             rx
                         }
@@ -105,27 +126,25 @@ async fn parse(
 
                     // Wait for all tasks to complete
                     let mut r = Vec::new();
-                    let mut need_soty = false;
+                    let mut mr = Vec::new();
 
                     while let Some((i, res)) = rx.recv().await {
                         let answers = res?;
                         println!("index: {i}, answers: {:?}", answers);
                         if answers.len() == 1 {
                             r.push((i, answers[0]));
-                            need_soty = true;
                         } else {
-                            r.extend(
-                                answers
-                                    .into_iter()
-                                    .enumerate()
-                                    .map(|(i, answer)| (i, answer)),
-                            );
+                            mr.push((i, answers));
                         }
                     }
 
-                    if need_soty {
-                        r.sort_by_key(|&(i, _)| i);
+                    mr.sort_by_key(|&(i, _)| i);
+                    for (_, answers) in mr {
+                        for answer in answers {
+                            r.push((0, answer));
+                        }
                     }
+                    r.sort_by_key(|&(i, _)| i);
 
                     let answers = r
                         .into_iter()

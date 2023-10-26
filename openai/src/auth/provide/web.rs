@@ -1,8 +1,8 @@
 use crate::{
     auth::{
         model::{self, AuthStrategy},
-        provide::{AuthenticateDataBuilder, GetAuthorizedUrlDataBuilder},
-        AuthClient, OPENAI_OAUTH_URL,
+        provide::AuthenticateData,
+        AuthClient, API_AUTH_SESSION_COOKIE_KEY, OPENAI_OAUTH_URL,
     },
     error::AuthError,
 };
@@ -13,8 +13,8 @@ use serde_json::Value;
 use url::Url;
 
 use super::{
-    AuthProvider, AuthResult, AuthenticateMfaDataBuilder, IdentifierDataBuilder, RequestContext,
-    RequestContextExt,
+    AuthProvider, AuthResult, AuthenticateMfaData, GetAuthorizedUrlData, IdentifierData,
+    RequestContext, RequestContextExt,
 };
 
 pub(crate) struct WebAuthProvider {
@@ -61,11 +61,11 @@ impl WebAuthProvider {
             ))
             .ext_context(ctx)
             .form(
-                &GetAuthorizedUrlDataBuilder::default()
+                &GetAuthorizedUrlData::builder()
                     .callback_url("/")
                     .csrf_token(&ctx.csrf_token)
                     .json("true")
-                    .build()?,
+                    .build(),
             )
             .send()
             .await
@@ -123,7 +123,7 @@ impl WebAuthProvider {
             .post(&url)
             .ext_context(ctx)
             .form(
-                &IdentifierDataBuilder::default()
+                &IdentifierData::builder()
                     .action("default")
                     .state(&ctx.state)
                     .username(&ctx.account.username)
@@ -131,7 +131,7 @@ impl WebAuthProvider {
                     .webauthn_available(true)
                     .is_brave(false)
                     .webauthn_platform_available(false)
-                    .build()?,
+                    .build(),
             )
             .send()
             .await?
@@ -156,12 +156,12 @@ impl WebAuthProvider {
             ))
             .ext_context(ctx)
             .form(
-                &AuthenticateDataBuilder::default()
+                &AuthenticateData::builder()
                     .action("default")
                     .state(&ctx.state)
                     .username(&ctx.account.username)
                     .password(&ctx.account.password)
-                    .build()?,
+                    .build(),
             )
             .send()
             .await
@@ -217,11 +217,11 @@ impl WebAuthProvider {
     ) -> AuthResult<model::AccessToken> {
         let url = format!("{OPENAI_OAUTH_URL}{}", location);
         let state = AuthClient::get_callback_state(&Url::parse(&url)?);
-        let data = AuthenticateMfaDataBuilder::default()
+        let data = AuthenticateMfaData::builder()
             .action("default")
             .state(&state)
             .code(mfa_code)
-            .build()?;
+            .build();
 
         let resp = self
             .inner
@@ -252,9 +252,19 @@ impl WebAuthProvider {
             .await
             .map_err(AuthError::FailedRequest)?;
         match resp.status() {
-            StatusCode::OK => Ok(model::AccessToken::Session(
-                resp.json::<model::SessionAccessToken>().await?,
-            )),
+            StatusCode::OK => {
+                let c = resp
+                    .cookies()
+                    .find(|c| c.name().eq(API_AUTH_SESSION_COOKIE_KEY))
+                    .ok_or_else(|| AuthError::FailedAuthSessionCookie)?;
+                let session = model::Session {
+                    value: c.value().to_owned(),
+                    expires: c.expires(),
+                };
+                let mut session_access_token = resp.json::<model::SessionAccessToken>().await?;
+                session_access_token.session = Some(session);
+                Ok(model::AccessToken::Session(session_access_token))
+            }
             StatusCode::TOO_MANY_REQUESTS => {
                 bail!(AuthError::TooManyRequests("Too Many Requests".to_owned()))
             }

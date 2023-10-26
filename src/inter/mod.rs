@@ -20,7 +20,7 @@ use inquire::{
 use openai::arkose::{funcaptcha, ArkoseToken, Type};
 use openai::{
     auth::{model::AuthStrategy, provide::AuthProvider},
-    model::AuthenticateToken,
+    token::model::AuthenticateToken,
 };
 use serde::Serialize;
 use serde_json::json;
@@ -108,7 +108,7 @@ pub async fn check_authorization() -> anyhow::Result<()> {
         for (k, token) in state.iter_mut() {
             if let AuthStrategy::Platform | AuthStrategy::Apple = k {
                 let time_left = token.expires() - current_time;
-                let difference = token.expires_in() / 10;
+                let difference = 14000;
                 if time_left < difference {
                     if let Some(refresh_token) = token.refresh_token() {
                         let pb = new_spinner("Initializing login...");
@@ -208,7 +208,7 @@ pub fn json_to_table<T: Serialize>(header: &str, value: T) {
 async fn get_chat_arkose_token(har_file: Option<&String>) -> anyhow::Result<ArkoseToken> {
     match har_file {
         None => {
-            let arkose_token = ArkoseToken::new_from_context(Type::Chat).await?;
+            let arkose_token = ArkoseToken::new_from_context(Type::Chat3).await?;
             arkose_challenge(&arkose_token).await;
             Ok(arkose_token)
         }

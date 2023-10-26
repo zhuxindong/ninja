@@ -14,20 +14,18 @@ o.rmempty = false
 
 o = s:option(Value, "proxies", translate("Proxies"), translate("Supports http/https/socks5, format: protocol://user:pass@ip:port"))
 
+o = s:option(Value, "interface", translate("Interface"), translate("Bind address for outgoing connections"))
+
+o = s:option(Value, "ipv6_subnet", translate("Ipv6 Subnet"), translate("IPv6 subnet, Example: 2001:19f0:6001:48e4::/64"))
+
 o = s:option(Flag, "disable_direct", translate("Turn off direct connection"), translate("Turn off direct connection using proxy"))
 o.rmempty = false
 
 o = s:option(Value, "level", translate("Log Level"), translate("info/debug/warn/trace/error"))
 o.default = "info"
 
-o = s:option(Value, "host", translate("Host"), translate("Default listening address: 0.0.0.0"))
-o.default = "0.0.0.0"
-o.datatype = "ipaddr"
-
-o = s:option(Value, "port", translate("Port"), translate("Default listening port: 7999"))
-o.datatype = "and(port,min(1))"
-o.default = "7999"
-o.rmempty = false
+o = s:option(Value, "bind", translate("Bind Address"), translate("Default listening address: 0.0.0.0:7999"))
+o.default = "0.0.0.0:7999"
 
 o = s:option(Value, "workers", translate("Workers"), translate("Default 1 worker thread"))
 o.default = "1"
@@ -53,33 +51,34 @@ o.rmempty = false
 o = s:option(Flag, "disable_webui", translate("Disable WebUI"))
 o.rmempty = false
 
+o = s:option(Value, "auth_key", translate("Auth Key"), translate("Login Authentication Key"))
+o.password = true
+
 o = s:option(Value, "preauth_api", translate("PreAuth API"), translate("PreAuth Cookie API URL"))
 
 o = s:option(Value, "api_prefix", translate("WebUI API prefix"))
-
-o = s:option(Value, "puid_user", translate("PUID Account"), translate("Obtain the PUID of the Plus account user, Example: `user:pass`"))
-o.password = true
 
 o = s:option(Value, "cf_site_key", translate("CF Site Key"), translate("Cloudflare turnstile captcha site key"))
 
 o = s:option(Value, "cf_secret_key", translate("CF Secret Key"), translate("Cloudflare turnstile captcha secret key"))
 o.password = true
 
-o = s:option(Value, "arkose_chat_har_file", translate("ChatGPT HAR file path"), translate("About the browser HAR file path requested by ChatGPT ArkoseLabs"))
+o = s:option(Value, "arkose_chat3_har_file", translate("ChatGPT GPT-3.5 HAR file path"), translate("About the browser HAR file path requested by ChatGPT GPT-3.5 ArkoseLabs"))
+
+o = s:option(Value, "arkose_chat4_har_file", translate("ChatGPT GPT-4 HAR file path"), translate("About the browser HAR file path requested by ChatGPT GPT-4 ArkoseLabs"))
 
 o = s:option(Value, "arkose_auth_har_file", translate("Auth HAR file path"), translate("About the browser HAR file path requested by Auth ArkoseLabs"))
 
 o = s:option(Value, "arkose_platform_har_file", translate("Platform HAR file path"), translate("About the browser HAR file path requested by Platform ArkoseLabs"))
 
 o = s:option(Value, "arkose_har_upload_key", translate("HAR Auth Key"), translate("HAR file upload authenticate key"))
+o.password = true
 
 o = s:option(Value, "arkose_solver", translate("Solver"), translate("About ArkoseLabs solver platform"))
 o:value("yescaptcha", "yescaptcha");
 o:value("capsolver", "capsolver");
 
 o = s:option(Value, "arkose_solver_key", translate("Solver Client Key"), translate("About the solver client key by ArkoseLabs"))
-
-o = s:option(Value, "arkose_token_endpoint", translate("Arkose token endpoint"), translate("Get arkose token endpoint"))
 
 o = s:option(Value, "tls_cert", translate("TLS certificate file path"), translate("Certificate in DER format"))
 

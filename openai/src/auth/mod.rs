@@ -3,12 +3,13 @@ pub mod provide;
 extern crate regex;
 
 use std::collections::HashMap;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{bail, Context};
 use regex::Regex;
-use reqwest::header::{HeaderMap, HeaderValue};
+use reqwest::header::{self, HeaderMap, HeaderValue};
 use reqwest::impersonate::Impersonate;
 use reqwest::redirect::Policy;
 use serde::de::DeserializeOwned;
@@ -16,7 +17,6 @@ use serde::de::DeserializeOwned;
 use base64::{engine::general_purpose, Engine as _};
 use rand::Rng;
 use reqwest::{Client, Proxy, StatusCode, Url};
-use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tokio::sync::OnceCell;
 
@@ -24,6 +24,7 @@ pub mod model;
 
 use crate::debug;
 use crate::error::AuthError;
+use crate::URL_CHATGPT_API;
 
 use self::model::{ApiKeyData, AuthStrategy};
 use self::provide::apple::AppleAuthProvider;
@@ -35,6 +36,7 @@ const OPENAI_API_URL: &str = "https://api.openai.com";
 const OPENAI_OAUTH_URL: &str = "https://auth0.openai.com";
 const OPENAI_OAUTH_TOKEN_URL: &str = "https://auth0.openai.com/oauth/token";
 const OPENAI_OAUTH_REVOKE_URL: &str = "https://auth0.openai.com/oauth/revoke";
+pub(crate) const API_AUTH_SESSION_COOKIE_KEY: &str = "__Secure-next-auth.session-token";
 
 static EMAIL_REGEX: OnceCell<Regex> = OnceCell::const_new();
 
@@ -49,26 +51,31 @@ pub struct AuthClient {
 }
 
 impl AuthClient {
-    pub async fn do_get_user_picture(&self, access_token: &str) -> AuthResult<Option<String>> {
-        let access_token = access_token.replace("Bearer ", "");
+    pub async fn do_session(&self, session: &str) -> AuthResult<model::SessionAccessToken> {
         let resp = self
             .inner
-            .get(format!("https://openai.openai.auth0app.com/userinfo"))
-            .bearer_auth(access_token)
+            .get(format!("{URL_CHATGPT_API}/api/auth/session"))
+            .header(
+                header::COOKIE,
+                format!("{API_AUTH_SESSION_COOKIE_KEY}={session};"),
+            )
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
 
-        match resp.error_for_status_ref() {
-            Ok(_) => Ok(resp
-                .json::<Value>()
-                .await?
-                .as_object()
-                .and_then(|v| v.get("picture"))
-                .and_then(|v| v.as_str())
-                .and_then(|v| Some(v.to_string()))),
-            Err(_) => bail!(AuthError::InvalidRequest(resp.text().await?)),
-        }
+        let c = resp
+            .cookies()
+            .find(|c| c.name().eq(API_AUTH_SESSION_COOKIE_KEY))
+            .ok_or_else(|| AuthError::FailedAuthSessionCookie)?;
+
+        let session = model::Session {
+            value: c.value().to_owned(),
+            expires: c.expires(),
+        };
+
+        let mut session_access_token = resp.json::<model::SessionAccessToken>().await?;
+        session_access_token.session = Some(session);
+        Ok(session_access_token)
     }
 
     pub async fn do_dashboard_login(&self, access_token: &str) -> AuthResult<model::DashSession> {
@@ -419,6 +426,22 @@ impl AuthClientBuilder {
         self
     }
 
+    /// Bind to a local IP Address.
+    pub fn local_address<T>(mut self, addr: T) -> Self
+    where
+        T: Into<Option<IpAddr>>,
+    {
+        self.inner = self.inner.local_address(addr);
+        self
+    }
+
+    /// Set that all sockets are bound to the configured IPv4 or IPv6 address (depending on host's
+    /// preferences) before connection.
+    pub fn local_addresses(mut self, addr_ipv4: Ipv4Addr, addr_ipv6: Ipv6Addr) -> Self {
+        self.inner = self.inner.local_addresses(addr_ipv4, addr_ipv6);
+        self
+    }
+
     pub fn build(self) -> AuthClient {
         let client = self.inner.build().expect("ClientBuilder::build()");
 
@@ -442,6 +465,7 @@ impl AuthClientBuilder {
         AuthClientBuilder {
             inner: Client::builder()
                 .impersonate(Impersonate::OkHttpAndroid13)
+                .danger_accept_invalid_certs(true)
                 .connect_timeout(Duration::from_secs(30))
                 .redirect(Policy::none()),
             preauth_api: None,

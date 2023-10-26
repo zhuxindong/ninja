@@ -1,6 +1,6 @@
 [package]
 name = "openai"
-version = "0.6.7"
+version = "0.7.3"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -9,7 +9,7 @@ edition = "2021"
 log = "0.4.20"
 anyhow = "1.0.75"
 thiserror = "1.0.48"
-reqwest = { package = "reqwest-impersonate", version ="0.11.13", default-features = false, features = [
+reqwest = { package = "reqwest-impersonate", version ="0.11.27", default-features = false, features = [
     "boring-tls", "impersonate","json", "cookies", "stream", "multipart", "socks"
 ] }
 tokio = { version = "1.32.0", features = ["fs", "sync", "signal", "rt-multi-thread"] }
@@ -21,7 +21,7 @@ url = "2.4.1"
 base64 = "0.21.4"
 rand = "0.8.5"
 async-trait = "0.1.73"
-derive_builder = "0.12.0"
+typed-builder = "0.18.0"
 jsonwebtokens = "1.2.0"
 sha2 = "0.10.7"
 futures-core = { version = "0.3.28", optional = true}
@@ -61,21 +61,33 @@ tracing-subscriber = { version = "0.3.17", features = ["env-filter"], optional =
 async-stream = { version = "0.3.5", optional = true }
 serde_with = "3.3.0"
 
+# mitm
+rcgen = { version = "0.10", features = ["x509-parser"], optional = true }
+moka = { version = "0.11", features = ["future"], optional = true }
+hyper = { version = "0.14.27", features = ["http1", "http2", "server", "stream", "tcp", "runtime"], optional = true }
+hyper-proxy = { version = "0.9.1", default-features = false, features = ["rustls"], optional = true }
+hyper-rustls = { version = "0.24.1", features = ["http2"], optional = true }
+tokio-rustls = { version = "0.24", default-features = false, features = ["tls12"], optional = true }
+rustls = { version = "0.21", features = ["dangerous_configuration"], optional = true }
+wildmatch = { version = "2.1", optional = true }
+http = { version = "0.2", optional = true }
+pin-project = { version = "1", optional = true }
+byteorder = { version = "1.4", optional = true }
+
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.48.0"
 default-features = false
 features = ["Win32_System_Com_CallObj", "Win32_Foundation", "Win32_Globalization", "Win32_UI_Shell_Common"]
 
-
 [build-dependencies]
 static-files = "0.2.3"
 
 [features]
-default = ["serve", "limit", "ninja", "platform", "stream", "template"]
-serve = ["dep:async-stream", "dep:tracing", "dep:tracing-subscriber", "dep:tower-http", "dep:tower", "dep:bytes", "dep:time", "dep:axum-server", "dep:axum-extra", "dep:axum", "dep:static-files", "dep:futures-core", "dep:tera"]
-ninja = []
-platform = ["dep:tokio-util"]
-stream = ["dep:futures", "dep:tokio-stream", "dep:eventsource-stream", "dep:futures-core", "dep:pin-project-lite", "dep:nom", "dep:mime", "dep:futures-timer"]
+default = ["serve", "limit", "template"]
+api = ["stream"]
+preauth = ["dep:rcgen", "dep:moka", "dep:hyper", "dep:hyper-proxy", "dep:hyper-rustls", "dep:tokio-rustls", "dep:rustls", "dep:wildmatch", "dep:http", "dep:pin-project", "dep:byteorder"]
+serve = ["stream", "dep:async-stream", "dep:tracing", "dep:tracing-subscriber", "dep:tower-http", "dep:tower", "dep:bytes", "dep:time", "dep:axum-server", "dep:axum-extra", "dep:axum", "dep:static-files", "dep:futures-core", "dep:tera"]
+stream = ["dep:tokio-util", "dep:futures", "dep:tokio-stream", "dep:eventsource-stream", "dep:futures-core", "dep:pin-project-lite", "dep:nom", "dep:mime", "dep:futures-timer"]
 remote-token = []
 limit = ["dep:redis", "dep:redis-macros"]
 template = []

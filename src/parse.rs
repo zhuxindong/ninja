@@ -19,6 +19,14 @@ pub fn parse_port_in_range(s: &str) -> anyhow::Result<u16> {
     ))
 }
 
+// parse socket address
+pub fn parse_socket_addr(s: &str) -> anyhow::Result<std::net::SocketAddr> {
+    let addr = s
+        .parse::<std::net::SocketAddr>()
+        .map_err(|_| anyhow::anyhow!(format!("`{}` isn't a socket address", s)))?;
+    Ok(addr)
+}
+
 // address parse
 pub fn parse_host(s: &str) -> anyhow::Result<std::net::IpAddr> {
     let addr = s
@@ -35,6 +43,15 @@ pub fn parse_url(s: &str) -> anyhow::Result<String> {
     match protocol.as_str() {
         "http" | "https" | "socks5" | "redis" | "rediss" => Ok(s.to_string()),
         _ => anyhow::bail!("Unsupported protocol: {}", protocol),
+    }
+}
+
+pub fn parse_ipv6_subnet(s: &str) -> anyhow::Result<(std::net::Ipv6Addr, u8)> {
+    match s.parse::<cidr::Ipv6Cidr>() {
+        Ok(cidr) => Ok((cidr.first_address(), cidr.network_length())),
+        Err(_) => {
+            anyhow::bail!(format!("`{}` isn't a ipv6 subnet", s))
+        }
     }
 }
 

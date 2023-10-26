@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use typed_builder::TypedBuilder;
 
 use crate::context;
 
@@ -47,7 +48,7 @@ struct ReqTask<'a> {
     question: &'a str,
 }
 
-#[derive(derive_builder::Builder)]
+#[derive(TypedBuilder)]
 pub struct SubmitSolver<'a> {
     solved: &'a Solver,
     client_key: &'a str,
@@ -75,8 +76,8 @@ pub async fn submit_task(submit_task: SubmitSolver<'_>) -> anyhow::Result<Vec<i3
 
     match submit_task.solved {
         Solver::Yescaptcha => {
-            body.soft_id = Some("18876");
-            url.push_str("https://api.yescaptcha.com/createTask")
+            body.soft_id = Some("26299");
+            url.push_str("https://global.yescaptcha.com/createTask")
         }
         Solver::Capsolver => {
             body.app_id = Some("60632CB0-8BE8-41D3-808F-60CC2442F16E");
@@ -94,10 +95,11 @@ pub async fn submit_task(submit_task: SubmitSolver<'_>) -> anyhow::Result<Vec<i3
                 anyhow::bail!(format!("solver task error: {error_description}"))
             }
             let target = task.solution.objects;
-            return match target.is_empty() {
-                true => Ok(vec![0]),
-                false => Ok(target),
-            };
+
+            if target.is_empty() {
+                anyhow::bail!(format!("solver task error: empty answer"))
+            }
+            Ok(target)
         }
         Err(err) => {
             let msg = resp.text().await?;

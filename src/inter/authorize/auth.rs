@@ -1,9 +1,9 @@
 use std::time::Duration;
 
 use inquire::{min_length, required, MultiSelect, Password, PasswordDisplayMode, Select, Text};
-use openai::auth::model::{AuthAccountBuilder, AuthStrategy};
+use openai::auth::model::{AuthAccount, AuthStrategy};
 use openai::auth::provide::AuthProvider;
-use openai::model::AuthenticateToken;
+use openai::token::model::AuthenticateToken;
 
 use crate::inter::standard::Auth;
 use crate::inter::{json_to_table, new_spinner, render_config};
@@ -92,12 +92,12 @@ async fn sign_in() -> anyhow::Result<()> {
         for auth_strategy in multi_strategy {
             let pb = new_spinner("Authenticating...");
 
-            let auth_account = AuthAccountBuilder::default()
+            let auth_account = AuthAccount::builder()
                 .username(username.clone())
                 .password(password.clone())
                 .mfa(mfa_code.clone())
                 .option(auth_strategy.clone())
-                .build()?;
+                .build();
 
             match client.do_access_token(&auth_account).await {
                 Ok(access_token) => {
@@ -237,7 +237,8 @@ async fn state() -> anyhow::Result<()> {
             .into_iter()
             .map(|(k, v)| State {
                 _type: k.to_owned(),
-                expires: openai::format_time(v.expires()).expect("Failed to format time"),
+                expires: openai::format_time_to_rfc3399(v.expires())
+                    .expect("Failed to format time"),
             })
             .collect::<Vec<State>>();
         list.push(AccountState {

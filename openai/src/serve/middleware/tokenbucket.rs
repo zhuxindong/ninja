@@ -119,7 +119,7 @@ impl TokenBucket for MemTokenBucket {
     }
 }
 
-#[derive(Clone, derive_builder::Builder)]
+#[derive(Clone, typed_builder::TypedBuilder)]
 pub struct RedisTokenBucket {
     enable: bool,
     /// token bucket capacity `capacity`

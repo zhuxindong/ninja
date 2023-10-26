@@ -1,8 +1,3 @@
-use std::collections::HashMap;
-use std::net::SocketAddr;
-use std::str::FromStr;
-use std::sync::OnceLock;
-
 use anyhow::anyhow;
 use axum::body::Body;
 use axum::extract::ConnectInfo;
@@ -13,13 +8,16 @@ use axum::headers::Authorization;
 use axum::http::header;
 use axum::http::HeaderMap;
 use axum::http::Response;
-use axum::response::IntoResponse;
 use axum::routing::any;
 use axum::routing::{get, post};
 use axum::Router;
 use axum::TypedHeader;
 use axum_extra::extract::cookie;
 use axum_extra::extract::CookieJar;
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::str::FromStr;
+use std::sync::OnceLock;
 
 use base64::Engine;
 
@@ -28,20 +26,21 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use time::format_description::well_known::Rfc3339;
 
+use crate::auth::model::AccessToken;
+use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
 use crate::context;
+use crate::context::ContextArgs;
 use crate::debug;
 use crate::info;
 use crate::now_duration;
 use crate::serve;
 use crate::serve::err::ResponseError;
 use crate::serve::header_convert;
-use crate::serve::response_convert;
 use crate::serve::turnstile;
-use crate::serve::Launcher;
 use crate::serve::EMPTY;
 use crate::{
     auth::{model::AuthAccount, provide::AuthProvider},
-    model::AuthenticateToken,
+    token::model::AuthenticateToken,
     URL_CHATGPT_API,
 };
 
@@ -51,7 +50,7 @@ const DEFAULT_INDEX: &str = "/";
 const LOGIN_INDEX: &str = "/auth/login";
 const SESSION_ID: &str = "ninja_session";
 const PUID_ID: &str = "_puid";
-const BUILD_ID: &str = "cdCfIN9NUpAX8XOZwcgjh";
+const BUILD_ID: &str = "tLfeYLzFNDDz-YFDI_84l";
 const TEMP_404: &str = "404.htm";
 const TEMP_AUTH: &str = "auth.htm";
 const TEMP_CHAT: &str = "chat.htm";
@@ -63,12 +62,12 @@ static TEMPLATE: OnceLock<tera::Tera> = OnceLock::new();
 
 #[derive(Serialize, Deserialize)]
 struct Session {
-    refresh_token: Option<String>,
     access_token: String,
+    refresh_token: Option<String>,
+    #[serde(skip_serializing)]
+    auth_session: Option<String>,
     user_id: String,
     email: String,
-    picture: Option<String>,
-    expires_in: i64,
     expires: i64,
 }
 
@@ -76,7 +75,7 @@ impl ToString for Session {
     fn to_string(&self) -> String {
         let json = serde_json::to_string(self)
             .expect("An error occurred during the internal serialization session");
-        base64::engine::general_purpose::URL_SAFE.encode(json.as_bytes())
+        base64::engine::general_purpose::STANDARD.encode(json.as_bytes())
     }
 }
 
@@ -84,7 +83,7 @@ impl FromStr for Session {
     type Err = ResponseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let data = base64::engine::general_purpose::URL_SAFE
+        let data = base64::engine::general_purpose::STANDARD
             .decode(s)
             .map_err(ResponseError::Unauthorized)?;
         serde_json::from_slice(&data).map_err(ResponseError::Unauthorized)
@@ -96,17 +95,16 @@ impl From<AuthenticateToken> for Session {
         Session {
             user_id: value.user_id().to_owned(),
             email: value.email().to_owned(),
-            picture: Some(value.picture().to_owned()),
             access_token: value.access_token().to_owned(),
-            expires_in: value.expires_in(),
             expires: value.expires(),
             refresh_token: value.refresh_token().map(|v| v.to_owned()),
+            auth_session: value.auth_session().map(|v| v.to_owned()),
         }
     }
 }
 
 // this function could be located in a different module
-pub(super) fn config(router: Router, args: &Launcher) -> Router {
+pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
     if !args.disable_ui {
         let ctx = context::get_instance();
         if let Some(url) = ctx.api_prefix() {
@@ -181,8 +179,6 @@ pub(super) fn config(router: Router, args: &Launcher) -> Router {
                 &format!("/_next/data/{BUILD_ID}/share/:share_id/continue.json"),
                 get(get_share_chat_continue_info),
             )
-            // user picture
-            .route("/_next/image", get(get_image))
             // static resource endpoints
             .route("/resources/*path", get(get_static_resource))
             .route("/_next/static/*path", get(get_static_resource))
@@ -226,14 +222,28 @@ async fn post_login(
             let cookie = cookie::Cookie::build(SESSION_ID, session.to_string())
                 .path(DEFAULT_INDEX)
                 .same_site(cookie::SameSite::Lax)
-                .max_age(time::Duration::seconds(session.expires_in))
+                .expires(time::OffsetDateTime::from_unix_timestamp(session.expires)?)
                 .secure(false)
                 .http_only(false)
                 .finish();
 
-            Ok(Response::builder()
+            let mut builder = Response::builder()
                 .status(StatusCode::SEE_OTHER)
-                .header(header::LOCATION, DEFAULT_INDEX)
+                .header(header::LOCATION, DEFAULT_INDEX);
+
+            if let Some(value) = session.auth_session {
+                let auth_cookie = cookie::Cookie::build(API_AUTH_SESSION_COOKIE_KEY, value)
+                    .path(DEFAULT_INDEX)
+                    .same_site(cookie::SameSite::Lax)
+                    .expires(time::OffsetDateTime::from_unix_timestamp(session.expires)?)
+                    .secure(true)
+                    .http_only(false)
+                    .finish();
+
+                builder = builder.header(header::SET_COOKIE, auth_cookie.to_string())
+            }
+
+            Ok(builder
                 .header(header::SET_COOKIE, cookie.to_string())
                 .body(Body::empty())
                 .map_err(ResponseError::InternalServerError)?)
@@ -262,35 +272,19 @@ async fn post_login_token(
             "Get Profile Erorr"
         )))?;
 
-    let session = match context::get_instance()
-        .auth_client()
-        .do_get_user_picture(access_token)
-        .await
-    {
-        Ok(picture) => Session {
-            refresh_token: None,
-            access_token: access_token.to_owned(),
-            user_id: profile.user_id().to_owned(),
-            email: profile.email().to_owned(),
-            picture,
-            expires_in: profile.expires_in(),
-            expires: profile.expires(),
-        },
-        Err(_) => Session {
-            user_id: profile.user_id().to_owned(),
-            email: profile.email().to_owned(),
-            picture: None,
-            access_token: access_token.to_owned(),
-            expires_in: profile.expires_in(),
-            expires: profile.expires(),
-            refresh_token: None,
-        },
+    let session = Session {
+        access_token: access_token.to_owned(),
+        user_id: profile.user_id().to_owned(),
+        email: profile.email().to_owned(),
+        expires: profile.expires(),
+        refresh_token: None,
+        auth_session: None,
     };
 
     let cookie = cookie::Cookie::build(SESSION_ID, session.to_string())
         .path(DEFAULT_INDEX)
         .same_site(cookie::SameSite::Lax)
-        .max_age(time::Duration::seconds(session.expires_in))
+        .expires(time::OffsetDateTime::from_unix_timestamp(session.expires)?)
         .secure(false)
         .http_only(false)
         .finish();
@@ -341,72 +335,81 @@ async fn get_logout(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
 }
 
 async fn get_session(jar: CookieJar) -> Result<Response<Body>, ResponseError> {
-    if let Some(cookie) = jar.get(SESSION_ID) {
-        // Extract session from cookie
-        let session = extract_session(cookie.value())?;
+    let session = match jar.get(SESSION_ID) {
+        Some(cookie) => extract_session(cookie.value())?,
+        None => return redirect_login(),
+    };
 
-        let current_timestamp = now_duration()?.as_secs() as i64;
+    let current_timestamp = now_duration()?.as_secs() as i64;
+    if session.expires < current_timestamp {
+        return redirect_login();
+    }
 
-        if session.expires < current_timestamp {
-            return redirect_login();
-        }
-
-        fn to_body(session: Session) -> anyhow::Result<String> {
-            let expires = time::OffsetDateTime::from_unix_timestamp(session.expires)
-                .map(|v| v.format(&Rfc3339))??;
-            let props = serde_json::json!({
-                "user": {
-                    "id": session.user_id,
-                    "name": session.email,
-                    "email": session.email,
-                    "image": session.picture,
-                    "picture": session.picture,
-                    "groups": [],
-                },
-                "expires" : expires,
-                "accessToken": session.access_token,
-                "authProvider": "auth0"
-            });
-            Ok(props.to_string())
-        }
-
-        fn to_response(
-            session: Session,
-            cookie: &cookie::Cookie,
-        ) -> Result<Response<Body>, ResponseError> {
-            Ok(Response::builder()
-                .status(StatusCode::OK)
-                .header(header::LOCATION, LOGIN_INDEX)
-                .header(header::SET_COOKIE, cookie.to_string())
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(to_body(session)?))
-                .map_err(ResponseError::InternalServerError)?)
-        }
-
-        if let Some(refresh_token) = session.refresh_token.as_ref() {
-            if session.expires - current_timestamp <= (session.expires_in / 5) {
-                let ctx = context::get_instance();
-                match ctx.auth_client().do_refresh_token(&refresh_token).await {
-                    Ok(refresh_token) => {
-                        let authentication_token = AuthenticateToken::try_from(refresh_token)?;
-                        let session = Session::from(authentication_token);
-                        let cookie = cookie::Cookie::build(SESSION_ID, session.to_string())
-                            .path(DEFAULT_INDEX)
-                            .same_site(cookie::SameSite::Lax)
-                            .max_age(time::Duration::seconds(session.expires_in))
-                            .secure(false)
-                            .http_only(false)
-                            .finish();
-                        return to_response(session, &cookie);
-                    }
-                    Err(err) => debug!("Refresh token error: {}", err),
+    if session.expires - current_timestamp <= 21600 {
+        let ctx = context::get_instance();
+        let new_session = if let Some(c) = jar.get(API_AUTH_SESSION_COOKIE_KEY) {
+            match ctx.auth_client().do_session(c.value()).await {
+                Ok(session_token) => {
+                    let authentication_token =
+                        AuthenticateToken::try_from(AccessToken::Session(session_token))?;
+                    Some(Session::from(authentication_token))
+                }
+                Err(err) => {
+                    debug!("Get session token error: {}", err);
+                    None
                 }
             }
-        }
+        } else if let Some(refresh_token) = session.refresh_token.as_ref() {
+            match ctx.auth_client().do_refresh_token(&refresh_token).await {
+                Ok(new_refresh_token) => {
+                    let authentication_token = AuthenticateToken::try_from(new_refresh_token)?;
+                    Some(Session::from(authentication_token))
+                }
+                Err(err) => {
+                    debug!("Refresh token error: {}", err);
+                    None
+                }
+            }
+        } else {
+            None
+        };
 
-        return to_response(session, cookie);
+        if let Some(new_session) = new_session {
+            return create_response_from_session(&new_session);
+        }
     }
-    redirect_login()
+
+    create_response_from_session(&session)
+}
+
+fn create_response_from_session(session: &Session) -> Result<Response<Body>, ResponseError> {
+    let body = session_to_body(session)?;
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header(header::LOCATION, LOGIN_INDEX)
+        .header(header::SET_COOKIE, session.to_string()) // Note: This might not be what you want
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(body))
+        .map_err(ResponseError::InternalServerError)?)
+}
+
+fn session_to_body(session: &Session) -> anyhow::Result<String> {
+    let expires = time::OffsetDateTime::from_unix_timestamp(session.expires)
+        .map(|v| v.format(&Rfc3339))??;
+    let props = serde_json::json!({
+        "user": {
+            "id": session.user_id,
+            "name": session.email,
+            "email": session.email,
+            "image": null,
+            "picture": null,
+            "groups": [],
+        },
+        "expires" : expires,
+        "accessToken": session.access_token,
+        "authProvider": "auth0"
+    });
+    Ok(props.to_string())
 }
 
 async fn get_chat(
@@ -431,8 +434,8 @@ async fn get_chat(
                                 "id": session.user_id,
                                 "name": session.email,
                                 "email": session.email,
-                                "image": session.picture,
-                                "picture": session.picture,
+                                "image": null,
+                                "picture": null,
                                 "groups": [],
                             },
                             "serviceStatus": {},
@@ -478,8 +481,8 @@ async fn get_chat_info(jar: CookieJar) -> Result<Response<Body>, ResponseError> 
                             "id": session.user_id,
                             "name": session.email,
                             "email": session.email,
-                            "image": session.picture,
-                            "picture": session.picture,
+                            "image": null,
+                            "picture": null,
                             "groups": [],
                         },
                         "serviceStatus": {},
@@ -747,8 +750,8 @@ async fn get_share_chat_continue_info(
                                     "id": session.user_id,
                                     "name": session.email,
                                     "email": session.email,
-                                    "image": session.picture,
-                                    "picture": session.picture,
+                                    "image": null,
+                                    "picture": null,
                                     "groups": [],
                                 },
                                 "serviceStatus": {},
@@ -771,8 +774,8 @@ async fn get_share_chat_continue_info(
                                         "id": session.user_id,
                                         "name": session.email,
                                         "email": session.email,
-                                        "image": session.picture,
-                                        "picture": session.picture,
+                                        "image": null,
+                                        "picture": null,
                                         "groups": [],
                                     },
                                     "serviceStatus": {},
@@ -823,20 +826,6 @@ async fn get_share_chat_continue_info(
         };
     }
     redirect_login()
-}
-
-async fn get_image(
-    params: Option<axum::extract::Query<ImageQuery>>,
-) -> Result<impl IntoResponse, ResponseError> {
-    let query = params.ok_or(ResponseError::BadRequest(anyhow::anyhow!(
-        "Missing URL parameter"
-    )))?;
-    let resp = context::get_instance()
-        .client()
-        .get(&query.url)
-        .send()
-        .await;
-    response_convert(resp)
 }
 
 async fn error_404() -> Result<Response<Body>, ResponseError> {

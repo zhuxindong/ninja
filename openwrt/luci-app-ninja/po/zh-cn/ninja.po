@@ -127,8 +127,11 @@ msgstr "关于 ArkoseLabs 的解析器客户端密钥"
 msgid "Get arkose token endpoint"
 msgstr "获取arkose token的端点"
 
-msgid "About the browser HAR file path requested by ChatGPT ArkoseLabs"
-msgstr "关于 ChatGPT 的ArkoseLabs请求的浏览器HAR文件路径"
+msgid "About the browser HAR file path requested by ChatGPT GPT-3.5 ArkoseLabs"
+msgstr "关于 ChatGPT GPT-3.5 的ArkoseLabs请求的浏览器HAR文件路径"
+
+msgid "About the browser HAR file path requested by ChatGPT GPT-4 ArkoseLabs"
+msgstr "关于 ChatGPT GPT-4 的ArkoseLabs请求的浏览器HAR文件路径"
 
 msgid "About the browser HAR file path requested by Auth ArkoseLabs"
 msgstr "关于 Auth 的ArkoseLabs请求的浏览器HAR文件路径"
@@ -136,8 +139,11 @@ msgstr "关于 Auth 的ArkoseLabs请求的浏览器HAR文件路径"
 msgid "About the browser HAR file path requested by Platform ArkoseLabs"
 msgstr "关于 Platform 的ArkoseLabs请求的浏览器HAR文件路径"
 
-msgid "ChatGPT HAR file path"
-msgstr "ChatGPT HAR 文件路径"
+msgid "ChatGPT GPT-3.5 HAR file path"
+msgstr "ChatGPT GPT-3.5 HAR 文件路径"
+
+msgid "ChatGPT GPT-4 HAR file path"
+msgstr "ChatGPT GPT-4 HAR 文件路径"
 
 msgid "Auth HAR file path"
 msgstr "Auth HAR 文件路径"
@@ -181,12 +187,6 @@ msgstr "禁用 WebUI"
 msgid "WebUI API prefix"
 msgstr "WebUI API 前缀"
 
-msgid "PUID Account"
-msgstr "PUID 账号"
-
-msgid "Obtain the PUID of the Plus account user, Example: `user:pass`"
-msgstr "获取 Plus 用户账号的 PUID，示例: `user:pass`"
-
 msgid "CF Site Key"
 msgstr "CF Site Key"
 
@@ -204,3 +204,21 @@ msgstr "连接池空闲超时"
 
 msgid "Set an optional timeout for idle sockets being kept-alive"
 msgstr "设置保持活动的空闲套接字的可选超时"
+
+msgid "Interface"
+msgstr "绑定网卡"
+
+msgid "Bind address for outgoing connections"
+msgstr "出站连接绑定地址"
+
+msgid "Ipv6 Subnet"
+msgstr "IPv6 子网"
+
+msgid "IPv6 subnet, Example: 2001:19f0:6001:48e4::/64"
+msgstr "IPv6 子网，示例: 2001:19f0:6001:48e4::/64"
+
+msgid "Auth Key"
+msgstr "认证Key"
+
+msgid "Login Authentication Key"
+msgstr "登录认证Key"

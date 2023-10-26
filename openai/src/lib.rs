@@ -8,19 +8,20 @@ pub mod balancer;
 pub mod chatgpt;
 pub mod context;
 pub mod error;
-#[cfg(feature = "stream")]
 pub mod eventsource;
 pub mod homedir;
 pub mod log;
-pub mod model;
 pub mod platform;
+pub mod token;
 pub mod unescape;
 pub mod urldecoding;
 pub mod uuid;
 
+#[cfg(feature = "preauth")]
+pub mod preauth;
+
 #[cfg(feature = "serve")]
 pub mod serve;
-pub mod token;
 
 pub const HEADER_UA: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36";
 
@@ -35,7 +36,7 @@ pub fn now_duration() -> anyhow::Result<Duration> {
     Ok(duration)
 }
 
-pub fn format_time(timestamp: i64) -> anyhow::Result<String> {
+pub fn format_time_to_rfc3399(timestamp: i64) -> anyhow::Result<String> {
     let time = time::OffsetDateTime::from_unix_timestamp(timestamp)?
         .format(&time::format_description::well_known::Rfc3339)?;
     Ok(time)
