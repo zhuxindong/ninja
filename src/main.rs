@@ -19,9 +19,9 @@ pub mod inter;
 pub mod store;
 
 pub mod args;
-pub mod env;
 pub mod handle;
 pub mod parse;
+pub mod utils;
 
 fn main() -> anyhow::Result<()> {
     let opt = args::cmd::Opt::parse();
