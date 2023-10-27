@@ -83,7 +83,7 @@ features = ["Win32_System_Com_CallObj", "Win32_Foundation", "Win32_Globalization
 static-files = "0.2.3"
 
 [features]
-default = ["serve", "limit", "template", "preauth"]
+default = ["serve", "limit", "template"]
 api = ["stream"]
 preauth = ["dep:rcgen", "dep:moka", "dep:hyper", "dep:hyper-proxy", "dep:hyper-rustls", "dep:tokio-rustls", "dep:rustls", "dep:wildmatch", "dep:http", "dep:pin-project", "dep:byteorder"]
 serve = ["stream", "dep:async-stream", "dep:tracing", "dep:tracing-subscriber", "dep:tower-http", "dep:tower", "dep:bytes", "dep:time", "dep:axum-server", "dep:axum-extra", "dep:axum", "dep:static-files", "dep:futures-core", "dep:tera"]
