@@ -2,14 +2,14 @@ use std::{ops::Not, path::PathBuf};
 
 use clap::CommandFactory;
 use openai::{
-    arkose::funcaptcha::ArkoseSolver,
-    context::ContextArgs,
-    serve::{middleware::tokenbucket::Strategy, Launcher},
+    arkose::funcaptcha::ArkoseSolver, context::ContextArgs,
+    serve::middleware::tokenbucket::Strategy,
 };
 
 use crate::{
     args::{self, ServeArgs},
-    env::fix_relative_path,
+    utils,
+    utils::unix::fix_relative_path,
 };
 
 pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<()> {
@@ -24,7 +24,10 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
     }
 
     #[cfg(target_os = "linux")]
-    crate::env::sysctl_ipv6_no_local_bind(args.ipv6_subnet.is_some());
+    crate::utils::unix::sysctl_route_add_ipv6_subnet(args.ipv6_subnet);
+
+    #[cfg(target_os = "linux")]
+    crate::utils::unix::sysctl_ipv6_no_local_bind(args.ipv6_subnet.is_some());
 
     // disable_direct and proxies are mutually exclusive
     if args.disable_direct {
@@ -38,7 +41,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         }
     }
 
-    let arkose_sovler = match args.arkose_solver_key.as_ref() {
+    let arkose_solver = match args.arkose_solver_key.as_ref() {
         Some(key) => Some(ArkoseSolver::new(args.arkose_solver.clone(), key.clone())),
         None => None,
     };
@@ -73,7 +76,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .arkose_auth_har_file(args.arkose_auth_har_file)
         .arkose_platform_har_file(args.arkose_platform_har_file)
         .arkose_har_upload_key(args.arkose_har_upload_key)
-        .arkose_solver(arkose_sovler);
+        .arkose_solver(arkose_solver);
 
     #[cfg(feature = "limit")]
     let builder = builder
@@ -84,12 +87,12 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .tb_fill_rate(args.tb_fill_rate)
         .tb_expired(args.tb_expired);
 
-    Launcher::new(builder.build()).run()
+    openai::serve::Launcher::new(builder.build()).run()
 }
 
 #[cfg(target_family = "unix")]
 pub(super) fn serve_start(mut args: ServeArgs) -> anyhow::Result<()> {
-    use crate::env::{self, check_root, get_pid};
+    use crate::utils::unix::{check_root, get_pid};
     use daemonize::Daemonize;
     use std::{
         fs::{File, Permissions},
@@ -97,27 +100,25 @@ pub(super) fn serve_start(mut args: ServeArgs) -> anyhow::Result<()> {
     };
 
     check_root();
-    #[cfg(target_os = "linux")]
-    crate::env::sysctl_ipv6_no_local_bind(args.ipv6_subnet.is_some());
 
     if let Some(pid) = get_pid() {
         println!("Ninja is already running with pid: {}", pid);
         return Ok(());
     }
 
-    let pid_file = File::create(env::PID_PATH)?;
+    let pid_file = File::create(utils::unix::PID_PATH)?;
     pid_file.set_permissions(Permissions::from_mode(0o755))?;
 
-    let stdout = File::create(env::DEFAULT_STDOUT_PATH)?;
+    let stdout = File::create(utils::unix::DEFAULT_STDOUT_PATH)?;
     stdout.set_permissions(Permissions::from_mode(0o755))?;
 
-    let stderr = File::create(env::DEFAULT_STDERR_PATH)?;
+    let stderr = File::create(utils::unix::DEFAULT_STDERR_PATH)?;
     stdout.set_permissions(Permissions::from_mode(0o755))?;
 
     let mut daemonize = Daemonize::new()
-        .pid_file(env::PID_PATH) // Every method except `new` and `start`
+        .pid_file(utils::unix::PID_PATH) // Every method except `new` and `start`
         .chown_pid_file(true) // is optional, see `Daemonize` documentation
-        .working_directory(env::DEFAULT_WORK_DIR) // for default behaviour.
+        .working_directory(utils::unix::DEFAULT_WORK_DIR) // for default behaviour.
         .umask(0o777) // Set umask, `0o027` by default.
         .stdout(stdout) // Redirect stdout to `/tmp/daemon.out`.
         .stderr(stderr) // Redirect stderr to `/tmp/daemon.err`.
@@ -142,7 +143,7 @@ pub(super) fn serve_start(mut args: ServeArgs) -> anyhow::Result<()> {
 
 #[cfg(target_family = "unix")]
 pub(super) fn serve_stop() -> anyhow::Result<()> {
-    use crate::env::{self, check_root, get_pid};
+    use crate::utils::unix::{check_root, get_pid};
     use nix::sys::signal;
     use nix::unistd::Pid;
 
@@ -151,12 +152,12 @@ pub(super) fn serve_stop() -> anyhow::Result<()> {
     if let Some(pid) = get_pid() {
         let pid = pid.parse::<i32>()?;
         for _ in 0..360 {
-            if nix::sys::signal::kill(Pid::from_raw(pid), signal::SIGINT).is_err() {
+            if signal::kill(Pid::from_raw(pid), signal::SIGINT).is_err() {
                 break;
             }
             std::thread::sleep(std::time::Duration::from_secs(1))
         }
-        let _ = std::fs::remove_file(env::PID_PATH);
+        let _ = std::fs::remove_file(utils::unix::PID_PATH);
     }
 
     Ok(())
@@ -164,7 +165,7 @@ pub(super) fn serve_stop() -> anyhow::Result<()> {
 
 #[cfg(target_family = "unix")]
 pub(super) fn serve_restart(args: ServeArgs) -> anyhow::Result<()> {
-    use crate::env::check_root;
+    use crate::utils::unix::check_root;
     check_root();
     serve_stop()?;
     serve_start(args)
@@ -172,7 +173,7 @@ pub(super) fn serve_restart(args: ServeArgs) -> anyhow::Result<()> {
 
 #[cfg(target_family = "unix")]
 pub(super) fn serve_status() -> anyhow::Result<()> {
-    use crate::env::get_pid;
+    use crate::utils::unix::get_pid;
     match get_pid() {
         Some(pid) => println!("Ninja is running with pid: {}", pid),
         None => println!("Ninja is not running"),
@@ -182,7 +183,6 @@ pub(super) fn serve_status() -> anyhow::Result<()> {
 
 #[cfg(target_family = "unix")]
 pub(super) fn serve_log() -> anyhow::Result<()> {
-    use crate::env;
     use std::{
         fs::File,
         io::{self, BufRead},
@@ -190,6 +190,10 @@ pub(super) fn serve_log() -> anyhow::Result<()> {
     };
 
     fn read_and_print_file(file_path: &Path, placeholder: &str) -> anyhow::Result<()> {
+        if !file_path.exists() {
+            return Ok(());
+        }
+
         // Check if the file is empty before opening it
         let metadata = std::fs::metadata(file_path)?;
         if metadata.len() == 0 {
@@ -215,10 +219,10 @@ pub(super) fn serve_log() -> anyhow::Result<()> {
         Ok(())
     }
 
-    let stdout_path = Path::new(env::DEFAULT_STDOUT_PATH);
+    let stdout_path = Path::new(utils::unix::DEFAULT_STDOUT_PATH);
     read_and_print_file(stdout_path, "STDOUT>")?;
 
-    let stderr_path = Path::new(env::DEFAULT_STDERR_PATH);
+    let stderr_path = Path::new(utils::unix::DEFAULT_STDERR_PATH);
     read_and_print_file(stderr_path, "STDERR>")?;
 
     Ok(())

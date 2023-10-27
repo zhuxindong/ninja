@@ -143,7 +143,7 @@ pub struct ServeArgs {
     pub(super) api_prefix: Option<String>,
 
     /// PreAuth Cookie API URL
-    #[clap(long, env = "PREAUTH_API", value_parser = parse::parse_url, default_value = "https://ai.fakeopen.com/auth/preauth")]
+    #[clap(long, env = "PREAUTH_API", value_parser = parse::parse_url)]
     pub(super) preauth_api: Option<String>,
 
     /// Disable WebUI

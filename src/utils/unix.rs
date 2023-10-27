@@ -10,7 +10,7 @@ pub(crate) const DEFAULT_STDERR_PATH: &str = "/var/run/ninja.err";
 pub(crate) const DEFAULT_WORK_DIR: &str = "/";
 
 #[cfg(target_family = "unix")]
-pub(crate) fn check_root() {
+pub fn check_root() {
     use nix::unistd::Uid;
 
     if !Uid::effective().is_root() {
@@ -20,14 +20,33 @@ pub(crate) fn check_root() {
 }
 
 #[cfg(target_os = "linux")]
+/// Try to add a route to the given subnet to the loopback interface.
+pub(crate) fn sysctl_route_add_ipv6_subnet(subnet: Option<(std::net::Ipv6Addr, u8)>) {
+    match subnet {
+        None => return,
+        Some((v6, len)) => {
+            if !nix::unistd::Uid::effective().is_root() {
+                return;
+            }
+
+            let res = std::process::Command::new("ip")
+                .args(&["route", "add", "local", &format!("{v6}/{len}"), "dev", "lo"])
+                .output();
+            if let Some(result) = res.err() {
+                println!("Failed to add route to the loopback interface: {}", result);
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+/// Try to remove a route to the given subnet to the loopback interface.
 pub(crate) fn sysctl_ipv6_no_local_bind(enable: bool) {
     if !enable {
         return;
     }
 
-    use nix::unistd::Uid;
-
-    if !Uid::effective().is_root() {
+    if !nix::unistd::Uid::effective().is_root() {
         return;
     }
 
