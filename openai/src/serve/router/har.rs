@@ -17,12 +17,7 @@ const UPLOAD_PAGE: &'static str = include_str!("../../../ui/har/upload.html");
 const SUCCESS_PAGE: &'static str = include_str!("../../../ui/har/success.html");
 
 pub(super) fn config(router: Router, _: &ContextArgs) -> Router {
-    router.route(
-        "/har/upload",
-        get(upload)
-            .post(upload_form)
-            .layer(axum::extract::DefaultBodyLimit::max(200 * 1024 * 1024)),
-    )
+    router.route("/har/upload", get(upload).post(upload_form))
 }
 
 async fn upload() -> Html<String> {

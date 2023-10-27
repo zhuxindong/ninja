@@ -112,7 +112,8 @@ impl Launcher {
             ))
             .layer(tower::timeout::TimeoutLayer::new(Duration::from_secs(
                 self.inner.timeout as u64,
-            )));
+            )))
+            .layer(axum::extract::DefaultBodyLimit::max(200 * 1024 * 1024));
 
         let app_layer = {
             let limit_context = TokenBucketLimitContext::from((
