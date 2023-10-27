@@ -318,7 +318,7 @@ async fn official_proxy(
         .path_and_query()
         .map(|v| v.as_str())
         .unwrap_or(uri.path());
-    let url = format!("{URL_CHATGPT_API}{path_and_query}");
+    let url = format!("{URL_PLATFORM_API}{path_and_query}");
 
     handle_dashboard_body(&url, &method, &mut body).await?;
 
@@ -358,7 +358,8 @@ async fn unofficial_proxy(
         .path_and_query()
         .map(|v| v.as_str())
         .unwrap_or(uri.path());
-    let url = format!("{URL_PLATFORM_API}{path_and_query}");
+
+    let url = format!("{URL_CHATGPT_API}{path_and_query}");
 
     handle_body(&url, &method, &mut headers, &mut body).await?;
 
@@ -376,14 +377,16 @@ pub(super) async fn header_convert(
     headers: &HeaderMap,
     jar: &CookieJar,
 ) -> Result<HeaderMap, ResponseError> {
-    let authorization = headers
-        .get(header::AUTHORIZATION)
-        .ok_or(ResponseError::Unauthorized(anyhow!(
-            "AccessToken required!"
-        )))?;
+    let authorization = match headers.get(header::AUTHORIZATION) {
+        Some(v) => Some(v),
+        // support Pandora WebUI passing X-Authorization header
+        None => headers.get("X-Authorization"),
+    };
 
     let mut headers = HeaderMap::new();
-    headers.insert(header::AUTHORIZATION, authorization.clone());
+    if let Some(h) = authorization {
+        headers.insert(header::AUTHORIZATION, h.clone());
+    }
     headers.insert(header::HOST, HeaderValue::from_static(HOST_CHATGPT));
     headers.insert(header::ORIGIN, HeaderValue::from_static(ORIGIN_CHATGPT));
     headers.insert(header::USER_AGENT, HeaderValue::from_static(HEADER_UA));
@@ -535,13 +538,15 @@ async fn handle_body(
         }
     }
 
-    let authorization = headers
-        .get(header::AUTHORIZATION)
+    if !has_puid(headers)? {
+        let authorization = match headers.get(header::AUTHORIZATION) {
+            Some(v) => Some(v),
+            None => headers.get("X-Authorization"),
+        }
         .ok_or(ResponseError::Unauthorized(anyhow!(
             "AccessToken required!"
         )))?;
 
-    if !has_puid(headers)? {
         let resp = context::get_instance()
             .client()
             .get(format!("{URL_CHATGPT_API}/backend-api/models"))
