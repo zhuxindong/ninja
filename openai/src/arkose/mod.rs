@@ -378,18 +378,20 @@ where
 {
     let ctx = context::get_instance();
     let arkose_token = get_token().await?;
-    if arkose_token.success() {
-        Ok(arkose_token)
-    } else if let Some(arkose_solver) = ctx.arkose_solver() {
-        submit_captcha(
-            &arkose_solver.solver,
-            &arkose_solver.client_key,
-            arkose_token,
-        )
-        .await
-    } else {
-        anyhow::bail!("No solver available")
+
+    if !arkose_token.success() {
+        if let Some(arkose_solver) = ctx.arkose_solver() {
+            return submit_captcha(
+                &arkose_solver.solver,
+                &arkose_solver.client_key,
+                arkose_token,
+            )
+            .await;
+        }
+        warn!("arkose token is invalid, but no solver is available, or the solver is invalid")
     }
+
+    Ok(arkose_token)
 }
 
 #[inline]

@@ -314,11 +314,11 @@ async fn official_proxy(
     jar: CookieJar,
     mut body: Option<Json<Value>>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let url = if let Some(query) = uri.query() {
-        format!("{URL_PLATFORM_API}{}?{query}", uri.path())
-    } else {
-        format!("{URL_PLATFORM_API}{}", uri.path())
-    };
+    let path_and_query = uri
+        .path_and_query()
+        .map(|v| v.as_str())
+        .unwrap_or(uri.path());
+    let url = format!("{URL_CHATGPT_API}{path_and_query}");
 
     handle_dashboard_body(&url, &method, &mut body).await?;
 
@@ -354,11 +354,11 @@ async fn unofficial_proxy(
     jar: CookieJar,
     mut body: Option<Json<Value>>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let url = if let Some(query) = uri.query() {
-        format!("{URL_CHATGPT_API}{}?{query}", uri.path())
-    } else {
-        format!("{URL_CHATGPT_API}{}", uri.path())
-    };
+    let path_and_query = uri
+        .path_and_query()
+        .map(|v| v.as_str())
+        .unwrap_or(uri.path());
+    let url = format!("{URL_CHATGPT_API}{path_and_query}");
 
     handle_body(&url, &method, &mut headers, &mut body).await?;
 
