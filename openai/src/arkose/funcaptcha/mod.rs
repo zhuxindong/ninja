@@ -6,7 +6,7 @@ use self::model::{Challenge, ConciseChallenge, FunCaptcha, RequestChallenge};
 
 use super::crypto;
 use crate::arkose::funcaptcha::model::SubmitChallenge;
-use crate::{context, debug, warn};
+use crate::{context, debug, now_duration, warn};
 use anyhow::{bail, Context};
 use reqwest::header;
 use serde::{Deserialize, Serialize};
@@ -59,24 +59,86 @@ impl ArkoseSolver {
     }
 }
 
+/// Callback to arkose
+async fn callback(client: reqwest::Client, arkose_token: String) -> anyhow::Result<()> {
+    // Split the data string by the "|" delimiter
+    let elements: Vec<&str> = arkose_token.split('|').collect();
+
+    // Session token
+    let session_token = elements
+        .first()
+        .context("invalid arkose token")?
+        .to_string();
+
+    // Create a mutable HashMap to store the key-value pairs
+    let mut parsed_data = std::collections::HashMap::new();
+
+    for element in elements {
+        let key_value: Vec<&str> = element.splitn(2, '=').collect();
+
+        if key_value.len() == 2 {
+            let key = key_value[0];
+            let value = key_value[1];
+
+            // Insert the key-value pair into the HashMap
+            parsed_data.insert(key, value);
+        }
+    }
+
+    let mut callback_data = Vec::with_capacity(6);
+    callback_data.push(format!("callback=__jsonp_{}", now_duration()?.as_millis()));
+    callback_data.push(format!("category=loaded"));
+    callback_data.push(format!("action=game loaded"));
+    callback_data.push(format!("session_token={session_token}"));
+    // Print the parsed data
+    for (key, value) in parsed_data {
+        if key.eq("pk") {
+            callback_data.push(format!("data[public_key]={value}"));
+            let t = super::Type::from_pk(value)?;
+            callback_data.push(format!("data[site]={}", t.get_site()));
+        }
+    }
+
+    let callback_query = callback_data.join("&");
+
+    let resp = client
+        .get(format!(
+            "https://client-api.arkoselabs.com/fc/a/?{callback_query}"
+        ))
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await?
+        .error_for_status()?;
+
+    if let Ok(ok) = resp.text().await {
+        debug!("funcaptcha callback: {ok}")
+    }
+
+    Ok(())
+}
+
 pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
     let fields: Vec<&str> = arkose_token.split('|').collect();
-    let session_token = fields[0].to_string();
-    let sid = fields[1].split('=').nth(1).unwrap_or_default();
+    let session_token = fields.get(0).context("invalid arkose token")?.to_string();
+    let sid = fields
+        .get(1)
+        .context("invalid arkose token")?
+        .split('=')
+        .nth(1)
+        .unwrap_or_default();
+    let mut headers = header::HeaderMap::new();
+
+    headers.insert(header::REFERER, format!("https://client-api.arkoselabs.com/fc/assets/ec-game-core/game-core/1.15.0/standard/index.html?session={}", arkose_token.replace("|", "&")).parse()?);
+    headers.insert(header::DNT, header::HeaderValue::from_static("1"));
     let mut session = Session {
         sid: sid.to_owned(),
-        session_token: session_token.clone(),
-        headers: header::HeaderMap::new(),
+        session_token,
         funcaptcha: None,
         challenge: None,
         client: context::get_instance().client(),
         game_type: 0,
+        headers,
     };
-
-    session.headers.insert(header::REFERER, format!("https://client-api.arkoselabs.com/fc/assets/ec-game-core/game-core/1.15.0/standard/index.html?session={}", arkose_token.replace("|", "&")).parse()?);
-    session
-        .headers
-        .insert(header::DNT, header::HeaderValue::from_static("1"));
 
     let concise_challenge = session.request_challenge().await?;
 
@@ -273,6 +335,13 @@ impl Session {
                         resp.incorrect_guess.unwrap_or_default()
                     )
                 }
+
+                tokio::spawn(async move {
+                    if let Err(err) = callback(self.client, self.session_token).await {
+                        warn!("funcaptcha callback error: {err}")
+                    }
+                });
+
                 Ok(())
             }
             Err(err) => {
