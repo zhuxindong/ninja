@@ -26,13 +26,33 @@ use crate::HEADER_UA;
 
 use self::funcaptcha::solver::SubmitSolver;
 use self::funcaptcha::Solver;
-
 #[derive(Hash, PartialEq, Eq, Debug)]
 pub enum Type {
     Chat3,
     Chat4,
     Platform,
     Auth0,
+}
+
+impl Type {
+    pub fn from_pk(pk: &str) -> anyhow::Result<Self> {
+        let t = match pk {
+            "3D86FBBA-9D22-402A-B512-3420086BA6CC" => Type::Chat3,
+            "35536E1E-65B4-4D96-9D97-6ADB7EFF8147" => Type::Chat4,
+            "0A1D34FC-659D-4E23-B17B-694DCFCF6A6C" => Type::Auth0,
+            "23AAD243-4799-4A9E-B01D-1166C5DE02DF" => Type::Platform,
+            _ => anyhow::bail!("Invalid public key"),
+        };
+        Ok(t)
+    }
+
+    pub fn get_site(&self) -> &'static str {
+        match self {
+            Type::Chat3 | Type::Chat4 => "https://chat.openai.com",
+            Type::Auth0 => "https://auth0.openai.com",
+            Type::Platform => "https://platform.openai.com",
+        }
+    }
 }
 
 impl std::str::FromStr for Type {
@@ -42,8 +62,8 @@ impl std::str::FromStr for Type {
         match s.to_lowercase().as_str() {
             "chat3" => Ok(Type::Chat3),
             "chat4" => Ok(Type::Chat4),
-            "platform" => Ok(Type::Platform),
             "auth0" => Ok(Type::Auth0),
+            "platform" => Ok(Type::Platform),
             _ => anyhow::bail!("Invalid type"),
         }
     }
@@ -388,7 +408,7 @@ where
             )
             .await;
         }
-        warn!("arkose token is invalid, but no solver is available, or the solver is invalid")
+        warn!("arkose token is invalid, but no solver is available.")
     }
 
     Ok(arkose_token)
@@ -456,7 +476,7 @@ async fn submit_captcha(
                     tokio::spawn(async move {
                         let res = funcaptcha::solver::submit_task(submit_task).await;
                         if let Some(err) = sender.send((i, res)).await.err() {
-                            println!("submit funcaptcha answer error: {err}")
+                            warn!("submit funcaptcha answer error: {err}")
                         }
                     });
                 }
