@@ -28,6 +28,8 @@ use serde_json::{json, Value};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tower_http::trace;
+use tracing::Level;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -96,7 +98,11 @@ impl Launcher {
         context::init(self.inner.clone());
 
         let global_layer = tower::ServiceBuilder::new()
-            .layer(tower_http::trace::TraceLayer::new_for_http())
+            .layer(
+                tower_http::trace::TraceLayer::new_for_http()
+                    .make_span_with(trace::DefaultMakeSpan::new().level(Level::DEBUG))
+                    .on_response(trace::DefaultOnResponse::new().level(Level::DEBUG)),
+            )
             .layer(tower::limit::ConcurrencyLimitLayer::new(
                 self.inner.concurrent_limit,
             ))
