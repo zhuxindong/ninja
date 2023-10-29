@@ -57,7 +57,6 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .disable_direct(args.disable_direct)
         .cookie_store(args.cookie_store)
         .api_prefix(args.api_prefix)
-        .preauth_api(args.preauth_api)
         .tcp_keepalive(args.tcp_keepalive)
         .pool_idle_timeout(args.pool_idle_timeout)
         .timeout(args.timeout)
@@ -76,7 +75,11 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .arkose_auth_har_file(args.arkose_auth_har_file)
         .arkose_platform_har_file(args.arkose_platform_har_file)
         .arkose_har_upload_key(args.arkose_har_upload_key)
-        .arkose_solver(arkose_solver);
+        .arkose_solver(arkose_solver)
+        .pbind(args.pbind)
+        .pupstream(args.pupstream)
+        .pcert(args.pcert)
+        .pkey(args.pkey);
 
     #[cfg(feature = "limit")]
     let builder = builder
@@ -87,6 +90,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .tb_fill_rate(args.tb_fill_rate)
         .tb_expired(args.tb_expired);
 
+    // openai::preauth::run(args.pbind.unwrap(), None, args.pcert, args.pkey)
     openai::serve::Launcher::new(builder.build()).run()
 }
 
@@ -261,6 +265,8 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
         cookie_store: true,
         pool_idle_timeout: 90,
         level: "info".to_owned(),
+        pcert: PathBuf::from("ca/cert.crt"),
+        pkey: PathBuf::from("ca/key.pem"),
         ..args::ServeArgs::default()
     };
 

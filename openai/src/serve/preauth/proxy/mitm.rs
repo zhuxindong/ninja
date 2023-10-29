@@ -21,18 +21,11 @@ use tokio::{
 use tokio_rustls::TlsAcceptor;
 
 /// Enum representing either an HTTP request or response.
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum RequestOrResponse {
     Request(Request<Body>),
     Response(Response<Body>),
-}
-
-/// Context for HTTP requests and responses.
-#[derive(Default, Debug)]
-pub struct HttpContext<D: Default + Send + Sync> {
-    pub uri: Option<Uri>,
-
-    pub custom_data: D,
 }
 
 #[derive(Clone)]
@@ -110,6 +103,7 @@ where
             header_mut.remove(http::header::HOST);
             header_mut.remove(http::header::ACCEPT_ENCODING);
             header_mut.remove(http::header::CONTENT_LENGTH);
+            header_mut.remove(http::header::CONNECTION);
         }
 
         let res = match self.client {
@@ -230,7 +224,7 @@ where
         Response::builder()
             .header(
                 http::header::CONTENT_DISPOSITION,
-                "attachment; filename=good-mitm.crt",
+                "attachment; filename=preauth-mitm.crt",
             )
             .header(http::header::CONTENT_TYPE, "application/octet-stream")
             .status(http::StatusCode::OK)

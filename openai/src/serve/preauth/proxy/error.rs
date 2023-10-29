@@ -10,8 +10,4 @@ pub enum Error {
     HyperError(#[from] hyper::Error),
     #[error("IO error")]
     IO(#[from] io::Error),
-    #[error("unable to decode response body")]
-    Decode,
-    #[error("unknown error")]
-    Unknown,
 }

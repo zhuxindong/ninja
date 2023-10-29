@@ -331,7 +331,6 @@ impl AuthProvider for AuthClient {
 }
 
 pub struct AuthClientBuilder {
-    preauth_api: Option<Url>,
     inner: reqwest::ClientBuilder,
 }
 
@@ -418,14 +417,6 @@ impl AuthClientBuilder {
         self
     }
 
-    /// Setting Custom PreAuth Cookie API
-    pub fn preauth_api(mut self, preauth_api: Option<String>) -> Self {
-        if let Some(preauth_api) = preauth_api {
-            self.preauth_api = Some(Url::parse(&preauth_api).expect("invalid preauth_api url"));
-        }
-        self
-    }
-
     /// Bind to a local IP Address.
     pub fn local_address<T>(mut self, addr: T) -> Self
     where
@@ -448,12 +439,7 @@ impl AuthClientBuilder {
         let mut providers: Vec<Box<dyn AuthProvider + Send + Sync>> = Vec::with_capacity(3);
         providers.push(Box::new(WebAuthProvider::new(client.clone())));
         providers.push(Box::new(PlatformAuthProvider::new(client.clone())));
-        if let Some(preauth_api) = self.preauth_api {
-            providers.push(Box::new(AppleAuthProvider::new(
-                client.clone(),
-                preauth_api,
-            )));
-        }
+        providers.push(Box::new(AppleAuthProvider::new(client.clone())));
 
         AuthClient {
             inner: client,
@@ -468,7 +454,6 @@ impl AuthClientBuilder {
                 .danger_accept_invalid_certs(true)
                 .connect_timeout(Duration::from_secs(30))
                 .redirect(Policy::none()),
-            preauth_api: None,
         }
     }
 }

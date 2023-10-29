@@ -2,7 +2,7 @@ use crate::arkose::ArkoseToken;
 use crate::arkose::Type;
 use crate::context;
 use crate::context::ContextArgs;
-use crate::serve::err::ResponseError;
+use crate::serve::error::ResponseError;
 use crate::serve::router::STATIC_FILES;
 use axum::body::Body;
 use axum::http::header;

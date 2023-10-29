@@ -33,8 +33,8 @@ impl CertificateAuthority {
     pub fn gen_ca() -> Result<Certificate, RcgenError> {
         let mut params = CertificateParams::default();
         let mut distinguished_name = DistinguishedName::new();
-        distinguished_name.push(DnType::CommonName, "Good-MITM");
-        distinguished_name.push(DnType::OrganizationName, "Good-MITM");
+        distinguished_name.push(DnType::CommonName, "PreAuth-MITM");
+        distinguished_name.push(DnType::OrganizationName, "PreAuth-MITM");
         distinguished_name.push(DnType::CountryName, "CN");
         distinguished_name.push(DnType::LocalityName, "CN");
         params.distinguished_name = distinguished_name;

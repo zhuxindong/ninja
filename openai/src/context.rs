@@ -3,6 +3,7 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::PathBuf,
     sync::OnceLock,
+    time::Duration,
 };
 
 use crate::{
@@ -15,6 +16,7 @@ use crate::{
     serve::middleware::tokenbucket,
     warn,
 };
+use moka::sync::Cache;
 use reqwest::Client;
 use std::sync::RwLock;
 use typed_builder::TypedBuilder;
@@ -86,10 +88,6 @@ pub struct ContextArgs {
     /// Web UI api prefix
     #[builder(setter(into), default)]
     pub(crate) api_prefix: Option<String>,
-
-    /// PreAuth Cookie API URL
-    #[builder(setter(into), default)]
-    pub(crate) preauth_api: Option<String>,
 
     /// TLS cert
     #[builder(setter(into), default)]
@@ -175,6 +173,26 @@ pub struct ContextArgs {
     #[cfg(feature = "limit")]
     #[builder(setter(into), default = 86400)]
     pub(crate) tb_expired: u32,
+
+    /// Preauth MITM server bind address
+    #[cfg(feature = "preauth")]
+    #[builder(setter(into), default)]
+    pub(crate) pbind: Option<std::net::SocketAddr>,
+
+    /// Preauth MITM server upstream proxy
+    #[cfg(feature = "preauth")]
+    #[builder(setter(into), default)]
+    pub(crate) pupstream: Option<String>,
+
+    /// crate MITM server CA certificate file path
+    #[cfg(feature = "preauth")]
+    #[builder(setter(into), default)]
+    pub(super) pcert: PathBuf,
+
+    /// Preauth MITM server CA private key file path
+    #[cfg(feature = "preauth")]
+    #[builder(setter(into), default)]
+    pub(crate) pkey: PathBuf,
 }
 
 #[derive(Debug)]
@@ -205,7 +223,9 @@ static CTX: OnceLock<Context> = OnceLock::new();
 static HAR: OnceLock<RwLock<HashMap<arkose::Type, Har>>> = OnceLock::new();
 
 pub struct Context {
+    /// Requesting client
     client_load: Option<ClientLoadBalancer>,
+    /// Requesting oauth client
     auth_client_load: Option<ClientLoadBalancer>,
     /// arkoselabs solver
     arkose_solver: Option<ArkoseSolver>,
@@ -219,6 +239,8 @@ pub struct Context {
     api_prefix: Option<String>,
     /// Arkose endpoint
     arkose_endpoint: Option<String>,
+    /// PreAuth cookie cache
+    preauth_cache: Option<Cache<String, String>>,
 }
 
 impl Context {
@@ -252,6 +274,15 @@ impl Context {
         HAR.set(std::sync::RwLock::new(har_map))
             .expect("Failed to set har map");
 
+        let preauth_cache = args.pbind.is_some().then(|| {
+            info!("Preauth MITM server enabled");
+            let cache: Cache<String, String> = Cache::builder()
+                .max_capacity(1000)
+                .time_to_live(Duration::from_secs(3600 * 24))
+                .build();
+            cache
+        });
+
         Context {
             client_load: Some(
                 ClientLoadBalancer::new_client(&args)
@@ -272,6 +303,7 @@ impl Context {
             }),
             api_prefix: args.api_prefix,
             auth_key: args.auth_key,
+            preauth_cache,
         }
     }
 
@@ -327,6 +359,32 @@ impl Context {
 
     pub fn auth_key(&self) -> Option<&String> {
         self.auth_key.as_ref()
+    }
+
+    pub fn enable_preauth(&self) -> bool {
+        if let Some(ref c) = self.preauth_cache {
+            return c.weighted_size() > 0;
+        }
+        false
+    }
+
+    pub fn push_preauth_cookie(&self, key: String, value: String) {
+        if let Some(ref c) = self.preauth_cache {
+            let _ = c.get_with(key, || {
+                info!("Push PreAuth Cookie: {value}");
+                value
+            });
+        }
+    }
+
+    pub fn pop_preauth_cookie(&self) -> Option<String> {
+        if let Some(ref c) = self.preauth_cache {
+            use rand::seq::IteratorRandom;
+            if let Some((_, v)) = c.iter().choose(&mut rand::thread_rng()) {
+                return Some(v);
+            }
+        }
+        None
     }
 }
 

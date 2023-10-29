@@ -54,8 +54,6 @@ o.rmempty = false
 o = s:option(Value, "auth_key", translate("Auth Key"), translate("Login Authentication Key"))
 o.password = true
 
-o = s:option(Value, "preauth_api", translate("PreAuth API"), translate("PreAuth Cookie API URL"))
-
 o = s:option(Value, "api_prefix", translate("WebUI API prefix"))
 
 o = s:option(Value, "cf_site_key", translate("CF Site Key"), translate("Cloudflare turnstile captcha site key"))
