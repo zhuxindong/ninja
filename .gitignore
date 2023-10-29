@@ -28,6 +28,7 @@ thunder-tests
 uploads
 ./vendor
 upgrade
+ca
 chat3.openai.com.har
 chat4.openai.com.har
 platform.openai.com.har
