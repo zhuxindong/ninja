@@ -64,7 +64,7 @@ fn main() -> anyhow::Result<()> {
                 #[cfg(target_family = "unix")]
                 args::ServeSubcommand::Log => handle::serve_log()?,
                 args::ServeSubcommand::Genca => {
-                    let _ = openai::preauth::cagen::gen_ca();
+                    let _ = openai::serve::preauth::cagen::gen_ca();
                 }
                 args::ServeSubcommand::GT { out } => handle::generate_template(out)?,
             },
