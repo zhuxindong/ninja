@@ -27,6 +27,7 @@ sha2 = "0.10.7"
 futures-core = { version = "0.3.28", optional = true}
 tera = { version = "1.19.1", default-features = false, optional = true }
 hotwatch = "0.5.0"
+moka = { version = "0.12.1", default-features = false, features = ["sync"], optional = true }
 
 # redis limit
 redis = { version = "0.23.3", features = ["tokio-comp", "tokio-rustls-comp"], optional = true }
@@ -63,7 +64,6 @@ serde_with = "3.3.0"
 
 # mitm
 rcgen = { version = "0.10", features = ["x509-parser"], optional = true }
-moka = { version = "0.12.1", default-features = false, features = ["sync"], optional = true }
 hyper = { version = "0.14.27", default-features = false, optional = true }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["rustls"], optional = true }
 hyper-rustls = { version = "0.24.1", features = ["http2"], optional = true }
@@ -90,7 +90,7 @@ preauth = ["dep:rustls-pemfile", "dep:rcgen", "dep:moka", "dep:hyper", "dep:hype
 serve = ["stream", "dep:async-stream", "dep:tracing", "dep:tracing-subscriber", "dep:tower-http", "dep:tower", "dep:bytes", "dep:time", "dep:axum-server", "dep:axum-extra", "dep:axum", "dep:static-files", "dep:futures-core", "dep:tera"]
 stream = ["dep:tokio-util", "dep:futures", "dep:tokio-stream", "dep:eventsource-stream", "dep:futures-core", "dep:pin-project-lite", "dep:nom", "dep:mime", "dep:futures-timer"]
 remote-token = []
-limit = ["dep:redis", "dep:redis-macros"]
+limit = ["dep:redis", "dep:redis-macros", "dep:moka"]
 template = []
 
 [lib]
