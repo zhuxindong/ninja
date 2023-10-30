@@ -164,13 +164,22 @@ where
         let mut recording_reader = RecordingBufReader::new(&mut stream);
         let reader = HandshakeRecordReader::new(&mut recording_reader);
         pin!(reader);
-        let sni_hostname = tokio::time::timeout(
+        let sni_hostname = match tokio::time::timeout(
             Duration::from_secs(5),
             read_sni_host_name_from_client_hello(reader),
         )
         .await
-        .unwrap()
-        .unwrap();
+        {
+            Ok(Ok(ok)) => ok,
+            Ok(Err(err)) => {
+                warn!("read sni hostname failed: {}", err);
+                return;
+            }
+            Err(err) => {
+                warn!("read sni hostname timeout: {}", err);
+                return;
+            }
+        };
 
         let read_buf = recording_reader.buf();
         let client_stream = PrefixedReaderWriter::new(stream, read_buf);
