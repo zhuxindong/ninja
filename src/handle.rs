@@ -30,15 +30,15 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
     crate::utils::unix::sysctl_ipv6_no_local_bind(args.ipv6_subnet.is_some());
 
     // disable_direct and proxies are mutually exclusive
-    if args.disable_direct {
-        if args.proxies.is_none() || args.proxies.clone().is_some_and(|x| x.is_empty()) {
-            let mut cmd = args::cmd::Opt::command();
-            cmd.error(
-                clap::error::ErrorKind::ArgumentConflict,
-                "Cannot disable direct connection and not set proxies",
-            )
-            .exit();
-        }
+    if args.disable_direct
+        && (args.proxies.is_none() || args.proxies.clone().is_some_and(|x| x.is_empty()))
+    {
+        let mut cmd = args::cmd::Opt::command();
+        cmd.error(
+            clap::error::ErrorKind::ArgumentConflict,
+            "Cannot disable direct connection and not set proxies",
+        )
+        .exit();
     }
 
     let arkose_solver = match args.arkose_solver_key.as_ref() {
