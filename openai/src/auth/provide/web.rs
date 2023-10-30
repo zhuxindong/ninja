@@ -170,6 +170,10 @@ impl WebAuthProvider {
 
         if resp.status().is_redirection() {
             let location = AuthClient::get_location_path(&resp.headers())?;
+            if location.eq("https://chat.openai.com/") {
+                bail!(AuthError::InvalidLocationPath)
+            }
+
             let resp = self
                 .inner
                 .get(format!("{OPENAI_OAUTH_URL}{location}"))

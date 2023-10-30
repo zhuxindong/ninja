@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
-use crate::context;
+use crate::{context, warn};
 
 use super::Solver;
 
@@ -85,8 +85,12 @@ pub async fn submit_task(submit_task: SubmitSolver<'_>) -> anyhow::Result<Vec<i3
         }
     }
 
-    let ctx = context::get_instance();
-    let resp = ctx.client().post(url).json(&body).send().await?;
+    let resp = context::get_instance()
+        .client()
+        .post(url)
+        .json(&body)
+        .send()
+        .await?;
 
     match resp.error_for_status_ref() {
         Ok(_) => {
@@ -102,6 +106,7 @@ pub async fn submit_task(submit_task: SubmitSolver<'_>) -> anyhow::Result<Vec<i3
             Ok(target)
         }
         Err(err) => {
+            warn!("submit task question error: {err}");
             let msg = resp.text().await?;
             anyhow::bail!(format!("solver task error: {err}\n{msg}"))
         }

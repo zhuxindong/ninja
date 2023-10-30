@@ -110,8 +110,10 @@ impl PlatformAuthProvider {
             .map_err(AuthError::FailedRequest)?
             .ext_context(ctx);
 
-        let location = AuthClient::get_location_path(&resp.headers())
-            .map_err(|_| AuthError::InvalidEmailOrPassword)?;
+        let location = AuthClient::get_location_path(&resp.headers())?;
+        if location.eq("https://chat.openai.com/") {
+            bail!(AuthError::InvalidLocationPath)
+        }
 
         if location.starts_with("/authorize/resume?") {
             return self.authenticate_resume(ctx, location).await;

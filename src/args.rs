@@ -99,7 +99,7 @@ pub struct ServeArgs {
     pub(super) interface: Option<std::net::IpAddr>,
 
     /// IPv6 subnet, Example: 2001:19f0:6001:48e4::/64
-    #[clap(long, short = 'I', env = "IPV4_SUBNET", value_parser = parse::parse_ipv6_subnet, group = "proxy")]
+    #[clap(long, short = 'I', env = "IPV6_SUBNET", value_parser = parse::parse_ipv6_subnet, group = "proxy")]
     pub(super) ipv6_subnet: Option<(std::net::Ipv6Addr, u8)>,
 
     /// Disable direct connection
@@ -143,7 +143,7 @@ pub struct ServeArgs {
     pub(super) api_prefix: Option<String>,
 
     /// PreAuth Cookie API URL
-    #[clap(long, env = "PREAUTH_API", value_parser = parse::parse_url, default_value = "https://ai.fakeopen.com/auth/preauth")]
+    #[clap(long, env = "PREAUTH_API", value_parser = parse::parse_url)]
     pub(super) preauth_api: Option<String>,
 
     /// Disable WebUI

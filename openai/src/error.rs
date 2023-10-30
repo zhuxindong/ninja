@@ -44,6 +44,8 @@ pub enum AuthError {
     InvalidAccessToken,
     #[error("invalid refresh token")]
     InvalidRefreshToken,
+    #[error("invalid location path")]
+    InvalidLocationPath,
     #[error("token expired")]
     TokenExpired,
     #[error("MFA failed")]

@@ -28,6 +28,8 @@ use serde_json::{json, Value};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tower_http::trace;
+use tracing::Level;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -96,7 +98,11 @@ impl Launcher {
         context::init(self.inner.clone());
 
         let global_layer = tower::ServiceBuilder::new()
-            .layer(tower_http::trace::TraceLayer::new_for_http())
+            .layer(
+                tower_http::trace::TraceLayer::new_for_http()
+                    .make_span_with(trace::DefaultMakeSpan::new().level(Level::DEBUG))
+                    .on_response(trace::DefaultOnResponse::new().level(Level::DEBUG)),
+            )
             .layer(tower::limit::ConcurrencyLimitLayer::new(
                 self.inner.concurrent_limit,
             ))
@@ -112,7 +118,8 @@ impl Launcher {
             ))
             .layer(tower::timeout::TimeoutLayer::new(Duration::from_secs(
                 self.inner.timeout as u64,
-            )));
+            )))
+            .layer(axum::extract::DefaultBodyLimit::max(200 * 1024 * 1024));
 
         let app_layer = {
             let limit_context = TokenBucketLimitContext::from((
@@ -314,11 +321,11 @@ async fn official_proxy(
     jar: CookieJar,
     mut body: Option<Json<Value>>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let url = if let Some(query) = uri.query() {
-        format!("{URL_PLATFORM_API}{}?{query}", uri.path())
-    } else {
-        format!("{URL_PLATFORM_API}{}", uri.path())
-    };
+    let path_and_query = uri
+        .path_and_query()
+        .map(|v| v.as_str())
+        .unwrap_or(uri.path());
+    let url = format!("{URL_PLATFORM_API}{path_and_query}");
 
     handle_dashboard_body(&url, &method, &mut body).await?;
 
@@ -354,11 +361,12 @@ async fn unofficial_proxy(
     jar: CookieJar,
     mut body: Option<Json<Value>>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let url = if let Some(query) = uri.query() {
-        format!("{URL_CHATGPT_API}{}?{query}", uri.path())
-    } else {
-        format!("{URL_CHATGPT_API}{}", uri.path())
-    };
+    let path_and_query = uri
+        .path_and_query()
+        .map(|v| v.as_str())
+        .unwrap_or(uri.path());
+
+    let url = format!("{URL_CHATGPT_API}{path_and_query}");
 
     handle_body(&url, &method, &mut headers, &mut body).await?;
 
@@ -376,14 +384,16 @@ pub(super) async fn header_convert(
     headers: &HeaderMap,
     jar: &CookieJar,
 ) -> Result<HeaderMap, ResponseError> {
-    let authorization = headers
-        .get(header::AUTHORIZATION)
-        .ok_or(ResponseError::Unauthorized(anyhow!(
-            "AccessToken required!"
-        )))?;
+    let authorization = match headers.get(header::AUTHORIZATION) {
+        Some(v) => Some(v),
+        // support Pandora WebUI passing X-Authorization header
+        None => headers.get("X-Authorization"),
+    };
 
     let mut headers = HeaderMap::new();
-    headers.insert(header::AUTHORIZATION, authorization.clone());
+    if let Some(h) = authorization {
+        headers.insert(header::AUTHORIZATION, h.clone());
+    }
     headers.insert(header::HOST, HeaderValue::from_static(HOST_CHATGPT));
     headers.insert(header::ORIGIN, HeaderValue::from_static(ORIGIN_CHATGPT));
     headers.insert(header::USER_AGENT, HeaderValue::from_static(HEADER_UA));
@@ -535,13 +545,15 @@ async fn handle_body(
         }
     }
 
-    let authorization = headers
-        .get(header::AUTHORIZATION)
+    if !has_puid(headers)? {
+        let authorization = match headers.get(header::AUTHORIZATION) {
+            Some(v) => Some(v),
+            None => headers.get("X-Authorization"),
+        }
         .ok_or(ResponseError::Unauthorized(anyhow!(
             "AccessToken required!"
         )))?;
 
-    if !has_puid(headers)? {
         let resp = context::get_instance()
             .client()
             .get(format!("{URL_CHATGPT_API}/backend-api/models"))

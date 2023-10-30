@@ -17,7 +17,11 @@ pub(super) async fn token_authorization_middleware<B>(
         return Ok(next.run(request).await);
     };
 
-    let authorization = request.headers().get(header::AUTHORIZATION);
+    // support Pandora WebUI passing X-Authorization header
+    let authorization = match request.headers().get(header::AUTHORIZATION) {
+        Some(v) => Some(v),
+        None => request.headers().get("X-Authorization"),
+    };
 
     match authorization {
         Some(token) => match crate::token::check_for_u8(token.as_bytes()) {
