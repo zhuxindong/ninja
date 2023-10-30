@@ -1,3 +1,4 @@
+pub mod model;
 pub mod provide;
 
 extern crate regex;
@@ -20,13 +21,12 @@ use reqwest::{Client, Proxy, StatusCode, Url};
 use sha2::{Digest, Sha256};
 use tokio::sync::OnceCell;
 
-pub mod model;
-
 use crate::debug;
 use crate::error::AuthError;
 use crate::URL_CHATGPT_API;
 
 use self::model::{ApiKeyData, AuthStrategy};
+#[cfg(feature = "preauth")]
 use self::provide::apple::AppleAuthProvider;
 use self::provide::platform::PlatformAuthProvider;
 use self::provide::web::WebAuthProvider;
@@ -439,6 +439,7 @@ impl AuthClientBuilder {
         let mut providers: Vec<Box<dyn AuthProvider + Send + Sync>> = Vec::with_capacity(3);
         providers.push(Box::new(WebAuthProvider::new(client.clone())));
         providers.push(Box::new(PlatformAuthProvider::new(client.clone())));
+        #[cfg(feature = "preauth")]
         providers.push(Box::new(AppleAuthProvider::new(client.clone())));
 
         AuthClient {

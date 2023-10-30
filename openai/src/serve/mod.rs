@@ -163,9 +163,8 @@ impl Launcher {
             .build()?;
 
         runtime.block_on(async move {
-            tokio::spawn(check_wan_address());
-
             // PreAuth mitm proxy
+            #[cfg(feature = "preauth")]
             if let Some(pbind) = self.inner.pbind.clone() {
                 let _ = preauth::mitm_proxy(
                     pbind,
@@ -200,6 +199,9 @@ impl Launcher {
 
             // Spawn a task to gracefully shutdown server.
             tokio::spawn(signal::graceful_shutdown(handle.clone()));
+
+            // Spawn a task to check wan address.
+            tokio::spawn(check_wan_address());
 
             let result = match (self.inner.tls_cert, self.inner.tls_key) {
                 (Some(cert), Some(key)) => {

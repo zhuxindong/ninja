@@ -325,14 +325,17 @@ impl Context {
             .into()
     }
 
+    /// Get the arkoselabs har file upload authenticate key
     pub fn arkose_har_upload_key(&self) -> Option<&String> {
         self.arkose_har_upload_key.as_ref()
     }
 
+    /// Get the arkoselabs solver
     pub fn arkose_solver(&self) -> Option<&ArkoseSolver> {
         self.arkose_solver.as_ref()
     }
 
+    /// Get the arkose har file path
     pub fn arkose_har_path(&self, _type: &arkose::Type) -> (bool, PathBuf) {
         let har_lock = HAR
             .get()
@@ -345,22 +348,28 @@ impl Context {
             .expect("Failed to get har path")
     }
 
+    /// Cloudflare Turnstile config
     pub fn cf_turnstile(&self) -> Option<&CfTurnstile> {
         self.cf_turnstile.as_ref()
     }
 
+    /// WebUI api prefix
     pub fn api_prefix(&self) -> Option<&String> {
         self.api_prefix.as_ref()
     }
 
+    /// Arkoselabs endpoint
     pub fn arkose_endpoint(&self) -> Option<&String> {
         self.arkose_endpoint.as_ref()
     }
 
+    /// Login auth key
     pub fn auth_key(&self) -> Option<&String> {
         self.auth_key.as_ref()
     }
 
+    /// Check PreAuth cookie cache
+    #[cfg(feature = "preauth")]
     pub fn enable_preauth(&self) -> bool {
         if let Some(ref c) = self.preauth_cache {
             return c.weighted_size() > 0;
@@ -368,6 +377,8 @@ impl Context {
         false
     }
 
+    /// Push a preauth cookie
+    #[cfg(feature = "preauth")]
     pub fn push_preauth_cookie(&self, key: String, value: String) {
         if let Some(ref c) = self.preauth_cache {
             let _ = c.get_with(key, || {
@@ -377,6 +388,8 @@ impl Context {
         }
     }
 
+    /// Pop a preauth cookie
+    #[cfg(feature = "preauth")]
     pub fn pop_preauth_cookie(&self) -> Option<String> {
         if let Some(ref c) = self.preauth_cache {
             use rand::seq::IteratorRandom;
