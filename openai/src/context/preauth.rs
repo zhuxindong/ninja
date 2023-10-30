@@ -1,4 +1,4 @@
-use crate::{error, homedir::home_dir, info, now_duration};
+use crate::{debug, error, homedir::home_dir, info, now_duration};
 use moka::sync::Cache;
 use std::{path::PathBuf, time::Duration};
 
@@ -31,6 +31,7 @@ impl PreauthCookieProvider {
 
         // Load from file
         data.into_iter().for_each(|value| {
+            debug!("Load file: {}, PreAuth Cookie: {value}", path.display());
             value.find(":").map(|colon_index| {
                 let device_id = &value[..colon_index];
                 cache.insert(device_id.to_owned(), value)
