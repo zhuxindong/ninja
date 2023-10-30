@@ -885,9 +885,8 @@ fn render_template(name: &str, context: &tera::Context) -> Result<Response<Body>
 fn settings_template_data(ctx: &mut tera::Context) {
     let g_ctx = context::get_instance();
 
-    let enable_preauth = g_ctx.enable_preauth();
-    if enable_preauth {
-        ctx.insert("support_apple", &enable_preauth.to_string());
+    if g_ctx.pop_preauth_cookie().is_some() {
+        ctx.insert("support_apple", "true");
     }
     if let Some(site_key) = g_ctx.cf_turnstile() {
         ctx.insert("site_key", &site_key.site_key);

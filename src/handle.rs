@@ -1,10 +1,7 @@
 use std::{ops::Not, path::PathBuf};
 
 use clap::CommandFactory;
-use openai::{
-    arkose::funcaptcha::ArkoseSolver, context::ContextArgs,
-    serve::middleware::tokenbucket::Strategy,
-};
+use openai::{arkose::funcaptcha::ArkoseSolver, context::ContextArgs};
 
 use crate::{
     args::{self, ServeArgs},
@@ -256,7 +253,7 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
         timeout: 600,
         connect_timeout: 60,
         tcp_keepalive: 60,
-        tb_store_strategy: Strategy::Mem,
+        tb_store_strategy: "mem".to_string(),
         tb_redis_url: "redis://127.0.0.1:6379".to_string(),
         tb_enable: false,
         tb_capacity: 60,

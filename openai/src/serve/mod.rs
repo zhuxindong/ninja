@@ -1,5 +1,5 @@
 mod error;
-pub mod middleware;
+mod middleware;
 mod signal;
 mod turnstile;
 
@@ -42,7 +42,7 @@ use crate::auth::model::{AccessToken, AuthAccount, RefreshToken, SessionAccessTo
 use crate::auth::provide::AuthProvider;
 use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
 use crate::context::{self, ContextArgs};
-use crate::serve::middleware::tokenbucket::TokenBucketLimitContext;
+use crate::serve::middleware::tokenbucket::{Strategy, TokenBucketLimitContext};
 use crate::serve::router::toapi::chat_to_api;
 use crate::{arkose, debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 
@@ -125,7 +125,7 @@ impl Launcher {
 
         let app_layer = {
             let limit_context = TokenBucketLimitContext::from((
-                self.inner.tb_store_strategy.clone(),
+                Strategy::from_str(self.inner.tb_store_strategy.as_str())?,
                 self.inner.tb_enable,
                 self.inner.tb_capacity,
                 self.inner.tb_fill_rate,
@@ -166,13 +166,17 @@ impl Launcher {
             // PreAuth mitm proxy
             #[cfg(feature = "preauth")]
             if let Some(pbind) = self.inner.pbind.clone() {
-                let _ = preauth::mitm_proxy(
+                if let Some(err) = preauth::mitm_proxy(
                     pbind,
                     self.inner.pupstream.clone(),
                     self.inner.pcert.clone(),
                     self.inner.pkey.clone(),
                 )
-                .await;
+                .await
+                .err()
+                {
+                    crate::error!("PreAuth proxy error: {}", err);
+                }
             }
 
             let router = axum::Router::new()

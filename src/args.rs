@@ -1,6 +1,6 @@
 use crate::parse;
 use clap::{Args, Subcommand};
-use openai::{arkose::funcaptcha::Solver, serve::middleware::tokenbucket::Strategy};
+use openai::arkose::funcaptcha::Solver;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -199,7 +199,7 @@ pub struct ServeArgs {
     /// Token bucket store strategy (mem/redis)
     #[clap(long, default_value = "mem", requires = "tb_enable")]
     #[cfg(feature = "limit")]
-    pub(super) tb_store_strategy: Strategy,
+    pub(super) tb_store_strategy: String,
 
     /// Token bucket redis connection url
     #[clap(long, default_value = "redis://127.0.0.1:6379", requires = "tb_enable", value_parser = parse::parse_url)]
