@@ -1,4 +1,4 @@
-use crate::{debug, error, homedir::home_dir, info, now_duration};
+use crate::{debug, error, homedir::home_dir, info, now_duration, warn};
 use moka::sync::Cache;
 use std::{path::PathBuf, time::Duration};
 
@@ -30,32 +30,36 @@ impl PreauthCookieProvider {
             .build();
 
         // Load from file
-        data.into_iter().for_each(|value| {
+        data.iter().for_each(|value| {
             debug!("Load file: {}, PreAuth Cookie: {value}", path.display());
             value.find(":").map(|colon_index| {
                 let device_id = &value[..colon_index];
-                cache.insert(device_id.to_owned(), value)
+                cache.insert(device_id.to_owned(), value.to_owned())
             });
         });
+
+        if let Some(err) = std::fs::write(&path, data.join("\n").as_bytes()).err() {
+            warn!("Failed to write preauth cookie to file: {err}")
+        };
 
         PreauthCookieProvider { cache, path }
     }
 
     pub(super) fn push(&self, value: &str) {
-        value.find("_preauth_devicecheck").map(|index| {
-            let cookie_value = &value[index + "_preauth_devicecheck=".len()..];
-            if let Some(index) = cookie_value.find(';') {
-                let preauth_devicecheck = &cookie_value[..index].trim();
+        value
+            .split(";")
+            .find(|s| s.contains("_preauth_devicecheck"))
+            .map(|value| {
+                let preauth_devicecheck = value.replace("_preauth_devicecheck=", "");
                 preauth_devicecheck.find(":").map(|colon_index| {
                     let device_id = &preauth_devicecheck[..colon_index];
                     let _ = self.cache.get_with(device_id.to_owned(), || {
-                        info!("Push PreAuth Cookie: {value}");
-                        self.append_preauth_cookie_to_file(value);
-                        value.to_owned()
+                        info!("Push PreAuth Cookie: {preauth_devicecheck}");
+                        self.append_preauth_cookie_to_file(&preauth_devicecheck);
+                        preauth_devicecheck
                     });
                 });
-            }
-        });
+            });
     }
 
     pub(super) fn get(&self) -> Option<String> {
