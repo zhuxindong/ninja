@@ -103,7 +103,6 @@ where
             header_mut.remove(http::header::HOST);
             header_mut.remove(http::header::ACCEPT_ENCODING);
             header_mut.remove(http::header::CONTENT_LENGTH);
-            header_mut.remove(http::header::CONNECTION);
         }
 
         let res = match self.client {
@@ -143,14 +142,20 @@ where
                     Ok(upgraded) => {
                         self.serve_tls(upgraded).await;
                     }
-                    Err(e) => debug!("upgrade error for {}: {}", authority, e),
+                    Err(err) => warn!("upgrade error for {authority}: {err}"),
                 };
             });
         } else {
             tokio::task::spawn(async move {
                 let remote_addr = host_addr(req.uri()).unwrap();
-                let upgraded = hyper::upgrade::on(req).await.unwrap();
-                tunnel(upgraded, remote_addr).await
+                match hyper::upgrade::on(req).await {
+                    Ok(upgraded) => {
+                        if let Some(err) = tunnel(upgraded, remote_addr).await.err() {
+                            debug!("tunnel error: {err}");
+                        }
+                    }
+                    Err(err) => warn!("upgrade error for {remote_addr}: {err}"),
+                }
             });
         }
         Ok(Response::new(Body::empty()))
@@ -196,8 +201,9 @@ where
         match TlsAcceptor::from(server_config).accept(client_stream).await {
             Ok(stream) => {
                 if let Err(e) = Http::new()
-                    .http1_preserve_header_case(true)
-                    .http1_title_case_headers(true)
+                    .http2_keep_alive_timeout(Duration::from_secs(60))
+                    .http2_enable_connect_protocol()
+                    .pipeline_flush(true)
                     .serve_connection(
                         stream,
                         service_fn(|req| self.clone().process_request(req, Scheme::HTTPS)),
