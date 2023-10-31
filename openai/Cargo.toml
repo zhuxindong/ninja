@@ -66,9 +66,9 @@ serde_with = "3.3.0"
 rcgen = { version = "0.10", features = ["x509-parser"], optional = true }
 hyper = { version = "0.14.27", default-features = false, optional = true }
 hyper-proxy = { version = "0.9.1", default-features = false, features = ["rustls"], optional = true }
-hyper-rustls = { version = "0.24.1", features = ["http2"], optional = true }
-tokio-rustls = { version = "0.24", default-features = false, features = ["tls12"], optional = true }
-rustls = { version = "0.21", features = ["dangerous_configuration"], optional = true }
+hyper-rustls = { version = "0.24.2", features = ["http2"], optional = true }
+tokio-rustls = { version = "0.24.1", default-features = false, features = ["tls12"], optional = true }
+rustls = { version = "0.21.8", features = ["dangerous_configuration"], optional = true }
 wildmatch = { version = "2.1", optional = true }
 http = { version = "0.2", optional = true }
 pin-project = { version = "1", optional = true }
