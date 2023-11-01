@@ -17,6 +17,7 @@ impl HttpClient {
         }
         let inner = builder
             .impersonate(Impersonate::Chrome99Android)
+            .http1_title_case_headers()
             .danger_accept_invalid_certs(true)
             .build()
             .expect("faild build reqwest client");
@@ -26,17 +27,20 @@ impl HttpClient {
     pub(super) async fn request(&self, req: Request<Body>) -> Result<Response<Body>, Error> {
         let (method, url) = (req.method().clone(), req.uri().to_string());
         let (parts, body) = req.into_parts();
-
         let resp = self
             .inner
             .clone()
             .request(method, url)
-            .body(hyper::body::to_bytes(body).await?)
             .headers(parts.headers)
+            .version(parts.version)
+            .body(hyper::body::to_bytes(body).await?)
             .send()
             .await?;
 
-        let mut builder = Builder::new().status(resp.status()).version(resp.version());
+        let mut builder = Builder::new()
+            .status(resp.status())
+            .version(resp.version())
+            .extension(parts.extensions);
 
         builder
             .headers_mut()

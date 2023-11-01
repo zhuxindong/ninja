@@ -1,4 +1,4 @@
-use crate::{debug, error, homedir::home_dir, info, now_duration, warn};
+use crate::{error, homedir::home_dir, info, now_duration, warn};
 use moka::sync::Cache;
 use std::{path::PathBuf, time::Duration};
 
@@ -31,7 +31,10 @@ impl PreauthCookieProvider {
 
         // Load from file
         data.iter().for_each(|value| {
-            debug!("Load file: {}, PreAuth Cookie: {value}", path.display());
+            info!(
+                "Load preauth cookie from file: {}, value: {value}",
+                path.display()
+            );
             value.find(":").map(|colon_index| {
                 let device_id = &value[..colon_index];
                 cache.insert(device_id.to_owned(), value.to_owned())
@@ -53,11 +56,9 @@ impl PreauthCookieProvider {
                 let preauth_devicecheck = value.replace("_preauth_devicecheck=", "");
                 preauth_devicecheck.find(":").map(|colon_index| {
                     let device_id = &preauth_devicecheck[..colon_index];
-                    let _ = self.cache.get_with(device_id.to_owned(), || {
-                        info!("Push PreAuth Cookie: {preauth_devicecheck}");
-                        self.append_preauth_cookie_to_file(&preauth_devicecheck);
-                        preauth_devicecheck
-                    });
+                    info!("Push PreAuth Cookie: {preauth_devicecheck}");
+                    self.cache.insert(device_id.to_owned(), preauth_devicecheck);
+                    self.sync_to_file();
                 });
             });
     }
@@ -75,21 +76,16 @@ impl PreauthCookieProvider {
         None
     }
 
-    fn append_preauth_cookie_to_file(&self, value: &str) {
-        std::fs::read(&self.path)
-            .map(|mut data| {
-                data.extend_from_slice(format!("{value}\n").as_bytes());
-                data
-            })
-            .or_else(|_| Ok(format!("{value}\n").as_bytes().to_vec()))
-            .and_then(|data| {
-                std::fs::write(&self.path, data).map_err(|err| {
-                    error!("Failed to write preauth cookie to file: {}", err);
-                    err
-                })
-            })
-            .err()
-            .map(|err| error!("Failed to append preauth cookie to file: {}", err));
+    fn sync_to_file(&self) {
+        let data = self
+            .cache
+            .iter()
+            .map(|(_, v)| v)
+            .collect::<Vec<String>>()
+            .join("\n");
+        let _ = std::fs::write(&self.path, data).map_err(|err| {
+            error!("Failed to write preauth cookie to file: {}", err);
+        });
     }
 
     fn is_invalid(input: &str) -> bool {
