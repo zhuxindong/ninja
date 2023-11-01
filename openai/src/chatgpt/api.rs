@@ -453,6 +453,7 @@ impl ChatGPTBuilder {
         let builder = reqwest::ClientBuilder::new()
             .user_agent(HEADER_UA)
             .impersonate(Impersonate::OkHttpAndroid13)
+            .danger_accept_invalid_certs(true)
             .cookie_store(true);
 
         ChatGPTBuilder {
