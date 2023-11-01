@@ -65,8 +65,6 @@ serde_with = "3.3.0"
 # mitm
 rcgen = { version = "0.10", features = ["x509-parser"], optional = true }
 hyper = { version = "0.14.27", default-features = false, optional = true }
-hyper-proxy = { version = "0.9.1", default-features = false, features = ["rustls"], optional = true }
-hyper-rustls = { version = "0.24.2", features = ["http2"], optional = true }
 tokio-rustls = { version = "0.24.1", default-features = false, features = ["tls12"], optional = true }
 rustls = { version = "0.21.8", features = ["dangerous_configuration"], optional = true }
 wildmatch = { version = "2.1", optional = true }
@@ -86,7 +84,7 @@ static-files = "0.2.3"
 [features]
 default = ["serve", "limit", "template", "preauth"]
 api = ["stream"]
-preauth = ["dep:rustls-pemfile", "dep:rcgen", "dep:moka", "dep:hyper", "dep:hyper-proxy", "dep:hyper-rustls", "dep:tokio-rustls", "dep:rustls", "dep:wildmatch", "dep:http", "dep:pin-project", "dep:byteorder"]
+preauth = ["dep:rustls-pemfile", "dep:rcgen", "dep:moka", "dep:hyper", "dep:tokio-rustls", "dep:rustls", "dep:wildmatch", "dep:http", "dep:pin-project", "dep:byteorder"]
 serve = ["stream", "dep:async-stream", "dep:tracing", "dep:tracing-subscriber", "dep:tower-http", "dep:tower", "dep:bytes", "dep:time", "dep:axum-server", "dep:axum-extra", "dep:axum", "dep:static-files", "dep:futures-core", "dep:tera"]
 stream = ["dep:tokio-util", "dep:futures", "dep:tokio-stream", "dep:eventsource-stream", "dep:futures-core", "dep:pin-project-lite", "dep:nom", "dep:mime", "dep:futures-timer"]
 remote-token = []

@@ -1,7 +1,5 @@
 use error::Error;
 use handler::{HttpHandler, MitmFilter};
-use http_client::gen_client;
-use hyper_proxy::Proxy as UpstreamProxy;
 use mitm::MitmProxy;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
@@ -11,6 +9,8 @@ pub use ca::CertificateAuthority;
 pub use hyper;
 pub use rcgen;
 pub use tokio_rustls;
+
+use self::http_client::HttpClient;
 
 mod ca;
 mod error;
@@ -29,8 +29,7 @@ where
     /// A future that once resolved will cause the proxy server to shut down.
     /// The certificate authority to use.
     pub ca: CertificateAuthority,
-    pub upstream_proxy: Option<UpstreamProxy>,
-
+    pub upstream_proxy: Option<String>,
     pub mitm_filters: Vec<String>,
     pub handler: H,
 }
@@ -40,7 +39,7 @@ where
     H: HttpHandler,
 {
     pub async fn start_proxy(self) -> Result<(), Error> {
-        let client = gen_client(self.upstream_proxy)?;
+        let client = HttpClient::new(self.upstream_proxy);
         let ca = Arc::new(self.ca);
         let http_handler = Arc::new(self.handler);
         let mitm_filter = Arc::new(MitmFilter::new(self.mitm_filters));

@@ -101,13 +101,14 @@ where
         {
             let header_mut = req.headers_mut();
             header_mut.remove(http::header::HOST);
-            header_mut.remove(http::header::ACCEPT_ENCODING);
-            header_mut.remove(http::header::CONTENT_LENGTH);
         }
 
-        let res = match self.client {
-            HttpClient::Proxy(client) => client.request(req).await?,
-            HttpClient::Https(client) => client.request(req).await?,
+        let res = match self.client.request(req).await {
+            Ok(res) => res,
+            Err(err) => {
+                warn!("proxy request failed: {err:?}");
+                Response::new(Body::empty())
+            }
         };
 
         let mut res = self.http_handler.handle_response(res).await;
@@ -201,7 +202,6 @@ where
         match TlsAcceptor::from(server_config).accept(client_stream).await {
             Ok(stream) => {
                 if let Err(e) = Http::new()
-                    .http2_keep_alive_timeout(Duration::from_secs(60))
                     .http2_enable_connect_protocol()
                     .pipeline_flush(true)
                     .serve_connection(
@@ -228,8 +228,8 @@ where
         S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     {
         Http::new()
-            .http1_preserve_header_case(true)
-            .http1_title_case_headers(true)
+            .http2_enable_connect_protocol()
+            .pipeline_flush(true)
             .serve_connection(stream, service_fn(|req| self.clone().proxy_req(req)))
             .with_upgrades()
             .await

@@ -1,9 +1,8 @@
 use std::{fs, net::SocketAddr, path::PathBuf};
 
 use anyhow::Context;
-use http::{header, Request, Response, Uri};
+use http::{header, Request, Response};
 use hyper::Body;
-use hyper_proxy::Intercept;
 
 use self::proxy::mitm::RequestOrResponse;
 use crate::{
@@ -41,18 +40,6 @@ pub(super) async fn mitm_proxy(
     )
     .context("Failed to create Certificate Authority")?;
 
-    let upstream_proxy = if let Some(ref p) = upstream_proxy {
-        let proxy = hyper_proxy::Proxy::new(
-            Intercept::All,
-            p.parse::<Uri>()
-                .context("Failed to parse upstream proxy address")?,
-        );
-        info!("PreAuth Http MITM Proxy use upstream proxy: {p}");
-        Some(proxy)
-    } else {
-        None
-    };
-
     info!("PreAuth Http MITM Proxy listen on: http://{bind}");
 
     let http_handler = PreAuthHanlder;
@@ -76,9 +63,6 @@ struct PreAuthHanlder;
 impl HttpHandler for PreAuthHanlder {
     async fn handle_request(&self, req: Request<Body>) -> RequestOrResponse {
         // remove accept-encoding to avoid encoded body
-        let mut req = req;
-        req.headers_mut().remove(http::header::ACCEPT_ENCODING);
-        req.headers_mut().remove(http::header::CONNECTION);
         if log::log_enabled!(log::Level::Debug) {
             log_req(&req).await;
         }
