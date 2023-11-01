@@ -107,7 +107,10 @@ where
             Ok(res) => res,
             Err(err) => {
                 warn!("proxy request failed: {err:?}");
-                Response::new(Body::empty())
+                Response::builder()
+                    .status(http::StatusCode::BAD_GATEWAY)
+                    .body(Body::empty())
+                    .expect("failed build response")
             }
         };
 
