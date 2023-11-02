@@ -58,7 +58,7 @@ pub enum ServeSubcommand {
     /// Show the Http server daemon log
     #[cfg(target_family = "unix")]
     Log,
-    /// Generate MITM CA certificate
+    /// Generate PreAuth MITM CA certificate
     Genca,
     /// Generate config template file (toml format file)
     GT {
@@ -66,6 +66,8 @@ pub enum ServeSubcommand {
         #[clap(short, long, group = "gt")]
         out: Option<PathBuf>,
     },
+    /// Update the application
+    Update,
 }
 
 #[derive(Args, Debug, Default, Serialize, Deserialize)]
