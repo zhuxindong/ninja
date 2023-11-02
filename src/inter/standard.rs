@@ -53,6 +53,7 @@ impl Display for Authorize {
 }
 
 #[derive(Debug, Copy, Clone)]
+#[allow(clippy::enum_variant_names)]
 pub enum OAuth {
     AccessToken,
     RefreshToken,

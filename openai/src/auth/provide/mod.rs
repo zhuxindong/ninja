@@ -1,3 +1,4 @@
+#[cfg(feature = "preauth")]
 pub mod apple;
 pub mod platform;
 pub mod web;

@@ -1,5 +1,6 @@
 use crate::auth::provide::{AuthenticateData, GrantType};
 use crate::auth::AuthClient;
+use crate::context;
 use crate::{
     auth::{
         model::{self, AuthStrategy},
@@ -25,19 +26,32 @@ const APPLE_CLIENT_ID: &str = "pdlLIX2Y72MIl2rhLhTE9VV9bN905kBh";
 const OPENAI_OAUTH_APPLE_CALLBACK_URL: &str =
     "com.openai.chat://auth0.openai.com/ios/com.openai.chat/callback";
 
+pub(crate) struct PreAuthProvider;
+
+impl PreAuthProvider {
+    fn get_preauth_cookie(&self) -> AuthResult<String> {
+        context::get_instance()
+            .pop_preauth_cookie()
+            .context(AuthError::PreauthCookieNotFound)
+    }
+}
+
 pub(crate) struct AppleAuthProvider {
-    preauth_api: Url,
     inner: Client,
+    preauth_provider: PreAuthProvider,
 }
 
 impl AppleAuthProvider {
-    pub fn new(inner: Client, preauth_api: Url) -> impl AuthProvider + Send + Sync {
-        Self { inner, preauth_api }
+    pub fn new(inner: Client) -> impl AuthProvider + Send + Sync {
+        Self {
+            inner,
+            preauth_provider: PreAuthProvider,
+        }
     }
 
     async fn authorize(&self, ctx: &mut RequestContext<'_>) -> AuthResult<()> {
         let code_challenge = ctx.code_challenge.as_str();
-        let preauth_cookie = self.get_preauth_cookie().await?;
+        let preauth_cookie = self.preauth_provider.get_preauth_cookie()?;
         let url = format!("{OPENAI_OAUTH_URL}/authorize?state={STATE}&ios_app_version={APP_VERSION}&client_id={APPLE_CLIENT_ID}&redirect_uri={OPENAI_OAUTH_APPLE_CALLBACK_URL}&code_challenge={code_challenge}&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write&prompt=login&preauth_cookie={preauth_cookie}&audience=https://api.openai.com/v1&code_challenge_method=S256&response_type=code&auth0Client={AUTH0_CLIENT}");
         let resp = self
             .inner
@@ -216,31 +230,6 @@ impl AppleAuthProvider {
             .map_err(AuthError::FailedRequest)?;
         let access_token = AuthClient::response_handle::<model::OAuthAccessToken>(resp).await?;
         Ok(model::AccessToken::OAuth(access_token))
-    }
-
-    async fn get_preauth_cookie(&self) -> AuthResult<String> {
-        let resp = self
-            .inner
-            .get(self.preauth_api.as_ref())
-            .send()
-            .await
-            .map_err(AuthError::FailedRequest)?;
-
-        let json = resp
-            .error_for_status()
-            .map_err(AuthError::FailedRequest)?
-            .json::<serde_json::Value>()
-            .await?;
-
-        let preauth_cookie = json
-            .as_object()
-            .map(|v| v.get("preauth_cookie"))
-            .flatten()
-            .map(|v| v.as_str())
-            .flatten()
-            .ok_or(anyhow::anyhow!("failed to extract preauth_cookie"))?
-            .to_owned();
-        Ok(preauth_cookie)
     }
 }
 

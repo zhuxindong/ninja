@@ -40,7 +40,9 @@ fn main() -> anyhow::Result<()> {
             args::ServeSubcommand::Status => handle::serve_status()?,
             #[cfg(target_family = "unix")]
             args::ServeSubcommand::Log => handle::serve_log()?,
-            args::ServeSubcommand::Genca => {}
+            args::ServeSubcommand::Genca => {
+                let _ = openai::serve::preauth::cagen::gen_ca();
+            }
             args::ServeSubcommand::GT { out } => handle::generate_template(out)?,
         }
     }
@@ -61,7 +63,9 @@ fn main() -> anyhow::Result<()> {
                 args::ServeSubcommand::Status => handle::serve_status()?,
                 #[cfg(target_family = "unix")]
                 args::ServeSubcommand::Log => handle::serve_log()?,
-                args::ServeSubcommand::Genca => {}
+                args::ServeSubcommand::Genca => {
+                    let _ = openai::serve::preauth::cagen::gen_ca();
+                }
                 args::ServeSubcommand::GT { out } => handle::generate_template(out)?,
             },
             SubCommands::Terminal => {

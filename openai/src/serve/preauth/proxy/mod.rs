@@ -1,9 +1,7 @@
 use error::Error;
 use handler::{HttpHandler, MitmFilter};
-use http_client::gen_client;
-use hyper_proxy::Proxy as UpstreamProxy;
 use mitm::MitmProxy;
-use std::{future::Future, net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 use typed_builder::TypedBuilder;
 
@@ -11,6 +9,8 @@ pub use ca::CertificateAuthority;
 pub use hyper;
 pub use rcgen;
 pub use tokio_rustls;
+
+use self::http_client::HttpClient;
 
 mod ca;
 mod error;
@@ -20,30 +20,26 @@ pub mod mitm;
 mod sni_reader;
 
 #[derive(TypedBuilder)]
-pub struct Proxy<F, H>
+pub struct Proxy<H>
 where
-    F: Future<Output = ()>,
     H: HttpHandler,
 {
     /// The address to listen on.
     pub listen_addr: SocketAddr,
     /// A future that once resolved will cause the proxy server to shut down.
-    pub shutdown_signal: F,
     /// The certificate authority to use.
     pub ca: CertificateAuthority,
-    pub upstream_proxy: Option<UpstreamProxy>,
-
+    pub upstream_proxy: Option<String>,
     pub mitm_filters: Vec<String>,
     pub handler: H,
 }
 
-impl<F, H> Proxy<F, H>
+impl<H> Proxy<H>
 where
-    F: Future<Output = ()>,
     H: HttpHandler,
 {
     pub async fn start_proxy(self) -> Result<(), Error> {
-        let client = gen_client(self.upstream_proxy)?;
+        let client = HttpClient::new(self.upstream_proxy);
         let ca = Arc::new(self.ca);
         let http_handler = Arc::new(self.handler);
         let mitm_filter = Arc::new(MitmFilter::new(self.mitm_filters));

@@ -5,7 +5,7 @@ use anyhow::anyhow;
 use axum::http::header;
 use axum::{http::Request, middleware::Next, response::Response};
 
-use super::err::ResponseError;
+use super::error::ResponseError;
 
 pub(super) async fn token_authorization_middleware<B>(
     request: Request<B>,

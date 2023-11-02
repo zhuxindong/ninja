@@ -234,7 +234,7 @@ async fn state() -> anyhow::Result<()> {
     for mut account in account_list {
         let states = account
             .state_mut()
-            .into_iter()
+            .iter_mut()
             .map(|(k, v)| State {
                 _type: k.to_owned(),
                 expires: openai::format_time_to_rfc3399(v.expires())

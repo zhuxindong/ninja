@@ -18,7 +18,7 @@ use crate::{
         resp::{ConvoResponse, PostConvoResponse},
     },
     context,
-    serve::{err::ResponseError, has_puid, header_convert},
+    serve::{error::ResponseError, has_puid, header_convert},
 };
 use crate::{chatgpt::model::Role, debug};
 

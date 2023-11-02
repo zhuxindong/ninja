@@ -56,6 +56,8 @@ pub enum AuthError {
     DeserializeError(String),
     #[error("implementation is not supported")]
     NotSupportedImplementation,
+    #[error("failed to get preauth cookie")]
+    PreauthCookieNotFound,
 }
 
 #[derive(thiserror::Error, Debug)]

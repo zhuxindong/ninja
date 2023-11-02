@@ -34,7 +34,7 @@ use crate::debug;
 use crate::info;
 use crate::now_duration;
 use crate::serve;
-use crate::serve::err::ResponseError;
+use crate::serve::error::ResponseError;
 use crate::serve::header_convert;
 use crate::serve::turnstile;
 use crate::serve::EMPTY;
@@ -884,6 +884,10 @@ fn render_template(name: &str, context: &tera::Context) -> Result<Response<Body>
 
 fn settings_template_data(ctx: &mut tera::Context) {
     let g_ctx = context::get_instance();
+
+    if g_ctx.pop_preauth_cookie().is_some() {
+        ctx.insert("support_apple", "true");
+    }
     if let Some(site_key) = g_ctx.cf_turnstile() {
         ctx.insert("site_key", &site_key.site_key);
     }

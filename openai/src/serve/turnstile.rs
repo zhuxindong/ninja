@@ -1,6 +1,6 @@
 use crate::context;
 
-use super::err::ResponseError;
+use super::error::ResponseError;
 
 pub(super) async fn cf_turnstile_check(
     addr: &std::net::IpAddr,

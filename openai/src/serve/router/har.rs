@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crate::context::{self, ContextArgs};
-use crate::serve::err::ResponseError;
+use crate::serve::error::ResponseError;
 use crate::{arkose, debug};
 use anyhow::anyhow;
 use axum::extract::Multipart;

@@ -1,3 +1,6 @@
+mod har;
+mod preauth;
+
 use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -10,16 +13,14 @@ use crate::{
     auth::AuthClient,
     balancer::ClientLoadBalancer,
     error,
-    homedir::home_dir,
-    info,
-    serve::middleware::tokenbucket,
-    warn,
 };
 use reqwest::Client;
-use std::sync::RwLock;
 use typed_builder::TypedBuilder;
 
-use hotwatch::{Event, EventKind, Hotwatch};
+use self::{
+    har::{HarProvider, HAR},
+    preauth::PreauthCookieProvider,
+};
 
 /// Use Once to guarantee initialization only once
 pub fn init(args: ContextArgs) {
@@ -87,10 +88,6 @@ pub struct ContextArgs {
     #[builder(setter(into), default)]
     pub(crate) api_prefix: Option<String>,
 
-    /// PreAuth Cookie API URL
-    #[builder(setter(into), default)]
-    pub(crate) preauth_api: Option<String>,
-
     /// TLS cert
     #[builder(setter(into), default)]
     pub(crate) tls_cert: Option<PathBuf>,
@@ -150,11 +147,8 @@ pub struct ContextArgs {
 
     /// Tokenbucket store strategy
     #[cfg(feature = "limit")]
-    #[builder(
-        setter(into),
-        default = crate::serve::middleware::tokenbucket::Strategy::Mem
-    )]
-    pub(crate) tb_store_strategy: tokenbucket::Strategy,
+    #[builder(setter(into), default = "mem".to_string())]
+    pub(crate) tb_store_strategy: String,
 
     /// Tokenbucket redis url
     #[cfg(feature = "limit")]
@@ -175,24 +169,26 @@ pub struct ContextArgs {
     #[cfg(feature = "limit")]
     #[builder(setter(into), default = 86400)]
     pub(crate) tb_expired: u32,
-}
 
-#[derive(Debug)]
-pub struct Har {
-    /// HAR file path
-    path: PathBuf,
-    /// HAR file state (file changed)
-    state: bool,
-    /// File Hotwatch
-    hotwatch: Hotwatch,
-}
+    /// Preauth MITM server bind address
+    #[cfg(feature = "preauth")]
+    #[builder(setter(into), default)]
+    pub(crate) pbind: Option<std::net::SocketAddr>,
 
-impl Drop for Har {
-    fn drop(&mut self) {
-        if let Some(err) = self.hotwatch.unwatch(self.path.as_path()).err() {
-            warn!("hotwatch stop error: {err}")
-        }
-    }
+    /// Preauth MITM server upstream proxy
+    #[cfg(feature = "preauth")]
+    #[builder(setter(into), default)]
+    pub(crate) pupstream: Option<String>,
+
+    /// crate MITM server CA certificate file path
+    #[cfg(feature = "preauth")]
+    #[builder(setter(into), default)]
+    pub(super) pcert: PathBuf,
+
+    /// Preauth MITM server CA private key file path
+    #[cfg(feature = "preauth")]
+    #[builder(setter(into), default)]
+    pub(crate) pkey: PathBuf,
 }
 
 pub struct CfTurnstile {
@@ -202,10 +198,11 @@ pub struct CfTurnstile {
 
 // Program context
 static CTX: OnceLock<Context> = OnceLock::new();
-static HAR: OnceLock<RwLock<HashMap<arkose::Type, Har>>> = OnceLock::new();
 
 pub struct Context {
+    /// Requesting client
     client_load: Option<ClientLoadBalancer>,
+    /// Requesting oauth client
     auth_client_load: Option<ClientLoadBalancer>,
     /// arkoselabs solver
     arkose_solver: Option<ArkoseSolver>,
@@ -219,26 +216,28 @@ pub struct Context {
     api_prefix: Option<String>,
     /// Arkose endpoint
     arkose_endpoint: Option<String>,
+    /// PreAuth cookie cache
+    preauth_provider: Option<PreauthCookieProvider>,
 }
 
 impl Context {
     fn new(args: ContextArgs) -> Self {
-        let chat3_har = init_har(
+        let chat3_har = HarProvider::init_har(
             arkose::Type::Chat3,
             &args.arkose_chat3_har_file,
             ".chat3.openai.com.har",
         );
-        let chat4_har = init_har(
+        let chat4_har = HarProvider::init_har(
             arkose::Type::Chat4,
             &args.arkose_chat4_har_file,
             ".chat4.openai.com.har",
         );
-        let auth_har = init_har(
+        let auth_har = HarProvider::init_har(
             arkose::Type::Auth0,
             &args.arkose_auth_har_file,
             ".auth.openai.com.har",
         );
-        let platform_har = init_har(
+        let platform_har = HarProvider::init_har(
             arkose::Type::Platform,
             &args.arkose_platform_har_file,
             ".platform.openai.com.har",
@@ -264,14 +263,15 @@ impl Context {
             arkose_endpoint: args.arkose_endpoint,
             arkose_solver: args.arkose_solver,
             arkose_har_upload_key: args.arkose_har_upload_key,
+            api_prefix: args.api_prefix,
+            auth_key: args.auth_key,
             cf_turnstile: args.cf_site_key.and_then(|site_key| {
                 args.cf_secret_key.map(|secret_key| CfTurnstile {
                     site_key,
                     secret_key,
                 })
             }),
-            api_prefix: args.api_prefix,
-            auth_key: args.auth_key,
+            preauth_provider: args.pbind.is_some().then(|| PreauthCookieProvider::new()),
         }
     }
 
@@ -293,14 +293,17 @@ impl Context {
             .into()
     }
 
+    /// Get the arkoselabs har file upload authenticate key
     pub fn arkose_har_upload_key(&self) -> Option<&String> {
         self.arkose_har_upload_key.as_ref()
     }
 
+    /// Get the arkoselabs solver
     pub fn arkose_solver(&self) -> Option<&ArkoseSolver> {
         self.arkose_solver.as_ref()
     }
 
+    /// Get the arkose har file path
     pub fn arkose_har_path(&self, _type: &arkose::Type) -> (bool, PathBuf) {
         let har_lock = HAR
             .get()
@@ -313,79 +316,35 @@ impl Context {
             .expect("Failed to get har path")
     }
 
+    /// Cloudflare Turnstile config
     pub fn cf_turnstile(&self) -> Option<&CfTurnstile> {
         self.cf_turnstile.as_ref()
     }
 
+    /// WebUI api prefix
     pub fn api_prefix(&self) -> Option<&String> {
         self.api_prefix.as_ref()
     }
 
+    /// Arkoselabs endpoint
     pub fn arkose_endpoint(&self) -> Option<&String> {
         self.arkose_endpoint.as_ref()
     }
 
+    /// Login auth key
     pub fn auth_key(&self) -> Option<&String> {
         self.auth_key.as_ref()
     }
-}
 
-fn init_har(_type: arkose::Type, path: &Option<PathBuf>, default_filename: &str) -> Har {
-    if let Some(file_path) = path {
-        return Har {
-            path: file_path.to_owned(),
-            state: true,
-            hotwatch: watch_har_file(_type, &file_path),
-        };
+    /// Push a preauth cookie
+    #[cfg(feature = "preauth")]
+    pub fn push_preauth_cookie(&self, value: &str) {
+        self.preauth_provider.as_ref().map(|p| p.push(value));
     }
 
-    let default_path = home_dir()
-        .expect("Failed to get home directory")
-        .join(default_filename);
-
-    let state = match default_path.is_file() {
-        true => {
-            let har_data = std::fs::read(&default_path).expect("Failed to read har file");
-            !har_data.is_empty()
-        }
-        false => {
-            info!("Create default HAR empty file: {}", default_path.display());
-            let har_file = std::fs::File::create(&default_path).expect("Failed to create har file");
-            drop(har_file);
-            false
-        }
-    };
-
-    Har {
-        hotwatch: watch_har_file(_type, &default_path),
-        path: default_path,
-        state,
+    /// Pop a preauth cookie
+    #[cfg(feature = "preauth")]
+    pub fn pop_preauth_cookie(&self) -> Option<String> {
+        self.preauth_provider.as_ref().map(|p| p.get()).flatten()
     }
-}
-
-fn watch_har_file(_type: arkose::Type, path: &PathBuf) -> Hotwatch {
-    let watch_path = path.display();
-    let mut hotwatch = Hotwatch::new().expect("hotwatch failed to initialize!");
-    hotwatch
-        .watch(watch_path.to_string(), {
-            let _type = _type;
-            move |event: Event| {
-                if let EventKind::Modify(_) = event.kind {
-                    event.paths.iter().for_each(|path| {
-                        info!("HAR file changes observed: {}", path.display());
-                        let lock = HAR.get().expect("Failed to get har lock");
-                        let mut har_map = lock.write().expect("Failed to get har map");
-                        if let Some(har) = har_map.get_mut(&_type) {
-                            har.state = true;
-                            match path.to_str() {
-                                Some(path_str) => arkose::har::clear(path_str),
-                                None => warn!("Failed to convert path to string"),
-                            }
-                        }
-                    });
-                }
-            }
-        })
-        .expect("failed to watch file!");
-    hotwatch
 }

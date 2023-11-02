@@ -1,6 +1,6 @@
 use crate::parse;
 use clap::{Args, Subcommand};
-use openai::{arkose::funcaptcha::Solver, serve::middleware::tokenbucket::Strategy};
+use openai::arkose::funcaptcha::Solver;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -142,10 +142,6 @@ pub struct ServeArgs {
     #[clap(long, env = "API_PREFIX", value_parser = parse::parse_url)]
     pub(super) api_prefix: Option<String>,
 
-    /// PreAuth Cookie API URL
-    #[clap(long, env = "PREAUTH_API", value_parser = parse::parse_url)]
-    pub(super) preauth_api: Option<String>,
-
     /// Disable WebUI
     #[clap(short = 'D', long, env = "DISABLE_WEBUI")]
     pub(super) disable_webui: bool,
@@ -203,7 +199,7 @@ pub struct ServeArgs {
     /// Token bucket store strategy (mem/redis)
     #[clap(long, default_value = "mem", requires = "tb_enable")]
     #[cfg(feature = "limit")]
-    pub(super) tb_store_strategy: Strategy,
+    pub(super) tb_store_strategy: String,
 
     /// Token bucket redis connection url
     #[clap(long, default_value = "redis://127.0.0.1:6379", requires = "tb_enable", value_parser = parse::parse_url)]
@@ -230,25 +226,25 @@ pub struct ServeArgs {
         short = 'B',
         long,
         env = "PREAUTH_BIND",
-        default_value = "0.0.0.0:8000",
-        value_parser = parse::parse_socket_addr
+        value_parser = parse::parse_socket_addr,
     )]
-    pub(super) preauth_bind: Option<std::net::SocketAddr>,
+    pub(super) pbind: Option<std::net::SocketAddr>,
 
-    /// Preauth MITM server upstream proxy
+    /// Preauth MITM server upstream proxy, Only support http protocol
     #[clap(
         short = 'X',
         long,
         env = "PREAUTH_UPSTREAM",
-        value_parser = parse::parse_url
+        value_parser = parse::parse_url,
+        requires = "pbind"
     )]
-    pub(super) preauth_upstream: Option<String>,
+    pub(super) pupstream: Option<String>,
 
     /// Preauth MITM server CA certificate file path
-    #[clap(long, default_value = "ca/cert.crt")]
-    pub(super) preauth_cert: Option<String>,
+    #[clap(long, default_value = "ca/cert.crt", requires = "pbind")]
+    pub(super) pcert: PathBuf,
 
     /// Preauth MITM server CA private key file path
-    #[clap(long, default_value = "ca/key.pem")]
-    pub(super) preauth_key: Option<String>,
+    #[clap(long, default_value = "ca/key.pem", requires = "pbind")]
+    pub(super) pkey: PathBuf,
 }

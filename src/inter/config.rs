@@ -40,12 +40,6 @@ pub async fn prompt() -> anyhow::Result<()> {
         }
     };
 
-    let preauth_api = Text::new("PreAuth API ›")
-        .with_render_config(render_config())
-        .with_help_message("Example: https://example.com/auth/preauth")
-        .with_validator(valid_url)
-        .with_default(&conf.preauth_api);
-
     let mut proxy = Text::new("Proxy ›")
         .with_render_config(render_config())
         .with_help_message("Supports http, https, socks5")
@@ -100,10 +94,6 @@ pub async fn prompt() -> anyhow::Result<()> {
         .prompt_skippable()?
         .map(|ok| if ok.is_empty() { None } else { Some(ok) })
         .unwrap_or(conf.proxy);
-
-    if let Some(preauth_api) = preauth_api.prompt_skippable()? {
-        conf.preauth_api = preauth_api;
-    }
 
     conf.official_api = official_api
         .prompt_skippable()?

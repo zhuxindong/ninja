@@ -13,8 +13,6 @@ pub struct Conf {
     pub official_api: Option<String>,
     /// Unofficial API prefix. Format: https://example.com
     pub unofficial_api: Option<String>,
-    /// OAuth preauth cookie api
-    pub preauth_api: String,
     /// Client proxy. Format: protocol://user:pass@ip:port
     pub proxy: Option<String>,
     /// About the solver client by ArkoseLabs
@@ -47,7 +45,6 @@ impl Conf {
             timeout: 60,
             connect_timeout: 600,
             tcp_keepalive: 75,
-            preauth_api: "https://ai.fakeopen.com/auth/preauth".to_owned(),
             id: DEFAULT_ID.to_owned(),
             ..Default::default()
         }
