@@ -16,3 +16,5 @@ tb_redis_url = "redis://127.0.0.1:6379"
 tb_capacity = 60
 tb_fill_rate = 1
 tb_expired = 86400
+pcert = "ca/cert.crt"
+pkey = "ca/key.pem"
