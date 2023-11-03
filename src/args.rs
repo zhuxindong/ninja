@@ -89,10 +89,10 @@ pub struct ServeArgs {
     pub(super) workers: usize,
 
     /// Enforces a limit on the concurrent number of requests the underlying
-    #[clap(long, default_value = "65535")]
+    #[clap(long, default_value = "1024")]
     pub(super) concurrent_limit: usize,
 
-    /// Server proxies pool, Example: protocol://user:pass@ip:port
+    /// Server proxies pool, Only support http/https/socks5 protocol
     #[clap(short = 'x',long, env = "PROXIES", value_parser = parse::parse_proxies_url, group = "proxy")]
     pub(super) proxies: Option<std::vec::Vec<String>>,
 
@@ -113,11 +113,11 @@ pub struct ServeArgs {
     pub(super) cookie_store: bool,
 
     /// Client timeout (seconds)
-    #[clap(long, default_value = "600")]
+    #[clap(long, default_value = "360")]
     pub(super) timeout: usize,
 
     /// Client connect timeout (seconds)
-    #[clap(long, default_value = "60")]
+    #[clap(long, default_value = "20")]
     pub(super) connect_timeout: usize,
 
     /// TCP keepalive (seconds)
@@ -232,7 +232,7 @@ pub struct ServeArgs {
     )]
     pub(super) pbind: Option<std::net::SocketAddr>,
 
-    /// Preauth MITM server upstream proxy, Only support http protocol
+    /// Preauth MITM server upstream proxy, Only support http/https/socks5 protocol
     #[clap(
         short = 'X',
         long,
