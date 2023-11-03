@@ -21,7 +21,7 @@ Reverse engineered `ChatGPT` proxy (bypass Cloudflare 403 Access Denied)
 
 - API key acquisition
 - Email/password account authentication (Google/Microsoft third-party login not supported)
--Supports obtaining RefreshToken
+- Supports obtaining RefreshToken
 - `ChatGPT-API`/`OpenAI-API`/`ChatGPT-to-API` Http API proxy (for third-party client access)
 - Support IP proxy pool (support using Ipv6 subnet as proxy pool)
 - ChatGPT WebUI
