@@ -114,7 +114,7 @@ Sending `GPT4/GPT-3.5 (already grayscale)/Creating API-Key` dialog requires send
 Making [Releases](https://github.com/gngpp/ninja/releases/latest) has a precompiled deb package, binaries, in Ubuntu, for example:
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.7.4/ninja-0.7.5-x86_64-unknown-linux-musl.deb
+wget https://github.com/gngpp/ninja/releases/download/v0.7.5/ninja-0.7.5-x86_64-unknown-linux-musl.deb
 dpkg -i ninja-0.7.5-x86_64-unknown-linux-musl.deb
 ninja run
 ```
@@ -124,11 +124,11 @@ ninja run
 There are pre-compiled ipk files in GitHub [Releases](https://github.com/gngpp/ninja/releases/latest), which currently provide versions of aarch64/x86_64 and other architectures. After downloading, use opkg to install, and use nanopi r4s as example:
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.7.4/ninja_0.7.4_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.7.4/luci-app-ninja_1.1.5-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.7.4/luci-i18n-ninja-zh-cn_1.1.5-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.7.5/ninja_0.7.5_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.7.5/luci-app-ninja_1.1.5-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.7.5/luci-i18n-ninja-zh-cn_1.1.5-1_all.ipk
 
-opkg install ninja_0.7.4_aarch64_generic.ipk
+opkg install ninja_0.7.5_aarch64_generic.ipk
 opkg install luci-app-ninja_1.1.5-1_all.ipk
 opkg install luci-i18n-ninja-zh-cn_1.1.5-1_all.ipk
 ```
