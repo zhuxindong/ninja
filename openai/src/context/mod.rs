@@ -18,7 +18,7 @@ use reqwest::Client;
 use typed_builder::TypedBuilder;
 
 use self::{
-    har::{HarProvider, HAR},
+    har::{HarPath, HarProvider, HAR},
     preauth::PreauthCookieProvider,
 };
 
@@ -118,19 +118,19 @@ pub struct ContextArgs {
 
     /// ChatGPT GPT-3.5 Arkoselabs HAR record file path
     #[builder(setter(into), default)]
-    pub(crate) arkose_chat3_har_file: Option<PathBuf>,
+    pub(crate) arkose_gpt3_har_dir: Option<PathBuf>,
 
     /// ChatGPT GPT-4 Arkoselabs HAR record file path
     #[builder(setter(into), default)]
-    pub(crate) arkose_chat4_har_file: Option<PathBuf>,
+    pub(crate) arkose_gpt4_har_dir: Option<PathBuf>,
 
     /// Auth Arkoselabs HAR record file path
     #[builder(setter(into), default)]
-    pub(crate) arkose_auth_har_file: Option<PathBuf>,
+    pub(crate) arkose_auth_har_dir: Option<PathBuf>,
 
     /// Platform Arkoselabs HAR record file path
     #[builder(setter(into), default)]
-    pub(crate) arkose_platform_har_file: Option<PathBuf>,
+    pub(crate) arkose_platform_har_dir: Option<PathBuf>,
 
     /// HAR file upload authenticate key
     #[builder(setter(into), default)]
@@ -222,32 +222,32 @@ pub struct Context {
 
 impl Context {
     fn new(args: ContextArgs) -> Self {
-        let chat3_har = HarProvider::init_har(
-            arkose::Type::Chat3,
-            &args.arkose_chat3_har_file,
-            ".chat3.openai.com.har",
+        let gpt3_har_provider = HarProvider::new(
+            arkose::Type::GPT3,
+            args.arkose_gpt3_har_dir.as_ref(),
+            ".gpt3",
         );
-        let chat4_har = HarProvider::init_har(
-            arkose::Type::Chat4,
-            &args.arkose_chat4_har_file,
-            ".chat4.openai.com.har",
+        let gpt4_har_provider = HarProvider::new(
+            arkose::Type::GPT4,
+            args.arkose_gpt4_har_dir.as_ref(),
+            ".gpt4",
         );
-        let auth_har = HarProvider::init_har(
-            arkose::Type::Auth0,
-            &args.arkose_auth_har_file,
-            ".auth.openai.com.har",
+        let auth_har_provider = HarProvider::new(
+            arkose::Type::Auth,
+            args.arkose_auth_har_dir.as_ref(),
+            ".auth",
         );
-        let platform_har = HarProvider::init_har(
+        let platform_har_provider = HarProvider::new(
             arkose::Type::Platform,
-            &args.arkose_platform_har_file,
-            ".platform.openai.com.har",
+            args.arkose_platform_har_dir.as_ref(),
+            ".platform",
         );
 
-        let mut har_map = HashMap::with_capacity(3);
-        har_map.insert(arkose::Type::Chat3, chat3_har);
-        har_map.insert(arkose::Type::Chat4, chat4_har);
-        har_map.insert(arkose::Type::Auth0, auth_har);
-        har_map.insert(arkose::Type::Platform, platform_har);
+        let mut har_map = HashMap::with_capacity(4);
+        har_map.insert(arkose::Type::GPT3, gpt3_har_provider);
+        har_map.insert(arkose::Type::GPT4, gpt4_har_provider);
+        har_map.insert(arkose::Type::Auth, auth_har_provider);
+        har_map.insert(arkose::Type::Platform, platform_har_provider);
         HAR.set(std::sync::RwLock::new(har_map))
             .expect("Failed to set har map");
 
@@ -304,7 +304,7 @@ impl Context {
     }
 
     /// Get the arkose har file path
-    pub fn arkose_har_path(&self, _type: &arkose::Type) -> (bool, PathBuf) {
+    pub fn arkose_har_path(&self, _type: &arkose::Type) -> HarPath {
         let har_lock = HAR
             .get()
             .expect("Failed to get har lock")
@@ -312,8 +312,8 @@ impl Context {
             .expect("Failed to get har map");
         har_lock
             .get(_type)
-            .map(|h| (h.state, h.path.clone()))
-            .expect("Failed to get har path")
+            .map(|h| h.pool())
+            .expect("Failed to get har pool")
     }
 
     /// Cloudflare Turnstile config

@@ -8,7 +8,7 @@ use openai::auth::{
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let ctx = openai::context::ContextArgs::builder()
-        .arkose_auth_har_file(PathBuf::from(
+        .arkose_auth_har_dir(PathBuf::from(
             "/Users/gngpp/VSCode/ninja/login.chat.openai.com.har",
         ))
         .build();

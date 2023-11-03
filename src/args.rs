@@ -58,7 +58,7 @@ pub enum ServeSubcommand {
     /// Show the Http server daemon log
     #[cfg(target_family = "unix")]
     Log,
-    /// Generate PreAuth MITM CA certificate
+    /// Generate MITM CA certificate
     Genca,
     /// Generate config template file (toml format file)
     GT {
@@ -160,21 +160,21 @@ pub struct ServeArgs {
     #[clap(long, value_parser = parse::parse_url)]
     pub(super) arkose_endpoint: Option<String>,
 
-    /// About the browser HAR file path requested by ChatGPT GPT-3.5 ArkoseLabs
-    #[clap(long, value_parser = parse::parse_file_path)]
-    pub(super) arkose_chat3_har_file: Option<PathBuf>,
+    /// About the browser HAR directory path requested by ChatGPT GPT-3.5 ArkoseLabs
+    #[clap(long, value_parser = parse::parse_dir_path)]
+    pub(super) arkose_gpt3_har_dir: Option<PathBuf>,
 
-    /// About the browser HAR file path requested by ChatGPT GPT-4 ArkoseLabs
-    #[clap(long, value_parser = parse::parse_file_path)]
-    pub(super) arkose_chat4_har_file: Option<PathBuf>,
+    /// About the browser HAR directory path requested by ChatGPT GPT-4 ArkoseLabs
+    #[clap(long, value_parser = parse::parse_dir_path)]
+    pub(super) arkose_gpt4_har_dir: Option<PathBuf>,
 
-    /// About the browser HAR file path requested by Auth ArkoseLabs
-    #[clap(long, value_parser = parse::parse_file_path)]
-    pub(super) arkose_auth_har_file: Option<PathBuf>,
+    ///  About the browser HAR directory path requested by Auth ArkoseLabs
+    #[clap(long, value_parser = parse::parse_dir_path)]
+    pub(super) arkose_auth_har_dir: Option<PathBuf>,
 
-    /// About the browser HAR file path requested by Platform ArkoseLabs
-    #[clap(long, value_parser = parse::parse_file_path)]
-    pub(super) arkose_platform_har_file: Option<PathBuf>,
+    /// About the browser HAR directory path requested by Platform ArkoseLabs
+    #[clap(long, value_parser = parse::parse_dir_path)]
+    pub(super) arkose_platform_har_dir: Option<PathBuf>,
 
     /// HAR file upload authenticate key
     #[clap(short = 'K', long)]

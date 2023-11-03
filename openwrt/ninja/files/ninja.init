@@ -20,10 +20,10 @@ get_config() {
 	config_get tls_cert $1 tls_cert ''
 	config_get tls_key $1 tls_key ''
 	config_get auth_key $1 auth_key ''
-	config_get arkose_chat3_har_file $1 arkose_chat3_har_file ''
-	config_get arkose_chat4_har_file $1 arkose_chat4_har_file ''
-	config_get arkose_auth_har_file $1 arkose_auth_har_file ''
-	config_get arkose_platform_har_file $1 arkose_platform_har_file ''
+	config_get arkose_gpt3_har_dir $1 arkose_gpt3_har_dir ''
+	config_get arkose_gpt4_har_dir $1 arkose_gpt4_har_dir ''
+	config_get arkose_auth_har_dir $1 arkose_auth_har_dir ''
+	config_get arkose_platform_har_dir $1 arkose_platform_har_dir ''
 	config_get arkose_har_upload_key $1 arkose_har_upload_key ''
 	config_get arkose_solver_key $1 arkose_solver_key ''
 	config_get arkose_solver $1 arkose_solver ''
@@ -92,20 +92,20 @@ start_service() {
 		args="$args --auth-key $auth_key"
 	fi
 
-	if [ -n "$arkose_chat3_har_file" ]; then
-		args="$args --arkose-chat3-har-file $arkose_chat3_har_file"
+	if [ -n "$arkose_gpt3_har_dir" ]; then
+		args="$args --arkose-gpt3-har-dir $arkose_gpt3_har_dir"
 	fi
 
-	if [ -n "$arkose_chat4_har_file" ]; then
-		args="$args --arkose-chat4-har-file $arkose_chat4_har_file"
+	if [ -n "$arkose_gpt4_har_dir" ]; then
+		args="$args --arkose-gpt4-har-dir $arkose_gpt4_har_dir"
 	fi
 
-	if [ -n "$arkose_auth_har_file" ]; then
-		args="$args --arkose-auth-har-file $arkose_auth_har_file"
+	if [ -n "$arkose_auth_har_dir" ]; then
+		args="$args --arkose-auth-har-dir $arkose_auth_har_dir"
 	fi
 
-	if [ -n "$arkose_platform_har_file" ]; then
-		args="$args --arkose-platform-har-file $arkose_platform_har_file"
+	if [ -n "$arkose_platform_har_dir" ]; then
+		args="$args --arkose-platform-har-dir $arkose_platform_har_dir"
 	fi
 	
 	if [ -n "$arkose_har_upload_key" ]; then
