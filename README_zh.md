@@ -105,6 +105,7 @@ ninja run --pbind 0.0.0.0:8888
 # 之后浏览器打开 http://192.168.1.1：8888/preauth/cert，下载证书安装并信任，之后打开iOS ChatGPT就可以愉快玩耍了
 ```
 
+> 对于`Web登录`默认返回一个名为: `__Secure-next-auth.session-token`的cookie，客户端只需要保存这个cookie，调用`/api/auth/session`也可以刷新`AccessToken`
 
 ### 安装
 

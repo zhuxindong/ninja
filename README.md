@@ -105,6 +105,8 @@ Sending `GPT4/GPT-3.5 (already grayscale)/Creating API-Key` dialog requires send
  # Then open the browser http://192.168.1.1:8888/preauth/cert, download the certificate, install it and trust it, then open iOS ChatGPT and you can play happily
  ```
 
+ > For `Web login`, a cookie named: `__Secure-next-auth.session-token` is returned by default. The client only needs to save this cookie. Calling `/api/auth/session` can also refresh `AccessToken`
+
 ### Install
 
 - #### Ubuntu(Other Linux)
