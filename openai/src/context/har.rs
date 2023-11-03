@@ -38,11 +38,13 @@ impl HarProvider {
 
         init_directory(&dir_path);
 
-        HarProvider {
+        let mut p = HarProvider {
             hotwatch: watch_har_dir(_type, &dir_path),
             dir_path,
             pool: Vec::new(),
-        }
+        };
+        p.reset_pool();
+        p
     }
 
     fn reset_pool(&mut self) {
@@ -58,7 +60,8 @@ impl HarProvider {
             })
             .for_each(|file_path| {
                 if let Some(file_name) = file_path.file_stem() {
-                    self.pool.push(file_name.to_string_lossy().to_string());
+                    self.pool
+                        .push(format!("{}.har", file_name.to_string_lossy()));
                 }
             });
     }
@@ -69,7 +72,7 @@ impl HarProvider {
             file_path: None,
         };
         self.pool.choose(&mut rand::thread_rng()).map(|file_name| {
-            har_path.file_path = Some(self.dir_path.join(format!("{file_name}.har")))
+            har_path.file_path = Some(self.dir_path.join(file_name))
         });
         har_path
     }
