@@ -1,15 +1,11 @@
 use crate::arkose::crypto;
 use crate::urldecoding;
-use anyhow::Context;
 use base64::Engine;
+use moka::sync::Cache;
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::path::Path;
 use std::sync::OnceLock;
-use std::{path::Path, sync::Mutex};
 use time::format_description::well_known::Rfc3339;
-
-static LOCK: Mutex<()> = Mutex::new(());
-static mut CACHE_REQUEST_ENTRY: OnceLock<HashMap<String, RequestEntry>> = OnceLock::new();
 
 #[derive(Clone)]
 pub struct RequestEntry {
@@ -38,27 +34,35 @@ pub fn parse_from_slice(s: &[u8]) -> anyhow::Result<RequestEntry> {
     parse(har)
 }
 
+static CACHE_REQUEST_ENTRY: OnceLock<Cache<String, RequestEntry>> = OnceLock::new();
+
+fn get_or_init_cache() -> &'static Cache<String, RequestEntry> {
+    CACHE_REQUEST_ENTRY.get_or_init(|| Cache::new(10000))
+}
+
+pub(crate) fn clear_cache(key: &str) {
+    get_or_init_cache().remove(key);
+}
+
 #[inline]
 pub fn parse_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<RequestEntry> {
-    if !path.as_ref().is_file() {
-        anyhow::bail!("{} not a file", path.as_ref().display());
-    }
+    // Check if the path is a file
+    path.as_ref()
+        .is_file()
+        .then(|| ())
+        .ok_or_else(|| anyhow::anyhow!("{} not a file", path.as_ref().display()))?;
 
-    let _ = unsafe { CACHE_REQUEST_ENTRY.get_or_init(|| HashMap::new()) };
-    let cache = unsafe { CACHE_REQUEST_ENTRY.get_mut().context("Unable to get cache") }?;
+    let cache = get_or_init_cache();
 
     let key = format!("{}", path.as_ref().display());
     match cache.get(&key) {
         Some(entry) => Ok(entry.clone()),
         None => {
-            let lock = LOCK.lock().expect("Unable to lock");
             let bytes = std::fs::read(path)?;
             let har = serde_json::from_slice::<Har>(&bytes)?;
             drop(bytes);
             let entry = parse(har)?;
-            cache.insert(key, entry.clone());
-            drop(lock);
-            Ok(entry)
+            Ok(cache.get_with(key, || entry))
         }
     }
 }
@@ -127,17 +131,6 @@ fn parse(har: Har) -> anyhow::Result<RequestEntry> {
     }
 
     anyhow::bail!("Unable to find har related request entry")
-}
-
-pub fn clear(key: &str) {
-    let lock = LOCK.lock().expect("Unable to lock");
-    unsafe {
-        if let Some(cache) = CACHE_REQUEST_ENTRY.get_mut() {
-            cache.remove(key);
-        }
-    };
-
-    drop(lock)
 }
 
 #[derive(Debug, Deserialize)]

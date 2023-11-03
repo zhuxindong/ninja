@@ -11,7 +11,7 @@ pub(super) async fn token_authorization_middleware<B>(
     request: Request<B>,
     next: Next<B>,
 ) -> Result<Response, ResponseError> {
-    let ok = ["/backend-api/public/plugins/by-id"];
+    let ok = ["/backend-api/public"];
 
     if let Some(_) = ok.iter().find(|v| request.uri().path().contains(*v)) {
         return Ok(next.run(request).await);

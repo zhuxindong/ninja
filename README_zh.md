@@ -21,6 +21,7 @@
 
 - API密钥获取
 - 电子邮件/密码帐户认证 (不支持Google/Microsoft第三方登录)
+- 支持获取RefreshToken
 - `ChatGPT-API`/`OpenAI-API`/`ChatGPT-to-API` Http API 代理 (供第三方客户端接入)
 - 支持IP代理池（支持使用Ipv6子网作为代理池）
 - ChatGPT WebUI
@@ -30,10 +31,12 @@
 
 ### ArkoseLabs
 
-发送`GPT4/GPT-3.5(已经灰度)/创建API-Key`对话需要`Arkose Token`作为参数发送，支持的解决方案暂时只有两种
+发送`GPT4/GPT-3.5)/创建API-Key`对话需要`Arkose Token`作为参数发送，支持的解决方案暂时只有两种
 
 1) 使用HAR
-   > `ChatGPT` 官网发送一次 `GPT4` 会话消息，浏览器 `F12` 下载 `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` 接口的HAR日志记录文件，使用启动参数 `--arkose-chat4-har-file` 指定HAR文件路径使用（不指定路径则使用默认路径`~/.chat4.openai.com.har`，可直接上传更新HAR），支持上传更新HAR，请求路径:`/har/upload`，可选上传身份验证参数:`--arkose-har-upload-key`
+
+   - 支持HAR特征池化，可同时上传多个HAR，使用策略为随机请求。
+   > `ChatGPT` 官网发送一次 `GPT4` 会话消息，浏览器 `F12` 下载 `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` 接口的HAR日志记录文件，使用启动参数 `--arkose-gpt4-har-dir` 指定HAR目录路径使用（不指定路径则使用默认路径`~/.chat4.openai.com.har`，可直接上传更新HAR），同理`GPT3.5`和其他类型也是一样方法。支持WebUI上传更新HAR，请求路径:`/har/upload`，可选上传身份验证参数:`--arkose-har-upload-key`。并且
 
 2) 使用[YesCaptcha](https://yescaptcha.com/i/1Cc5i4) / [CapSolver](https://dashboard.capsolver.com/passport/register?inviteCode=y7CtB_a-3X6d)
    > 平台进行验证码解析，启动参数`--arkose-solver`选择平台（默认使用`YesCaptcha`），`--arkose-solver-key` 填写`Client Key`
@@ -41,7 +44,7 @@
 - 两种方案都使用，优先级是：`HAR` > `YesCaptcha` / `CapSolver`
 - `YesCaptcha` / `CapSolver`推荐搭配HAR使用，出验证码则调用解析器处理，验证后HAR使用更持久
 
-> 目前OpenAI已经更新`登录`需要验证`Arkose Token`，解决方式同GPT4，填写启动参数指定HAR文件`--arkose-auth-har-file`。不想上传，可以通过浏览器打码登录，非必需。创建API-Key需要上传Platform相关的HAR特征文件，获取方式同上。
+> 目前OpenAI已经更新`登录`需要验证`Arkose Token`，解决方式同GPT4，填写启动参数指定HAR文件`--arkose-auth-har-dir`。不想上传，可以通过浏览器打码登录，非必需。创建API-Key需要上传Platform相关的HAR特征文件，获取方式同上。
 
 ### Http 服务
 
@@ -73,6 +76,8 @@
 - `ChatGPT` 转 `API`
 - 可接入第三方客户端
 - 可接入IP代理池，提高并发
+- 支持获取RefreshToken
+- 支持以HAR格式文件特征池
 
 #### 参数说明
 
@@ -85,6 +90,11 @@
 - `--disable-webui`, 如果不想使用默认自带的WebUI，使用此参数关闭
 
 [...](https://github.com/gngpp/ninja/blob/main/README_zh.md#%E5%91%BD%E4%BB%A4%E6%89%8B%E5%86%8C)
+
+#### RefreshToken
+
+`关于Refresh Token`获取的方式，采用`Apple`平台`ChatGPT App`登录方式，原理是使用内置MITM代理。`Apple设备`连上代理即可开启`Apple平台`登录获取`RefreshToken`，仅适用于量小或者个人使用`（量大会封设备，慎用）`，详细使用请看启动参数说明。
+
 
 ### 安装
 
@@ -136,7 +146,7 @@ services:
     environment:
       - TZ=Asia/Shanghai
       - PROXIES=socks5://warp:10000
-    command: run
+    command: run --disable-direct
     ports:
       - "8080:7999"
     depends_on:
@@ -174,6 +184,7 @@ Commands:
   log      Show the Http server daemon log
   genca    Generate MITM CA certificate
   gt       Generate config template file (toml format file)
+  update   Update the application
   help     Print this message or the help of the given subcommand(s)
 
 Options:
@@ -195,7 +206,7 @@ Options:
   -W, --workers <WORKERS>
           Server worker-pool size (Recommended number of CPU cores) [default: 1]
       --concurrent-limit <CONCURRENT_LIMIT>
-          Enforces a limit on the concurrent number of requests the underlying [default: 65535]
+          Enforces a limit on the concurrent number of requests the underlying [default: 1024]
   -x, --proxies <PROXIES>
           Server proxies pool, Example: protocol://user:pass@ip:port [env: PROXIES=]
   -i, --interface <INTERFACE>
@@ -207,9 +218,9 @@ Options:
       --cookie-store
           Enabled Cookie Store [env: COOKIE_STORE=]
       --timeout <TIMEOUT>
-          Client timeout (seconds) [default: 600]
+          Client timeout (seconds) [default: 360]
       --connect-timeout <CONNECT_TIMEOUT>
-          Client connect timeout (seconds) [default: 60]
+          Client connect timeout (seconds) [default: 20]
       --tcp-keepalive <TCP_KEEPALIVE>
           TCP keepalive (seconds) [default: 60]
       --pool-idle-timeout <POOL_IDLE_TIMEOUT>
@@ -230,14 +241,14 @@ Options:
           Cloudflare turnstile captcha secret key [env: CF_SITE_KEY=]
       --arkose-endpoint <ARKOSE_ENDPOINT>
           Arkose endpoint, Example: https://client-api.arkoselabs.com
-      --arkose-chat3-har-file <ARKOSE_CHAT3_HAR_FILE>
-          About the browser HAR file path requested by ChatGPT GPT-3.5 ArkoseLabs
-      --arkose-chat4-har-file <ARKOSE_CHAT4_HAR_FILE>
-          About the browser HAR file path requested by ChatGPT GPT-4 ArkoseLabs
-      --arkose-auth-har-file <ARKOSE_AUTH_HAR_FILE>
-          About the browser HAR file path requested by Auth ArkoseLabs
-      --arkose-platform-har-file <ARKOSE_PLATFORM_HAR_FILE>
-          About the browser HAR file path requested by Platform ArkoseLabs
+      --arkose-gpt3-har-dir <ARKOSE_GPT3_HAR_DIR>
+          About the browser HAR directory path requested by ChatGPT GPT-3.5 ArkoseLabs
+      --arkose-gpt4-har-dir <ARKOSE_GPT4_HAR_DIR>
+          About the browser HAR directory path requested by ChatGPT GPT-4 ArkoseLabs
+      --arkose-auth-har-dir <ARKOSE_AUTH_HAR_DIR>
+          About the browser HAR directory path requested by Auth ArkoseLabs
+      --arkose-platform-har-dir <ARKOSE_PLATFORM_HAR_DIR>
+          About the browser HAR directory path requested by Platform ArkoseLabs
   -K, --arkose-har-upload-key <ARKOSE_HAR_UPLOAD_KEY>
           HAR file upload authenticate key
   -s, --arkose-solver <ARKOSE_SOLVER>

@@ -58,7 +58,7 @@ pub enum ServeSubcommand {
     /// Show the Http server daemon log
     #[cfg(target_family = "unix")]
     Log,
-    /// Generate PreAuth MITM CA certificate
+    /// Generate MITM CA certificate
     Genca,
     /// Generate config template file (toml format file)
     GT {
@@ -89,10 +89,10 @@ pub struct ServeArgs {
     pub(super) workers: usize,
 
     /// Enforces a limit on the concurrent number of requests the underlying
-    #[clap(long, default_value = "65535")]
+    #[clap(long, default_value = "1024")]
     pub(super) concurrent_limit: usize,
 
-    /// Server proxies pool, Example: protocol://user:pass@ip:port
+    /// Server proxies pool, Only support http/https/socks5 protocol
     #[clap(short = 'x',long, env = "PROXIES", value_parser = parse::parse_proxies_url, group = "proxy")]
     pub(super) proxies: Option<std::vec::Vec<String>>,
 
@@ -113,11 +113,11 @@ pub struct ServeArgs {
     pub(super) cookie_store: bool,
 
     /// Client timeout (seconds)
-    #[clap(long, default_value = "600")]
+    #[clap(long, default_value = "360")]
     pub(super) timeout: usize,
 
     /// Client connect timeout (seconds)
-    #[clap(long, default_value = "60")]
+    #[clap(long, default_value = "20")]
     pub(super) connect_timeout: usize,
 
     /// TCP keepalive (seconds)
@@ -160,21 +160,21 @@ pub struct ServeArgs {
     #[clap(long, value_parser = parse::parse_url)]
     pub(super) arkose_endpoint: Option<String>,
 
-    /// About the browser HAR file path requested by ChatGPT GPT-3.5 ArkoseLabs
-    #[clap(long, value_parser = parse::parse_file_path)]
-    pub(super) arkose_chat3_har_file: Option<PathBuf>,
+    /// About the browser HAR directory path requested by ChatGPT GPT-3.5 ArkoseLabs
+    #[clap(long, value_parser = parse::parse_dir_path)]
+    pub(super) arkose_gpt3_har_dir: Option<PathBuf>,
 
-    /// About the browser HAR file path requested by ChatGPT GPT-4 ArkoseLabs
-    #[clap(long, value_parser = parse::parse_file_path)]
-    pub(super) arkose_chat4_har_file: Option<PathBuf>,
+    /// About the browser HAR directory path requested by ChatGPT GPT-4 ArkoseLabs
+    #[clap(long, value_parser = parse::parse_dir_path)]
+    pub(super) arkose_gpt4_har_dir: Option<PathBuf>,
 
-    /// About the browser HAR file path requested by Auth ArkoseLabs
-    #[clap(long, value_parser = parse::parse_file_path)]
-    pub(super) arkose_auth_har_file: Option<PathBuf>,
+    ///  About the browser HAR directory path requested by Auth ArkoseLabs
+    #[clap(long, value_parser = parse::parse_dir_path)]
+    pub(super) arkose_auth_har_dir: Option<PathBuf>,
 
-    /// About the browser HAR file path requested by Platform ArkoseLabs
-    #[clap(long, value_parser = parse::parse_file_path)]
-    pub(super) arkose_platform_har_file: Option<PathBuf>,
+    /// About the browser HAR directory path requested by Platform ArkoseLabs
+    #[clap(long, value_parser = parse::parse_dir_path)]
+    pub(super) arkose_platform_har_dir: Option<PathBuf>,
 
     /// HAR file upload authenticate key
     #[clap(short = 'K', long)]
@@ -232,7 +232,7 @@ pub struct ServeArgs {
     )]
     pub(super) pbind: Option<std::net::SocketAddr>,
 
-    /// Preauth MITM server upstream proxy, Only support http protocol
+    /// Preauth MITM server upstream proxy, Only support http/https/socks5 protocol
     #[clap(
         short = 'X',
         long,

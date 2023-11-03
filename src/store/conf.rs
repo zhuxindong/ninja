@@ -23,7 +23,7 @@ pub struct Conf {
     pub arkose_chat_har_path: Option<String>,
     /// About the browser HAR file path requested by Auth0 ArkoseLabs
     pub arkose_auth_har_path: Option<String>,
-    /// About the browser HAR file path requested by Platform ArkoseLabs
+    /// About the browser HAR directory path requested by Platform ArkoseLabs
     pub arkose_platform_har_path: Option<String>,
     /// Client timeout (seconds)
     pub timeout: usize,

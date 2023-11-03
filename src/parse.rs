@@ -54,7 +54,7 @@ pub fn parse_proxies_url(s: &str) -> anyhow::Result<Vec<String>> {
     Ok(proxies)
 }
 
-// file path parse
+/// parse file path
 pub fn parse_file_path(s: &str) -> anyhow::Result<PathBuf> {
     let path =
         PathBuf::from_str(s).map_err(|_| anyhow::anyhow!(format!("`{}` isn't a path", s)))?;
@@ -65,6 +65,22 @@ pub fn parse_file_path(s: &str) -> anyhow::Result<PathBuf> {
 
     if !path.is_file() {
         anyhow::bail!(format!("{} not a file", path.display()))
+    }
+
+    Ok(path)
+}
+
+// parse directory path
+pub fn parse_dir_path(s: &str) -> anyhow::Result<PathBuf> {
+    let path =
+        PathBuf::from_str(s).map_err(|_| anyhow::anyhow!(format!("`{}` isn't a path", s)))?;
+
+    if !path.exists() {
+        anyhow::bail!(format!("Path {} not exists", path.display()))
+    }
+
+    if !path.is_dir() {
+        anyhow::bail!(format!("{} not a directory", path.display()))
     }
 
     Ok(path)
