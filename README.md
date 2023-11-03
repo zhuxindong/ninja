@@ -21,6 +21,7 @@ Reverse engineered `ChatGPT` proxy (bypass Cloudflare 403 Access Denied)
 
 - API key acquisition
 - Email/password account authentication (Google/Microsoft third-party login not supported)
+-Supports obtaining RefreshToken
 - `ChatGPT-API`/`OpenAI-API`/`ChatGPT-to-API` Http API proxy (for third-party client access)
 - Support IP proxy pool (support using Ipv6 subnet as proxy pool)
 - ChatGPT WebUI
@@ -33,7 +34,9 @@ Reverse engineered `ChatGPT` proxy (bypass Cloudflare 403 Access Denied)
 Sending `GPT4/GPT-3.5 (already grayscale)/Creating API-Key` dialog requires sending `Arkose Token` as a parameter. There are only two supported solutions for the time being.
 
 1) Use HAR
-    > The `ChatGPT` official website sends a `GPT4` session message, and the browser `F12` downloads the `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` interface. HAR log file, use the startup parameter `--arkose-gpt4-har-dir` to specify the HAR file path to use (if you do not specify a path, use the default path `~/.chat4.openai.com.har`, you can directly upload and update HAR ), supports uploading and updating HAR, request path: `/har/upload`, optional upload authentication parameter: `--arkose-har-upload-key`
+
+   - Supports HAR feature pooling, multiple HARs can be uploaded at the same time, and the usage strategy is random request.
+   > The `ChatGPT` official website sends a `GPT4` session message, and the browser `F12` downloads the `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` interface. HAR log file, use the startup parameter `--arkose-gpt4-har-dir` to specify the HAR directory path to use (if you do not specify a path, use the default path `~/.chat4.openai.com.har`, you can directly upload and update HAR ), the same method applies to `GPT3.5` and other types. Supports WebUI to upload and update HAR, request path: `/har/upload`, optional upload authentication parameter: `--arkose-har-upload-key`. and
 
 2) Use [YesCaptcha](https://yescaptcha.com/i/1Cc5i4) / [CapSolver](https://dashboard.capsolver.com/passport/register?inviteCode=y7CtB_a-3X6d)
     > The platform performs verification code parsing, start the parameter `--arkose-solver` to select the platform (use `YesCaptcha` by default), `--arkose-solver-key` fill in `Client Key`
@@ -73,6 +76,8 @@ Sending `GPT4/GPT-3.5 (already grayscale)/Creating API-Key` dialog requires send
 - `ChatGPT` to `API`
 - Can access third-party clients
 - Can access IP proxy pool to improve concurrency
+- Supports obtaining RefreshToken
+- Support file feature pooling in HAR format
 
 #### Parameter Description
 
@@ -85,6 +90,10 @@ Sending `GPT4/GPT-3.5 (already grayscale)/Creating API-Key` dialog requires send
 - `--disable-webui`, if you don’t want to use the default built-in WebUI, use this parameter to turn it off
 
 [...](https://github.com/gngpp/ninja/blob/main/README.md#command-manual)
+
+#### RefreshToken
+
+`About the method of obtaining Refresh Token`, use the `ChatGPT App` login method of the `Apple` platform. The principle is to use the built-in MITM agent. When the `Apple device` is connected to the agent, you can log in to the `Apple platform` to obtain `RefreshToken`. It is only suitable for small quantities or personal use `(large quantities will seal the device, use with caution)`. For detailed usage, please see the startup parameter description.
 
 ### Install
 
@@ -174,6 +183,7 @@ Commands:
   log      Show the Http server daemon log
   genca    Generate MITM CA certificate
   gt       Generate config template file (toml format file)
+  update   Update the application
   help     Print this message or the help of the given subcommand(s)
 
 Options:
@@ -195,7 +205,7 @@ Options:
   -W, --workers <WORKERS>
           Server worker-pool size (Recommended number of CPU cores) [default: 1]
       --concurrent-limit <CONCURRENT_LIMIT>
-          Enforces a limit on the concurrent number of requests the underlying [default: 65535]
+          Enforces a limit on the concurrent number of requests the underlying [default: 1024]
   -x, --proxies <PROXIES>
           Server proxies pool, Example: protocol://user:pass@ip:port [env: PROXIES=]
   -i, --interface <INTERFACE>
@@ -207,9 +217,9 @@ Options:
       --cookie-store
           Enabled Cookie Store [env: COOKIE_STORE=]
       --timeout <TIMEOUT>
-          Client timeout (seconds) [default: 600]
+          Client timeout (seconds) [default: 360]
       --connect-timeout <CONNECT_TIMEOUT>
-          Client connect timeout (seconds) [default: 60]
+          Client connect timeout (seconds) [default: 20]
       --tcp-keepalive <TCP_KEEPALIVE>
           TCP keepalive (seconds) [default: 60]
       --pool-idle-timeout <POOL_IDLE_TIMEOUT>
@@ -230,13 +240,13 @@ Options:
           Cloudflare turnstile captcha secret key [env: CF_SITE_KEY=]
       --arkose-endpoint <ARKOSE_ENDPOINT>
           Arkose endpoint, Example: https://client-api.arkoselabs.com
-      --arkose-gpt3-har-dir <ARKOSE_CHAT3_HAR_FILE>
+      --arkose-gpt3-har-dir <ARKOSE_GPT3_HAR_DIR>
           About the browser HAR directory path requested by ChatGPT GPT-3.5 ArkoseLabs
-      --arkose-gpt4-har-dir <ARKOSE_CHAT4_HAR_FILE>
+      --arkose-gpt4-har-dir <ARKOSE_GPT4_HAR_DIR>
           About the browser HAR directory path requested by ChatGPT GPT-4 ArkoseLabs
-      --arkose-auth-har-dir <ARKOSE_AUTH_HAR_FILE>
-           About the browser HAR directory path requested by Auth ArkoseLabs
-      --arkose-platform-har-dir <ARKOSE_PLATFORM_HAR_FILE>
+      --arkose-auth-har-dir <ARKOSE_AUTH_HAR_DIR>
+          About the browser HAR directory path requested by Auth ArkoseLabs
+      --arkose-platform-har-dir <ARKOSE_PLATFORM_HAR_DIR>
           About the browser HAR directory path requested by Platform ArkoseLabs
   -K, --arkose-har-upload-key <ARKOSE_HAR_UPLOAD_KEY>
           HAR file upload authenticate key
