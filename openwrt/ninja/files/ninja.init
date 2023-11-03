@@ -39,6 +39,10 @@ get_config() {
 	config_get cf_site_key $1 cf_site_key ""
 	config_get cf_secret_key $1 cf_secret_key ""
 	config_get pool_idle_timeout $1 pool_idle_timeout "90"
+	config_get pbind $1 pbind ""
+	config_get pupstream $1 pupstream ""
+	config_get pkey $1 pkey ""
+	config_get pcert $1 pcert ""
 }
 
 start_service() {
@@ -173,6 +177,22 @@ start_service() {
 
 	if [ -n "$pool_idle_timeout" ]; then
 		args="$args --pool-idle-timeout $pool_idle_timeout"
+	fi
+
+	if [ -n "$pbind" ]; then
+		args="$args --pbind $pbind"
+	fi
+
+	if [ -n "$pupstream" ]; then
+		args="$args --pupstream $pupstream"
+	fi
+
+	if [ -n "$pkey" ]; then
+		args="$args --pkey $pkey"
+	fi
+
+	if [ -n "$pcert" ]; then
+		args="$args --pcert $pcert"
 	fi
 
 	procd_open_instance

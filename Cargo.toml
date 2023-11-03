@@ -1,6 +1,6 @@
 [package]
 name = "ninja"
-version = "0.7.4"
+version = "0.7.5"
 edition = "2021"
 description = "Reverse engineered ChatGPT proxy"
 license = "GPL-3.0"
