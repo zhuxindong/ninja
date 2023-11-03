@@ -71,9 +71,9 @@ impl HarProvider {
             dir_path: self.dir_path.clone(),
             file_path: None,
         };
-        self.pool.choose(&mut rand::thread_rng()).map(|file_name| {
-            har_path.file_path = Some(self.dir_path.join(file_name))
-        });
+        self.pool
+            .choose(&mut rand::thread_rng())
+            .map(|file_name| har_path.file_path = Some(self.dir_path.join(file_name)));
         har_path
     }
 }
