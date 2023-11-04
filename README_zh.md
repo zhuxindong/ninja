@@ -114,9 +114,9 @@ ninja run --pbind 0.0.0.0:8888
   GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 deb包，二进制文件，以Ubuntu为例：
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.7.6/ninja-0.7.6-x86_64-unknown-linux-musl.deb
-dpkg -i ninja-0.7.6-x86_64-unknown-linux-musl.deb
-ninja run
+wget https://github.com/gngpp/ninja/releases/download/v0.7.6/ninja-0.7.6-x86_64-unknown-linux-musl.tar.gz
+tar -xf ninja-0.7.6-x86_64-unknown-linux-musl.tar.gz
+./ninja run
 ```
 
 - #### OpenWrt

@@ -114,9 +114,9 @@ Sending `GPT4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` a
 Making [Releases](https://github.com/gngpp/ninja/releases/latest) has a precompiled deb package, binaries, in Ubuntu, for example:
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.7.6/ninja-0.7.6-x86_64-unknown-linux-musl.deb
-dpkg -i ninja-0.7.6-x86_64-unknown-linux-musl.deb
-ninja run
+wget https://github.com/gngpp/ninja/releases/download/v0.7.6/ninja-0.7.6-x86_64-unknown-linux-musl.tar.gz
+tar -xf ninja-0.7.6-x86_64-unknown-linux-musl.tar.gz
+./ninja run
 ```
 
 - #### OpenWrt

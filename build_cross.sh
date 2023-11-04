@@ -9,7 +9,6 @@ root=$(pwd)
 [ ! -d uploads ] && mkdir uploads
 
 cargo update
-cargo install cargo-deb
 
 pull_docker_image() {
     docker pull ghcr.io/gngpp/ninja-builder:$1
@@ -39,11 +38,6 @@ build_linux_target() {
         ghcr.io/gngpp/ninja-builder:$1 cargo build --release
     sudo chmod -R 777 target
     upx --best --lzma target/$1/release/ninja
-    cargo deb --target=$1 --no-build --no-strip
-    cd target/$1/debian
-    rename 's/.*/ninja-'$tag'-'$1'.deb/' *.deb
-    mv ./* $root/uploads/
-    cd -
     cd target/$1/release
     tar czvf ninja-$tag-$1.tar.gz ninja
     shasum -a 256 ninja-$tag-$1.tar.gz >ninja-$tag-$1.tar.gz.sha256
