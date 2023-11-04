@@ -22,7 +22,7 @@ fn main() {
                 std::fs::create_dir_all(p).unwrap();
             }
         }
-        
+
         let req_url = format!("{}/{}", host, path);
         let resp = client.get(&req_url).send().unwrap();
 
@@ -34,6 +34,5 @@ fn main() {
         }
 
         std::thread::sleep(std::time::Duration::from_secs(3));
-
     }
 }

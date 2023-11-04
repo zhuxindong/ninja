@@ -141,7 +141,7 @@ async fn post_upload(
             .ok_or(ResponseError::BadRequest(anyhow!("invalid field")))?
             != FIELD_FILE
         {
-            return Ok(error_html(FAILED_UPLOAD_TITLE, "Upload failed", true).into_response());
+            return Ok(error_html(FAILED_UPLOAD_TITLE, "Upload failed", false).into_response());
         }
 
         // require file name
@@ -160,7 +160,7 @@ async fn post_upload(
             return Ok(error_html(
                 FAILED_UPLOAD_TITLE,
                 "The content and format of the Har file do not meet the requirements",
-                true,
+                false,
             )
             .into_response());
         }
@@ -274,9 +274,21 @@ async fn rename_file(
         return Ok(err.into_response());
     };
 
+    if tokio::fs::try_exists(&new_file)
+        .await
+        .map_err(ResponseError::BadRequest)?
+    {
+        return Ok(error_html(
+            "File renamed failed",
+            "Your file has been failed to rename: file already exists",
+            false,
+        )
+        .into_response());
+    }
+
     tokio::fs::rename(old_file, new_file)
         .await
-        .map_err(ResponseError::InternalServerError)?;
+        .map_err(ResponseError::BadRequest)?;
 
     Ok(success_html(
         "File renamed successfully",
