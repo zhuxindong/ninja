@@ -1,15 +1,4 @@
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "aarch64"),
-    target_env = "musl"
-))]
-use tikv_jemallocator::Jemalloc;
-
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "aarch64"),
-    target_env = "musl"
-))]
-#[global_allocator]
-static GLOBAL: Jemalloc = Jemalloc;
+pub mod allocator;
 
 use clap::Parser;
 

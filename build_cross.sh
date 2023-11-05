@@ -8,8 +8,6 @@ root=$(pwd)
 : ${os=linux}
 [ ! -d uploads ] && mkdir uploads
 
-cargo update
-
 pull_docker_image() {
     docker pull ghcr.io/gngpp/ninja-builder:$1
 }
@@ -31,11 +29,20 @@ build_macos_target() {
 }
 
 build_linux_target() {
+    features=""
+    if [ "$1" = "armv5te-unknown-linux-musleabi" ] || [ "$1" = "arm-unknown-linux-musleabi" ] || [ "$1" = "arm-unknown-linux-musleabihf" ]; then
+        features="--features rpmalloc"
+    else
+        features="--features mimalloc"
+    fi
+
     docker run --rm -t --user=$UID:$(id -g $USER) \
         -v $(pwd):/home/rust/src \
         -v $HOME/.cargo/registry:/root/.cargo/registry \
         -v $HOME/.cargo/git:/root/.cargo/git \
-        ghcr.io/gngpp/ninja-builder:$1 cargo build --release
+        -e "FEATURES=$features" \
+        ghcr.io/gngpp/ninja-builder:$1 /bin/bash -c "cargo build --release \$FEATURES"
+
     sudo chmod -R 777 target
     upx --best --lzma target/$1/release/ninja
     cd target/$1/release
