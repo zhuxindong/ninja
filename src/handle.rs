@@ -5,9 +5,11 @@ use openai::{arkose::funcaptcha::ArkoseSolver, context::ContextArgs};
 
 use crate::{
     args::{self, ServeArgs},
-    utils,
     utils::unix::fix_relative_path,
 };
+
+#[cfg(target_family = "unix")]
+use crate::utils;
 
 pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<()> {
     if relative_path {
@@ -21,10 +23,10 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
     }
 
     #[cfg(target_os = "linux")]
-    crate::utils::unix::sysctl_route_add_ipv6_subnet(args.ipv6_subnet);
+    utils::unix::sysctl_route_add_ipv6_subnet(args.ipv6_subnet);
 
     #[cfg(target_os = "linux")]
-    crate::utils::unix::sysctl_ipv6_no_local_bind(args.ipv6_subnet.is_some());
+    utils::unix::sysctl_ipv6_no_local_bind(args.ipv6_subnet.is_some());
 
     // disable_direct and proxies are mutually exclusive
     if args.disable_direct
