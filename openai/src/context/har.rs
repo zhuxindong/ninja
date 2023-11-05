@@ -1,5 +1,5 @@
 use crate::{arkose, homedir::home_dir, info, warn};
-use hotwatch::{Event, Hotwatch};
+use hotwatch::{Event, EventKind, Hotwatch};
 use rand::seq::SliceRandom;
 use std::{
     collections::HashMap,
@@ -38,18 +38,18 @@ impl HarProvider {
 
         init_directory(&dir_path);
 
-        let mut p = HarProvider {
+        let mut pool = Vec::new();
+        Self::init_pool(&dir_path, &mut pool);
+
+        HarProvider {
+            pool,
             hotwatch: watch_har_dir(_type, &dir_path),
             dir_path,
-            pool: Vec::new(),
-        };
-        p.reset_pool();
-        p
+        }
     }
 
-    fn reset_pool(&mut self) {
-        self.pool.clear();
-        std::fs::read_dir(&self.dir_path)
+    fn init_pool(dir_path: impl AsRef<Path>, pool: &mut Vec<String>) {
+        std::fs::read_dir(dir_path.as_ref())
             .expect("Failed to read har directory")
             .filter_map(|entry| entry.ok().map(|e| e.path()))
             .filter(|file_path| {
@@ -60,10 +60,14 @@ impl HarProvider {
             })
             .for_each(|file_path| {
                 if let Some(file_name) = file_path.file_stem() {
-                    self.pool
-                        .push(format!("{}.har", file_name.to_string_lossy()));
+                    pool.push(format!("{}.har", file_name.to_string_lossy()));
                 }
             });
+    }
+
+    fn reset_pool(&mut self) {
+        self.pool.clear();
+        Self::init_pool(&self.dir_path, &mut self.pool)
     }
 
     pub(super) fn pool(&self) -> HarPath {
@@ -95,7 +99,7 @@ fn watch_har_dir(_type: arkose::Type, path: impl AsRef<Path>) -> Hotwatch {
             let watch_path = path.as_ref().display().to_string();
             info!("Start watching HAR directory: {}", watch_path);
             move |event: Event| match event.kind {
-                _ => {
+                EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_) => {
                     event.paths.iter().for_each(|path| {
                         info!(
                             "HAR directory: {watch_path} changes observed: {}",
@@ -112,6 +116,7 @@ fn watch_har_dir(_type: arkose::Type, path: impl AsRef<Path>) -> Hotwatch {
                         }
                     });
                 }
+                _ => {}
             }
         })
         .expect("failed to watch file!");

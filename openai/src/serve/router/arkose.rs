@@ -55,9 +55,7 @@ async fn proxy(
 
     if req_path.contains("/fc/gt2/public_key/") {
         let pk = req_path.trim_start_matches("/fc/gt2/public_key/");
-        let arkose_res = ArkoseToken::new_from_context(Type::from_pk(pk)?).await;
-
-        if let Ok(arkose_token) = arkose_res {
+        if let Ok(arkose_token) = ArkoseToken::new_from_context(Type::from_pk(pk)?).await {
             if arkose_token.success() {
                 let target = serde_json::json!({
                     "token": arkose_token,
