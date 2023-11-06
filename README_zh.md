@@ -63,7 +63,7 @@
   - `/to/v1/chat/completions`
   > 关于`ChatGPT`转`API`使用方法，`AceessToken`当`API Key`使用
 
-- 授权接口
+- 授权
   - 登录: `/auth/token`，表单`option`可选参数，默认为`web`登录，返回`AccessToken`与`Session`；参数为`apple`/`platform`，返回`AccessToken`与`RefreshToken`
   - 刷新 `RefreshToken`: `/auth/refresh_token`
   - 撤销 `RefreshToken`: `/auth/revoke_token`

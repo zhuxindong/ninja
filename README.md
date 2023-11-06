@@ -63,7 +63,7 @@ Sending `GPT4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` a
   - `/to/v1/chat/completions`
   > About using `ChatGPT` to `API`, use `AceessToken` directly as `API Key`, interface path: `/to/v1/chat/completions`
 
-- Authorization interface
+- Authorization
   - Login: `/auth/token`, form `option` optional parameter, default is `web` login, returns `AccessToken` and `Session`; parameter is `apple`/`platform`, returns `AccessToken` and `RefreshToken`
   - Refresh `RefreshToken`: `/auth/refresh_token`
   - Revoke `RefreshToken`: `/auth/revoke_token`
