@@ -33,8 +33,10 @@ impl Display for AuthStrategy {
 pub struct AuthAccount {
     pub username: String,
     pub password: String,
-    #[builder(setter(into), default)]
+    #[builder(setter(into, strip_option), default)]
     pub mfa: Option<String>,
+    #[builder(setter(into, strip_option), default)]
+    pub csrf_token: Option<String>,
     #[serde(default)]
     pub option: AuthStrategy,
     #[builder(setter(into, strip_option), default)]

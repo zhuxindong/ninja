@@ -1,3 +1,4 @@
+pub mod csrf;
 #[cfg(feature = "limit")]
 pub mod tokenbucket;
 
