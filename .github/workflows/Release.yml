@@ -62,7 +62,7 @@ jobs:
           generate_release_notes: true
 
   macos:
-    runs-on: macos-12
+    runs-on: macos-latest
     name: MacOS
     environment: MacOS
     steps:
