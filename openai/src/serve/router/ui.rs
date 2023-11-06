@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use axum::body;
 use axum::body::Body;
 use axum::extract::ConnectInfo;
 use axum::extract::Path;
@@ -8,16 +9,23 @@ use axum::headers::Authorization;
 use axum::http::header;
 use axum::http::HeaderMap;
 use axum::http::Response;
+use axum::response::IntoResponse;
 use axum::routing::any;
 use axum::routing::{get, post};
 use axum::Router;
 use axum::TypedHeader;
+use axum_csrf::CsrfConfig;
+use axum_csrf::CsrfLayer;
+use axum_csrf::CsrfToken;
+use axum_csrf::Key;
 use axum_extra::extract::cookie;
 use axum_extra::extract::CookieJar;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::OnceLock;
+use tower::ServiceBuilder;
+use tower_http::ServiceBuilderExt;
 
 use base64::Engine;
 
@@ -128,10 +136,19 @@ pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
 
         let _ = TEMPLATE.set(tera);
 
+        let cookie_key = Key::generate();
+        let config = CsrfConfig::default().with_key(Some(cookie_key));
+
         router
+            .route(
+                "/auth/login",
+                post(post_login).layer(ServiceBuilder::new().map_request_body(body::boxed).layer(
+                    axum::middleware::from_fn(serve::middleware::csrf::auth_middleware),
+                )),
+            )
             .route("/auth", get(get_auth))
             .route("/auth/login", get(get_login))
-            .route("/auth/login", post(post_login))
+            .layer(CsrfLayer::new(config))
             .route("/auth/login/token", post(post_login_token))
             .route("/auth/logout", get(get_logout))
             .route("/auth/session", get(get_session))
@@ -192,18 +209,22 @@ pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
     }
 }
 
-async fn get_auth() -> Result<Response<Body>, ResponseError> {
+async fn get_auth(token: CsrfToken) -> Result<impl IntoResponse, ResponseError> {
     let mut ctx = tera::Context::new();
+    ctx.insert("csrf_token", &token.authenticity_token()?);
     settings_template_data(&mut ctx);
-    render_template(TEMP_AUTH, &ctx)
+    let tm = render_template(TEMP_AUTH, &ctx)?;
+    Ok((token, tm))
 }
 
-async fn get_login() -> Result<Response<Body>, ResponseError> {
+async fn get_login(token: CsrfToken) -> Result<impl IntoResponse, ResponseError> {
     let mut ctx = tera::Context::new();
+    ctx.insert("csrf_token", &token.authenticity_token()?);
     ctx.insert("error", "");
     ctx.insert("username", "");
     settings_template_data(&mut ctx);
-    render_template(TEMP_LOGIN, &ctx)
+    let tm = render_template(TEMP_LOGIN, &ctx)?;
+    Ok((token, tm))
 }
 
 async fn post_login(
