@@ -83,13 +83,13 @@ impl From<&context::ContextArgs> for Inner {
     }
 }
 
-pub struct ClientLoadBalancer {
+pub struct ClientRoundRobinBalancer {
     clients: Vec<ClientType>,
     index: AtomicUsize,
     inner: Inner,
 }
 
-impl ClientLoadBalancer {
+impl ClientRoundRobinBalancer {
     fn new_client_generic<F, T>(
         args: &context::ContextArgs,
         client_type: fn(T) -> ClientType,
@@ -133,7 +133,7 @@ impl ClientLoadBalancer {
     }
 }
 
-impl ClientLoadBalancer {
+impl ClientRoundRobinBalancer {
     fn rebuild_client_with_ipv6(&self, client: &ClientType) -> ClientType {
         let bind_addr = self.inner.ipv6_subnet.as_ref().unwrap().get_random_ipv6();
         match client {

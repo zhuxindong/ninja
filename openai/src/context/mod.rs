@@ -11,7 +11,7 @@ use std::{
 use crate::{
     arkose::{self, funcaptcha::ArkoseSolver},
     auth::AuthClient,
-    balancer::ClientLoadBalancer,
+    balancer::ClientRoundRobinBalancer,
     error,
 };
 use reqwest::Client;
@@ -201,9 +201,9 @@ static CTX: OnceLock<Context> = OnceLock::new();
 
 pub struct Context {
     /// Requesting client
-    client_load: Option<ClientLoadBalancer>,
+    client_load: Option<ClientRoundRobinBalancer>,
     /// Requesting oauth client
-    auth_client_load: Option<ClientLoadBalancer>,
+    auth_client_load: Option<ClientRoundRobinBalancer>,
     /// arkoselabs solver
     arkose_solver: Option<ArkoseSolver>,
     /// HAR file upload authenticate key
@@ -253,11 +253,11 @@ impl Context {
 
         Context {
             client_load: Some(
-                ClientLoadBalancer::new_client(&args)
+                ClientRoundRobinBalancer::new_client(&args)
                     .expect("Failed to initialize the requesting client"),
             ),
             auth_client_load: Some(
-                ClientLoadBalancer::new_auth_client(&args)
+                ClientRoundRobinBalancer::new_auth_client(&args)
                     .expect("Failed to initialize the requesting oauth client"),
             ),
             arkose_endpoint: args.arkose_endpoint,
