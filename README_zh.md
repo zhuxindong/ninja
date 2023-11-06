@@ -35,7 +35,7 @@
 
 1) 使用HAR
 
-   - 支持HAR特征池化，可同时上传多个HAR，使用轮训策略使用。
+   - 支持HAR特征池化，可同时上传多个HAR，使用轮训策略
    > `ChatGPT` 官网发送一次 `GPT4` 会话消息，浏览器 `F12` 下载 `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` 接口的HAR日志记录文件，使用启动参数 `--arkose-gpt4-har-dir` 指定HAR目录路径使用（不指定路径则使用默认路径`~/.gpt4`，可直接上传更新HAR），同理`GPT3.5`和其他类型也是一样方法。支持WebUI上传更新HAR，请求路径:`/har/upload`，可选上传身份验证参数:`--arkose-har-upload-key`
 
 2) 使用[YesCaptcha](https://yescaptcha.com/i/1Cc5i4) / [CapSolver](https://dashboard.capsolver.com/passport/register?inviteCode=y7CtB_a-3X6d)
@@ -55,7 +55,7 @@
   - `/backend-api/*`
   
 - OpenAI-API
-  - `/v1/*>`
+  - `/v1/*`
 
 - Platform-API
   - `/dashboard/*`

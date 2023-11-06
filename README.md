@@ -35,7 +35,7 @@ Sending `GPT4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` a
 
 1) Use HAR
 
-   - Supports HAR feature pooling, can upload multiple HARs at the same time, and use it using a rotation training strategy.
+   - Supports HAR feature pooling, can upload multiple HARs at the same time, and use rotation training strategy
    > The `ChatGPT` official website sends a `GPT4` session message, and the browser `F12` downloads the `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` interface. HAR log file, use the startup parameter `--arkose-gpt4-har-dir` to specify the HAR directory path to use (if you do not specify a path, use the default path `~/.gpt4`, you can directly upload and update HAR ), the same method applies to `GPT3.5` and other types. Supports WebUI to upload and update HAR, request path: `/har/upload`, optional upload authentication parameter: `--arkose-har-upload-key`
 
 2) Use [YesCaptcha](https://yescaptcha.com/i/1Cc5i4) / [CapSolver](https://dashboard.capsolver.com/passport/register?inviteCode=y7CtB_a-3X6d)
