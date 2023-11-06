@@ -1,10 +1,12 @@
 use crate::{arkose, homedir::home_dir, info, warn};
 use hotwatch::{Event, EventKind, Hotwatch};
-use rand::seq::SliceRandom;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    sync::{OnceLock, RwLock},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        OnceLock, RwLock,
+    },
 };
 
 pub(super) static HAR: OnceLock<RwLock<HashMap<arkose::Type, HarProvider>>> = OnceLock::new();
@@ -22,6 +24,7 @@ pub(super) struct HarProvider {
     hotwatch: Hotwatch,
     /// HAR file pool
     pool: Vec<String>,
+    index: AtomicUsize,
 }
 
 impl HarProvider {
@@ -45,6 +48,7 @@ impl HarProvider {
             pool,
             hotwatch: watch_har_dir(_type, &dir_path),
             dir_path,
+            index: AtomicUsize::new(0),
         }
     }
 
@@ -71,14 +75,23 @@ impl HarProvider {
     }
 
     pub(super) fn pool(&self) -> HarPath {
-        let mut har_path = HarPath {
+        let len = self.pool.len();
+        let mut old = self.index.load(Ordering::Relaxed);
+        let mut new;
+        loop {
+            new = (old + 1) % len;
+            match self
+                .index
+                .compare_exchange_weak(old, new, Ordering::SeqCst, Ordering::Relaxed)
+            {
+                Ok(_) => break,
+                Err(x) => old = x,
+            }
+        }
+        HarPath {
             dir_path: self.dir_path.clone(),
-            file_path: None,
-        };
-        self.pool
-            .choose(&mut rand::thread_rng())
-            .map(|file_name| har_path.file_path = Some(self.dir_path.join(file_name)));
-        har_path
+            file_path: Some(self.dir_path.join(&self.pool[old])),
+        }
     }
 }
 
@@ -86,7 +99,7 @@ fn init_directory(path: impl AsRef<Path>) {
     let path = path.as_ref();
 
     if !path.exists() {
-        info!("Create default HAR empty file: {}", path.display());
+        info!("Create default HAR directory: {}", path.display());
         std::fs::create_dir_all(&path).expect("Failed to create har directory");
     }
 }

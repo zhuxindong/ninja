@@ -229,8 +229,9 @@ async fn get_login(token: CsrfToken) -> Result<impl IntoResponse, ResponseError>
 
 async fn post_login(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    token: CsrfToken,
     mut account: axum::Form<AuthAccount>,
-) -> Result<Response<Body>, ResponseError> {
+) -> Result<impl IntoResponse, ResponseError> {
     turnstile::cf_turnstile_check(&addr.ip(), account.cf_turnstile_response.as_deref()).await?;
 
     match serve::try_login(&mut account).await {
@@ -266,13 +267,16 @@ async fn post_login(
             Ok(builder
                 .header(header::SET_COOKIE, cookie.to_string())
                 .body(Body::empty())
-                .map_err(ResponseError::InternalServerError)?)
+                .map_err(ResponseError::InternalServerError)?
+                .into_response())
         }
         Err(err) => {
             let mut ctx = tera::Context::new();
+            ctx.insert("csrf_token", &token.authenticity_token()?);
             ctx.insert("username", &account.username);
             ctx.insert("error", &err.to_string());
-            render_template(TEMP_LOGIN, &ctx)
+            let tm = render_template(TEMP_LOGIN, &ctx)?;
+            Ok((token, tm).into_response())
         }
     }
 }

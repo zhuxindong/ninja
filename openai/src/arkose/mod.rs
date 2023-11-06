@@ -25,6 +25,7 @@ use crate::warn;
 use crate::HEADER_UA;
 
 use self::funcaptcha::solver::SubmitSolver;
+use self::funcaptcha::ArkoseSolver;
 use self::funcaptcha::Solver;
 #[derive(Hash, PartialEq, Eq, Debug)]
 pub enum Type {
@@ -337,44 +338,65 @@ async fn get_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<ArkoseToken> {
 /// Get ArkoseLabs token from context (Only support ChatGPT, Platform, Auth)
 #[inline]
 async fn get_from_context(t: Type) -> anyhow::Result<ArkoseToken> {
-    let valid_arkose_token = move |arkose_token: ArkoseToken| async {
-        let get = move || async { Ok(arkose_token) };
-        return submit_if_invalid(get).await;
-    };
+    let valid_arkose_token =
+        |arkose_token: ArkoseToken, arkose_solver: Option<&'static ArkoseSolver>| async move {
+            let get = move || async { Ok(arkose_token) };
+            return submit_if_invalid(get, arkose_solver).await;
+        };
 
     let ctx = context::get_instance();
 
+    // Get arkose solver
+    let arkose_solver = ctx.arkose_solver();
+
     let hat_path = ctx.arkose_har_path(&t);
     if let Some(file_path) = hat_path.file_path {
-        let arkose_token = ArkoseToken::new_from_har(file_path).await?;
-        return valid_arkose_token(arkose_token).await;
+        match ArkoseToken::new_from_har(&file_path).await {
+            Ok(arkose_token) => {
+                return valid_arkose_token(arkose_token, arkose_solver).await;
+            }
+            Err(err) => {
+                warn!(
+                    "get arkose token from har file: {} error: {err}",
+                    file_path.display()
+                )
+            }
+        }
     }
 
-    if ctx.arkose_solver().is_some() {
-        let arkose_token = ArkoseToken::new(t).await?;
-        return valid_arkose_token(arkose_token).await;
+    if let Some(arkose_solver) = arkose_solver {
+        match ArkoseToken::new(t).await {
+            Ok(arkose_token) => {
+                return valid_arkose_token(arkose_token, Some(arkose_solver)).await;
+            }
+            Err(err) => {
+                warn!("get arkose token from local bx error: {err}")
+            }
+        }
     }
 
     anyhow::bail!("No solver available")
 }
 
 #[inline]
-async fn submit_if_invalid<F, Fut>(get_token: F) -> anyhow::Result<ArkoseToken>
+async fn submit_if_invalid<F, Fut>(
+    get_token: F,
+    arkose_solver: Option<&'static ArkoseSolver>,
+) -> anyhow::Result<ArkoseToken>
 where
     F: FnOnce() -> Fut,
     Fut: futures_core::Future<Output = anyhow::Result<ArkoseToken>>,
 {
-    let ctx = context::get_instance();
     let arkose_token = get_token().await?;
 
     if arkose_token.success() {
         // Submit token to funcaptcha callback
         tokio::spawn(funcaptcha::callback(
-            ctx.client(),
+            context::get_instance().client(),
             arkose_token.value().to_owned(),
         ));
     } else {
-        if let Some(arkose_solver) = ctx.arkose_solver() {
+        if let Some(arkose_solver) = arkose_solver {
             return submit_captcha(
                 &arkose_solver.solver,
                 &arkose_solver.client_key,
