@@ -35,7 +35,7 @@
 
 1) 使用HAR
 
-   - 支持HAR特征池化，可同时上传多个HAR，使用策略为随机请求。
+   - 支持HAR特征池化，可同时上传多个HAR，使用轮训策略使用。
    > `ChatGPT` 官网发送一次 `GPT4` 会话消息，浏览器 `F12` 下载 `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` 接口的HAR日志记录文件，使用启动参数 `--arkose-gpt4-har-dir` 指定HAR目录路径使用（不指定路径则使用默认路径`~/.gpt4`，可直接上传更新HAR），同理`GPT3.5`和其他类型也是一样方法。支持WebUI上传更新HAR，请求路径:`/har/upload`，可选上传身份验证参数:`--arkose-har-upload-key`
 
 2) 使用[YesCaptcha](https://yescaptcha.com/i/1Cc5i4) / [CapSolver](https://dashboard.capsolver.com/passport/register?inviteCode=y7CtB_a-3X6d)
@@ -62,6 +62,14 @@
 - ChatGPT-To-API
   - `/to/v1/chat/completions`
   > 关于`ChatGPT`转`API`使用方法，`AceessToken`当`API Key`使用
+
+- 授权接口
+  - 登录: `/auth/token`，表单`option`可选参数，默认为`web`登录，返回`AccessToken`与`Session`；参数为`apple`/`platform`，返回`AccessToken`与`RefreshToken`
+  - 刷新 `RefreshToken`: `/auth/refresh_token`
+  - 撤销 `RefreshToken`: `/auth/revoke_token`
+  - 刷新 `Session`: `/api/auth/session`，发送名为`__Secure-next-auth.session-token`的Cookie调用刷新`Session`，同时返回新的`AccessToken`
+  
+  > 关于`RefreshToken`获取的方式，采用`Apple`平台`ChatGPT App`登录方式，原理是使用内置MITM代理。`Apple设备`连上代理即可开启`Apple平台`登录获取`RefreshToken`，仅适用于量小或者个人使用`（量大会封设备，慎用）`，详细使用请看启动参数说明。
 
 #### API文档
 
@@ -91,10 +99,6 @@
 
 [...](https://github.com/gngpp/ninja/blob/main/README_zh.md#%E5%91%BD%E4%BB%A4%E6%89%8B%E5%86%8C)
 
-#### RefreshToken
-
-`关于Refresh Token`获取的方式，采用`Apple`平台`ChatGPT App`登录方式，原理是使用内置MITM代理。`Apple设备`连上代理即可开启`Apple平台`登录获取`RefreshToken`，仅适用于量小或者个人使用`（量大会封设备，慎用）`，详细使用请看启动参数说明。
-
 ```shell
 # 生成证书
 ninja genca
@@ -114,8 +118,8 @@ ninja run --pbind 0.0.0.0:8888
   GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 deb包，二进制文件，以Ubuntu为例：
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.7.6/ninja-0.7.6-x86_64-unknown-linux-musl.tar.gz
-tar -xf ninja-0.7.6-x86_64-unknown-linux-musl.tar.gz
+wget https://github.com/gngpp/ninja/releases/download/v0.7.7/ninja-0.7.7-x86_64-unknown-linux-musl.tar.gz
+tar -xf ninja-0.7.7-x86_64-unknown-linux-musl.tar.gz
 ./ninja run
 ```
 
@@ -124,11 +128,11 @@ tar -xf ninja-0.7.6-x86_64-unknown-linux-musl.tar.gz
 GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 ipk 文件， 目前提供了 aarch64/x86_64 等架构的版本，下载后使用 opkg 安装，以 nanopi r4s 为例：
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.7.6/ninja_0.7.6_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.7.6/luci-app-ninja_1.1.5-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.7.6/luci-i18n-ninja-zh-cn_1.1.5-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.7.7/ninja_0.7.7_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.7.7/luci-app-ninja_1.1.5-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.7.7/luci-i18n-ninja-zh-cn_1.1.5-1_all.ipk
 
-opkg install ninja_0.7.6_aarch64_generic.ipk
+opkg install ninja_0.7.7_aarch64_generic.ipk
 opkg install luci-app-ninja_1.1.5-1_all.ipk
 opkg install luci-i18n-ninja-zh-cn_1.1.5-1_all.ipk
 ```

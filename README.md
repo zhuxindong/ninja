@@ -35,7 +35,7 @@ Sending `GPT4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` a
 
 1) Use HAR
 
-   - Supports HAR feature pooling, multiple HARs can be uploaded at the same time, and the usage strategy is random request.
+   - Supports HAR feature pooling, can upload multiple HARs at the same time, and use it using a rotation training strategy.
    > The `ChatGPT` official website sends a `GPT4` session message, and the browser `F12` downloads the `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` interface. HAR log file, use the startup parameter `--arkose-gpt4-har-dir` to specify the HAR directory path to use (if you do not specify a path, use the default path `~/.gpt4`, you can directly upload and update HAR ), the same method applies to `GPT3.5` and other types. Supports WebUI to upload and update HAR, request path: `/har/upload`, optional upload authentication parameter: `--arkose-har-upload-key`
 
 2) Use [YesCaptcha](https://yescaptcha.com/i/1Cc5i4) / [CapSolver](https://dashboard.capsolver.com/passport/register?inviteCode=y7CtB_a-3X6d)
@@ -62,6 +62,14 @@ Sending `GPT4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` a
 - ChatGPT-To-API
   - `/to/v1/chat/completions`
   > About using `ChatGPT` to `API`, use `AceessToken` directly as `API Key`, interface path: `/to/v1/chat/completions`
+
+- Authorization interface
+  - Login: `/auth/token`, form `option` optional parameter, default is `web` login, returns `AccessToken` and `Session`; parameter is `apple`/`platform`, returns `AccessToken` and `RefreshToken`
+  - Refresh `RefreshToken`: `/auth/refresh_token`
+  - Revoke `RefreshToken`: `/auth/revoke_token`
+  - Refresh `Session`: `/api/auth/session`, send a cookie named `__Secure-next-auth.session-token` to call refresh `Session`, and return a new `AccessToken`
+
+  > About the method of obtaining `RefreshToken`, use the `ChatGPT App` login method of the `Apple` platform. The principle is to use the built-in MITM agent. When the `Apple device` is connected to the agent, you can log in to the `Apple platform` to obtain `RefreshToken`. It is only suitable for small quantities or personal use `(large quantities will seal the device, use with caution)`. For detailed usage, please see the startup parameter description.
 
 #### API documentation
 
@@ -91,10 +99,6 @@ Sending `GPT4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` a
 
 [...](https://github.com/gngpp/ninja/blob/main/README.md#command-manual)
 
-#### RefreshToken
-
-`About the method of obtaining Refresh Token`, use the `ChatGPT App` login method of the `Apple` platform. The principle is to use the built-in MITM agent. When the `Apple device` is connected to the agent, you can log in to the `Apple platform` to obtain `RefreshToken`. It is only suitable for small quantities or personal use `(large quantities will seal the device, use with caution)`. For detailed usage, please see the startup parameter description.
-
 ```shell
  # Generate certificate
  ninja genca
@@ -114,8 +118,8 @@ Sending `GPT4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` a
 Making [Releases](https://github.com/gngpp/ninja/releases/latest) has a precompiled deb package, binaries, in Ubuntu, for example:
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.7.6/ninja-0.7.6-x86_64-unknown-linux-musl.tar.gz
-tar -xf ninja-0.7.6-x86_64-unknown-linux-musl.tar.gz
+wget https://github.com/gngpp/ninja/releases/download/v0.7.7/ninja-0.7.7-x86_64-unknown-linux-musl.tar.gz
+tar -xf ninja-0.7.7-x86_64-unknown-linux-musl.tar.gz
 ./ninja run
 ```
 
@@ -124,11 +128,11 @@ tar -xf ninja-0.7.6-x86_64-unknown-linux-musl.tar.gz
 There are pre-compiled ipk files in GitHub [Releases](https://github.com/gngpp/ninja/releases/latest), which currently provide versions of aarch64/x86_64 and other architectures. After downloading, use opkg to install, and use nanopi r4s as example:
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.7.6/ninja_0.7.6_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.7.6/luci-app-ninja_1.1.5-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.7.6/luci-i18n-ninja-zh-cn_1.1.5-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.7.7/ninja_0.7.7_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.7.7/luci-app-ninja_1.1.5-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.7.7/luci-i18n-ninja-zh-cn_1.1.5-1_all.ipk
 
-opkg install ninja_0.7.6_aarch64_generic.ipk
+opkg install ninja_0.7.7_aarch64_generic.ipk
 opkg install luci-app-ninja_1.1.5-1_all.ipk
 opkg install luci-i18n-ninja-zh-cn_1.1.5-1_all.ipk
 ```
