@@ -346,13 +346,25 @@ async fn get_from_context(t: Type) -> anyhow::Result<ArkoseToken> {
 
     let hat_path = ctx.arkose_har_path(&t);
     if let Some(file_path) = hat_path.file_path {
-        let arkose_token = ArkoseToken::new_from_har(file_path).await?;
-        return valid_arkose_token(arkose_token).await;
+        match ArkoseToken::new_from_har(file_path).await {
+            Ok(arkose_token) => {
+                return valid_arkose_token(arkose_token).await;
+            }
+            Err(err) => {
+                warn!("get arkose token from har error: {err}")
+            }
+        }
     }
 
     if ctx.arkose_solver().is_some() {
-        let arkose_token = ArkoseToken::new(t).await?;
-        return valid_arkose_token(arkose_token).await;
+        match ArkoseToken::new(t).await {
+            Ok(arkose_token) => {
+                return valid_arkose_token(arkose_token).await;
+            }
+            Err(err) => {
+                warn!("get arkose token from local bx error: {err}")
+            }
+        }
     }
 
     anyhow::bail!("No solver available")
