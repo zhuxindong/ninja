@@ -75,6 +75,15 @@ impl HarProvider {
     }
 
     pub(super) fn pool(&self) -> HarPath {
+        let mut har_path = HarPath {
+            dir_path: self.dir_path.clone(),
+            file_path: None,
+        };
+
+        if self.pool.is_empty() {
+            return har_path;
+        }
+
         let len = self.pool.len();
         let mut old = self.index.load(Ordering::Relaxed);
         let mut new;
@@ -88,10 +97,9 @@ impl HarProvider {
                 Err(x) => old = x,
             }
         }
-        HarPath {
-            dir_path: self.dir_path.clone(),
-            file_path: Some(self.dir_path.join(&self.pool[old])),
-        }
+
+        har_path.file_path = Some(self.dir_path.join(&self.pool[new]));
+        har_path
     }
 }
 

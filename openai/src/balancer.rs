@@ -179,7 +179,7 @@ impl ClientRoundRobinBalancer {
                         Err(x) => old = x,
                     }
                 }
-                self.clients[old].clone()
+                self.clients[new].clone()
             }
         }
     }
