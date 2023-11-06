@@ -109,7 +109,7 @@ async fn post_login(
         return Ok(generate_success_response().await.into_response());
     }
 
-    Ok(error_html(FAILED_AUTH_TITLE, "Password error", true).into_response())
+    Ok(error_html(FAILED_AUTH_TITLE, "Invalid authentication", true).into_response())
 }
 
 /// Upload page
