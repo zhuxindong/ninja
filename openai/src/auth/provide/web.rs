@@ -257,17 +257,27 @@ impl WebAuthProvider {
             .map_err(AuthError::FailedRequest)?;
         match resp.status() {
             StatusCode::OK => {
-                let c = resp
+                let session = resp
                     .cookies()
                     .find(|c| c.name().eq(API_AUTH_SESSION_COOKIE_KEY))
-                    .ok_or_else(|| AuthError::FailedAuthSessionCookie)?;
-                let session = model::Session {
-                    value: c.value().to_owned(),
-                    expires: c.expires(),
-                };
-                let mut session_access_token = resp.json::<model::SessionAccessToken>().await?;
-                session_access_token.session = Some(session);
-                Ok(model::AccessToken::Session(session_access_token))
+                    .map(|c| model::Session {
+                        value: c.value().to_owned(),
+                        expires: c.expires(),
+                    });
+
+                match session {
+                    Some(session) => {
+                        let mut session_access_token =
+                            resp.json::<model::SessionAccessToken>().await?;
+                        session_access_token.session = Some(session);
+                        Ok(model::AccessToken::Session(session_access_token))
+                    }
+                    None => {
+                        let text = resp.text().await?;
+                        warn!("Unable to obtain {API_AUTH_SESSION_COOKIE_KEY}, error: {text}");
+                        bail!(AuthError::FailedAccessToken(text))
+                    }
+                }
             }
             StatusCode::TOO_MANY_REQUESTS => {
                 bail!(AuthError::TooManyRequests("Too Many Requests".to_owned()))
