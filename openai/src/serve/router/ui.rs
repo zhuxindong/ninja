@@ -114,12 +114,7 @@ impl From<AuthenticateToken> for Session {
 // this function could be located in a different module
 pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
     if !args.disable_ui {
-        let ctx = context::get_instance();
-        if let Some(url) = ctx.api_prefix() {
-            info!("WebUI site use API: {url}")
-        }
-
-        if let Some(endpoint) = ctx.arkose_endpoint() {
+        if let Some(endpoint) = context::get_instance().arkose_endpoint() {
             info!("WebUI site use Arkose endpoint: {endpoint}")
         }
 
@@ -552,11 +547,9 @@ async fn get_share_chat(
         return match extract_session(cookie.value()) {
             Ok(session) => {
                 set_auth_header(&mut headers, &session.access_token)?;
-                let ctx = context::get_instance();
-                let url = get_url();
-                let resp = ctx
+                let resp = context::get_instance()
                     .client()
-                    .get(format!("{url}/backend-api/share/{share_id}"))
+                    .get(format!("{URL_CHATGPT_API}/backend-api/share/{share_id}"))
                     .headers(header_convert(&headers, &jar).await?)
                     .send()
                     .await
@@ -660,11 +653,9 @@ async fn get_share_chat_info(
     if let Some(cookie) = jar.get(SESSION_ID) {
         if let Ok(session) = extract_session(cookie.value()) {
             set_auth_header(&mut headers, &session.access_token)?;
-            let ctx = context::get_instance();
-            let url = get_url();
-            let resp = ctx
+            let resp = context::get_instance()
                 .client()
-                .get(format!("{url}/backend-api/share/{share_id}"))
+                .get(format!("{URL_CHATGPT_API}/backend-api/share/{share_id}"))
                 .headers(header_convert(&headers, &jar).await?)
                 .send()
                 .await
@@ -745,11 +736,12 @@ async fn get_share_chat_continue_info(
         return match extract_session(cookie.value()) {
             Ok(session) => {
                 set_auth_header(&mut headers, &session.access_token)?;
-                let ctx = context::get_instance();
-                let url = get_url();
-                let resp = ctx
+                let resp = context::get_instance()
                     .client()
-                    .get(format!("{url}/backend-api/share/{}", share_id.0))
+                    .get(format!(
+                        "{URL_CHATGPT_API}/backend-api/share/{}",
+                        share_id.0
+                    ))
                     .headers(header_convert(&headers, &jar).await?)
                     .send()
                     .await
@@ -916,9 +908,6 @@ fn settings_template_data(ctx: &mut tera::Context) {
     if let Some(site_key) = g_ctx.cf_turnstile() {
         ctx.insert("site_key", &site_key.site_key);
     }
-    if let Some(api_prefix) = g_ctx.api_prefix() {
-        ctx.insert("api_prefix", api_prefix);
-    }
     if let Some(arkose_endpoint) = g_ctx.arkose_endpoint() {
         ctx.insert("arkose_endpoint", arkose_endpoint)
     }
@@ -927,14 +916,6 @@ fn settings_template_data(ctx: &mut tera::Context) {
 fn check_token(token: &str) -> Result<(), ResponseError> {
     let _ = crate::token::check(token).map_err(ResponseError::Unauthorized)?;
     Ok(())
-}
-
-fn get_url() -> &'static str {
-    let ctx = context::get_instance();
-    match ctx.api_prefix() {
-        Some(api_prefix) => api_prefix,
-        None => URL_CHATGPT_API,
-    }
 }
 
 fn set_auth_header(headers: &mut HeaderMap, access_token: &str) -> Result<(), ResponseError> {

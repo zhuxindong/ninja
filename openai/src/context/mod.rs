@@ -84,10 +84,6 @@ pub struct ContextArgs {
     #[builder(setter(into), default)]
     pub(crate) ipv6_subnet: Option<(std::net::Ipv6Addr, u8)>,
 
-    /// Web UI api prefix
-    #[builder(setter(into), default)]
-    pub(crate) api_prefix: Option<String>,
-
     /// TLS cert
     #[builder(setter(into), default)]
     pub(crate) tls_cert: Option<PathBuf>,
@@ -131,6 +127,10 @@ pub struct ContextArgs {
     /// Platform Arkoselabs HAR record file path
     #[builder(setter(into), default)]
     pub(crate) arkose_platform_har_dir: Option<PathBuf>,
+
+    /// Enable Arkose GPT-3.5 experiment
+    #[builder(setter(into), default = false)]
+    pub(crate) arkose_gpt3_experiment: bool,
 
     /// HAR file upload authenticate key
     #[builder(setter(into), default)]
@@ -212,10 +212,10 @@ pub struct Context {
     auth_key: Option<String>,
     /// Cloudflare Turnstile
     cf_turnstile: Option<CfTurnstile>,
-    /// Web UI api prefix
-    api_prefix: Option<String>,
     /// Arkose endpoint
     arkose_endpoint: Option<String>,
+    /// Enable Arkose GPT-3.5 experiment
+    arkose_gpt3_experiment: bool,
     /// PreAuth cookie cache
     preauth_provider: Option<PreauthCookieProvider>,
 }
@@ -263,7 +263,7 @@ impl Context {
             arkose_endpoint: args.arkose_endpoint,
             arkose_solver: args.arkose_solver,
             arkose_har_upload_key: args.arkose_har_upload_key,
-            api_prefix: args.api_prefix,
+            arkose_gpt3_experiment: args.arkose_gpt3_experiment,
             auth_key: args.auth_key,
             cf_turnstile: args.cf_site_key.and_then(|site_key| {
                 args.cf_secret_key.map(|secret_key| CfTurnstile {
@@ -321,11 +321,6 @@ impl Context {
         self.cf_turnstile.as_ref()
     }
 
-    /// WebUI api prefix
-    pub fn api_prefix(&self) -> Option<&String> {
-        self.api_prefix.as_ref()
-    }
-
     /// Arkoselabs endpoint
     pub fn arkose_endpoint(&self) -> Option<&String> {
         self.arkose_endpoint.as_ref()
@@ -346,5 +341,10 @@ impl Context {
     #[cfg(feature = "preauth")]
     pub fn pop_preauth_cookie(&self) -> Option<String> {
         self.preauth_provider.as_ref().map(|p| p.get()).flatten()
+    }
+
+    /// Get the arkose gpt3 experiment
+    pub fn arkose_gpt3_experiment(&self) -> bool {
+        self.arkose_gpt3_experiment
     }
 }

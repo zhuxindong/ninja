@@ -97,6 +97,7 @@ impl Launcher {
             .as_ref()
             .map(|i| info!("Bind address: {i} for outgoing connection"));
 
+        // init context
         context::init(self.inner.clone());
 
         let global_layer = tower::ServiceBuilder::new()
@@ -143,6 +144,25 @@ impl Launcher {
                 ))
         };
 
+        let router = axum::Router::new()
+            // official dashboard api endpoint
+            .route("/dashboard/*path", any(official_proxy))
+            // official v1 api endpoint
+            .route("/v1/*path", any(official_proxy))
+            // unofficial backend api endpoint
+            .route("/backend-api/*path", any(unofficial_proxy))
+            // unofficial api to official api
+            .route("/to/v1/chat/completions", post(chat_to_api))
+            .route_layer(app_layer)
+            // unofficial public api endpoint
+            .route("/public-api/*path", any(unofficial_proxy))
+            .route("/auth/token", post(post_access_token))
+            .route("/auth/refresh_token", post(post_refresh_token))
+            .route("/auth/revoke_token", post(post_revoke_token))
+            .route("/api/auth/session", get(get_session));
+
+        let router = router::config(router, &self.inner).layer(global_layer);
+
         let http_config = HttpConfig::new()
             .http1_keep_alive(true)
             .http1_header_read_timeout(Duration::from_secs(self.inner.tcp_keepalive as u64))
@@ -178,25 +198,6 @@ impl Launcher {
                     crate::error!("PreAuth proxy error: {}", err);
                 }
             }
-
-            let router = axum::Router::new()
-                // official dashboard api endpoint
-                .route("/dashboard/*path", any(official_proxy))
-                // official v1 api endpoint
-                .route("/v1/*path", any(official_proxy))
-                // unofficial backend api endpoint
-                .route("/backend-api/*path", any(unofficial_proxy))
-                // unofficial api to official api
-                .route("/to/v1/chat/completions", post(chat_to_api))
-                .route_layer(app_layer)
-                // unofficial public api endpoint
-                .route("/public-api/*path", any(unofficial_proxy))
-                .route("/auth/token", post(post_access_token))
-                .route("/auth/refresh_token", post(post_refresh_token))
-                .route("/auth/revoke_token", post(post_revoke_token))
-                .route("/api/auth/session", get(get_session));
-
-            let router = router::config(router, &self.inner).layer(global_layer);
 
             // Signal the server to shutdown using Handle.
             let handle = Handle::new();
@@ -390,7 +391,6 @@ async fn unofficial_proxy(
         .path_and_query()
         .map(|v| v.as_str())
         .unwrap_or(uri.path());
-
     let url = format!("{URL_CHATGPT_API}{path_and_query}");
 
     handle_body(&url, &method, &mut headers, &mut body).await?;
@@ -549,17 +549,21 @@ async fn handle_body(
 
     match arkose::GPTModel::from_str(model) {
         Ok(model) => {
-            let condition = match body.get("arkose_token") {
-                Some(s) => {
-                    let s = s.as_str().unwrap_or(EMPTY);
-                    s.is_empty() || s.eq("null")
-                }
-                None => true,
-            };
+            if (context::get_instance().arkose_gpt3_experiment() && model.is_gpt3())
+                || model.is_gpt4()
+            {
+                let condition = match body.get("arkose_token") {
+                    Some(s) => {
+                        let s = s.as_str().unwrap_or(EMPTY);
+                        s.is_empty() || s.eq("null")
+                    }
+                    None => true,
+                };
 
-            if condition {
-                let arkose_token = arkose::ArkoseToken::new_from_context(model.into()).await?;
-                body.insert("arkose_token".to_owned(), json!(arkose_token));
+                if condition {
+                    let arkose_token = arkose::ArkoseToken::new_from_context(model.into()).await?;
+                    body.insert("arkose_token".to_owned(), json!(arkose_token));
+                }
             }
         }
         Err(err) => {

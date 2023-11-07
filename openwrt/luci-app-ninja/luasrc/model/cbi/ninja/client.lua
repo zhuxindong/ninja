@@ -54,12 +54,12 @@ o.rmempty = false
 o = s:option(Value, "auth_key", translate("Auth Key"), translate("Login Authentication Key"))
 o.password = true
 
-o = s:option(Value, "api_prefix", translate("WebUI API prefix"))
-
 o = s:option(Value, "cf_site_key", translate("CF Site Key"), translate("Cloudflare turnstile captcha site key"))
 
 o = s:option(Value, "cf_secret_key", translate("CF Secret Key"), translate("Cloudflare turnstile captcha secret key"))
 o.password = true
+
+o = s:option(Flag, "arkose_gpt3_experiment", translate("Enable ChatGPT GPT-3.5 ArkoseLabs"))
 
 o = s:option(Value, "arkose_gpt3_har_dir", translate("ChatGPT GPT-3.5 HAR directory path"), translate("About the browser HAR directory path requested by ChatGPT GPT-3.5 ArkoseLabs"))
 

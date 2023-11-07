@@ -140,10 +140,6 @@ pub struct ServeArgs {
     #[clap(short = 'A', long, env = "AUTH_KEY")]
     pub(super) auth_key: Option<String>,
 
-    /// WebUI api prefix
-    #[clap(long, env = "API_PREFIX", value_parser = parse::parse_url)]
-    pub(super) api_prefix: Option<String>,
-
     /// Disable WebUI
     #[clap(short = 'D', long, env = "DISABLE_WEBUI")]
     pub(super) disable_webui: bool,
@@ -159,6 +155,10 @@ pub struct ServeArgs {
     /// Arkose endpoint, Example: https://client-api.arkoselabs.com
     #[clap(long, value_parser = parse::parse_url)]
     pub(super) arkose_endpoint: Option<String>,
+
+    /// Enable Arkose GPT-3.5 experiment
+    #[clap(short = 'E', long, default_value = "false")]
+    pub(super) arkose_gpt3_experiment: bool,
 
     /// About the browser HAR directory path requested by ChatGPT GPT-3.5 ArkoseLabs
     #[clap(long, value_parser = parse::parse_dir_path)]
