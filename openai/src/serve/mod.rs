@@ -183,6 +183,7 @@ impl Launcher {
             .build()?;
 
         runtime.block_on(async move {
+            let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
             // PreAuth mitm proxy
             #[cfg(feature = "preauth")]
             if let Some(pbind) = self.inner.pbind.clone() {
@@ -191,6 +192,7 @@ impl Launcher {
                     self.inner.pupstream.clone(),
                     self.inner.pcert.clone(),
                     self.inner.pkey.clone(),
+                    rx,
                 )
                 .await
                 .err()
@@ -232,8 +234,20 @@ impl Launcher {
             };
 
             if let Some(err) = result.err() {
-                warn!("Server error: {}", err);
+                warn!("Http Server error: {}", err);
             }
+
+            let timeout = 3;
+
+            if let Some(err) = tx
+                .send_timeout((), Duration::from_secs(timeout))
+                .await
+                .err()
+            {
+                warn!("Send shutdown signal error: {}", err);
+            }
+
+            tokio::time::sleep(Duration::from_secs(timeout)).await;
         });
 
         Ok(())

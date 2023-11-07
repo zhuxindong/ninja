@@ -102,7 +102,6 @@ where
             let header_mut = req.headers_mut();
             header_mut.remove(http::header::HOST);
             header_mut.remove(http::header::CONNECTION);
-            header_mut.remove(http::header::ACCEPT_ENCODING);
             header_mut.remove(http::header::CONTENT_LENGTH);
         }
 

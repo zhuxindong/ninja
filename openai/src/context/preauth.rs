@@ -53,7 +53,8 @@ impl PreauthCookieProvider {
             .split(";")
             .find(|s| s.contains("_preauth_devicecheck"))
             .map(|value| {
-                let preauth_devicecheck = value.replace("_preauth_devicecheck=", "");
+                let preauth_devicecheck =
+                    value.replace("_preauth_devicecheck=", "").trim().to_owned();
                 preauth_devicecheck.find(":").map(|colon_index| {
                     let device_id = &preauth_devicecheck[..colon_index];
                     info!("Push PreAuth Cookie: {preauth_devicecheck}");
