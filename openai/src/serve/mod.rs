@@ -6,7 +6,7 @@ mod turnstile;
 #[cfg(feature = "preauth")]
 pub mod preauth;
 #[cfg(feature = "template")]
-mod router;
+mod route;
 
 use anyhow::anyhow;
 use axum::body::{Body, StreamBody};
@@ -43,7 +43,7 @@ use crate::auth::provide::AuthProvider;
 use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
 use crate::context::{self, ContextArgs};
 use crate::serve::middleware::tokenbucket::{Strategy, TokenBucketLimitContext};
-use crate::serve::router::toapi::chat_to_api;
+use crate::serve::route::toapi::chat_to_api;
 use crate::{arkose, debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 
 use crate::serve::error::ResponseError;
@@ -196,7 +196,7 @@ impl Launcher {
                 .route("/auth/revoke_token", post(post_revoke_token))
                 .route("/api/auth/session", get(get_session));
 
-            let router = router::config(router, &self.inner).layer(global_layer);
+            let router = route::config(router, &self.inner).layer(global_layer);
 
             // Signal the server to shutdown using Handle.
             let handle = Handle::new();
