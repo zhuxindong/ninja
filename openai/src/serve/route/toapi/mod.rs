@@ -68,7 +68,7 @@ pub(crate) async fn chat_to_api(
         .messages(messages)
         .model(model)
         .history_and_training_disabled(true)
-        .arkose_token(Some(&arkose_token))
+        .arkose_token(&arkose_token)
         .build();
 
     let client = context::get_instance().client();
@@ -327,9 +327,18 @@ async fn event_convert_handler(
     Ok(Event::default().data(data))
 }
 
-async fn model_mapper(model: &str) -> Result<(&str, &str, ArkoseToken), ResponseError> {
+async fn model_mapper(model: &str) -> Result<(&str, &str, Option<ArkoseToken>), ResponseError> {
     let gpt_model = GPTModel::from_str(model)?;
-    let arkose_token = ArkoseToken::new_from_context(gpt_model.into()).await?;
+
+    let arkose_token = if (context::get_instance().arkose_gpt3_experiment() && gpt_model.is_gpt3())
+        && gpt_model.is_gpt4()
+    {
+        let arkose_token = ArkoseToken::new_from_context(gpt_model.into()).await?;
+        Some(arkose_token)
+    } else {
+        None
+    };
+
     match model {
         model if model.starts_with("gpt-3.5") => {
             Ok(("text-davinci-002-render-sha", "gpt-3.5-turbo", arkose_token))

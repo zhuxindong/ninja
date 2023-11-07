@@ -16,6 +16,8 @@ pub enum AuthError {
     FailedRequest(#[from] reqwest::Error),
     #[error("invalid client request (error {0:?})")]
     InvalidClientRequest(String),
+    #[error("failed to get access token (error {0:?})")]
+    FailedAccessToken(String),
     #[error("invalid arkose token ({0:?})")]
     InvalidArkoseToken(anyhow::Error),
     #[error("failed get code from callback url")]
