@@ -129,12 +129,12 @@ There are pre-compiled ipk files in GitHub [Releases](https://github.com/gngpp/n
 
 ```shell
 wget https://github.com/gngpp/ninja/releases/download/v0.7.7/ninja_0.7.7_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.7.7/luci-app-ninja_1.1.5-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.7.7/luci-i18n-ninja-zh-cn_1.1.5-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.7.7/luci-app-ninja_1.1.6-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.7.7/luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
 
 opkg install ninja_0.7.7_aarch64_generic.ipk
-opkg install luci-app-ninja_1.1.5-1_all.ipk
-opkg install luci-i18n-ninja-zh-cn_1.1.5-1_all.ipk
+opkg install luci-app-ninja_1.1.6-1_all.ipk
+opkg install luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
 ```
 
 - #### Docker
