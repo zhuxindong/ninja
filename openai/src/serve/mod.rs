@@ -97,11 +97,6 @@ impl Launcher {
             .as_ref()
             .map(|i| info!("Bind address: {i} for outgoing connection"));
 
-        info!(
-            "Enable ArkoseLabs GPT-3.5 experiment: {}",
-            self.inner.arkose_gpt3_experiment
-        );
-
         // init context
         context::init(self.inner.clone());
 
