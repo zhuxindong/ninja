@@ -223,7 +223,7 @@ Options:
       --concurrent-limit <CONCURRENT_LIMIT>
           Enforces a limit on the concurrent number of requests the underlying [default: 1024]
   -x, --proxies <PROXIES>
-          Server proxies pool, Example: protocol://user:pass@ip:port [env: PROXIES=]
+          Server proxies pool, Only support http/https/socks5 protocol [env: PROXIES=]
   -i, --interface <INTERFACE>
           Bind address for outgoing connections (or IPv6 subnet fallback to Ipv4) [env: INTERFACE=]
   -I, --ipv6-subnet <IPV6_SUBNET>
@@ -246,8 +246,6 @@ Options:
           TLS private key file path (EC/PKCS8/RSA) [env: TLS_KEY=]
   -A, --auth-key <AUTH_KEY>
           Login Authentication Key [env: AUTH_KEY=]
-      --api-prefix <API_PREFIX>
-          WebUI api prefix [env: API_PREFIX=]
   -D, --disable-webui
           Disable WebUI [env: DISABLE_WEBUI=]
       --cf-site-key <CF_SITE_KEY>
@@ -256,6 +254,8 @@ Options:
           Cloudflare turnstile captcha secret key [env: CF_SITE_KEY=]
       --arkose-endpoint <ARKOSE_ENDPOINT>
           Arkose endpoint, Example: https://client-api.arkoselabs.com
+  -E, --arkose-gpt3-experiment
+          Enable Arkose GPT-3.5 experiment
       --arkose-gpt3-har-dir <ARKOSE_GPT3_HAR_DIR>
           About the browser HAR directory path requested by ChatGPT GPT-3.5 ArkoseLabs
       --arkose-gpt4-har-dir <ARKOSE_GPT4_HAR_DIR>
@@ -285,7 +285,7 @@ Options:
   -B, --pbind <PBIND>
           Preauth MITM server bind address [env: PREAUTH_BIND=]
   -X, --pupstream <PUPSTREAM>
-          Preauth MITM server upstream proxy, Only support http protocol [env: PREAUTH_UPSTREAM=]
+          Preauth MITM server upstream proxy, Only support http/https/socks5 protocol [env: PREAUTH_UPSTREAM=]
       --pcert <PCERT>
           Preauth MITM server CA certificate file path [default: ca/cert.crt]
       --pkey <PKEY>

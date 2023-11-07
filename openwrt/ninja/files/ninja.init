@@ -27,12 +27,12 @@ get_config() {
 	config_get arkose_har_upload_key $1 arkose_har_upload_key ''
 	config_get arkose_solver_key $1 arkose_solver_key ''
 	config_get arkose_solver $1 arkose_solver ''
+	config_get_bool arkose_gpt3_experiment $1 arkose_gpt3_experiment 0
 	config_get tb_store_strategy $1 tb_store_strategy "mem"
 	config_get tb_redis_url $1 tb_redis_url 'redis://127.0.0.1:6379'
 	config_get tb_capacity $1 tb_capacity "60"
 	config_get tb_fill_rate $1 tb_fill_rate "1"
 	config_get tb_expired $1 tb_expired "86400"
-	config_get api_prefix $1 api_prefix ""
 	config_get_bool cookie_store $1 cookie_store 0
 	config_get concurrent_limit $1 concurrent_limit ""
 	config_get_bool disable_webui $1 disable_webui 0
@@ -124,6 +124,10 @@ start_service() {
 		args="$args --arkose-solver-key $arkose_solver_key"
 	fi
 
+	if [ $arkose_gpt3_experiment -ne 0 ]; then
+		args="$args --arkose-gpt3-experiment"
+	fi
+	
 	if [ -n "$tls_cert" ]; then
 		args="$args --tls-cert $tls_cert"
 	fi
@@ -149,10 +153,6 @@ start_service() {
 		if [ -n "$tb_expired" ]; then
 		    args="$args --tb-expired $tb_expired"
         fi
-	fi
-
-	if [ -n "$api_prefix" ]; then
-		args="$args --api-prefix $api_prefix"
 	fi
 
 	if [ $cookie_store -ne 0 ]; then 

@@ -55,7 +55,6 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .proxies(args.proxies.unwrap_or_default())
         .disable_direct(args.disable_direct)
         .cookie_store(args.cookie_store)
-        .api_prefix(args.api_prefix)
         .tcp_keepalive(args.tcp_keepalive)
         .pool_idle_timeout(args.pool_idle_timeout)
         .timeout(args.timeout)
@@ -73,6 +72,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .arkose_gpt4_har_dir(args.arkose_gpt4_har_dir)
         .arkose_auth_har_dir(args.arkose_auth_har_dir)
         .arkose_platform_har_dir(args.arkose_platform_har_dir)
+        .arkose_gpt3_experiment(args.arkose_gpt3_experiment)
         .arkose_har_upload_key(args.arkose_har_upload_key)
         .arkose_solver(arkose_solver)
         .pbind(args.pbind)
@@ -266,6 +266,7 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
         level: "info".to_owned(),
         pcert: PathBuf::from("ca/cert.crt"),
         pkey: PathBuf::from("ca/key.pem"),
+        arkose_gpt3_experiment: false,
         ..args::ServeArgs::default()
     };
 

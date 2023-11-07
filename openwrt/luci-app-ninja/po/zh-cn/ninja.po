@@ -184,9 +184,6 @@ msgstr "启用 Cookie 存储"
 msgid "Disable WebUI"
 msgstr "禁用 WebUI"
 
-msgid "WebUI API prefix"
-msgstr "WebUI API 前缀"
-
 msgid "CF Site Key"
 msgstr "CF Site Key"
 
@@ -237,3 +234,6 @@ msgstr "Preauth MITM 服务 CA 证书文件路径"
 
 msgid "Preauth MITM server CA private key file path"
 msgstr "Preauth MITM 服务 CA 私钥文件路径"
+
+msgid "Enable ChatGPT GPT-3.5 ArkoseLabs"
+msgstr "启用 ChatGPT GPT-3.5 ArkoseLabs"

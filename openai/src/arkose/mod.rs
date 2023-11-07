@@ -78,6 +78,22 @@ pub enum GPTModel {
     Gpt4Other,
 }
 
+impl GPTModel {
+    pub fn is_gpt3(&self) -> bool {
+        match self {
+            GPTModel::Gpt35Model | GPTModel::Gpt35Other => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_gpt4(&self) -> bool {
+        match self {
+            GPTModel::Gpt4Model | GPTModel::Gpt4Other => true,
+            _ => false,
+        }
+    }
+}
+
 impl Into<Type> for GPTModel {
     fn into(self) -> Type {
         match self {
