@@ -12,6 +12,7 @@ use axum::http::Response;
 use axum::response::IntoResponse;
 use axum::routing::any;
 use axum::routing::{get, post};
+use axum::Json;
 use axum::Router;
 use axum::TypedHeader;
 use axum_csrf::CsrfConfig;
@@ -147,6 +148,7 @@ pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
             .route("/auth/login/token", post(post_login_token))
             .route("/auth/logout", get(get_logout))
             .route("/auth/session", get(get_session))
+            .route("/auth/me", get(get_auth_me))
             .route("/", get(get_chat))
             .route("/c", get(get_chat))
             .route("/c/:conversation_id", get(get_chat))
@@ -429,6 +431,23 @@ fn session_to_body(session: &Session) -> anyhow::Result<String> {
         "authProvider": "auth0"
     });
     Ok(props.to_string())
+}
+
+async fn get_auth_me(
+    TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
+) -> Result<impl IntoResponse, ResponseError> {
+    let mut json = context::get_instance()
+        .client()
+        .get(format!("{URL_CHATGPT_API}/backend-api/me"))
+        .bearer_auth(bearer.token())
+        .send()
+        .await
+        .map_err(ResponseError::InternalServerError)?
+        .json::<Value>()
+        .await?;
+    json.as_object_mut()
+        .map(|v| v.insert("picture".to_owned(), Value::Null));
+    Ok(Json(json))
 }
 
 async fn get_chat(
