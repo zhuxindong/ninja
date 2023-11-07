@@ -18,17 +18,17 @@ impl Context {
     pub async fn init_openai_context() -> anyhow::Result<()> {
         let conf = Self::get_conf().await?;
 
-        let arkose_chat_har_file = conf
+        let arkose_gpt4_har_dir = conf
             .arkose_chat_har_path
             .map(|f| Some(PathBuf::from(f)))
             .unwrap_or(None);
 
-        let arkose_auth_har_file = conf
+        let arkose_auth_har_dir = conf
             .arkose_auth_har_path
             .map(|f| Some(PathBuf::from(f)))
             .unwrap_or(None);
 
-        let arkose_platform_har_file = conf
+        let arkose_platform_har_dir = conf
             .arkose_platform_har_path
             .map(|f| Some(PathBuf::from(f)))
             .unwrap_or(None);
@@ -41,9 +41,9 @@ impl Context {
         let proxies = conf.proxy.map(|p| vec![p]).unwrap_or(vec![]);
 
         let args = openai::context::ContextArgs::builder()
-            .arkose_chat4_har_file(arkose_chat_har_file)
-            .arkose_auth_har_file(arkose_auth_har_file)
-            .arkose_platform_har_file(arkose_platform_har_file)
+            .arkose_gpt4_har_dir(arkose_gpt4_har_dir)
+            .arkose_auth_har_dir(arkose_auth_har_dir)
+            .arkose_platform_har_dir(arkose_platform_har_dir)
             .arkose_solver(arkose_solver)
             .timeout(conf.timeout)
             .connect_timeout(conf.connect_timeout)
@@ -117,7 +117,6 @@ impl Context {
                     .expect("Failed to read configuration");
                 AuthClientBuilder::builder()
                     .proxy(conf.proxy)
-                    .preauth_api(Some(conf.preauth_api))
                     .timeout(time::Duration::from_secs(conf.timeout as u64))
                     .connect_timeout(time::Duration::from_secs(conf.connect_timeout as u64))
                     .tcp_keepalive(time::Duration::from_secs(conf.tcp_keepalive as u64))

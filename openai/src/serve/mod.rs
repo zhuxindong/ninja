@@ -1,10 +1,12 @@
-pub mod err;
-pub mod middleware;
-pub mod turnstile;
+mod error;
+mod middleware;
+mod signal;
+mod turnstile;
 
+#[cfg(feature = "preauth")]
+pub mod preauth;
 #[cfg(feature = "template")]
-pub mod router;
-pub mod signal;
+mod router;
 
 use anyhow::anyhow;
 use axum::body::{Body, StreamBody};
@@ -40,11 +42,11 @@ use crate::auth::model::{AccessToken, AuthAccount, RefreshToken, SessionAccessTo
 use crate::auth::provide::AuthProvider;
 use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
 use crate::context::{self, ContextArgs};
-use crate::serve::middleware::tokenbucket::TokenBucketLimitContext;
+use crate::serve::middleware::tokenbucket::{Strategy, TokenBucketLimitContext};
 use crate::serve::router::toapi::chat_to_api;
 use crate::{arkose, debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
 
-use crate::serve::err::ResponseError;
+use crate::serve::error::ResponseError;
 use crate::{HEADER_UA, URL_CHATGPT_API, URL_PLATFORM_API};
 
 const EMPTY: &str = "";
@@ -123,7 +125,7 @@ impl Launcher {
 
         let app_layer = {
             let limit_context = TokenBucketLimitContext::from((
-                self.inner.tb_store_strategy.clone(),
+                Strategy::from_str(self.inner.tb_store_strategy.as_str())?,
                 self.inner.tb_enable,
                 self.inner.tb_capacity,
                 self.inner.tb_fill_rate,
@@ -155,12 +157,27 @@ impl Launcher {
             .build();
 
         let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
+            .enable_io()
+            .enable_time()
             .worker_threads(self.inner.workers)
             .build()?;
 
-        runtime.block_on(async {
-            tokio::spawn(check_wan_address());
+        runtime.block_on(async move {
+            // PreAuth mitm proxy
+            #[cfg(feature = "preauth")]
+            if let Some(pbind) = self.inner.pbind.clone() {
+                if let Some(err) = preauth::mitm_proxy(
+                    pbind,
+                    self.inner.pupstream.clone(),
+                    self.inner.pcert.clone(),
+                    self.inner.pkey.clone(),
+                )
+                .await
+                .err()
+                {
+                    crate::error!("PreAuth proxy error: {}", err);
+                }
+            }
 
             let router = axum::Router::new()
                 // official dashboard api endpoint
@@ -181,12 +198,16 @@ impl Launcher {
 
             let router = router::config(router, &self.inner).layer(global_layer);
 
+            // Signal the server to shutdown using Handle.
             let handle = Handle::new();
 
             // Spawn a task to gracefully shutdown server.
             tokio::spawn(signal::graceful_shutdown(handle.clone()));
 
-            match (self.inner.tls_cert, self.inner.tls_key) {
+            // Spawn a task to check wan address.
+            tokio::spawn(check_wan_address());
+
+            let result = match (self.inner.tls_cert, self.inner.tls_key) {
                 (Some(cert), Some(key)) => {
                     let tls_config = RustlsConfig::from_pem_file(cert, key)
                         .await
@@ -198,15 +219,19 @@ impl Launcher {
                         .http_config(http_config)
                         .serve(router.into_make_service_with_connect_info::<SocketAddr>())
                         .await
-                        .expect("openai server failed")
                 }
-                _ => axum_server::bind(self.inner.bind.unwrap())
-                    .handle(handle)
-                    .addr_incoming_config(incoming_config)
-                    .http_config(http_config)
-                    .serve(router.into_make_service_with_connect_info::<SocketAddr>())
-                    .await
-                    .expect("openai server failed"),
+                _ => {
+                    axum_server::bind(self.inner.bind.unwrap())
+                        .handle(handle)
+                        .addr_incoming_config(incoming_config)
+                        .http_config(http_config)
+                        .serve(router.into_make_service_with_connect_info::<SocketAddr>())
+                        .await
+                }
+            };
+
+            if let Some(err) = result.err() {
+                warn!("Server error: {}", err);
             }
         });
 

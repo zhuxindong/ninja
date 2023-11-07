@@ -57,7 +57,6 @@ struct Inner {
     connect_timeout: u64,
     pool_idle_timeout: u64,
     tcp_keepalive: u64,
-    preauth_api: Option<String>,
     proxies: Vec<String>,
     interface: Option<IpAddr>,
     ipv6_subnet: Option<Ipv6Subnet>,
@@ -77,7 +76,6 @@ impl From<&context::ContextArgs> for Inner {
             connect_timeout: args.connect_timeout as u64,
             tcp_keepalive: args.tcp_keepalive as u64,
             pool_idle_timeout: args.pool_idle_timeout as u64,
-            preauth_api: args.preauth_api.clone(),
             proxies: args.proxies.clone(),
             interface: args.interface,
             ipv6_subnet,
@@ -85,13 +83,13 @@ impl From<&context::ContextArgs> for Inner {
     }
 }
 
-pub struct ClientLoadBalancer {
+pub struct ClientRoundRobinBalancer {
     clients: Vec<ClientType>,
     index: AtomicUsize,
     inner: Inner,
 }
 
-impl ClientLoadBalancer {
+impl ClientRoundRobinBalancer {
     fn new_client_generic<F, T>(
         args: &context::ContextArgs,
         client_type: fn(T) -> ClientType,
@@ -135,7 +133,7 @@ impl ClientLoadBalancer {
     }
 }
 
-impl ClientLoadBalancer {
+impl ClientRoundRobinBalancer {
     fn rebuild_client_with_ipv6(&self, client: &ClientType) -> ClientType {
         let bind_addr = self.inner.ipv6_subnet.as_ref().unwrap().get_random_ipv6();
         match client {
@@ -181,7 +179,7 @@ impl ClientLoadBalancer {
                         Err(x) => old = x,
                     }
                 }
-                self.clients[old].clone()
+                self.clients[new].clone()
             }
         }
     }
@@ -265,6 +263,5 @@ fn build_auth_client(
         .timeout(Duration::from_secs(inner.timeout))
         .connect_timeout(Duration::from_secs(inner.connect_timeout))
         .proxy(proxy_url.cloned())
-        .preauth_api(inner.preauth_api.clone())
         .build()
 }

@@ -21,18 +21,11 @@ use tokio::{
 use tokio_rustls::TlsAcceptor;
 
 /// Enum representing either an HTTP request or response.
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum RequestOrResponse {
     Request(Request<Body>),
     Response(Response<Body>),
-}
-
-/// Context for HTTP requests and responses.
-#[derive(Default, Debug)]
-pub struct HttpContext<D: Default + Send + Sync> {
-    pub uri: Option<Uri>,
-
-    pub custom_data: D,
 }
 
 #[derive(Clone)]
@@ -108,13 +101,20 @@ where
         {
             let header_mut = req.headers_mut();
             header_mut.remove(http::header::HOST);
+            header_mut.remove(http::header::CONNECTION);
             header_mut.remove(http::header::ACCEPT_ENCODING);
             header_mut.remove(http::header::CONTENT_LENGTH);
         }
 
-        let res = match self.client {
-            HttpClient::Proxy(client) => client.request(req).await?,
-            HttpClient::Https(client) => client.request(req).await?,
+        let res = match self.client.request(req).await {
+            Ok(res) => res,
+            Err(err) => {
+                warn!("proxy request failed: {err:?}");
+                Response::builder()
+                    .status(http::StatusCode::BAD_GATEWAY)
+                    .body(Body::empty())
+                    .expect("failed build response")
+            }
         };
 
         let mut res = self.http_handler.handle_response(res).await;
@@ -149,14 +149,20 @@ where
                     Ok(upgraded) => {
                         self.serve_tls(upgraded).await;
                     }
-                    Err(e) => debug!("upgrade error for {}: {}", authority, e),
+                    Err(err) => warn!("upgrade error for {authority}: {err}"),
                 };
             });
         } else {
             tokio::task::spawn(async move {
                 let remote_addr = host_addr(req.uri()).unwrap();
-                let upgraded = hyper::upgrade::on(req).await.unwrap();
-                tunnel(upgraded, remote_addr).await
+                match hyper::upgrade::on(req).await {
+                    Ok(upgraded) => {
+                        if let Some(err) = tunnel(upgraded, remote_addr).await.err() {
+                            debug!("tunnel error: {err}");
+                        }
+                    }
+                    Err(err) => warn!("upgrade error for {remote_addr}: {err}"),
+                }
             });
         }
         Ok(Response::new(Body::empty()))
@@ -170,13 +176,22 @@ where
         let mut recording_reader = RecordingBufReader::new(&mut stream);
         let reader = HandshakeRecordReader::new(&mut recording_reader);
         pin!(reader);
-        let sni_hostname = tokio::time::timeout(
+        let sni_hostname = match tokio::time::timeout(
             Duration::from_secs(5),
             read_sni_host_name_from_client_hello(reader),
         )
         .await
-        .unwrap()
-        .unwrap();
+        {
+            Ok(Ok(ok)) => ok,
+            Ok(Err(err)) => {
+                warn!("read sni hostname failed: {}", err);
+                return;
+            }
+            Err(err) => {
+                warn!("read sni hostname timeout: {}", err);
+                return;
+            }
+        };
 
         let read_buf = recording_reader.buf();
         let client_stream = PrefixedReaderWriter::new(stream, read_buf);
@@ -193,8 +208,8 @@ where
         match TlsAcceptor::from(server_config).accept(client_stream).await {
             Ok(stream) => {
                 if let Err(e) = Http::new()
-                    .http1_preserve_header_case(true)
-                    .http1_title_case_headers(true)
+                    .http2_enable_connect_protocol()
+                    .pipeline_flush(true)
                     .serve_connection(
                         stream,
                         service_fn(|req| self.clone().process_request(req, Scheme::HTTPS)),
@@ -219,8 +234,8 @@ where
         S: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     {
         Http::new()
-            .http1_preserve_header_case(true)
-            .http1_title_case_headers(true)
+            .http2_enable_connect_protocol()
+            .pipeline_flush(true)
             .serve_connection(stream, service_fn(|req| self.clone().proxy_req(req)))
             .with_upgrades()
             .await
@@ -230,7 +245,7 @@ where
         Response::builder()
             .header(
                 http::header::CONTENT_DISPOSITION,
-                "attachment; filename=good-mitm.crt",
+                "attachment; filename=preauth-mitm.crt",
             )
             .header(http::header::CONTENT_TYPE, "application/octet-stream")
             .status(http::StatusCode::OK)

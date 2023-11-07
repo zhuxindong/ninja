@@ -8,10 +8,10 @@ pub enum Error {
     Tls(#[from] RcgenError),
     #[error("network error")]
     HyperError(#[from] hyper::Error),
+    #[error("body error")]
+    BodyErrpr(#[from] http::Error),
+    #[error("request connect error")]
+    RequestConnectError(#[from] reqwest::Error),
     #[error("IO error")]
     IO(#[from] io::Error),
-    #[error("unable to decode response body")]
-    Decode,
-    #[error("unknown error")]
-    Unknown,
 }

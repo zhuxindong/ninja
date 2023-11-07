@@ -1,11 +1,9 @@
+use moka::sync::Cache;
 use redis::RedisResult;
 use redis_macros::{FromRedisValue, ToRedisArgs};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::net::IpAddr;
-use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::sync::Mutex;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 fn now_timestamp() -> u64 {
     let now_duration = SystemTime::now()
@@ -44,7 +42,7 @@ impl std::str::FromStr for Strategy {
     }
 }
 
-#[derive(Serialize, Deserialize, FromRedisValue, ToRedisArgs, Debug)]
+#[derive(Serialize, Deserialize, FromRedisValue, ToRedisArgs, Debug, Clone)]
 struct BucketState {
     tokens: u32,
     last_time: u64,
@@ -57,34 +55,20 @@ pub struct MemTokenBucket {
     /// token bucket fill rate `fill_rate`
     fill_rate: u32,
     /// ip -> token backet
-    buckets: Arc<Mutex<HashMap<IpAddr, BucketState>>>,
-    _cleanup_task: Option<tokio::task::JoinHandle<()>>,
+    buckets: moka::sync::Cache<IpAddr, BucketState>,
 }
 
 impl MemTokenBucket {
     pub fn new(enable: bool, capacity: u32, fill_rate: u32, expired: u32) -> Self {
-        let buckets: Arc<Mutex<HashMap<IpAddr, BucketState>>> =
-            Arc::new(Mutex::new(HashMap::new()));
-        let b = buckets.clone();
-        let task = if enable {
-            let task = tokio::task::spawn(async move {
-                loop {
-                    tokio::time::sleep(std::time::Duration::from_secs(expired.into())).await;
-                    let mut b = b.lock().await;
-                    b.retain(|_, v| v.last_time > now_timestamp());
-                    drop(b)
-                }
-            });
-            Some(task)
-        } else {
-            None
-        };
+        let buckets: Cache<IpAddr, BucketState> = Cache::builder()
+            .max_capacity(65535)
+            .time_to_idle(Duration::from_secs(expired as u64))
+            .build();
         Self {
             enable,
             capacity,
             fill_rate,
             buckets,
-            _cleanup_task: task,
         }
     }
 }
@@ -95,14 +79,17 @@ impl TokenBucket for MemTokenBucket {
         if !self.enable {
             return Ok(true);
         }
-        let mut buckets = self.buckets.lock().await;
 
         let now_timestamp = now_timestamp();
 
-        let bucket = buckets.entry(ip).or_insert(BucketState {
-            tokens: self.capacity,
-            last_time: now_timestamp,
-        });
+        let mut bucket = self
+            .buckets
+            .entry(ip)
+            .or_insert(BucketState {
+                tokens: self.capacity,
+                last_time: now_timestamp,
+            })
+            .into_value();
 
         let elapsed = now_timestamp - bucket.last_time;
         let tokens_to_add = (elapsed as u32) * self.fill_rate;
@@ -111,7 +98,7 @@ impl TokenBucket for MemTokenBucket {
 
         if bucket.tokens > 0 {
             bucket.tokens -= 1;
-            drop(buckets);
+            self.buckets.insert(ip, bucket);
             Ok(true)
         } else {
             Ok(false)

@@ -7,7 +7,7 @@ use axum::{body::Body, extract::Path, http::Response, Router};
 
 use crate::context::ContextArgs;
 
-use super::err::ResponseError;
+use super::error::ResponseError;
 
 mod arkose;
 mod har;

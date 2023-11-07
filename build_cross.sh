@@ -8,9 +8,6 @@ root=$(pwd)
 : ${os=linux}
 [ ! -d uploads ] && mkdir uploads
 
-cargo update
-cargo install cargo-deb
-
 pull_docker_image() {
     docker pull ghcr.io/gngpp/ninja-builder:$1
 }
@@ -20,7 +17,7 @@ rmi_docker_image() {
 }
 
 build_macos_target() {
-    cargo build --release --target $1
+    cargo build --release --target $1 --features mimalloc
     sudo chmod -R 777 target
     cd target/$1/release
     upx --best --lzma ninja
@@ -32,18 +29,22 @@ build_macos_target() {
 }
 
 build_linux_target() {
+    features=""
+    if [ "$1" = "armv5te-unknown-linux-musleabi" ] || [ "$1" = "arm-unknown-linux-musleabi" ] || [ "$1" = "arm-unknown-linux-musleabihf" ]; then
+        features="--features rpmalloc"
+    else
+        features="--features mimalloc"
+    fi
+
     docker run --rm -t --user=$UID:$(id -g $USER) \
         -v $(pwd):/home/rust/src \
         -v $HOME/.cargo/registry:/root/.cargo/registry \
         -v $HOME/.cargo/git:/root/.cargo/git \
-        ghcr.io/gngpp/ninja-builder:$1 cargo build --release
+        -e "FEATURES=$features" \
+        ghcr.io/gngpp/ninja-builder:$1 /bin/bash -c "cargo build --release \$FEATURES"
+
     sudo chmod -R 777 target
     upx --best --lzma target/$1/release/ninja
-    cargo deb --target=$1 --no-build --no-strip
-    cd target/$1/debian
-    rename 's/.*/ninja-'$tag'-'$1'.deb/' *.deb
-    mv ./* $root/uploads/
-    cd -
     cd target/$1/release
     tar czvf ninja-$tag-$1.tar.gz ninja
     shasum -a 256 ninja-$tag-$1.tar.gz >ninja-$tag-$1.tar.gz.sha256
@@ -57,7 +58,7 @@ build_windows_target() {
         -v $(pwd):/home/rust/src \
         -v $HOME/.cargo/registry:/usr/local/cargo/registry \
         -v $HOME/.cargo/git:/usr/local/cargo/git \
-        ghcr.io/gngpp/ninja-builder:$1 cargo xwin build --release --target $1
+        ghcr.io/gngpp/ninja-builder:$1 cargo xwin build --release --target $1 --features mimalloc
     sudo chmod -R 777 target
     sudo upx --best --lzma target/$1/release/ninja.exe
     cd target/$1/release
@@ -87,7 +88,9 @@ if [ "$os" = "linux" ]; then
 fi
 
 if [ "$os" = "macos" ]; then
-    brew install upx
+    if ! which upx &>/dev/null; then
+        brew install upx
+    fi
     rustup target add x86_64-apple-darwin aarch64-apple-darwin
     target_list=(x86_64-apple-darwin aarch64-apple-darwin)
     for target in "${target_list[@]}"; do

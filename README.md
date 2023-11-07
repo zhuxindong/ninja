@@ -21,6 +21,7 @@ Reverse engineered `ChatGPT` proxy (bypass Cloudflare 403 Access Denied)
 
 - API key acquisition
 - Email/password account authentication (Google/Microsoft third-party login not supported)
+- Supports obtaining RefreshToken
 - `ChatGPT-API`/`OpenAI-API`/`ChatGPT-to-API` Http API proxy (for third-party client access)
 - Support IP proxy pool (support using Ipv6 subnet as proxy pool)
 - ChatGPT WebUI
@@ -30,10 +31,12 @@ Reverse engineered `ChatGPT` proxy (bypass Cloudflare 403 Access Denied)
 
 ### ArkoseLabs
 
-Sending `GPT4/GPT-3.5 (already grayscale)/Creating API-Key` dialog requires sending `Arkose Token` as a parameter. There are only two supported solutions for the time being.
+Sending `GPT4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` as a parameter. There are only two supported solutions for the time being.
 
 1) Use HAR
-    > The `ChatGPT` official website sends a `GPT4` session message, and the browser `F12` downloads the `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` interface. HAR log file, use the startup parameter `--arkose-chat4-har-file` to specify the HAR file path to use (if you do not specify a path, use the default path `~/.chat4.openai.com.har`, you can directly upload and update HAR ), supports uploading and updating HAR, request path: `/har/upload`, optional upload authentication parameter: `--arkose-har-upload-key`
+
+   - Supports HAR feature pooling, can upload multiple HARs at the same time, and use rotation training strategy
+   > The `ChatGPT` official website sends a `GPT4` session message, and the browser `F12` downloads the `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` interface. HAR log file, use the startup parameter `--arkose-gpt4-har-dir` to specify the HAR directory path to use (if you do not specify a path, use the default path `~/.gpt4`, you can directly upload and update HAR ), the same method applies to `GPT3.5` and other types. Supports WebUI to upload and update HAR, request path: `/har/upload`, optional upload authentication parameter: `--arkose-har-upload-key`
 
 2) Use [YesCaptcha](https://yescaptcha.com/i/1Cc5i4) / [CapSolver](https://dashboard.capsolver.com/passport/register?inviteCode=y7CtB_a-3X6d)
     > The platform performs verification code parsing, start the parameter `--arkose-solver` to select the platform (use `YesCaptcha` by default), `--arkose-solver-key` fill in `Client Key`
@@ -41,24 +44,32 @@ Sending `GPT4/GPT-3.5 (already grayscale)/Creating API-Key` dialog requires send
 - Both solutions are used, the priority is: `HAR` > `YesCaptcha` / `CapSolver`
 - `YesCaptcha` / `CapSolver` is recommended to be used with HAR. When the verification code is generated, the parser is called for processing. After verification, HAR is more durable.
 
-> Currently OpenAI has updated `Login` which requires verification of `Arkose Token`. The solution is the same as GPT4. Fill in the startup parameters and specify the HAR file `--arkose-auth-har-file`. If you don't want to upload, you can log in through the browser code, which is not required. To create an API-Key, you need to upload the HAR feature file related to the Platform. The acquisition method is the same as above.
+> Currently OpenAI has updated `Login` which requires verification of `Arkose Token`. The solution is the same as GPT4. Fill in the startup parameters and specify the HAR file `--arkose-auth-har-dir`. If you don't want to upload, you can log in through the browser code, which is not required. To create an API-Key, you need to upload the HAR feature file related to the Platform. The acquisition method is the same as above.
 
 ### Http Server
 
 #### Public interface, `*` represents any `URL` suffix
 
 - ChatGPT-API
-  - <https://host:port/public-api/*>
-  - <https://host:port/backend-api/*>
+  - `/public-api/*`
+  - `/backend-api/*`
   
 - OpenAI-API
-  - <https://host:port/v1/*>
+  - `/v1/*`
 
 - Platform-API
-  - <https://host:port/dashboard/*>
+  - `/dashboard/*`
 - ChatGPT-To-API
-  - <https://host:port/to/v1/chat/completions>
+  - `/to/v1/chat/completions`
   > About using `ChatGPT` to `API`, use `AceessToken` directly as `API Key`, interface path: `/to/v1/chat/completions`
+
+- Authorization
+  - Login: `/auth/token`, form `option` optional parameter, default is `web` login, returns `AccessToken` and `Session`; parameter is `apple`/`platform`, returns `AccessToken` and `RefreshToken`
+  - Refresh `RefreshToken`: `/auth/refresh_token`
+  - Revoke `RefreshToken`: `/auth/revoke_token`
+  - Refresh `Session`: `/api/auth/session`, send a cookie named `__Secure-next-auth.session-token` to call refresh `Session`, and return a new `AccessToken`
+
+  > About the method of obtaining `RefreshToken`, use the `ChatGPT App` login method of the `Apple` platform. The principle is to use the built-in MITM agent. When the `Apple device` is connected to the agent, you can log in to the `Apple platform` to obtain `RefreshToken`. It is only suitable for small quantities or personal use `(large quantities will seal the device, use with caution)`. For detailed usage, please see the startup parameter description.
 
 #### API documentation
 
@@ -73,6 +84,8 @@ Sending `GPT4/GPT-3.5 (already grayscale)/Creating API-Key` dialog requires send
 - `ChatGPT` to `API`
 - Can access third-party clients
 - Can access IP proxy pool to improve concurrency
+- Supports obtaining RefreshToken
+- Support file feature pooling in HAR format
 
 #### Parameter Description
 
@@ -86,6 +99,18 @@ Sending `GPT4/GPT-3.5 (already grayscale)/Creating API-Key` dialog requires send
 
 [...](https://github.com/gngpp/ninja/blob/main/README.md#command-manual)
 
+```shell
+ # Generate certificate
+ ninja genca
+
+ ninja run --pbind 0.0.0.0:8888
+
+ # Set the network on your mobile phone to set your proxy listening address, for example: http://192.168.1.1:8888
+ # Then open the browser http://192.168.1.1:8888/preauth/cert, download the certificate, install it and trust it, then open iOS ChatGPT and you can play happily
+ ```
+
+ > For `Web login`, a cookie named: `__Secure-next-auth.session-token` is returned by default. The client only needs to save this cookie. Calling `/api/auth/session` can also refresh `AccessToken`
+
 ### Install
 
 - #### Ubuntu(Other Linux)
@@ -93,9 +118,9 @@ Sending `GPT4/GPT-3.5 (already grayscale)/Creating API-Key` dialog requires send
 Making [Releases](https://github.com/gngpp/ninja/releases/latest) has a precompiled deb package, binaries, in Ubuntu, for example:
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.7.4/ninja-0.7.4-x86_64-unknown-linux-musl.deb
-dpkg -i ninja-0.7.4-x86_64-unknown-linux-musl.deb
-ninja run
+wget https://github.com/gngpp/ninja/releases/download/v0.7.7/ninja-0.7.7-x86_64-unknown-linux-musl.tar.gz
+tar -xf ninja-0.7.7-x86_64-unknown-linux-musl.tar.gz
+./ninja run
 ```
 
 - #### OpenWrt
@@ -103,13 +128,13 @@ ninja run
 There are pre-compiled ipk files in GitHub [Releases](https://github.com/gngpp/ninja/releases/latest), which currently provide versions of aarch64/x86_64 and other architectures. After downloading, use opkg to install, and use nanopi r4s as example:
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.7.4/ninja_0.7.4_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.7.4/luci-app-ninja_1.1.4-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.7.4/luci-i18n-ninja-zh-cn_1.1.4-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.7.7/ninja_0.7.7_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.7.7/luci-app-ninja_1.1.5-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.7.7/luci-i18n-ninja-zh-cn_1.1.5-1_all.ipk
 
-opkg install ninja_0.7.4_aarch64_generic.ipk
-opkg install luci-app-ninja_1.1.4-1_all.ipk
-opkg install luci-i18n-ninja-zh-cn_1.1.4-1_all.ipk
+opkg install ninja_0.7.7_aarch64_generic.ipk
+opkg install luci-app-ninja_1.1.5-1_all.ipk
+opkg install luci-i18n-ninja-zh-cn_1.1.5-1_all.ipk
 ```
 
 - #### Docker
@@ -172,7 +197,9 @@ Commands:
   restart  Restart the HTTP server daemon
   status   Status of the Http server daemon process
   log      Show the Http server daemon log
+  genca    Generate MITM CA certificate
   gt       Generate config template file (toml format file)
+  update   Update the application
   help     Print this message or the help of the given subcommand(s)
 
 Options:
@@ -194,21 +221,21 @@ Options:
   -W, --workers <WORKERS>
           Server worker-pool size (Recommended number of CPU cores) [default: 1]
       --concurrent-limit <CONCURRENT_LIMIT>
-          Enforces a limit on the concurrent number of requests the underlying [default: 65535]
+          Enforces a limit on the concurrent number of requests the underlying [default: 1024]
   -x, --proxies <PROXIES>
           Server proxies pool, Example: protocol://user:pass@ip:port [env: PROXIES=]
   -i, --interface <INTERFACE>
           Bind address for outgoing connections (or IPv6 subnet fallback to Ipv4) [env: INTERFACE=]
   -I, --ipv6-subnet <IPV6_SUBNET>
-          IPv6 subnet, Example: 2001:19f0:6001:48e4::/64 [env: IPV4_SUBNET=]
+          IPv6 subnet, Example: 2001:19f0:6001:48e4::/64 [env: IPV6_SUBNET=]
       --disable-direct
           Disable direct connection [env: DISABLE_DIRECT=]
       --cookie-store
           Enabled Cookie Store [env: COOKIE_STORE=]
       --timeout <TIMEOUT>
-          Client timeout (seconds) [default: 600]
+          Client timeout (seconds) [default: 360]
       --connect-timeout <CONNECT_TIMEOUT>
-          Client connect timeout (seconds) [default: 60]
+          Client connect timeout (seconds) [default: 20]
       --tcp-keepalive <TCP_KEEPALIVE>
           TCP keepalive (seconds) [default: 60]
       --pool-idle-timeout <POOL_IDLE_TIMEOUT>
@@ -221,8 +248,6 @@ Options:
           Login Authentication Key [env: AUTH_KEY=]
       --api-prefix <API_PREFIX>
           WebUI api prefix [env: API_PREFIX=]
-      --preauth-api <PREAUTH_API>
-          PreAuth Cookie API URL [env: PREAUTH_API=] [default: https://ai.fakeopen.com/auth/preauth]
   -D, --disable-webui
           Disable WebUI [env: DISABLE_WEBUI=]
       --cf-site-key <CF_SITE_KEY>
@@ -231,14 +256,14 @@ Options:
           Cloudflare turnstile captcha secret key [env: CF_SITE_KEY=]
       --arkose-endpoint <ARKOSE_ENDPOINT>
           Arkose endpoint, Example: https://client-api.arkoselabs.com
-      --arkose-chat3-har-file <ARKOSE_CHAT3_HAR_FILE>
-          About the browser HAR file path requested by ChatGPT GPT-3.5 ArkoseLabs
-      --arkose-chat4-har-file <ARKOSE_CHAT4_HAR_FILE>
-          About the browser HAR file path requested by ChatGPT GPT-4 ArkoseLabs
-      --arkose-auth-har-file <ARKOSE_AUTH_HAR_FILE>
-          About the browser HAR file path requested by Auth ArkoseLabs
-      --arkose-platform-har-file <ARKOSE_PLATFORM_HAR_FILE>
-          About the browser HAR file path requested by Platform ArkoseLabs
+      --arkose-gpt3-har-dir <ARKOSE_GPT3_HAR_DIR>
+          About the browser HAR directory path requested by ChatGPT GPT-3.5 ArkoseLabs
+      --arkose-gpt4-har-dir <ARKOSE_GPT4_HAR_DIR>
+          About the browser HAR directory path requested by ChatGPT GPT-4 ArkoseLabs
+      --arkose-auth-har-dir <ARKOSE_AUTH_HAR_DIR>
+          About the browser HAR directory path requested by Auth ArkoseLabs
+      --arkose-platform-har-dir <ARKOSE_PLATFORM_HAR_DIR>
+          About the browser HAR directory path requested by Platform ArkoseLabs
   -K, --arkose-har-upload-key <ARKOSE_HAR_UPLOAD_KEY>
           HAR file upload authenticate key
   -s, --arkose-solver <ARKOSE_SOLVER>
@@ -257,13 +282,13 @@ Options:
           Token bucket fill rate [default: 1]
       --tb-expired <TB_EXPIRED>
           Token bucket expired (seconds) [default: 86400]
-  -B, --preauth-bind <PREAUTH_BIND>
-          Preauth MITM server bind address [env: PREAUTH_BIND=] [default: 0.0.0.0:8000]
-  -X, --preauth-upstream <PREAUTH_UPSTREAM>
-          Preauth MITM server upstream proxy [env: PREAUTH_UPSTREAM=]
-      --preauth-cert <PREAUTH_CERT>
+  -B, --pbind <PBIND>
+          Preauth MITM server bind address [env: PREAUTH_BIND=]
+  -X, --pupstream <PUPSTREAM>
+          Preauth MITM server upstream proxy, Only support http protocol [env: PREAUTH_UPSTREAM=]
+      --pcert <PCERT>
           Preauth MITM server CA certificate file path [default: ca/cert.crt]
-      --preauth-key <PREAUTH_KEY>
+      --pkey <PKEY>
           Preauth MITM server CA private key file path [default: ca/key.pem]
   -h, --help
           Print help

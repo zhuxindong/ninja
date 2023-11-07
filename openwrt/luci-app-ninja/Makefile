@@ -3,7 +3,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-ninja
-PKG_VERSION:=1.1.4
+PKG_VERSION:=1.1.5
 
 PKG_MAINTAINER:=gngpp <gngppz@gmail.com>
 

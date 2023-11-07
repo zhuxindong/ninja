@@ -1,6 +1,6 @@
 use crate::parse;
 use clap::{Args, Subcommand};
-use openai::{arkose::funcaptcha::Solver, serve::middleware::tokenbucket::Strategy};
+use openai::arkose::funcaptcha::Solver;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -66,6 +66,8 @@ pub enum ServeSubcommand {
         #[clap(short, long, group = "gt")]
         out: Option<PathBuf>,
     },
+    /// Update the application
+    Update,
 }
 
 #[derive(Args, Debug, Default, Serialize, Deserialize)]
@@ -87,10 +89,10 @@ pub struct ServeArgs {
     pub(super) workers: usize,
 
     /// Enforces a limit on the concurrent number of requests the underlying
-    #[clap(long, default_value = "65535")]
+    #[clap(long, default_value = "1024")]
     pub(super) concurrent_limit: usize,
 
-    /// Server proxies pool, Example: protocol://user:pass@ip:port
+    /// Server proxies pool, Only support http/https/socks5 protocol
     #[clap(short = 'x',long, env = "PROXIES", value_parser = parse::parse_proxies_url, group = "proxy")]
     pub(super) proxies: Option<std::vec::Vec<String>>,
 
@@ -111,11 +113,11 @@ pub struct ServeArgs {
     pub(super) cookie_store: bool,
 
     /// Client timeout (seconds)
-    #[clap(long, default_value = "600")]
+    #[clap(long, default_value = "360")]
     pub(super) timeout: usize,
 
     /// Client connect timeout (seconds)
-    #[clap(long, default_value = "60")]
+    #[clap(long, default_value = "20")]
     pub(super) connect_timeout: usize,
 
     /// TCP keepalive (seconds)
@@ -142,10 +144,6 @@ pub struct ServeArgs {
     #[clap(long, env = "API_PREFIX", value_parser = parse::parse_url)]
     pub(super) api_prefix: Option<String>,
 
-    /// PreAuth Cookie API URL
-    #[clap(long, env = "PREAUTH_API", value_parser = parse::parse_url)]
-    pub(super) preauth_api: Option<String>,
-
     /// Disable WebUI
     #[clap(short = 'D', long, env = "DISABLE_WEBUI")]
     pub(super) disable_webui: bool,
@@ -162,21 +160,21 @@ pub struct ServeArgs {
     #[clap(long, value_parser = parse::parse_url)]
     pub(super) arkose_endpoint: Option<String>,
 
-    /// About the browser HAR file path requested by ChatGPT GPT-3.5 ArkoseLabs
-    #[clap(long, value_parser = parse::parse_file_path)]
-    pub(super) arkose_chat3_har_file: Option<PathBuf>,
+    /// About the browser HAR directory path requested by ChatGPT GPT-3.5 ArkoseLabs
+    #[clap(long, value_parser = parse::parse_dir_path)]
+    pub(super) arkose_gpt3_har_dir: Option<PathBuf>,
 
-    /// About the browser HAR file path requested by ChatGPT GPT-4 ArkoseLabs
-    #[clap(long, value_parser = parse::parse_file_path)]
-    pub(super) arkose_chat4_har_file: Option<PathBuf>,
+    /// About the browser HAR directory path requested by ChatGPT GPT-4 ArkoseLabs
+    #[clap(long, value_parser = parse::parse_dir_path)]
+    pub(super) arkose_gpt4_har_dir: Option<PathBuf>,
 
-    /// About the browser HAR file path requested by Auth ArkoseLabs
-    #[clap(long, value_parser = parse::parse_file_path)]
-    pub(super) arkose_auth_har_file: Option<PathBuf>,
+    ///  About the browser HAR directory path requested by Auth ArkoseLabs
+    #[clap(long, value_parser = parse::parse_dir_path)]
+    pub(super) arkose_auth_har_dir: Option<PathBuf>,
 
-    /// About the browser HAR file path requested by Platform ArkoseLabs
-    #[clap(long, value_parser = parse::parse_file_path)]
-    pub(super) arkose_platform_har_file: Option<PathBuf>,
+    /// About the browser HAR directory path requested by Platform ArkoseLabs
+    #[clap(long, value_parser = parse::parse_dir_path)]
+    pub(super) arkose_platform_har_dir: Option<PathBuf>,
 
     /// HAR file upload authenticate key
     #[clap(short = 'K', long)]
@@ -203,7 +201,7 @@ pub struct ServeArgs {
     /// Token bucket store strategy (mem/redis)
     #[clap(long, default_value = "mem", requires = "tb_enable")]
     #[cfg(feature = "limit")]
-    pub(super) tb_store_strategy: Strategy,
+    pub(super) tb_store_strategy: String,
 
     /// Token bucket redis connection url
     #[clap(long, default_value = "redis://127.0.0.1:6379", requires = "tb_enable", value_parser = parse::parse_url)]
@@ -230,25 +228,25 @@ pub struct ServeArgs {
         short = 'B',
         long,
         env = "PREAUTH_BIND",
-        default_value = "0.0.0.0:8000",
-        value_parser = parse::parse_socket_addr
+        value_parser = parse::parse_socket_addr,
     )]
-    pub(super) preauth_bind: Option<std::net::SocketAddr>,
+    pub(super) pbind: Option<std::net::SocketAddr>,
 
-    /// Preauth MITM server upstream proxy
+    /// Preauth MITM server upstream proxy, Only support http/https/socks5 protocol
     #[clap(
         short = 'X',
         long,
         env = "PREAUTH_UPSTREAM",
-        value_parser = parse::parse_url
+        value_parser = parse::parse_url,
+        requires = "pbind"
     )]
-    pub(super) preauth_upstream: Option<String>,
+    pub(super) pupstream: Option<String>,
 
     /// Preauth MITM server CA certificate file path
-    #[clap(long, default_value = "ca/cert.crt")]
-    pub(super) preauth_cert: Option<String>,
+    #[clap(long, default_value = "ca/cert.crt", requires = "pbind")]
+    pub(super) pcert: PathBuf,
 
     /// Preauth MITM server CA private key file path
-    #[clap(long, default_value = "ca/key.pem")]
-    pub(super) preauth_key: Option<String>,
+    #[clap(long, default_value = "ca/key.pem", requires = "pbind")]
+    pub(super) pkey: PathBuf,
 }

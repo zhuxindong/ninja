@@ -1,3 +1,6 @@
+mod har;
+mod preauth;
+
 use std::{
     collections::HashMap,
     net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -8,18 +11,16 @@ use std::{
 use crate::{
     arkose::{self, funcaptcha::ArkoseSolver},
     auth::AuthClient,
-    balancer::ClientLoadBalancer,
+    balancer::ClientRoundRobinBalancer,
     error,
-    homedir::home_dir,
-    info,
-    serve::middleware::tokenbucket,
-    warn,
 };
 use reqwest::Client;
-use std::sync::RwLock;
 use typed_builder::TypedBuilder;
 
-use hotwatch::{Event, EventKind, Hotwatch};
+use self::{
+    har::{HarPath, HarProvider, HAR},
+    preauth::PreauthCookieProvider,
+};
 
 /// Use Once to guarantee initialization only once
 pub fn init(args: ContextArgs) {
@@ -87,10 +88,6 @@ pub struct ContextArgs {
     #[builder(setter(into), default)]
     pub(crate) api_prefix: Option<String>,
 
-    /// PreAuth Cookie API URL
-    #[builder(setter(into), default)]
-    pub(crate) preauth_api: Option<String>,
-
     /// TLS cert
     #[builder(setter(into), default)]
     pub(crate) tls_cert: Option<PathBuf>,
@@ -121,19 +118,19 @@ pub struct ContextArgs {
 
     /// ChatGPT GPT-3.5 Arkoselabs HAR record file path
     #[builder(setter(into), default)]
-    pub(crate) arkose_chat3_har_file: Option<PathBuf>,
+    pub(crate) arkose_gpt3_har_dir: Option<PathBuf>,
 
     /// ChatGPT GPT-4 Arkoselabs HAR record file path
     #[builder(setter(into), default)]
-    pub(crate) arkose_chat4_har_file: Option<PathBuf>,
+    pub(crate) arkose_gpt4_har_dir: Option<PathBuf>,
 
     /// Auth Arkoselabs HAR record file path
     #[builder(setter(into), default)]
-    pub(crate) arkose_auth_har_file: Option<PathBuf>,
+    pub(crate) arkose_auth_har_dir: Option<PathBuf>,
 
     /// Platform Arkoselabs HAR record file path
     #[builder(setter(into), default)]
-    pub(crate) arkose_platform_har_file: Option<PathBuf>,
+    pub(crate) arkose_platform_har_dir: Option<PathBuf>,
 
     /// HAR file upload authenticate key
     #[builder(setter(into), default)]
@@ -150,11 +147,8 @@ pub struct ContextArgs {
 
     /// Tokenbucket store strategy
     #[cfg(feature = "limit")]
-    #[builder(
-        setter(into),
-        default = crate::serve::middleware::tokenbucket::Strategy::Mem
-    )]
-    pub(crate) tb_store_strategy: tokenbucket::Strategy,
+    #[builder(setter(into), default = "mem".to_string())]
+    pub(crate) tb_store_strategy: String,
 
     /// Tokenbucket redis url
     #[cfg(feature = "limit")]
@@ -175,24 +169,26 @@ pub struct ContextArgs {
     #[cfg(feature = "limit")]
     #[builder(setter(into), default = 86400)]
     pub(crate) tb_expired: u32,
-}
 
-#[derive(Debug)]
-pub struct Har {
-    /// HAR file path
-    path: PathBuf,
-    /// HAR file state (file changed)
-    state: bool,
-    /// File Hotwatch
-    hotwatch: Hotwatch,
-}
+    /// Preauth MITM server bind address
+    #[cfg(feature = "preauth")]
+    #[builder(setter(into), default)]
+    pub(crate) pbind: Option<std::net::SocketAddr>,
 
-impl Drop for Har {
-    fn drop(&mut self) {
-        if let Some(err) = self.hotwatch.unwatch(self.path.as_path()).err() {
-            warn!("hotwatch stop error: {err}")
-        }
-    }
+    /// Preauth MITM server upstream proxy
+    #[cfg(feature = "preauth")]
+    #[builder(setter(into), default)]
+    pub(crate) pupstream: Option<String>,
+
+    /// crate MITM server CA certificate file path
+    #[cfg(feature = "preauth")]
+    #[builder(setter(into), default)]
+    pub(super) pcert: PathBuf,
+
+    /// Preauth MITM server CA private key file path
+    #[cfg(feature = "preauth")]
+    #[builder(setter(into), default)]
+    pub(crate) pkey: PathBuf,
 }
 
 pub struct CfTurnstile {
@@ -202,11 +198,12 @@ pub struct CfTurnstile {
 
 // Program context
 static CTX: OnceLock<Context> = OnceLock::new();
-static HAR: OnceLock<RwLock<HashMap<arkose::Type, Har>>> = OnceLock::new();
 
 pub struct Context {
-    client_load: Option<ClientLoadBalancer>,
-    auth_client_load: Option<ClientLoadBalancer>,
+    /// Requesting client
+    client_load: Option<ClientRoundRobinBalancer>,
+    /// Requesting oauth client
+    auth_client_load: Option<ClientRoundRobinBalancer>,
     /// arkoselabs solver
     arkose_solver: Option<ArkoseSolver>,
     /// HAR file upload authenticate key
@@ -219,59 +216,62 @@ pub struct Context {
     api_prefix: Option<String>,
     /// Arkose endpoint
     arkose_endpoint: Option<String>,
+    /// PreAuth cookie cache
+    preauth_provider: Option<PreauthCookieProvider>,
 }
 
 impl Context {
     fn new(args: ContextArgs) -> Self {
-        let chat3_har = init_har(
-            arkose::Type::Chat3,
-            &args.arkose_chat3_har_file,
-            ".chat3.openai.com.har",
+        let gpt3_har_provider = HarProvider::new(
+            arkose::Type::GPT3,
+            args.arkose_gpt3_har_dir.as_ref(),
+            ".gpt3",
         );
-        let chat4_har = init_har(
-            arkose::Type::Chat4,
-            &args.arkose_chat4_har_file,
-            ".chat4.openai.com.har",
+        let gpt4_har_provider = HarProvider::new(
+            arkose::Type::GPT4,
+            args.arkose_gpt4_har_dir.as_ref(),
+            ".gpt4",
         );
-        let auth_har = init_har(
-            arkose::Type::Auth0,
-            &args.arkose_auth_har_file,
-            ".auth.openai.com.har",
+        let auth_har_provider = HarProvider::new(
+            arkose::Type::Auth,
+            args.arkose_auth_har_dir.as_ref(),
+            ".auth",
         );
-        let platform_har = init_har(
+        let platform_har_provider = HarProvider::new(
             arkose::Type::Platform,
-            &args.arkose_platform_har_file,
-            ".platform.openai.com.har",
+            args.arkose_platform_har_dir.as_ref(),
+            ".platform",
         );
 
-        let mut har_map = HashMap::with_capacity(3);
-        har_map.insert(arkose::Type::Chat3, chat3_har);
-        har_map.insert(arkose::Type::Chat4, chat4_har);
-        har_map.insert(arkose::Type::Auth0, auth_har);
-        har_map.insert(arkose::Type::Platform, platform_har);
+        let mut har_map = HashMap::with_capacity(4);
+        har_map.insert(arkose::Type::GPT3, gpt3_har_provider);
+        har_map.insert(arkose::Type::GPT4, gpt4_har_provider);
+        har_map.insert(arkose::Type::Auth, auth_har_provider);
+        har_map.insert(arkose::Type::Platform, platform_har_provider);
         HAR.set(std::sync::RwLock::new(har_map))
             .expect("Failed to set har map");
 
         Context {
             client_load: Some(
-                ClientLoadBalancer::new_client(&args)
+                ClientRoundRobinBalancer::new_client(&args)
                     .expect("Failed to initialize the requesting client"),
             ),
             auth_client_load: Some(
-                ClientLoadBalancer::new_auth_client(&args)
+                ClientRoundRobinBalancer::new_auth_client(&args)
                     .expect("Failed to initialize the requesting oauth client"),
             ),
             arkose_endpoint: args.arkose_endpoint,
             arkose_solver: args.arkose_solver,
             arkose_har_upload_key: args.arkose_har_upload_key,
+            api_prefix: args.api_prefix,
+            auth_key: args.auth_key,
             cf_turnstile: args.cf_site_key.and_then(|site_key| {
                 args.cf_secret_key.map(|secret_key| CfTurnstile {
                     site_key,
                     secret_key,
                 })
             }),
-            api_prefix: args.api_prefix,
-            auth_key: args.auth_key,
+            preauth_provider: args.pbind.is_some().then(|| PreauthCookieProvider::new()),
         }
     }
 
@@ -293,15 +293,18 @@ impl Context {
             .into()
     }
 
+    /// Get the arkoselabs har file upload authenticate key
     pub fn arkose_har_upload_key(&self) -> Option<&String> {
         self.arkose_har_upload_key.as_ref()
     }
 
+    /// Get the arkoselabs solver
     pub fn arkose_solver(&self) -> Option<&ArkoseSolver> {
         self.arkose_solver.as_ref()
     }
 
-    pub fn arkose_har_path(&self, _type: &arkose::Type) -> (bool, PathBuf) {
+    /// Get the arkose har file path
+    pub fn arkose_har_path(&self, _type: &arkose::Type) -> HarPath {
         let har_lock = HAR
             .get()
             .expect("Failed to get har lock")
@@ -309,83 +312,39 @@ impl Context {
             .expect("Failed to get har map");
         har_lock
             .get(_type)
-            .map(|h| (h.state, h.path.clone()))
-            .expect("Failed to get har path")
+            .map(|h| h.pool())
+            .expect("Failed to get har pool")
     }
 
+    /// Cloudflare Turnstile config
     pub fn cf_turnstile(&self) -> Option<&CfTurnstile> {
         self.cf_turnstile.as_ref()
     }
 
+    /// WebUI api prefix
     pub fn api_prefix(&self) -> Option<&String> {
         self.api_prefix.as_ref()
     }
 
+    /// Arkoselabs endpoint
     pub fn arkose_endpoint(&self) -> Option<&String> {
         self.arkose_endpoint.as_ref()
     }
 
+    /// Login auth key
     pub fn auth_key(&self) -> Option<&String> {
         self.auth_key.as_ref()
     }
-}
 
-fn init_har(_type: arkose::Type, path: &Option<PathBuf>, default_filename: &str) -> Har {
-    if let Some(file_path) = path {
-        return Har {
-            path: file_path.to_owned(),
-            state: true,
-            hotwatch: watch_har_file(_type, &file_path),
-        };
+    /// Push a preauth cookie
+    #[cfg(feature = "preauth")]
+    pub fn push_preauth_cookie(&self, value: &str) {
+        self.preauth_provider.as_ref().map(|p| p.push(value));
     }
 
-    let default_path = home_dir()
-        .expect("Failed to get home directory")
-        .join(default_filename);
-
-    let state = match default_path.is_file() {
-        true => {
-            let har_data = std::fs::read(&default_path).expect("Failed to read har file");
-            !har_data.is_empty()
-        }
-        false => {
-            info!("Create default HAR empty file: {}", default_path.display());
-            let har_file = std::fs::File::create(&default_path).expect("Failed to create har file");
-            drop(har_file);
-            false
-        }
-    };
-
-    Har {
-        hotwatch: watch_har_file(_type, &default_path),
-        path: default_path,
-        state,
+    /// Pop a preauth cookie
+    #[cfg(feature = "preauth")]
+    pub fn pop_preauth_cookie(&self) -> Option<String> {
+        self.preauth_provider.as_ref().map(|p| p.get()).flatten()
     }
-}
-
-fn watch_har_file(_type: arkose::Type, path: &PathBuf) -> Hotwatch {
-    let watch_path = path.display();
-    let mut hotwatch = Hotwatch::new().expect("hotwatch failed to initialize!");
-    hotwatch
-        .watch(watch_path.to_string(), {
-            let _type = _type;
-            move |event: Event| {
-                if let EventKind::Modify(_) = event.kind {
-                    event.paths.iter().for_each(|path| {
-                        info!("HAR file changes observed: {}", path.display());
-                        let lock = HAR.get().expect("Failed to get har lock");
-                        let mut har_map = lock.write().expect("Failed to get har map");
-                        if let Some(har) = har_map.get_mut(&_type) {
-                            har.state = true;
-                            match path.to_str() {
-                                Some(path_str) => arkose::har::clear(path_str),
-                                None => warn!("Failed to convert path to string"),
-                            }
-                        }
-                    });
-                }
-            }
-        })
-        .expect("failed to watch file!");
-    hotwatch
 }

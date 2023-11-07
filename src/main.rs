@@ -1,15 +1,4 @@
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "aarch64"),
-    target_env = "musl"
-))]
-use tikv_jemallocator::Jemalloc;
-
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "aarch64"),
-    target_env = "musl"
-))]
-#[global_allocator]
-static GLOBAL: Jemalloc = Jemalloc;
+pub mod allocator;
 
 use clap::Parser;
 
@@ -18,10 +7,11 @@ pub mod inter;
 #[cfg(feature = "terminal")]
 pub mod store;
 
-pub mod args;
-pub mod handle;
-pub mod parse;
-pub mod utils;
+mod args;
+mod handle;
+mod parse;
+mod update;
+mod utils;
 
 fn main() -> anyhow::Result<()> {
     let opt = args::cmd::Opt::parse();
@@ -40,8 +30,11 @@ fn main() -> anyhow::Result<()> {
             args::ServeSubcommand::Status => handle::serve_status()?,
             #[cfg(target_family = "unix")]
             args::ServeSubcommand::Log => handle::serve_log()?,
-            args::ServeSubcommand::Genca => {}
+            args::ServeSubcommand::Genca => {
+                let _ = openai::serve::preauth::cagen::gen_ca();
+            }
             args::ServeSubcommand::GT { out } => handle::generate_template(out)?,
+            args::ServeSubcommand::Update => update::update()?,
         }
     }
 
@@ -61,8 +54,11 @@ fn main() -> anyhow::Result<()> {
                 args::ServeSubcommand::Status => handle::serve_status()?,
                 #[cfg(target_family = "unix")]
                 args::ServeSubcommand::Log => handle::serve_log()?,
-                args::ServeSubcommand::Genca => {}
+                args::ServeSubcommand::Genca => {
+                    let _ = openai::serve::preauth::cagen::gen_ca();
+                }
                 args::ServeSubcommand::GT { out } => handle::generate_template(out)?,
+                args::ServeSubcommand::Update => update::update()?,
             },
             SubCommands::Terminal => {
                 let runtime = tokio::runtime::Builder::new_multi_thread()

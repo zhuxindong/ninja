@@ -1,16 +1,15 @@
 use std::{ops::Not, path::PathBuf};
 
 use clap::CommandFactory;
-use openai::{
-    arkose::funcaptcha::ArkoseSolver, context::ContextArgs,
-    serve::middleware::tokenbucket::Strategy,
-};
+use openai::{arkose::funcaptcha::ArkoseSolver, context::ContextArgs};
 
 use crate::{
     args::{self, ServeArgs},
-    utils,
     utils::unix::fix_relative_path,
 };
+
+#[cfg(target_family = "unix")]
+use crate::utils;
 
 pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<()> {
     if relative_path {
@@ -24,21 +23,21 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
     }
 
     #[cfg(target_os = "linux")]
-    crate::utils::unix::sysctl_route_add_ipv6_subnet(args.ipv6_subnet);
+    utils::unix::sysctl_route_add_ipv6_subnet(args.ipv6_subnet);
 
     #[cfg(target_os = "linux")]
-    crate::utils::unix::sysctl_ipv6_no_local_bind(args.ipv6_subnet.is_some());
+    utils::unix::sysctl_ipv6_no_local_bind(args.ipv6_subnet.is_some());
 
     // disable_direct and proxies are mutually exclusive
-    if args.disable_direct {
-        if args.proxies.is_none() || args.proxies.clone().is_some_and(|x| x.is_empty()) {
-            let mut cmd = args::cmd::Opt::command();
-            cmd.error(
-                clap::error::ErrorKind::ArgumentConflict,
-                "Cannot disable direct connection and not set proxies",
-            )
-            .exit();
-        }
+    if args.disable_direct
+        && (args.proxies.is_none() || args.proxies.clone().is_some_and(|x| x.is_empty()))
+    {
+        let mut cmd = args::cmd::Opt::command();
+        cmd.error(
+            clap::error::ErrorKind::ArgumentConflict,
+            "Cannot disable direct connection and not set proxies",
+        )
+        .exit();
     }
 
     let arkose_solver = match args.arkose_solver_key.as_ref() {
@@ -57,7 +56,6 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .disable_direct(args.disable_direct)
         .cookie_store(args.cookie_store)
         .api_prefix(args.api_prefix)
-        .preauth_api(args.preauth_api)
         .tcp_keepalive(args.tcp_keepalive)
         .pool_idle_timeout(args.pool_idle_timeout)
         .timeout(args.timeout)
@@ -71,12 +69,16 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .cf_secret_key(args.cf_secret_key)
         .disable_ui(args.disable_webui)
         .arkose_endpoint(args.arkose_endpoint)
-        .arkose_chat3_har_file(args.arkose_chat3_har_file)
-        .arkose_chat4_har_file(args.arkose_chat4_har_file)
-        .arkose_auth_har_file(args.arkose_auth_har_file)
-        .arkose_platform_har_file(args.arkose_platform_har_file)
+        .arkose_gpt3_har_dir(args.arkose_gpt3_har_dir)
+        .arkose_gpt4_har_dir(args.arkose_gpt4_har_dir)
+        .arkose_auth_har_dir(args.arkose_auth_har_dir)
+        .arkose_platform_har_dir(args.arkose_platform_har_dir)
         .arkose_har_upload_key(args.arkose_har_upload_key)
-        .arkose_solver(arkose_solver);
+        .arkose_solver(arkose_solver)
+        .pbind(args.pbind)
+        .pupstream(args.pupstream)
+        .pcert(args.pcert)
+        .pkey(args.pkey);
 
     #[cfg(feature = "limit")]
     let builder = builder
@@ -87,6 +89,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .tb_fill_rate(args.tb_fill_rate)
         .tb_expired(args.tb_expired);
 
+    // openai::preauth::run(args.pbind.unwrap(), None, args.pcert, args.pkey)
     openai::serve::Launcher::new(builder.build()).run()
 }
 
@@ -252,7 +255,7 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
         timeout: 600,
         connect_timeout: 60,
         tcp_keepalive: 60,
-        tb_store_strategy: Strategy::Mem,
+        tb_store_strategy: "mem".to_string(),
         tb_redis_url: "redis://127.0.0.1:6379".to_string(),
         tb_enable: false,
         tb_capacity: 60,
@@ -261,6 +264,8 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
         cookie_store: true,
         pool_idle_timeout: 90,
         level: "info".to_owned(),
+        pcert: PathBuf::from("ca/cert.crt"),
+        pkey: PathBuf::from("ca/key.pem"),
         ..args::ServeArgs::default()
     };
 

@@ -2,23 +2,6 @@ use anyhow::Context;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-const PORT_RANGE: std::ops::RangeInclusive<usize> = 1024..=65535;
-
-// port range parse
-pub fn parse_port_in_range(s: &str) -> anyhow::Result<u16> {
-    let port: usize = s
-        .parse()
-        .map_err(|_| anyhow::anyhow!(format!("`{}` isn't a port number", s)))?;
-    if PORT_RANGE.contains(&port) {
-        return Ok(port as u16);
-    }
-    anyhow::bail!(format!(
-        "Port not in range {}-{}",
-        PORT_RANGE.start(),
-        PORT_RANGE.end()
-    ))
-}
-
 // parse socket address
 pub fn parse_socket_addr(s: &str) -> anyhow::Result<std::net::SocketAddr> {
     let addr = s
@@ -71,7 +54,7 @@ pub fn parse_proxies_url(s: &str) -> anyhow::Result<Vec<String>> {
     Ok(proxies)
 }
 
-// file path parse
+/// parse file path
 pub fn parse_file_path(s: &str) -> anyhow::Result<PathBuf> {
     let path =
         PathBuf::from_str(s).map_err(|_| anyhow::anyhow!(format!("`{}` isn't a path", s)))?;
@@ -87,65 +70,18 @@ pub fn parse_file_path(s: &str) -> anyhow::Result<PathBuf> {
     Ok(path)
 }
 
-// parse account，support split: ':', '-', '--', '---'....
-pub fn parse_puid_user(s: &str) -> anyhow::Result<(String, String)> {
-    #[inline]
-    fn handle_parts(mut parts: Vec<String>) -> anyhow::Result<(String, String)> {
-        parts.reverse();
-        match parts.len() {
-            2 => Ok((parts.pop().unwrap(), parts.pop().unwrap())),
-            _ => anyhow::bail!("Input format is invalid!"),
-        }
+// parse directory path
+pub fn parse_dir_path(s: &str) -> anyhow::Result<PathBuf> {
+    let path =
+        PathBuf::from_str(s).map_err(|_| anyhow::anyhow!(format!("`{}` isn't a path", s)))?;
+
+    if !path.exists() {
+        anyhow::bail!(format!("Path {} not exists", path.display()))
     }
 
-    if s.contains(':') {
-        let parts = s
-            .split(':')
-            .map(|part| part.to_string())
-            .collect::<Vec<_>>();
-        return handle_parts(parts);
+    if !path.is_dir() {
+        anyhow::bail!(format!("{} not a directory", path.display()))
     }
 
-    match find_single_consecutive_dashes(s, '-') {
-        Ok(targets) => {
-            let parts = s
-                .split(&targets)
-                .map(|part| part.to_string())
-                .collect::<Vec<_>>();
-            handle_parts(parts)
-        }
-        Err(_) => anyhow::bail!("Input format is invalid!"),
-    }
-}
-
-fn find_single_consecutive_dashes(s: &str, target: char) -> Result<String, &'static str> {
-    let mut count = 0;
-    let mut dashes = String::new();
-    let mut found = None;
-
-    for c in s.chars() {
-        if c == target {
-            count += 1;
-            dashes.push(target);
-        } else {
-            if count > 0 {
-                if found.is_some() {
-                    return Err("Found more than one group of consecutive dashes");
-                }
-                found = Some(dashes.clone());
-            }
-            count = 0;
-            dashes.clear();
-        }
-    }
-
-    // Check at the end, in case the string ends with consecutive
-    if count > 0 {
-        if found.is_some() {
-            return Err("Found more than one group of consecutive dashes");
-        }
-        found = Some(dashes);
-    }
-
-    found.ok_or("No consecutive dashes found")
+    Ok(path)
 }

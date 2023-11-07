@@ -2,8 +2,9 @@ use crate::arkose::ArkoseToken;
 use crate::arkose::Type;
 use crate::context;
 use crate::context::ContextArgs;
-use crate::serve::err::ResponseError;
+use crate::serve::error::ResponseError;
 use crate::serve::router::STATIC_FILES;
+use crate::warn;
 use axum::body::Body;
 use axum::http::header;
 use axum::http::method::Method;
@@ -15,6 +16,8 @@ use axum::{
     routing::any,
     Form, Router,
 };
+use bytes::Bytes;
+use http::response::Builder;
 use std::collections::HashMap;
 
 pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
@@ -33,72 +36,74 @@ async fn proxy(
     mut headers: HeaderMap,
     body: Option<Form<HashMap<String, String>>>,
 ) -> Result<impl IntoResponse, ResponseError> {
+    let req_path = uri.path();
+
     if let Some((_, v)) = STATIC_FILES
         .get()
         .expect("static file")
         .iter()
-        .find(|(k, _v)| k.contains(uri.path()))
+        .find(|(k, _v)| k.contains(req_path))
     {
-        let mime_type = if v.mime_type.eq("application/octet-stream") {
+        let mime_type = if v.mime_type == "application/octet-stream" {
             "text/html"
         } else {
             v.mime_type
         };
-        return Ok(Response::builder()
-            .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, mime_type)
-            .body(Body::from(v.data))
-            .map_err(ResponseError::InternalServerError)?);
+        return create_response(StatusCode::OK, mime_type, v.data);
     }
-
-    let req_path = uri.path();
 
     if req_path.contains("/fc/gt2/public_key/") {
         let pk = req_path.trim_start_matches("/fc/gt2/public_key/");
-        let arkose_res = ArkoseToken::new_from_context(Type::from_pk(pk)?).await;
-
-        if let Ok(arkose_token) = arkose_res {
-            if arkose_token.success() {
-                let target = serde_json::json!({
-                    "token": arkose_token,
-                    "challenge_url":"",
-                    "challenge_url_cdn":"https://client-api.arkoselabs.com/cdn/fc/assets/ec-game-core/bootstrap/1.14.1/standard/game_core_bootstrap.js",
-                    "challenge_url_cdn_sri":null,
-                    "noscript":"Disable",
-                    "inject_script_integrity":null,
-                    "inject_script_url":null,
-                    "mbio":true,
-                    "tbio":true,
-                    "kbio":true,
-                    "styles":null,
-                    "iframe_width":null,
-                    "iframe_height":null,
-                    "disable_default_styling":false,
-                    "string_table":{
-                        "meta.api_timeout_error":"与验证服务器的连接已中断。请重新加载挑战以重试。",
-                        "meta.generic_error":"出错了。请重新加载挑战以重试。",
-                        "meta.loading_info":"进行中，请稍候...",
-                        "meta.reload_challenge":"重新加载挑战",
-                        "meta.visual_challenge_frame_title":"视觉挑战"
-                    }
-                });
-
-                return Ok(Response::builder()
-                    .status(StatusCode::OK)
-                    .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
-                    .body(Body::from(target.to_string()))
-                    .map_err(ResponseError::InternalServerError)?);
+        match ArkoseToken::new_from_context(Type::from_pk(pk)?).await {
+            Ok(arkose_token) => {
+                if arkose_token.success() {
+                    let target = serde_json::json!({
+                        "token": arkose_token,
+                        "challenge_url":"",
+                        "challenge_url_cdn":"https://client-api.arkoselabs.com/cdn/fc/assets/ec-game-core/bootstrap/1.14.1/standard/game_core_bootstrap.js",
+                        "challenge_url_cdn_sri":null,
+                        "noscript":"Disable",
+                        "inject_script_integrity":null,
+                        "inject_script_url":null,
+                        "mbio":true,
+                        "tbio":true,
+                        "kbio":true,
+                        "styles":null,
+                        "iframe_width":null,
+                        "iframe_height":null,
+                        "disable_default_styling":false,
+                        "string_table":{
+                            "meta.api_timeout_error":"与验证服务器的连接已中断。请重新加载挑战以重试。",
+                            "meta.generic_error":"出错了。请重新加载挑战以重试。",
+                            "meta.loading_info":"进行中，请稍候...",
+                            "meta.reload_challenge":"重新加载挑战",
+                            "meta.visual_challenge_frame_title":"视觉挑战"
+                        }
+                    });
+                    return create_response(
+                        StatusCode::OK,
+                        "text/plain; charset=utf-8",
+                        target.to_string(),
+                    );
+                }
+            }
+            Err(err) => {
+                warn!("ArkoseToken::new_from_context error: {}", err);
             }
         }
     }
 
-    headers.remove(header::CONNECTION);
-    headers.remove(header::CONTENT_TYPE);
-    headers.remove(header::CONTENT_LENGTH);
+    for header in &[
+        header::CONNECTION,
+        header::CONTENT_TYPE,
+        header::CONTENT_LENGTH,
+    ] {
+        headers.remove(header);
+    }
 
     let client = context::get_instance().client();
+    let url = format!("https://client-api.arkoselabs.com{}", req_path);
 
-    let url = format!("https://client-api.arkoselabs.com{}", uri.path());
     let resp = match body {
         Some(form) => {
             client
@@ -122,7 +127,26 @@ async fn proxy(
         .await
         .map_err(ResponseError::InternalServerError)?;
 
-    Ok(builder
+    Ok(create_response_with_bytes(builder, bytes)?)
+}
+
+fn create_response(
+    status: StatusCode,
+    content_type: &str,
+    data: impl Into<Body>,
+) -> Result<Response<Body>, ResponseError> {
+    Response::builder()
+        .status(status)
+        .header(header::CONTENT_TYPE, content_type)
+        .body(data.into())
+        .map_err(ResponseError::InternalServerError)
+}
+
+fn create_response_with_bytes(
+    builder: Builder,
+    bytes: Bytes,
+) -> Result<Response<Body>, ResponseError> {
+    builder
         .body(Body::from(bytes))
-        .map_err(ResponseError::InternalServerError)?)
+        .map_err(ResponseError::InternalServerError)
 }

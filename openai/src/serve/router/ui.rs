@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use axum::body;
 use axum::body::Body;
 use axum::extract::ConnectInfo;
 use axum::extract::Path;
@@ -8,16 +9,23 @@ use axum::headers::Authorization;
 use axum::http::header;
 use axum::http::HeaderMap;
 use axum::http::Response;
+use axum::response::IntoResponse;
 use axum::routing::any;
 use axum::routing::{get, post};
 use axum::Router;
 use axum::TypedHeader;
+use axum_csrf::CsrfConfig;
+use axum_csrf::CsrfLayer;
+use axum_csrf::CsrfToken;
+use axum_csrf::Key;
 use axum_extra::extract::cookie;
 use axum_extra::extract::CookieJar;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::OnceLock;
+use tower::ServiceBuilder;
+use tower_http::ServiceBuilderExt;
 
 use base64::Engine;
 
@@ -34,7 +42,7 @@ use crate::debug;
 use crate::info;
 use crate::now_duration;
 use crate::serve;
-use crate::serve::err::ResponseError;
+use crate::serve::error::ResponseError;
 use crate::serve::header_convert;
 use crate::serve::turnstile;
 use crate::serve::EMPTY;
@@ -50,7 +58,7 @@ const DEFAULT_INDEX: &str = "/";
 const LOGIN_INDEX: &str = "/auth/login";
 const SESSION_ID: &str = "ninja_session";
 const PUID_ID: &str = "_puid";
-const BUILD_ID: &str = "tLfeYLzFNDDz-YFDI_84l";
+const BUILD_ID: &str = "eFlZtDCQUjuHAccnRY3au";
 const TEMP_404: &str = "404.htm";
 const TEMP_AUTH: &str = "auth.htm";
 const TEMP_CHAT: &str = "chat.htm";
@@ -128,10 +136,19 @@ pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
 
         let _ = TEMPLATE.set(tera);
 
+        let cookie_key = Key::generate();
+        let config = CsrfConfig::default().with_key(Some(cookie_key));
+
         router
+            .route(
+                "/auth/login",
+                post(post_login).layer(ServiceBuilder::new().map_request_body(body::boxed).layer(
+                    axum::middleware::from_fn(serve::middleware::csrf::auth_middleware),
+                )),
+            )
             .route("/auth", get(get_auth))
             .route("/auth/login", get(get_login))
-            .route("/auth/login", post(post_login))
+            .layer(CsrfLayer::new(config))
             .route("/auth/login/token", post(post_login_token))
             .route("/auth/logout", get(get_logout))
             .route("/auth/session", get(get_session))
@@ -192,24 +209,29 @@ pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
     }
 }
 
-async fn get_auth() -> Result<Response<Body>, ResponseError> {
+async fn get_auth(token: CsrfToken) -> Result<impl IntoResponse, ResponseError> {
     let mut ctx = tera::Context::new();
+    ctx.insert("csrf_token", &token.authenticity_token()?);
     settings_template_data(&mut ctx);
-    render_template(TEMP_AUTH, &ctx)
+    let tm = render_template(TEMP_AUTH, &ctx)?;
+    Ok((token, tm))
 }
 
-async fn get_login() -> Result<Response<Body>, ResponseError> {
+async fn get_login(token: CsrfToken) -> Result<impl IntoResponse, ResponseError> {
     let mut ctx = tera::Context::new();
+    ctx.insert("csrf_token", &token.authenticity_token()?);
     ctx.insert("error", "");
     ctx.insert("username", "");
     settings_template_data(&mut ctx);
-    render_template(TEMP_LOGIN, &ctx)
+    let tm = render_template(TEMP_LOGIN, &ctx)?;
+    Ok((token, tm))
 }
 
 async fn post_login(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    token: CsrfToken,
     mut account: axum::Form<AuthAccount>,
-) -> Result<Response<Body>, ResponseError> {
+) -> Result<impl IntoResponse, ResponseError> {
     turnstile::cf_turnstile_check(&addr.ip(), account.cf_turnstile_response.as_deref()).await?;
 
     match serve::try_login(&mut account).await {
@@ -246,13 +268,16 @@ async fn post_login(
             Ok(builder
                 .header(header::SET_COOKIE, cookie.to_string())
                 .body(Body::empty())
-                .map_err(ResponseError::InternalServerError)?)
+                .map_err(ResponseError::InternalServerError)?
+                .into_response())
         }
         Err(err) => {
             let mut ctx = tera::Context::new();
+            ctx.insert("csrf_token", &token.authenticity_token()?);
             ctx.insert("username", &account.username);
             ctx.insert("error", &err.to_string());
-            render_template(TEMP_LOGIN, &ctx)
+            let tm = render_template(TEMP_LOGIN, &ctx)?;
+            Ok((token, tm).into_response())
         }
     }
 }
@@ -885,6 +910,10 @@ fn render_template(name: &str, context: &tera::Context) -> Result<Response<Body>
 
 fn settings_template_data(ctx: &mut tera::Context) {
     let g_ctx = context::get_instance();
+
+    if g_ctx.pop_preauth_cookie().is_some() {
+        ctx.insert("support_apple", "true");
+    }
     if let Some(site_key) = g_ctx.cf_turnstile() {
         ctx.insert("site_key", &site_key.site_key);
     }

@@ -54,8 +54,6 @@ o.rmempty = false
 o = s:option(Value, "auth_key", translate("Auth Key"), translate("Login Authentication Key"))
 o.password = true
 
-o = s:option(Value, "preauth_api", translate("PreAuth API"), translate("PreAuth Cookie API URL"))
-
 o = s:option(Value, "api_prefix", translate("WebUI API prefix"))
 
 o = s:option(Value, "cf_site_key", translate("CF Site Key"), translate("Cloudflare turnstile captcha site key"))
@@ -63,13 +61,13 @@ o = s:option(Value, "cf_site_key", translate("CF Site Key"), translate("Cloudfla
 o = s:option(Value, "cf_secret_key", translate("CF Secret Key"), translate("Cloudflare turnstile captcha secret key"))
 o.password = true
 
-o = s:option(Value, "arkose_chat3_har_file", translate("ChatGPT GPT-3.5 HAR file path"), translate("About the browser HAR file path requested by ChatGPT GPT-3.5 ArkoseLabs"))
+o = s:option(Value, "arkose_gpt3_har_dir", translate("ChatGPT GPT-3.5 HAR directory path"), translate("About the browser HAR directory path requested by ChatGPT GPT-3.5 ArkoseLabs"))
 
-o = s:option(Value, "arkose_chat4_har_file", translate("ChatGPT GPT-4 HAR file path"), translate("About the browser HAR file path requested by ChatGPT GPT-4 ArkoseLabs"))
+o = s:option(Value, "arkose_gpt4_har_dir", translate("ChatGPT GPT-4 HAR directory path"), translate("About the browser HAR directory path requested by ChatGPT GPT-4 ArkoseLabs"))
 
-o = s:option(Value, "arkose_auth_har_file", translate("Auth HAR file path"), translate("About the browser HAR file path requested by Auth ArkoseLabs"))
+o = s:option(Value, "arkose_auth_har_dir", translate("Auth HAR directory path"), translate(" About the browser HAR directory path requested by Auth ArkoseLabs"))
 
-o = s:option(Value, "arkose_platform_har_file", translate("Platform HAR file path"), translate("About the browser HAR file path requested by Platform ArkoseLabs"))
+o = s:option(Value, "arkose_platform_har_dir", translate("Platform HAR directory path"), translate("About the browser HAR directory path requested by Platform ArkoseLabs"))
 
 o = s:option(Value, "arkose_har_upload_key", translate("HAR Auth Key"), translate("HAR file upload authenticate key"))
 o.password = true
@@ -103,5 +101,13 @@ o.default = "1"
 
 o = s:option(Value, "tb_expired", translate("Token Bucket Expired"), translate("Token bucket expired time, the default is 86400 seconds"))
 o.default = "86400"
+
+o = s:option(Value, "pbind", translate("Preauth MITM server bind address"))
+
+o = s:option(Value, "pupstream", translate("MITM Upstream proxy"), translate("Supports http/https/socks5, format: protocol://user:pass@ip:port"))
+
+o = s:option(Value, "pcert", translate("Preauth MITM server CA certificate file path"))
+
+o = s:option(Value, "pkey", translate("Preauth MITM server CA private key file path"))
 
 return m

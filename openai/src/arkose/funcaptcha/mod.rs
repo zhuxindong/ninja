@@ -60,7 +60,7 @@ impl ArkoseSolver {
 }
 
 /// Callback to arkose
-async fn callback(client: reqwest::Client, arkose_token: String) -> anyhow::Result<()> {
+pub async fn callback(client: reqwest::Client, arkose_token: String) -> anyhow::Result<()> {
     // Split the data string by the "|" delimiter
     let elements: Vec<&str> = arkose_token.split('|').collect();
 
@@ -107,11 +107,19 @@ async fn callback(client: reqwest::Client, arkose_token: String) -> anyhow::Resu
         ))
         .timeout(std::time::Duration::from_secs(5))
         .send()
-        .await?
-        .error_for_status()?;
+        .await?;
 
-    if let Ok(ok) = resp.text().await {
-        debug!("funcaptcha callback: {ok}")
+    match resp.error_for_status() {
+        Ok(resp) => {
+            if log::log_enabled!(log::Level::Debug) {
+                if let Ok(ok) = resp.text().await {
+                    debug!("funcaptcha callback: {ok}")
+                }
+            }
+        }
+        Err(err) => {
+            warn!("funcaptcha callback error: {err}")
+        }
     }
 
     Ok(())

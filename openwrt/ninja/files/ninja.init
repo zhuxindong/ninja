@@ -13,7 +13,6 @@ get_config() {
 	config_get proxies $1 proxies ''
 	config_get interface $1 interface ''
 	config_get ipv6_subnet $1 ipv6_subnet ''
-	config_get preauth_api $1 preauth_api ''
 	config_get_bool disable_direct $1 disable_direct 1
 	config_get timeout $1 timeout '600'
 	config_get connect_timeout $1 connect_timeout '60'
@@ -21,10 +20,10 @@ get_config() {
 	config_get tls_cert $1 tls_cert ''
 	config_get tls_key $1 tls_key ''
 	config_get auth_key $1 auth_key ''
-	config_get arkose_chat3_har_file $1 arkose_chat3_har_file ''
-	config_get arkose_chat4_har_file $1 arkose_chat4_har_file ''
-	config_get arkose_auth_har_file $1 arkose_auth_har_file ''
-	config_get arkose_platform_har_file $1 arkose_platform_har_file ''
+	config_get arkose_gpt3_har_dir $1 arkose_gpt3_har_dir ''
+	config_get arkose_gpt4_har_dir $1 arkose_gpt4_har_dir ''
+	config_get arkose_auth_har_dir $1 arkose_auth_har_dir ''
+	config_get arkose_platform_har_dir $1 arkose_platform_har_dir ''
 	config_get arkose_har_upload_key $1 arkose_har_upload_key ''
 	config_get arkose_solver_key $1 arkose_solver_key ''
 	config_get arkose_solver $1 arkose_solver ''
@@ -40,6 +39,10 @@ get_config() {
 	config_get cf_site_key $1 cf_site_key ""
 	config_get cf_secret_key $1 cf_secret_key ""
 	config_get pool_idle_timeout $1 pool_idle_timeout "90"
+	config_get pbind $1 pbind ""
+	config_get pupstream $1 pupstream ""
+	config_get pkey $1 pkey ""
+	config_get pcert $1 pcert ""
 }
 
 start_service() {
@@ -73,10 +76,6 @@ start_service() {
 		args="$args --ipv6-subnet $ipv6_subnet"
 	fi
 
-	if [ -n "$preauth_api" ]; then
-		args="$args --preauth-api $preauth_api"
-	fi
-
 	if [ $disable_direct -ne 0 ]; then
 		args="$args --disable-direct"
 	fi
@@ -97,20 +96,20 @@ start_service() {
 		args="$args --auth-key $auth_key"
 	fi
 
-	if [ -n "$arkose_chat3_har_file" ]; then
-		args="$args --arkose-chat3-har-file $arkose_chat3_har_file"
+	if [ -n "$arkose_gpt3_har_dir" ]; then
+		args="$args --arkose-gpt3-har-dir $arkose_gpt3_har_dir"
 	fi
 
-	if [ -n "$arkose_chat4_har_file" ]; then
-		args="$args --arkose-chat4-har-file $arkose_chat4_har_file"
+	if [ -n "$arkose_gpt4_har_dir" ]; then
+		args="$args --arkose-gpt4-har-dir $arkose_gpt4_har_dir"
 	fi
 
-	if [ -n "$arkose_auth_har_file" ]; then
-		args="$args --arkose-auth-har-file $arkose_auth_har_file"
+	if [ -n "$arkose_auth_har_dir" ]; then
+		args="$args --arkose-auth-har-dir $arkose_auth_har_dir"
 	fi
 
-	if [ -n "$arkose_platform_har_file" ]; then
-		args="$args --arkose-platform-har-file $arkose_platform_har_file"
+	if [ -n "$arkose_platform_har_dir" ]; then
+		args="$args --arkose-platform-har-dir $arkose_platform_har_dir"
 	fi
 	
 	if [ -n "$arkose_har_upload_key" ]; then
@@ -178,6 +177,22 @@ start_service() {
 
 	if [ -n "$pool_idle_timeout" ]; then
 		args="$args --pool-idle-timeout $pool_idle_timeout"
+	fi
+
+	if [ -n "$pbind" ]; then
+		args="$args --pbind $pbind"
+	fi
+
+	if [ -n "$pupstream" ]; then
+		args="$args --pupstream $pupstream"
+	fi
+
+	if [ -n "$pkey" ]; then
+		args="$args --pkey $pkey"
+	fi
+
+	if [ -n "$pcert" ]; then
+		args="$args --pcert $pcert"
 	fi
 
 	procd_open_instance
