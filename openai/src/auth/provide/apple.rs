@@ -1,6 +1,5 @@
 use crate::auth::provide::{AuthenticateData, GrantType};
 use crate::auth::AuthClient;
-use crate::context;
 use crate::{
     auth::{
         model::{self, AuthStrategy},
@@ -8,6 +7,7 @@ use crate::{
     },
     error::AuthError,
 };
+use crate::{context, warn};
 use anyhow::{bail, Context};
 use async_recursion::async_recursion;
 use axum::http::HeaderValue;
@@ -136,7 +136,8 @@ impl AppleAuthProvider {
             .ext_context(ctx);
 
         let location = AuthClient::get_location_path(&resp.headers())?;
-        if location.eq("https://chat.openai.com/") {
+        if location.contains("https://chat.openai.com/") {
+            warn!("AppleAuthProvider::authenticate_password: location contains {location}");
             bail!(AuthError::InvalidLocationPath)
         }
 

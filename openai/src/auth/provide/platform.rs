@@ -1,6 +1,5 @@
 use crate::auth::provide::{AuthenticateData, GrantType};
 use crate::auth::AuthClient;
-use crate::debug;
 use crate::{
     auth::{
         model::{self, AuthStrategy},
@@ -8,6 +7,7 @@ use crate::{
     },
     error::AuthError,
 };
+use crate::{debug, warn};
 use anyhow::{bail, Context};
 use async_recursion::async_recursion;
 use axum::http::HeaderValue;
@@ -111,7 +111,8 @@ impl PlatformAuthProvider {
             .ext_context(ctx);
 
         let location = AuthClient::get_location_path(&resp.headers())?;
-        if location.eq("https://chat.openai.com/") {
+        if location.contains("https://chat.openai.com/") {
+            warn!("PlatformAuthProvider::authenticate_password: invalid location path: {location}");
             bail!(AuthError::InvalidLocationPath)
         }
 

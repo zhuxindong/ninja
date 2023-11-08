@@ -19,7 +19,7 @@ pub(super) async fn mitm_proxy(
     upstream_proxy: Option<String>,
     cert: PathBuf,
     key: PathBuf,
-    rx: tokio::sync::mpsc::Receiver<()>,
+    graceful_shutdown: tokio::sync::mpsc::Receiver<()>,
 ) -> anyhow::Result<()> {
     info!("PreAuth CA Private key use: {}", key.display());
     let private_key_bytes = fs::read(key).context("ca private key file path not valid!")?;
@@ -51,7 +51,7 @@ pub(super) async fn mitm_proxy(
         .upstream_proxy(upstream_proxy)
         .mitm_filters(vec![String::from("ios.chat.openai.com")])
         .handler(http_handler.clone())
-        .rx(rx)
+        .graceful_shutdown(graceful_shutdown)
         .build();
 
     tokio::spawn(proxy.start_proxy());
