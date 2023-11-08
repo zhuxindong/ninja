@@ -21,6 +21,7 @@ use axum_csrf::CsrfToken;
 use axum_csrf::Key;
 use axum_extra::extract::cookie;
 use axum_extra::extract::CookieJar;
+use http::response::Builder;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -442,18 +443,38 @@ async fn get_auth_me(
     headers: HeaderMap,
     jar: CookieJar,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let mut json = context::get_instance()
+    let resp = context::get_instance()
         .client()
         .get(format!("{URL_CHATGPT_API}/backend-api/me"))
         .headers(header_convert(&headers, &jar)?)
         .send()
         .await
-        .map_err(ResponseError::InternalServerError)?
-        .json::<Value>()
-        .await?;
-    json.as_object_mut()
-        .map(|v| v.insert("picture".to_owned(), Value::Null));
-    Ok(Json(json))
+        .map_err(ResponseError::InternalServerError)?;
+
+    let status = resp.status();
+
+    let headers = resp.headers().clone();
+
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(ResponseError::InternalServerError)?;
+
+    match serde_json::from_slice::<Value>(&bytes) {
+        Ok(mut json) => {
+            json.as_object_mut()
+                .map(|v| v.insert("picture".to_owned(), Value::Null));
+            Ok(Json(json).into_response())
+        }
+        Err(_err) => {
+            let mut builder = Builder::new().status(status);
+            builder.headers_mut().map(|h| h.extend(headers));
+            Ok(builder
+                .body(Body::from(bytes))
+                .map_err(ResponseError::InternalServerError)?
+                .into_response())
+        }
+    }
 }
 
 async fn get_chat(
