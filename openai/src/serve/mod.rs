@@ -103,8 +103,10 @@ impl Launcher {
         let global_layer = tower::ServiceBuilder::new()
             .layer(
                 tower_http::trace::TraceLayer::new_for_http()
-                    .make_span_with(trace::DefaultMakeSpan::new().level(Level::DEBUG))
-                    .on_response(trace::DefaultOnResponse::new().level(Level::DEBUG)),
+                    .make_span_with(trace::DefaultMakeSpan::new().level(Level::INFO))
+                    .on_response(trace::DefaultOnResponse::new().level(Level::INFO))
+                    .on_request(trace::DefaultOnRequest::new().level(Level::INFO))
+                    .on_failure(trace::DefaultOnFailure::new().level(Level::WARN)),
             )
             .layer(tower::limit::ConcurrencyLimitLayer::new(
                 self.inner.concurrent_limit,
