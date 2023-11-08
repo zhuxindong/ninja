@@ -34,7 +34,7 @@ where
     pub upstream_proxy: Option<String>,
     pub mitm_filters: Vec<String>,
     pub handler: H,
-    rx: tokio::sync::mpsc::Receiver<()>,
+    graceful_shutdown: tokio::sync::mpsc::Receiver<()>,
 }
 
 impl<H> Proxy<H>
@@ -55,7 +55,7 @@ where
             let mitm_filter = Arc::clone(&mitm_filter);
 
             tokio::select! {
-                _ = self.rx.recv() => {
+                _ = self.graceful_shutdown.recv() => {
                     info!("PreAuth Http MITM Proxy shutdown");
                     return Ok(());
                 }

@@ -170,7 +170,8 @@ impl WebAuthProvider {
 
         if resp.status().is_redirection() {
             let location = AuthClient::get_location_path(&resp.headers())?;
-            if location.eq("https://chat.openai.com/") {
+            if location.contains("https://chat.openai.com/") {
+                warn!("WebAuthProvider::authenticate_password: invalid location path: {location}");
                 bail!(AuthError::InvalidLocationPath)
             }
 

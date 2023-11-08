@@ -135,6 +135,12 @@ pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
         let cookie_key = Key::generate();
         let config = CsrfConfig::default().with_key(Some(cookie_key));
 
+        let router = if context::get_instance().auth_key().is_some() {
+            router
+        } else {
+            router.route("/auth", get(get_auth))
+        };
+
         router
             .route(
                 "/auth/login",
@@ -142,7 +148,6 @@ pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
                     axum::middleware::from_fn(serve::middleware::csrf::auth_middleware),
                 )),
             )
-            .route("/auth", get(get_auth))
             .route("/auth/login", get(get_login))
             .layer(CsrfLayer::new(config))
             .route("/auth/login/token", post(post_login_token))
@@ -434,12 +439,13 @@ fn session_to_body(session: &Session) -> anyhow::Result<String> {
 }
 
 async fn get_auth_me(
-    TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
+    headers: HeaderMap,
+    jar: CookieJar,
 ) -> Result<impl IntoResponse, ResponseError> {
     let mut json = context::get_instance()
         .client()
         .get(format!("{URL_CHATGPT_API}/backend-api/me"))
-        .bearer_auth(bearer.token())
+        .headers(header_convert(&headers, &jar)?)
         .send()
         .await
         .map_err(ResponseError::InternalServerError)?
@@ -569,7 +575,7 @@ async fn get_share_chat(
                 let resp = context::get_instance()
                     .client()
                     .get(format!("{URL_CHATGPT_API}/backend-api/share/{share_id}"))
-                    .headers(header_convert(&headers, &jar).await?)
+                    .headers(header_convert(&headers, &jar)?)
                     .send()
                     .await
                     .map_err(ResponseError::InternalServerError)?;
@@ -675,7 +681,7 @@ async fn get_share_chat_info(
             let resp = context::get_instance()
                 .client()
                 .get(format!("{URL_CHATGPT_API}/backend-api/share/{share_id}"))
-                .headers(header_convert(&headers, &jar).await?)
+                .headers(header_convert(&headers, &jar)?)
                 .send()
                 .await
                 .map_err(ResponseError::InternalServerError)?;
@@ -761,7 +767,7 @@ async fn get_share_chat_continue_info(
                         "{URL_CHATGPT_API}/backend-api/share/{}",
                         share_id.0
                     ))
-                    .headers(header_convert(&headers, &jar).await?)
+                    .headers(header_convert(&headers, &jar)?)
                     .send()
                     .await
                     .map_err(ResponseError::InternalServerError)?;
@@ -921,6 +927,9 @@ fn render_template(name: &str, context: &tera::Context) -> Result<Response<Body>
 fn settings_template_data(ctx: &mut tera::Context) {
     let g_ctx = context::get_instance();
 
+    if g_ctx.auth_key().is_none() {
+        ctx.insert("auth_key", "false");
+    }
     if g_ctx.pop_preauth_cookie().is_some() {
         ctx.insert("support_apple", "true");
     }

@@ -44,7 +44,7 @@ use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
 use crate::context::{self, ContextArgs};
 use crate::serve::middleware::tokenbucket::{Strategy, TokenBucketLimitContext};
 use crate::serve::route::toapi::chat_to_api;
-use crate::{arkose, debug, info, warn, HOST_CHATGPT, ORIGIN_CHATGPT};
+use crate::{arkose, debug, info, warn, ORIGIN_CHATGPT};
 
 use crate::serve::error::ResponseError;
 use crate::{HEADER_UA, URL_CHATGPT_API, URL_PLATFORM_API};
@@ -237,17 +237,11 @@ impl Launcher {
                 warn!("Http Server error: {}", err);
             }
 
-            let timeout = 3;
-
-            if let Some(err) = tx
-                .send_timeout((), Duration::from_secs(timeout))
-                .await
-                .err()
-            {
+            if let Some(err) = tx.send(()).await.err() {
                 warn!("Send shutdown signal error: {}", err);
             }
 
-            tokio::time::sleep(Duration::from_secs(timeout)).await;
+            tokio::time::sleep(Duration::from_secs(3)).await;
         });
 
         Ok(())
@@ -372,7 +366,7 @@ async fn official_proxy(
     let builder = context::get_instance()
         .client()
         .request(method, &url)
-        .headers(header_convert(&headers, &jar).await?);
+        .headers(header_convert(&headers, &jar)?);
     let resp = match body {
         Some(body) => builder.json(&body.0).send().await,
         None => builder.send().await,
@@ -412,48 +406,49 @@ async fn unofficial_proxy(
     let builder = context::get_instance()
         .client()
         .request(method, url)
-        .headers(header_convert(&headers, &jar).await?);
+        .headers(header_convert(&headers, &jar)?);
     let resp = match body {
         Some(body) => builder.json(&body.0).send().await,
         None => builder.send().await,
     };
     response_convert(resp)
 }
-pub(super) async fn header_convert(
-    headers: &HeaderMap,
-    jar: &CookieJar,
-) -> Result<HeaderMap, ResponseError> {
-    let authorization = match headers.get(header::AUTHORIZATION) {
+pub(super) fn header_convert(h: &HeaderMap, jar: &CookieJar) -> Result<HeaderMap, ResponseError> {
+    let mut headers = HeaderMap::new();
+
+    h.iter()
+        .filter(|(k, _)| {
+            k.ne(&header::AUTHORIZATION)
+                && k.ne(&header::COOKIE)
+                && k.ne(&header::HOST)
+                && k.ne(&header::ORIGIN)
+                && k.ne(&header::REFERER)
+                && k.ne(&header::CONTENT_LENGTH)
+                && k.ne(&header::CONNECTION)
+                && k.ne(&header::COOKIE)
+                && k.ne(&header::SET_COOKIE)
+        })
+        .for_each(|(k, v)| {
+            headers.insert(k.clone(), v.clone());
+        });
+
+    // Support Pandora WebUI passing X-Authorization header
+    let authorization = match h.get(header::AUTHORIZATION) {
         Some(v) => Some(v),
-        // support Pandora WebUI passing X-Authorization header
-        None => headers.get("X-Authorization"),
+        None => h.get("X-Authorization"),
     };
 
-    let mut headers = HeaderMap::new();
-    if let Some(h) = authorization {
-        headers.insert(header::AUTHORIZATION, h.clone());
+    if let Some(auth) = authorization {
+        headers.insert(header::AUTHORIZATION, auth.clone());
     }
-    headers.insert(header::HOST, HeaderValue::from_static(HOST_CHATGPT));
+
     headers.insert(header::ORIGIN, HeaderValue::from_static(ORIGIN_CHATGPT));
-    headers.insert(header::USER_AGENT, HeaderValue::from_static(HEADER_UA));
     headers.insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static("application/json"),
+        header::USER_AGENT,
+        h.get(header::USER_AGENT)
+            .unwrap_or(&HeaderValue::from_static(HEADER_UA))
+            .clone(),
     );
-    headers.insert(
-        "sec-ch-ua",
-        HeaderValue::from_static(
-            r#""Chromium";v="110", "Not A(Brand";v="24", "Google Chrome";v="110"#,
-        ),
-    );
-    headers.insert("sec-ch-ua-mobile", HeaderValue::from_static("?0"));
-    headers.insert("sec-ch-ua-platform", HeaderValue::from_static("Linux"));
-    headers.insert("sec-fetch-dest", HeaderValue::from_static("empty"));
-    headers.insert("sec-fetch-mode", HeaderValue::from_static("cors"));
-    headers.insert("sec-fetch-site", HeaderValue::from_static("same-origin"));
-    headers.insert("sec-gpc", HeaderValue::from_static("1"));
-    headers.insert("Pragma", HeaderValue::from_static("no-cache"));
-    headers.remove(header::CONNECTION);
 
     let mut cookie = String::new();
 

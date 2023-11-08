@@ -72,7 +72,7 @@ pub(crate) async fn chat_to_api(
         .build();
 
     let client = context::get_instance().client();
-    let headers = header_convert(&headers, &jar).await?;
+    let headers = header_convert(&headers, &jar)?;
 
     match GPTModel::from_str(model) {
         Ok(GPTModel::Gpt4Other) | Ok(GPTModel::Gpt4Model) => {
