@@ -31,20 +31,24 @@ Reverse engineered `ChatGPT` proxy (bypass Cloudflare 403 Access Denied)
 
 ### ArkoseLabs
 
-Sending `GPT4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` as a parameter. There are only two supported solutions for the time being.
+Sending `GPT-4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` as a parameter. There are only two supported solutions for the time being.
 
 1) Use HAR
 
-   - Supports HAR feature pooling, can upload multiple HARs at the same time, and use rotation training strategy
-   > The `ChatGPT` official website sends a `GPT4` session message, and the browser `F12` downloads the `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` interface. HAR log file, use the startup parameter `--arkose-gpt4-har-dir` to specify the HAR directory path to use (if you do not specify a path, use the default path `~/.gpt4`, you can directly upload and update HAR ), the same method applies to `GPT3.5` and other types. Supports WebUI to upload and update HAR, request path: `/har/upload`, optional upload authentication parameter: `--arkose-har-upload-key`
+- Supports HAR feature pooling, can upload multiple HARs at the same time, and use rotation training strategy
+
+> The `ChatGPT` official website sends a `GPT-4` session message, and the browser `F12` downloads the `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` interface. HAR log file, use the startup parameter `--arkose-gpt4-har-dir` to specify the HAR directory path to use (if you do not specify a path, use the default path `~/.gpt4`, you can directly upload and update HAR ), the same method applies to `GPT-3.5` and other types. Supports WebUI to upload and update HAR, request path: `/har/upload`, optional upload authentication parameter: `--arkose-har-upload-key`
 
 2) Use [YesCaptcha](https://yescaptcha.com/i/1Cc5i4) / [CapSolver](https://dashboard.capsolver.com/passport/register?inviteCode=y7CtB_a-3X6d)
-    > The platform performs verification code parsing, start the parameter `--arkose-solver` to select the platform (use `YesCaptcha` by default), `--arkose-solver-key` fill in `Client Key`
+
+> The platform performs verification code parsing, start the parameter `--arkose-solver` to select the platform (use `YesCaptcha` by default), `--arkose-solver-key` fill in `Client Key`
 
 - Both solutions are used, the priority is: `HAR` > `YesCaptcha` / `CapSolver`
 - `YesCaptcha` / `CapSolver` is recommended to be used with HAR. When the verification code is generated, the parser is called for processing. After verification, HAR is more durable.
 
-> Currently OpenAI has updated `Login` which requires verification of `Arkose Token`. The solution is the same as GPT4. Fill in the startup parameters and specify the HAR file `--arkose-auth-har-dir`. If you don't want to upload, you can log in through the browser code, which is not required. To create an API-Key, you need to upload the HAR feature file related to the Platform. The acquisition method is the same as above.
+> Currently OpenAI has updated `Login` which requires verification of `Arkose Token`. The solution is the same as `GPT-4`. Fill in the startup parameters and specify the HAR file `--arkose-auth-har-dir`. If you don't want to upload, you can log in through the browser code, which is not required. To create an API-Key, you need to upload the HAR feature file related to the Platform. The acquisition method is the same as above.
+
+> Recently, `OpenAI` has canceled the `Arkose` verification for `GPT-3.5`. It can be used without uploading HAR feature files (uploaded ones will not be affected). After compatibility, `Arkose` verification may be turned on again, and startup parameters need to be added. `--arkose-gpt3-experiment` enables the `GPT-3.5` model `Arkose` verification processing, and the WebUI is not affected.
 
 ### Http Server
 
