@@ -75,6 +75,18 @@ Sending `GPT-4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` 
 
   > About the method of obtaining `RefreshToken`, use the `ChatGPT App` login method of the `Apple` platform. The principle is to use the built-in MITM agent. When the `Apple device` is connected to the agent, you can log in to the `Apple platform` to obtain `RefreshToken`. It is only suitable for small quantities or personal use `(large quantities will seal the device, use with caution)`. For detailed usage, please see the startup parameter description.
 
+  ```shell
+  # Generate certificate
+  ninja genca
+
+  ninja run --pbind 0.0.0.0:8888
+
+  # Set the network on your mobile phone to set your proxy listening address, for example: http://192.168.1.1:8888
+  # Then open the browser http://192.168.1.1:8888/preauth/cert, download the certificate, install it and trust it, then open iOS ChatGPT and you can play happily
+   ```
+
+  > `Web login`, a cookie named: `__Secure-next-auth.session-token` is returned by default. The client only needs to save this cookie. Calling `/api/auth/session` can also refresh `AccessToken`
+
 #### API documentation
 
 - Platfrom API [doc](https://platform.openai.com/docs/api-reference)
@@ -102,18 +114,6 @@ Sending `GPT-4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` 
 - `--disable-webui`, if you don’t want to use the default built-in WebUI, use this parameter to turn it off
 
 [...](https://github.com/gngpp/ninja/blob/main/README.md#command-manual)
-
-```shell
- # Generate certificate
- ninja genca
-
- ninja run --pbind 0.0.0.0:8888
-
- # Set the network on your mobile phone to set your proxy listening address, for example: http://192.168.1.1:8888
- # Then open the browser http://192.168.1.1:8888/preauth/cert, download the certificate, install it and trust it, then open iOS ChatGPT and you can play happily
- ```
-
- > For `Web login`, a cookie named: `__Secure-next-auth.session-token` is returned by default. The client only needs to save this cookie. Calling `/api/auth/session` can also refresh `AccessToken`
 
 ### Install
 

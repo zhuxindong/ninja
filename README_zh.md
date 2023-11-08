@@ -73,7 +73,19 @@
   - 撤销 `RefreshToken`: `/auth/revoke_token`
   - 刷新 `Session`: `/api/auth/session`，发送名为`__Secure-next-auth.session-token`的Cookie调用刷新`Session`，同时返回新的`AccessToken`
   
-  > 关于`RefreshToken`获取的方式，采用`Apple`平台`ChatGPT App`登录方式，原理是使用内置MITM代理。`Apple设备`连上代理即可开启`Apple平台`登录获取`RefreshToken`，仅适用于量小或者个人使用`（量大会封设备，慎用）`，详细使用请看启动参数说明。
+  > `RefreshToken`获取的方式，采用`Apple`平台`ChatGPT App`登录方式，原理是使用内置MITM代理。`Apple设备`连上代理即可开启`Apple平台`登录获取`RefreshToken`，仅适用于量小或者个人使用`（量大会封设备，慎用）`，详细使用请看启动参数说明。
+
+  ```shell
+  # 生成证书
+  ninja genca
+
+  ninja run --pbind 0.0.0.0:8888
+
+  # 手机设置网络设置你代理监听地址，例如： http://192.168.1.1:8888
+  # 之后浏览器打开 http://192.168.1.1：8888/preauth/cert，下载证书安装并信任，之后打开iOS ChatGPT就可以愉快玩耍了
+  ```
+
+  > `Web登录`默认返回一个名为: `__Secure-next-auth.session-token`的cookie，客户端只需要保存这个cookie，调用`/api/auth/session`也可以刷新`AccessToken`
 
 #### API文档
 
@@ -102,18 +114,6 @@
 - `--disable-webui`, 如果不想使用默认自带的WebUI，使用此参数关闭
 
 [...](https://github.com/gngpp/ninja/blob/main/README_zh.md#%E5%91%BD%E4%BB%A4%E6%89%8B%E5%86%8C)
-
-```shell
-# 生成证书
-ninja genca
-
-ninja run --pbind 0.0.0.0:8888
-
-# 手机设置网络设置你代理监听地址，例如： http://192.168.1.1:8888
-# 之后浏览器打开 http://192.168.1.1：8888/preauth/cert，下载证书安装并信任，之后打开iOS ChatGPT就可以愉快玩耍了
-```
-
-> 对于`Web登录`默认返回一个名为: `__Secure-next-auth.session-token`的cookie，客户端只需要保存这个cookie，调用`/api/auth/session`也可以刷新`AccessToken`
 
 ### 安装
 
