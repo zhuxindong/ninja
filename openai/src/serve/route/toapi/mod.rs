@@ -1,15 +1,18 @@
 use axum::{
-    http::HeaderMap,
+    headers::{authorization::Bearer, Authorization},
     response::{sse::Event, IntoResponse, Sse},
-    Json,
+    routing::post,
+    Json, Router, TypedHeader,
 };
-use axum_extra::extract::CookieJar;
 use eventsource_stream::{EventStream, Eventsource};
 use futures::StreamExt;
 use futures_core::Stream;
-use reqwest::StatusCode;
+use http::header;
+use moka::sync::Cache;
+use reqwest::{Client, StatusCode};
 use serde_json::Value;
 use std::{convert::Infallible, str::FromStr};
+use tokio::sync::OnceCell;
 
 use crate::{
     arkose::{ArkoseToken, GPTModel},
@@ -18,7 +21,7 @@ use crate::{
         resp::{ConvoResponse, PostConvoResponse},
     },
     context,
-    serve::{error::ResponseError, has_puid, header_convert},
+    serve::error::ResponseError,
 };
 use crate::{chatgpt::model::Role, debug};
 
@@ -35,11 +38,71 @@ use crate::URL_CHATGPT_API;
 mod req;
 mod resp;
 
-pub(crate) async fn chat_to_api(
-    headers: HeaderMap,
-    jar: CookieJar,
+static PUID_CACHE: OnceCell<Cache<String, String>> = OnceCell::const_new();
+
+pub(super) fn config(router: Router) -> Router {
+    // unofficial api to official api
+    router.route("/to/v1/chat/completions", post(chat_to_api))
+}
+
+async fn puid_cache() -> &'static Cache<String, String> {
+    PUID_CACHE
+        .get_or_init(|| async {
+            Cache::builder()
+                .time_to_live(std::time::Duration::from_secs(3600 * 24))
+                .build()
+        })
+        .await
+}
+
+fn reduce_cache_key(key: &str) -> Result<String, ResponseError> {
+    let token_profile = crate::token::check(key)
+        .map_err(ResponseError::Unauthorized)?
+        .ok_or(ResponseError::BadRequest(anyhow::anyhow!(
+            "invalid access token"
+        )))?;
+    Ok(token_profile.email().to_owned())
+}
+
+async fn get_or_init_puid(
+    client: &Client,
+    bearer: &str,
+    model: &str,
+    cache_id: String,
+) -> Result<String, ResponseError> {
+    let mut m_puid = String::new();
+    if GPTModel::from_str(model)?.is_gpt4() {
+        let puid_cache = puid_cache().await;
+        if let Some(puid) = puid_cache.get(&cache_id) {
+            m_puid.push_str(&puid);
+            drop(puid);
+        } else {
+            let resp = client
+                .get(format!("{URL_CHATGPT_API}/backend-api/models"))
+                .bearer_auth(bearer)
+                .send()
+                .await
+                .map_err(ResponseError::InternalServerError)?
+                .error_for_status()
+                .map_err(ResponseError::BadRequest)?;
+
+            if let Some(c) = resp.cookies().into_iter().find(|c| c.name().eq("_puid")) {
+                m_puid.push_str(c.value());
+                puid_cache.insert(cache_id, m_puid.clone());
+            };
+        }
+    }
+    Ok(m_puid)
+}
+
+async fn chat_to_api(
+    TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
     body: Json<req::Req>,
 ) -> Result<impl IntoResponse, ResponseError> {
+    // Exstract the token from the Authorization header
+    let cache_id = reduce_cache_key(bearer.token())?;
+
+    // Convert to ChatGPT API Message
     let mut messages = Vec::with_capacity(body.messages.len());
     for body_msg in body.messages.iter() {
         let role = if body_msg.role.eq(&Role::System) {
@@ -60,7 +123,10 @@ pub(crate) async fn chat_to_api(
         messages.push(message)
     }
 
+    // OpenAI API to ChatGPT API model mapper
     let (model, map_model, arkose_token) = model_mapper(&body.model).await?;
+
+    // Create request
     let parent_message_id = uuid();
     let req = PostConvoRequest::builder()
         .action(Action::Next)
@@ -72,26 +138,20 @@ pub(crate) async fn chat_to_api(
         .build();
 
     let client = context::get_instance().client();
-    let headers = header_convert(&headers, &jar)?;
 
-    if GPTModel::from_str(model)?.is_gpt4() {
-        if !has_puid(&headers)? {
-            let result = client
-                .get(format!("{URL_CHATGPT_API}/backend-api/models"))
-                .headers(headers.clone())
-                .send()
-                .await;
+    // Try to get puid from cache
+    let puid = get_or_init_puid(&client, bearer.token(), &body.model, cache_id).await?;
 
-            result
-                .map_err(ResponseError::InternalServerError)?
-                .error_for_status()
-                .map_err(ResponseError::BadRequest)?;
-        }
+    let mut builder = client
+        .post(format!("{URL_CHATGPT_API}/backend-api/conversation"))
+        .bearer_auth(bearer.token());
+
+    if !puid.is_empty() {
+        builder = builder.header(header::COOKIE, format!("_puid=shabi;"))
     }
 
-    let resp = client
-        .post(format!("{URL_CHATGPT_API}/backend-api/conversation"))
-        .headers(headers)
+    // Send request
+    let resp = builder
         .json(&req)
         .send()
         .await

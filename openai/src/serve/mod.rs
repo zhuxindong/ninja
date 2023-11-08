@@ -43,7 +43,6 @@ use crate::auth::provide::AuthProvider;
 use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
 use crate::context::{self, ContextArgs};
 use crate::serve::middleware::tokenbucket::{Strategy, TokenBucketLimitContext};
-use crate::serve::route::toapi::chat_to_api;
 use crate::{arkose, debug, info, warn, ORIGIN_CHATGPT};
 
 use crate::serve::error::ResponseError;
@@ -153,8 +152,6 @@ impl Launcher {
             .route("/v1/*path", any(official_proxy))
             // unofficial backend api endpoint
             .route("/backend-api/*path", any(unofficial_proxy))
-            // unofficial api to official api
-            .route("/to/v1/chat/completions", post(chat_to_api))
             .route_layer(app_layer)
             // unofficial public api endpoint
             .route("/public-api/*path", any(unofficial_proxy))
@@ -453,11 +450,6 @@ pub(super) fn header_convert(h: &HeaderMap, jar: &CookieJar) -> Result<HeaderMap
     );
 
     let mut cookie = String::new();
-
-    if let Some(puid) = headers.get("PUID") {
-        let puid = puid.to_str()?;
-        cookie.push_str(&format!("_puid={puid};"))
-    }
 
     if let Some(cookier) = jar.get("_puid") {
         let c = &format!("_puid={};", puid_cookie_encoded(cookier.value()));

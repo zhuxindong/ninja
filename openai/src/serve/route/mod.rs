@@ -20,9 +20,10 @@ static STATIC_FILES: OnceLock<HashMap<&'static str, static_files::Resource>> = O
 
 pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
     init_static_files();
-    let router = ui::config(router, args);
     let router = arkose::config(router, args);
     let router = har::config(router, args);
+    let router = toapi::config(router);
+    let router = ui::config(router, args);
     router
 }
 
