@@ -74,22 +74,19 @@ pub(crate) async fn chat_to_api(
     let client = context::get_instance().client();
     let headers = header_convert(&headers, &jar)?;
 
-    match GPTModel::from_str(model) {
-        Ok(GPTModel::Gpt4Other) | Ok(GPTModel::Gpt4Model) => {
-            if !has_puid(&headers)? {
-                let result = client
-                    .get(format!("{URL_CHATGPT_API}/backend-api/models"))
-                    .headers(headers.clone())
-                    .send()
-                    .await;
+    if GPTModel::from_str(model)?.is_gpt4() {
+        if !has_puid(&headers)? {
+            let result = client
+                .get(format!("{URL_CHATGPT_API}/backend-api/models"))
+                .headers(headers.clone())
+                .send()
+                .await;
 
-                result
-                    .map_err(ResponseError::InternalServerError)?
-                    .error_for_status()
-                    .map_err(ResponseError::BadRequest)?;
-            }
+            result
+                .map_err(ResponseError::InternalServerError)?
+                .error_for_status()
+                .map_err(ResponseError::BadRequest)?;
         }
-        _ => {}
     }
 
     let resp = client
@@ -331,7 +328,7 @@ async fn model_mapper(model: &str) -> Result<(&str, &str, Option<ArkoseToken>), 
     let gpt_model = GPTModel::from_str(model)?;
 
     let arkose_token = if (context::get_instance().arkose_gpt3_experiment() && gpt_model.is_gpt3())
-        && gpt_model.is_gpt4()
+        || gpt_model.is_gpt4()
     {
         let arkose_token = ArkoseToken::new_from_context(gpt_model.into()).await?;
         Some(arkose_token)
