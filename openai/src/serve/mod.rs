@@ -413,41 +413,31 @@ async fn unofficial_proxy(
     response_convert(resp)
 }
 pub(super) fn header_convert(h: &HeaderMap, jar: &CookieJar) -> Result<HeaderMap, ResponseError> {
-    let mut headers = HeaderMap::new();
-
-    h.iter()
-        .filter(|(k, _)| {
-            k.ne(&header::AUTHORIZATION)
-                && k.ne(&header::COOKIE)
-                && k.ne(&header::HOST)
-                && k.ne(&header::ORIGIN)
-                && k.ne(&header::REFERER)
-                && k.ne(&header::CONTENT_LENGTH)
-                && k.ne(&header::CONNECTION)
-                && k.ne(&header::COOKIE)
-                && k.ne(&header::SET_COOKIE)
-        })
-        .for_each(|(k, v)| {
-            headers.insert(k.clone(), v.clone());
-        });
-
-    // Support Pandora WebUI passing X-Authorization header
     let authorization = match h.get(header::AUTHORIZATION) {
         Some(v) => Some(v),
+        // support Pandora WebUI passing X-Authorization header
         None => h.get("X-Authorization"),
     };
 
-    if let Some(auth) = authorization {
-        headers.insert(header::AUTHORIZATION, auth.clone());
+    let mut headers = HeaderMap::new();
+    if let Some(h) = authorization {
+        headers.insert(header::AUTHORIZATION, h.clone());
     }
-
     headers.insert(header::ORIGIN, HeaderValue::from_static(ORIGIN_CHATGPT));
+    headers.insert(header::USER_AGENT, HeaderValue::from_static(HEADER_UA));
     headers.insert(
-        header::USER_AGENT,
-        h.get(header::USER_AGENT)
-            .unwrap_or(&HeaderValue::from_static(HEADER_UA))
-            .clone(),
+        "sec-ch-ua",
+        HeaderValue::from_static(
+            r#""Chromium";v="114", "Not A(Brand";v="24", "Google Chrome";v="114"#,
+        ),
     );
+    headers.insert("sec-ch-ua-mobile", HeaderValue::from_static("?0"));
+    headers.insert("sec-ch-ua-platform", HeaderValue::from_static("Linux"));
+    headers.insert("sec-fetch-dest", HeaderValue::from_static("empty"));
+    headers.insert("sec-fetch-mode", HeaderValue::from_static("cors"));
+    headers.insert("sec-fetch-site", HeaderValue::from_static("same-origin"));
+    headers.insert("sec-gpc", HeaderValue::from_static("1"));
+    headers.insert("Pragma", HeaderValue::from_static("no-cache"));
 
     let mut cookie = String::new();
 
