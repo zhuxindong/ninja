@@ -1,5 +1,6 @@
 mod error;
 mod middleware;
+mod puid;
 mod signal;
 mod turnstile;
 
@@ -47,6 +48,8 @@ use crate::{arkose, debug, info, warn, ORIGIN_CHATGPT};
 
 use crate::serve::error::ResponseError;
 use crate::{HEADER_UA, URL_CHATGPT_API, URL_PLATFORM_API};
+
+use self::puid::{get_or_init_puid, reduce_cache_key};
 
 const EMPTY: &str = "";
 
@@ -425,19 +428,6 @@ pub(super) fn header_convert(h: &HeaderMap, jar: &CookieJar) -> Result<HeaderMap
     }
     headers.insert(header::ORIGIN, HeaderValue::from_static(ORIGIN_CHATGPT));
     headers.insert(header::USER_AGENT, HeaderValue::from_static(HEADER_UA));
-    headers.insert(
-        "sec-ch-ua",
-        HeaderValue::from_static(
-            r#""Chromium";v="114", "Not A(Brand";v="24", "Google Chrome";v="114"#,
-        ),
-    );
-    headers.insert("sec-ch-ua-mobile", HeaderValue::from_static("?0"));
-    headers.insert("sec-ch-ua-platform", HeaderValue::from_static("Linux"));
-    headers.insert("sec-fetch-dest", HeaderValue::from_static("empty"));
-    headers.insert("sec-fetch-mode", HeaderValue::from_static("cors"));
-    headers.insert("sec-fetch-site", HeaderValue::from_static("same-origin"));
-    headers.insert("sec-gpc", HeaderValue::from_static("1"));
-    headers.insert("Pragma", HeaderValue::from_static("no-cache"));
 
     let mut cookie = String::new();
 
@@ -540,6 +530,25 @@ async fn handle_body(
         None => return Ok(()),
     };
 
+    if !has_puid(headers)? {
+        // extract token from Authorization header
+        let token = extract_authorization(headers)?;
+
+        // Exstract the token from the Authorization header
+        let cache_id = reduce_cache_key(token)?;
+
+        // Get or init puid
+        let puid = get_or_init_puid(token, model, cache_id).await?;
+
+        if let Some(puid) = puid {
+            headers.insert(
+                header::COOKIE,
+                HeaderValue::from_str(&format!("_puid={puid};"))
+                    .map_err(ResponseError::BadRequest)?,
+            );
+        }
+    }
+
     match arkose::GPTModel::from_str(model) {
         Ok(model) => {
             if (context::get_instance().arkose_gpt3_experiment() && model.is_gpt3())
@@ -564,37 +573,6 @@ async fn handle_body(
                 "GPTModel parse error: {}",
                 err
             )))
-        }
-    }
-
-    if !has_puid(headers)? {
-        let authorization = match headers.get(header::AUTHORIZATION) {
-            Some(v) => Some(v),
-            None => headers.get("X-Authorization"),
-        }
-        .ok_or(ResponseError::Unauthorized(anyhow!(
-            "AccessToken required!"
-        )))?;
-
-        let resp = context::get_instance()
-            .client()
-            .get(format!("{URL_CHATGPT_API}/backend-api/models"))
-            .header(header::AUTHORIZATION, authorization)
-            .send()
-            .await
-            .map_err(ResponseError::InternalServerError)?;
-        match resp.error_for_status() {
-            Ok(resp) => {
-                if let Some(puid_cookie) = resp.cookies().into_iter().find(|s| s.name().eq("_puid"))
-                {
-                    headers.insert(
-                        header::COOKIE,
-                        HeaderValue::from_str(&format!("_puid={};", puid_cookie.value()))
-                            .map_err(ResponseError::BadRequest)?,
-                    );
-                }
-            }
-            Err(err) => return Err(ResponseError::InternalServerError(err)),
         }
     }
 
@@ -630,6 +608,19 @@ pub(super) fn has_puid(headers: &HeaderMap) -> Result<bool, ResponseError> {
         None => false,
     };
     Ok(res)
+}
+
+fn extract_authorization<'a>(headers: &'a HeaderMap) -> Result<&'a str, ResponseError> {
+    let token = match headers.get(header::AUTHORIZATION) {
+        Some(v) => Some(v),
+        None => headers.get("X-Authorization"),
+    }
+    .ok_or(ResponseError::Unauthorized(anyhow!(
+        "AccessToken required!"
+    )))?
+    .to_str()
+    .map_err(ResponseError::BadGateway)?;
+    Ok(token)
 }
 
 impl TryInto<Response<Body>> for SessionAccessToken {
