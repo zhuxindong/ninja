@@ -2,6 +2,8 @@
 
 use std::time::Duration;
 
+use reqwest::impersonate::Impersonate;
+
 pub mod arkose;
 pub mod auth;
 pub mod balancer;
@@ -26,6 +28,22 @@ pub const URL_CHATGPT_API: &str = "https://chat.openai.com";
 pub const URL_PLATFORM_API: &str = "https://api.openai.com";
 pub const ORIGIN_CHATGPT: &str = "https://chat.openai.com/chat";
 pub const HOST_CHATGPT: &str = "chat.openai.com";
+
+/// Randomly select a user agent from a list of known user agents.
+pub(crate) fn random_user_agent() -> Impersonate {
+    use rand::seq::IteratorRandom;
+
+    let random_list = [
+        Impersonate::OkHttp3,
+        Impersonate::OkHttp4,
+        Impersonate::OkHttp5,
+    ];
+
+    random_list
+        .into_iter()
+        .choose(&mut rand::thread_rng())
+        .unwrap_or(Impersonate::OkHttp4)
+}
 
 pub fn now_duration() -> anyhow::Result<Duration> {
     let now = std::time::SystemTime::now();

@@ -1,15 +1,15 @@
 use rand::Rng;
-use reqwest::{impersonate::Impersonate, Client};
+use reqwest::Client;
 use std::{
     net::IpAddr,
     sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
 };
 
-use crate::{auth::AuthClient, context};
+use crate::{auth::AuthClient, context, random_user_agent};
 use crate::{
     auth::{self},
-    info, HEADER_UA,
+    info,
 };
 
 #[derive(Clone)]
@@ -220,8 +220,7 @@ fn build_client(
     }
 
     let client = builder
-        .user_agent(HEADER_UA)
-        .impersonate(Impersonate::OkHttpAndroid13)
+        .impersonate(random_user_agent())
         .danger_accept_invalid_certs(true)
         .connect_timeout(Duration::from_secs(inner.connect_timeout))
         .timeout(Duration::from_secs(inner.timeout))
@@ -258,8 +257,7 @@ fn build_auth_client(
     }
 
     builder
-        .user_agent(HEADER_UA)
-        .impersonate(Impersonate::OkHttpAndroid13)
+        .impersonate(random_user_agent())
         .timeout(Duration::from_secs(inner.timeout))
         .connect_timeout(Duration::from_secs(inner.connect_timeout))
         .proxy(proxy_url.cloned())
