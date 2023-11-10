@@ -21,9 +21,9 @@ use reqwest::{Client, Proxy, StatusCode, Url};
 use sha2::{Digest, Sha256};
 use tokio::sync::OnceCell;
 
-use crate::debug;
 use crate::error::AuthError;
 use crate::URL_CHATGPT_API;
+use crate::{debug, random_user_agent};
 
 use self::model::{ApiKeyData, AuthStrategy};
 #[cfg(feature = "preauth")]
@@ -451,7 +451,7 @@ impl AuthClientBuilder {
     pub fn builder() -> AuthClientBuilder {
         AuthClientBuilder {
             inner: Client::builder()
-                .impersonate(Impersonate::OkHttpAndroid13)
+                .impersonate(random_user_agent())
                 .danger_accept_invalid_certs(true)
                 .connect_timeout(Duration::from_secs(30))
                 .redirect(Policy::none()),

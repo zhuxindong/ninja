@@ -47,7 +47,7 @@ use crate::serve::middleware::tokenbucket::{Strategy, TokenBucketLimitContext};
 use crate::{arkose, debug, info, warn, ORIGIN_CHATGPT};
 
 use crate::serve::error::ResponseError;
-use crate::{HEADER_UA, URL_CHATGPT_API, URL_PLATFORM_API};
+use crate::{URL_CHATGPT_API, URL_PLATFORM_API};
 
 use self::puid::{get_or_init_puid, reduce_cache_key};
 
@@ -427,7 +427,6 @@ pub(super) fn header_convert(h: &HeaderMap, jar: &CookieJar) -> Result<HeaderMap
         headers.insert(header::AUTHORIZATION, h.clone());
     }
     headers.insert(header::ORIGIN, HeaderValue::from_static(ORIGIN_CHATGPT));
-    headers.insert(header::USER_AGENT, HeaderValue::from_static(HEADER_UA));
 
     let mut cookie = String::new();
 
