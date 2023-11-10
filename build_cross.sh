@@ -20,7 +20,6 @@ build_macos_target() {
     cargo build --release --target $1 --features mimalloc
     sudo chmod -R 777 target
     cd target/$1/release
-    upx --best --lzma ninja
     tar czvf ninja-$tag-$1.tar.gz ninja
     shasum -a 256 ninja-$tag-$1.tar.gz >ninja-$tag-$1.tar.gz.sha256
     mv ninja-$tag-$1.tar.gz $root/uploads/
@@ -58,7 +57,7 @@ build_windows_target() {
         -v $(pwd):/home/rust/src \
         -v $HOME/.cargo/registry:/usr/local/cargo/registry \
         -v $HOME/.cargo/git:/usr/local/cargo/git \
-        ghcr.io/gngpp/ninja-builder:$1 cargo xwin build --release --target $1 --features mimalloc
+        ghcr.io/gngpp/ninja-builder:$1 cargo xwin build --release --target $1
     sudo chmod -R 777 target
     sudo upx --best --lzma target/$1/release/ninja.exe
     cd target/$1/release
