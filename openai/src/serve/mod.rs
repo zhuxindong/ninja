@@ -44,7 +44,7 @@ use crate::auth::provide::AuthProvider;
 use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
 use crate::context::{self, ContextArgs};
 use crate::serve::middleware::tokenbucket::{Strategy, TokenBucketLimitContext};
-use crate::{arkose, debug, info, warn, ORIGIN_CHATGPT};
+use crate::{arkose, debug, info, warn};
 
 use crate::serve::error::ResponseError;
 use crate::{URL_CHATGPT_API, URL_PLATFORM_API};
@@ -426,7 +426,6 @@ pub(super) fn header_convert(h: &HeaderMap, jar: &CookieJar) -> Result<HeaderMap
     if let Some(h) = authorization {
         headers.insert(header::AUTHORIZATION, h.clone());
     }
-    headers.insert(header::ORIGIN, HeaderValue::from_static(ORIGIN_CHATGPT));
 
     let mut cookie = String::new();
 
@@ -453,15 +452,12 @@ fn response_convert(
     let mut builder = Response::builder().status(resp.status());
     for kv in resp.headers().into_iter().filter(|(k, _v)| {
         let name = k.as_str().to_lowercase();
-        name.ne("__cf_bm") || name.ne("__cfduid") || name.ne("_cfuvid") || name.ne("set-cookie")
+        name.ne("__cf_bm") && name.ne("__cfduid") && name.ne("_cfuvid") && name.ne("set-cookie")
     }) {
         builder = builder.header(kv.0, kv.1);
     }
 
-    for c in resp.cookies().into_iter().filter(|c| {
-        let key = c.name();
-        key.eq("_puid") || key.eq("_account")
-    }) {
+    for c in resp.cookies().into_iter() {
         if let Some(expires) = c.expires() {
             let timestamp_secs = expires
                 .duration_since(UNIX_EPOCH)

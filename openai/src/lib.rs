@@ -29,20 +29,24 @@ pub const URL_PLATFORM_API: &str = "https://api.openai.com";
 pub const ORIGIN_CHATGPT: &str = "https://chat.openai.com/chat";
 pub const HOST_CHATGPT: &str = "chat.openai.com";
 
+const RANDOM_IMPERSONATE: [Impersonate; 7] = [
+    Impersonate::OkHttp3_9,
+    Impersonate::OkHttp3_11,
+    Impersonate::OkHttp3_13,
+    Impersonate::OkHttp3_14,
+    Impersonate::OkHttp4_9,
+    Impersonate::OkHttp4_10,
+    Impersonate::OkHttp5,
+];
+
 /// Randomly select a user agent from a list of known user agents.
-pub(crate) fn random_user_agent() -> Impersonate {
+pub(crate) fn random_impersonate() -> Impersonate {
     use rand::seq::IteratorRandom;
 
-    let random_list = [
-        Impersonate::OkHttp3,
-        Impersonate::OkHttp4,
-        Impersonate::OkHttp5,
-    ];
-
-    random_list
+    RANDOM_IMPERSONATE
         .into_iter()
         .choose(&mut rand::thread_rng())
-        .unwrap_or(Impersonate::OkHttp4)
+        .unwrap_or(Impersonate::OkHttp5)
 }
 
 pub fn now_duration() -> anyhow::Result<Duration> {
