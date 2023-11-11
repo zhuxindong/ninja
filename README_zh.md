@@ -46,7 +46,7 @@
 - 两种方案都使用，优先级是：`HAR` > `YesCaptcha` / `CapSolver`
 - `YesCaptcha` / `CapSolver`推荐搭配HAR使用，出验证码则调用解析器处理，验证后HAR使用更持久
 
-> 目前OpenAI已经更新`登录`需要验证`Arkose Token`，解决方式同`GPT-4`，填写启动参数指定HAR文件`--arkose-auth-har-dir`。不想上传，可以通过浏览器打码登录，非必需。创建API-Key需要上传Platform相关的HAR特征文件，获取方式同上。
+> 目前OpenAI已经更新`登录`需要验证`Arkose Token`，解决方式同`GPT-4`，填写启动参数指定HAR文件`--arkose-auth-har-dir`。创建API-Key需要上传Platform相关的HAR特征文件，获取方式同上。
 
 > 近日，`OpenAI`取消对`GPT-3.5`进行`Arkose`验证，可以不上传HAR特征文件使用（已上传的不影响），兼容后续可能会再次开启`Arkose`验证，需要加上启动参数`--arkose-gpt3-experiment`进行开启`GPT-3.5`模型`Arkose`验证处理，WebUI不受影响.
 
@@ -122,8 +122,8 @@
   GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 deb包，二进制文件，以Ubuntu为例：
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.8.0/ninja-0.8.0-x86_64-unknown-linux-musl.tar.gz
-tar -xf ninja-0.8.0-x86_64-unknown-linux-musl.tar.gz
+wget https://github.com/gngpp/ninja/releases/download/v0.8.1/ninja-0.8.1-x86_64-unknown-linux-musl.tar.gz
+tar -xf ninja-0.8.1-x86_64-unknown-linux-musl.tar.gz
 ./ninja run
 ```
 
@@ -132,11 +132,11 @@ tar -xf ninja-0.8.0-x86_64-unknown-linux-musl.tar.gz
 GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 ipk 文件， 目前提供了 aarch64/x86_64 等架构的版本，下载后使用 opkg 安装，以 nanopi r4s 为例：
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.8.0/ninja_0.8.0_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.8.0/luci-app-ninja_1.1.6-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.8.0/luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.8.1/ninja_0.8.1_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.8.1/luci-app-ninja_1.1.6-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.8.1/luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
 
-opkg install ninja_0.8.0_aarch64_generic.ipk
+opkg install ninja_0.8.1_aarch64_generic.ipk
 opkg install luci-app-ninja_1.1.6-1_all.ipk
 opkg install luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
 ```

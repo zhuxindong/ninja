@@ -9,6 +9,7 @@ connect_timeout = 60
 tcp_keepalive = 60
 pool_idle_timeout = 90
 disable_webui = false
+arkose_gpt3_experiment = false
 arkose_solver = "yescaptcha"
 tb_enable = false
 tb_store_strategy = "mem"
