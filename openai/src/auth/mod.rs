@@ -23,7 +23,7 @@ use tokio::sync::OnceCell;
 
 use crate::error::AuthError;
 use crate::URL_CHATGPT_API;
-use crate::{debug, random_user_agent};
+use crate::{debug, random_impersonate};
 
 use self::model::{ApiKeyData, AuthStrategy};
 #[cfg(feature = "preauth")]
@@ -451,7 +451,7 @@ impl AuthClientBuilder {
     pub fn builder() -> AuthClientBuilder {
         AuthClientBuilder {
             inner: Client::builder()
-                .impersonate(random_user_agent())
+                .impersonate(random_impersonate())
                 .danger_accept_invalid_certs(true)
                 .connect_timeout(Duration::from_secs(30))
                 .redirect(Policy::none()),

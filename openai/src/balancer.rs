@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{auth::AuthClient, context, random_user_agent};
+use crate::{auth::AuthClient, context, random_impersonate};
 use crate::{
     auth::{self},
     info,
@@ -220,7 +220,7 @@ fn build_client(
     }
 
     let client = builder
-        .impersonate(random_user_agent())
+        .impersonate(random_impersonate())
         .danger_accept_invalid_certs(true)
         .connect_timeout(Duration::from_secs(inner.connect_timeout))
         .timeout(Duration::from_secs(inner.timeout))
@@ -257,7 +257,7 @@ fn build_auth_client(
     }
 
     builder
-        .impersonate(random_user_agent())
+        .impersonate(random_impersonate())
         .timeout(Duration::from_secs(inner.timeout))
         .connect_timeout(Duration::from_secs(inner.connect_timeout))
         .proxy(proxy_url.cloned())
