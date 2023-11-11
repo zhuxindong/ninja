@@ -26,7 +26,7 @@ use axum_extra::extract::cookie::Cookie;
 use axum_extra::extract::{cookie, CookieJar};
 use axum_server::tls_rustls::RustlsConfig;
 use axum_server::HttpConfig;
-use reqwest::header::{HeaderMap, HeaderValue};
+use reqwest::header::HeaderMap;
 use serde_json::{json, Value};
 use std::str::FromStr;
 use std::sync::Arc;
@@ -44,7 +44,7 @@ use crate::auth::provide::AuthProvider;
 use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
 use crate::context::{self, ContextArgs};
 use crate::serve::middleware::tokenbucket::{Strategy, TokenBucketLimitContext};
-use crate::{arkose, debug, info, warn};
+use crate::{arkose, info, warn};
 
 use crate::serve::error::ResponseError;
 use crate::{URL_CHATGPT_API, URL_PLATFORM_API};
@@ -368,7 +368,7 @@ async fn official_proxy(
     let builder = context::get_instance()
         .client()
         .request(method, &url)
-        .headers(header_convert(&headers, &jar)?);
+        .headers(header_convert(&headers, &jar, URL_PLATFORM_API)?);
     let resp = match body {
         Some(body) => builder.json(&body.0).send().await,
         None => builder.send().await,
@@ -408,14 +408,18 @@ async fn unofficial_proxy(
     let builder = context::get_instance()
         .client()
         .request(method, url)
-        .headers(header_convert(&headers, &jar)?);
+        .headers(header_convert(&headers, &jar, URL_CHATGPT_API)?);
     let resp = match body {
         Some(body) => builder.json(&body.0).send().await,
         None => builder.send().await,
     };
     response_convert(resp)
 }
-pub(super) fn header_convert(h: &HeaderMap, jar: &CookieJar) -> Result<HeaderMap, ResponseError> {
+pub(super) fn header_convert(
+    h: &HeaderMap,
+    jar: &CookieJar,
+    origin: &'static str,
+) -> Result<HeaderMap, ResponseError> {
     let authorization = match h.get(header::AUTHORIZATION) {
         Some(v) => Some(v),
         // support Pandora WebUI passing X-Authorization header
@@ -426,20 +430,26 @@ pub(super) fn header_convert(h: &HeaderMap, jar: &CookieJar) -> Result<HeaderMap
     if let Some(h) = authorization {
         headers.insert(header::AUTHORIZATION, h.clone());
     }
+    headers.insert(header::REFERER, header::HeaderValue::from_static(origin));
+    headers.insert(header::REFERER, header::HeaderValue::from_static(origin));
 
-    let mut cookie = String::new();
+    let mut cookies = Vec::new();
 
-    if let Some(cookier) = jar.get("_puid") {
-        let c = &format!("_puid={};", puid_cookie_encoded(cookier.value()));
-        cookie.push_str(c);
-        debug!("request cookie `puid`: {}", c);
-    }
+    jar.iter()
+        .filter(|c| {
+            let name = c.name().to_lowercase();
+            name.eq("_puid") || name.eq("cf_clearance")
+        })
+        .for_each(|c| {
+            let c = format!("{}={}", c.name(), cookie_encoded(c.value()));
+            cookies.push(c);
+        });
 
     // setting cookie
-    if !cookie.is_empty() {
+    if !cookies.is_empty() {
         headers.insert(
             header::COOKIE,
-            HeaderValue::from_str(cookie.as_str()).expect("setting cookie error"),
+            header::HeaderValue::from_str(&cookies.join(";")).expect("setting cookie error"),
         );
     }
     Ok(headers)
@@ -450,14 +460,22 @@ fn response_convert(
 ) -> Result<impl IntoResponse, ResponseError> {
     let resp = res.map_err(ResponseError::InternalServerError)?;
     let mut builder = Response::builder().status(resp.status());
-    for kv in resp.headers().into_iter().filter(|(k, _v)| {
-        let name = k.as_str().to_lowercase();
-        name.ne("__cf_bm") && name.ne("__cfduid") && name.ne("_cfuvid") && name.ne("set-cookie")
-    }) {
+    for kv in resp
+        .headers()
+        .into_iter()
+        .filter(|(k, _)| k.as_str().to_lowercase().ne("set-cookie"))
+    {
         builder = builder.header(kv.0, kv.1);
     }
 
-    for c in resp.cookies().into_iter() {
+    for c in resp
+        .cookies()
+        .filter(|c| {
+            let name = c.name().to_lowercase();
+            name.eq("_puid") || name.eq("cf_clearance")
+        })
+        .into_iter()
+    {
         if let Some(expires) = c.expires() {
             let timestamp_secs = expires
                 .duration_since(UNIX_EPOCH)
@@ -538,7 +556,7 @@ async fn handle_body(
         if let Some(puid) = puid {
             headers.insert(
                 header::COOKIE,
-                HeaderValue::from_str(&format!("_puid={puid};"))
+                header::HeaderValue::from_str(&format!("_puid={puid};"))
                     .map_err(ResponseError::BadRequest)?,
             );
         }
@@ -574,7 +592,7 @@ async fn handle_body(
     Ok(())
 }
 
-fn puid_cookie_encoded(input: &str) -> String {
+fn cookie_encoded(input: &str) -> String {
     let separator = ':';
     if let Some((name, value)) = input.split_once(separator) {
         let encoded_value = value
