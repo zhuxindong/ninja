@@ -446,7 +446,7 @@ async fn get_auth_me(
     let resp = context::get_instance()
         .client()
         .get(format!("{URL_CHATGPT_API}/backend-api/me"))
-        .headers(header_convert(&headers, &jar)?)
+        .headers(header_convert(&headers, &jar, URL_CHATGPT_API)?)
         .send()
         .await
         .map_err(ResponseError::InternalServerError)?;
@@ -596,7 +596,7 @@ async fn get_share_chat(
                 let resp = context::get_instance()
                     .client()
                     .get(format!("{URL_CHATGPT_API}/backend-api/share/{share_id}"))
-                    .headers(header_convert(&headers, &jar)?)
+                    .headers(header_convert(&headers, &jar, URL_CHATGPT_API)?)
                     .send()
                     .await
                     .map_err(ResponseError::InternalServerError)?;
@@ -702,7 +702,7 @@ async fn get_share_chat_info(
             let resp = context::get_instance()
                 .client()
                 .get(format!("{URL_CHATGPT_API}/backend-api/share/{share_id}"))
-                .headers(header_convert(&headers, &jar)?)
+                .headers(header_convert(&headers, &jar, URL_CHATGPT_API)?)
                 .send()
                 .await
                 .map_err(ResponseError::InternalServerError)?;
@@ -788,7 +788,7 @@ async fn get_share_chat_continue_info(
                         "{URL_CHATGPT_API}/backend-api/share/{}",
                         share_id.0
                     ))
-                    .headers(header_convert(&headers, &jar)?)
+                    .headers(header_convert(&headers, &jar, URL_CHATGPT_API)?)
                     .send()
                     .await
                     .map_err(ResponseError::InternalServerError)?;
