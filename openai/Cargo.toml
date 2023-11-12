@@ -55,9 +55,9 @@ axum-server = { version = "0.5.1", features = ["tls-rustls"], optional = true }
 tower-http = { version = "0.4.4", default-features = false, features = ["cors", "trace", "map-request-body", "util"], optional = true }
 tower = { version = "0.4.13", default-features = false, features = ["limit", "timeout"], optional = true}
 bytes = { version = "1.5.0", optional = true }
-time = { version =  "0.3.28", optional = true }
+time = { version =  "0.3.30", optional = true }
 static-files = { version = "0.2.3", optional = true }
-tracing = { version = "0.1.37", optional = true }
+tracing = { version = "0.1.40", optional = true }
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"], optional = true }
 async-stream = { version = "0.3.5", optional = true }
 axum_csrf = { version = "0.7.2", features = ["layer"], optional = true }

@@ -1,13 +1,13 @@
 mod error;
+mod extract;
 mod middleware;
-mod puid;
-mod signal;
-mod turnstile;
-
 #[cfg(feature = "preauth")]
 pub mod preauth;
+mod puid;
 #[cfg(feature = "template")]
 mod route;
+mod signal;
+mod turnstile;
 
 use anyhow::anyhow;
 use axum::body::{Body, StreamBody};
@@ -19,15 +19,22 @@ use axum::routing::{any, get, post};
 use axum::{Json, TypedHeader};
 use axum_server::{AddrIncomingConfig, Handle};
 
+use self::extract::SendRequestExt;
+use crate::auth::model::{AccessToken, AuthAccount, RefreshToken, SessionAccessToken};
+use crate::auth::provide::AuthProvider;
+use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
+use crate::context::{self, ContextArgs};
+use crate::serve::error::ResponseError;
+use crate::serve::middleware::tokenbucket::{Strategy, TokenBucketLimitContext};
+use crate::{debug, info, warn};
+use crate::{URL_CHATGPT_API, URL_PLATFORM_API};
 use axum::http::header;
-use axum::http::method::Method;
-use axum::http::uri::Uri;
 use axum_extra::extract::cookie::Cookie;
 use axum_extra::extract::{cookie, CookieJar};
 use axum_server::tls_rustls::RustlsConfig;
 use axum_server::HttpConfig;
 use reqwest::header::HeaderMap;
-use serde_json::{json, Value};
+use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -35,21 +42,6 @@ use tower_http::trace;
 use tracing::Level;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-
-use std::net::SocketAddr;
-
-use crate::arkose::Type;
-use crate::auth::model::{AccessToken, AuthAccount, RefreshToken, SessionAccessToken};
-use crate::auth::provide::AuthProvider;
-use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
-use crate::context::{self, ContextArgs};
-use crate::serve::middleware::tokenbucket::{Strategy, TokenBucketLimitContext};
-use crate::{arkose, info, warn};
-
-use crate::serve::error::ResponseError;
-use crate::{URL_CHATGPT_API, URL_PLATFORM_API};
-
-use self::puid::{get_or_init_puid, reduce_cache_key};
 
 const EMPTY: &str = "";
 
@@ -325,97 +317,29 @@ async fn post_revoke_token(
 ///
 /// platform API match path /v1/{tail.*}
 /// reference: https://platform.openai.com/docs/api-reference
-/// GET https://api.openai.com/v1/models
-/// GET https://api.openai.com/v1/models/{model}
-/// POST https://api.openai.com/v1/chat/completions
-/// POST https://api.openai.com/v1/completions
-/// POST https://api.openai.com/v1/edits
-/// POST https://api.openai.com/v1/images/generations
-/// POST https://api.openai.com/v1/images/edits
-/// POST https://api.openai.com/v1/images/variations
-/// POST https://api.openai.com/v1/embeddings
-/// POST https://api.openai.com/v1/audio/transcriptions
-/// POST https://api.openai.com/v1/audio/translations
-/// GET https://api.openai.com/v1/files
-/// POST https://api.openai.com/v1/files
-/// DELETE https://api.openai.com/v1/files/{file_id}
-/// GET https://api.openai.com/v1/files/{file_id}
-/// GET https://api.openai.com/v1/files/{file_id}/content
-/// POST https://api.openai.com/v1/fine-tunes
-/// GET https://api.openai.com/v1/fine-tunes
-/// GET https://api.openai.com/v1/fine-tunes/{fine_tune_id}
-/// POST https://api.openai.com/v1/fine-tunes/{fine_tune_id}/cancel
-/// GET https://api.openai.com/v1/fine-tunes/{fine_tune_id}/events
-/// DELETE https://api.openai.com/v1/models/{model}
-/// POST https://api.openai.com/v1/moderations
-/// Deprecated GET https://api.openai.com/v1/engines
-/// Deprecated GET https://api.openai.com/v1/engines/{engine_id}
 async fn official_proxy(
-    uri: Uri,
-    method: Method,
-    headers: HeaderMap,
-    jar: CookieJar,
-    mut body: Option<Json<Value>>,
+    req: extract::RequestExtractor,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let path_and_query = uri
-        .path_and_query()
-        .map(|v| v.as_str())
-        .unwrap_or(uri.path());
-    let url = format!("{URL_PLATFORM_API}{path_and_query}");
-
-    handle_dashboard_body(&url, &method, &mut body).await?;
-
-    let builder = context::get_instance()
+    let resp = context::get_instance()
         .client()
-        .request(method, &url)
-        .headers(header_convert(&headers, &jar, URL_PLATFORM_API)?);
-    let resp = match body {
-        Some(body) => builder.json(&body.0).send().await,
-        None => builder.send().await,
-    };
+        .send_request(URL_PLATFORM_API, req)
+        .await?;
     response_convert(resp)
 }
 
 /// reference: doc/http.rest
-/// GET http://{{host}}/backend-api/models?history_and_training_disabled=false
-/// GET http://{{host}}/backend-api/accounts/check
-/// GET http://{{host}}/backend-api/accounts/check/v4-2023-04-27
-/// GET http://{{host}}/backend-api/settings/beta_features
-/// GET http://{{host}}/backend-api/conversation/{conversation_id}
-/// GET http://{{host}}/backend-api/conversations?offset=0&limit=3&order=updated
-/// GET http://{{host}}/public-api/conversation_limit
-/// POST http://{{host}}/backend-api/conversation
-/// PATCH http://{{host}}/backend-api/conversation/{conversation_id}
-/// POST http://{{host}}/backend-api/conversation/gen_title/{conversation_id}
-/// PATCH http://{{host}}/backend-api/conversation/{conversation_id}
-/// PATCH http://{{host}}/backend-api/conversations
-/// POST http://{{host}}/backend-api/conversation/message_feedback
 async fn unofficial_proxy(
-    uri: Uri,
-    method: Method,
-    mut headers: HeaderMap,
-    jar: CookieJar,
-    mut body: Option<Json<Value>>,
+    req: extract::RequestExtractor,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let path_and_query = uri
-        .path_and_query()
-        .map(|v| v.as_str())
-        .unwrap_or(uri.path());
-    let url = format!("{URL_CHATGPT_API}{path_and_query}");
-
-    handle_body(&url, &method, &mut headers, &mut body).await?;
-
-    let builder = context::get_instance()
+    let resp = context::get_instance()
         .client()
-        .request(method, url)
-        .headers(header_convert(&headers, &jar, URL_CHATGPT_API)?);
-    let resp = match body {
-        Some(body) => builder.json(&body.0).send().await,
-        None => builder.send().await,
-    };
+        .send_request(URL_CHATGPT_API, req)
+        .await?;
     response_convert(resp)
 }
-pub(super) fn header_convert(
+
+/// Request headers convert
+fn header_convert(
     h: &HeaderMap,
     jar: &CookieJar,
     origin: &'static str,
@@ -430,6 +354,9 @@ pub(super) fn header_convert(
     if let Some(h) = authorization {
         headers.insert(header::AUTHORIZATION, h.clone());
     }
+    if let Some(content_type) = h.get(header::CONTENT_TYPE) {
+        headers.insert(header::CONTENT_TYPE, content_type.clone());
+    }
     headers.insert(header::REFERER, header::HeaderValue::from_static(origin));
     headers.insert(header::REFERER, header::HeaderValue::from_static(origin));
 
@@ -442,6 +369,7 @@ pub(super) fn header_convert(
         })
         .for_each(|c| {
             let c = format!("{}={}", c.name(), cookie_encoded(c.value()));
+            debug!("cookie: {}", c);
             cookies.push(c);
         });
 
@@ -455,10 +383,8 @@ pub(super) fn header_convert(
     Ok(headers)
 }
 
-fn response_convert(
-    res: Result<reqwest::Response, reqwest::Error>,
-) -> Result<impl IntoResponse, ResponseError> {
-    let resp = res.map_err(ResponseError::InternalServerError)?;
+/// Response convert
+fn response_convert(resp: reqwest::Response) -> Result<impl IntoResponse, ResponseError> {
     let mut builder = Response::builder().status(resp.status());
     for kv in resp
         .headers()
@@ -501,97 +427,6 @@ pub(crate) async fn try_login(account: &axum::Form<AuthAccount>) -> anyhow::Resu
     ctx.auth_client().do_access_token(&account).await
 }
 
-async fn handle_dashboard_body(
-    url: &str,
-    method: &Method,
-    body: &mut Option<Json<Value>>,
-) -> Result<(), ResponseError> {
-    if !url.contains("/dashboard/user/api_keys") || !method.eq("POST") {
-        return Ok(());
-    }
-
-    let body = match body.as_mut().and_then(|b| b.as_object_mut()) {
-        Some(body) => body,
-        None => return Ok(()),
-    };
-
-    if body.get("arkose_token").is_none() {
-        let arkose_token = arkose::ArkoseToken::new_from_context(Type::Platform).await?;
-        body.insert("arkose_token".to_owned(), json!(arkose_token));
-    }
-
-    Ok(())
-}
-
-async fn handle_body(
-    url: &str,
-    method: &Method,
-    headers: &mut HeaderMap,
-    body: &mut Option<Json<Value>>,
-) -> Result<(), ResponseError> {
-    if !url.contains("/backend-api/conversation") || !method.eq("POST") {
-        return Ok(());
-    }
-
-    let body = match body.as_mut().and_then(|b| b.as_object_mut()) {
-        Some(body) => body,
-        None => return Ok(()),
-    };
-
-    let model = match body.get("model").and_then(|m| m.as_str()) {
-        Some(model) => model,
-        None => return Ok(()),
-    };
-
-    if !has_puid(headers)? {
-        // extract token from Authorization header
-        let token = extract_authorization(headers)?;
-
-        // Exstract the token from the Authorization header
-        let cache_id = reduce_cache_key(token)?;
-
-        // Get or init puid
-        let puid = get_or_init_puid(token, model, cache_id).await?;
-
-        if let Some(puid) = puid {
-            headers.insert(
-                header::COOKIE,
-                header::HeaderValue::from_str(&format!("_puid={puid};"))
-                    .map_err(ResponseError::BadRequest)?,
-            );
-        }
-    }
-
-    match arkose::GPTModel::from_str(model) {
-        Ok(model) => {
-            if (context::get_instance().arkose_gpt3_experiment() && model.is_gpt3())
-                || model.is_gpt4()
-            {
-                let condition = match body.get("arkose_token") {
-                    Some(s) => {
-                        let s = s.as_str().unwrap_or(EMPTY);
-                        s.is_empty() || s.eq("null")
-                    }
-                    None => true,
-                };
-
-                if condition {
-                    let arkose_token = arkose::ArkoseToken::new_from_context(model.into()).await?;
-                    body.insert("arkose_token".to_owned(), json!(arkose_token));
-                }
-            }
-        }
-        Err(err) => {
-            return Err(ResponseError::BadRequest(anyhow!(
-                "GPTModel parse error: {}",
-                err
-            )))
-        }
-    }
-
-    Ok(())
-}
-
 fn cookie_encoded(input: &str) -> String {
     let separator = ':';
     if let Some((name, value)) = input.split_once(separator) {
@@ -610,30 +445,6 @@ fn cookie_encoded(input: &str) -> String {
     } else {
         input.to_string()
     }
-}
-
-pub(super) fn has_puid(headers: &HeaderMap) -> Result<bool, ResponseError> {
-    let res = match headers.get(header::COOKIE) {
-        Some(hv) => hv
-            .to_str()
-            .map_err(ResponseError::BadRequest)?
-            .contains("_puid"),
-        None => false,
-    };
-    Ok(res)
-}
-
-fn extract_authorization<'a>(headers: &'a HeaderMap) -> Result<&'a str, ResponseError> {
-    let token = match headers.get(header::AUTHORIZATION) {
-        Some(v) => Some(v),
-        None => headers.get("X-Authorization"),
-    }
-    .ok_or(ResponseError::Unauthorized(anyhow!(
-        "AccessToken required!"
-    )))?
-    .to_str()
-    .map_err(ResponseError::BadGateway)?;
-    Ok(token)
 }
 
 impl TryInto<Response<Body>> for SessionAccessToken {
