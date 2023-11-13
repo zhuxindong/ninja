@@ -319,6 +319,10 @@ Options:
 - Linux编译，Ubuntu机器为例:
 
 ```shell
+apt install build-essential
+apt install cmake
+apt install libclang-dev
+
 git clone https://github.com/gngpp/ninja.git && cd ninja
 cargo build --release
 ```
