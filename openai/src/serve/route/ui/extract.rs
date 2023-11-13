@@ -1,18 +1,16 @@
 use std::str::FromStr;
 
-use axum::{async_trait, extract::FromRequestParts, http::request::Parts};
+use axum::{async_trait, extract::FromRequest};
 use axum_extra::extract::CookieJar;
 use base64::Engine;
-use http::HeaderMap;
+use http::{HeaderMap, Request};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     auth::API_AUTH_SESSION_COOKIE_KEY,
-    serve::{error::ResponseError, route::ui::SESSION_ID},
+    serve::{error::ResponseError, route::ui::LOGIN_INDEX, route::ui::SESSION_ID},
     token::model::AuthenticateToken,
 };
-
-const LOGIN_INDEX: &str = "/auth/login";
 
 #[derive(Serialize, Deserialize)]
 pub(super) struct Session {
@@ -65,13 +63,15 @@ pub(super) struct SessionExtractor {
 }
 
 #[async_trait]
-impl<S> FromRequestParts<S> for SessionExtractor
+impl<S, B> FromRequest<S, B> for SessionExtractor
 where
+    B: Send + 'static,
     S: Send + Sync,
 {
     type Rejection = ResponseError;
 
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request(req: Request<B>, _: &S) -> Result<Self, Self::Rejection> {
+        let (parts, _) = req.into_parts().into();
         let jar = CookieJar::from_headers(&parts.headers);
         match jar.get(SESSION_ID) {
             Some(c) => {

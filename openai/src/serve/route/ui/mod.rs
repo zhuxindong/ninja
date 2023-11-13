@@ -429,9 +429,9 @@ async fn get_auth_me(
 }
 
 async fn get_chat(
-    extract: SessionExtractor,
     conversation_id: Option<Path<String>>,
     mut query: Query<HashMap<String, String>>,
+    extract: SessionExtractor,
 ) -> Result<Response<Body>, ResponseError> {
     let template_name = match conversation_id {
         Some(conversation_id) => {
@@ -510,8 +510,8 @@ async fn get_chat_info(extract: SessionExtractor) -> Result<Response<Body>, Resp
 }
 
 async fn get_share_chat(
-    extract: SessionExtractor,
     share_id: Path<String>,
+    extract: SessionExtractor,
 ) -> Result<Response<Body>, ResponseError> {
     let share_id = share_id.0;
     let resp = context::get_instance()
@@ -598,8 +598,8 @@ async fn get_share_chat(
 }
 
 async fn get_share_chat_info(
-    extract: SessionExtractor,
     share_id: Path<String>,
+    extract: SessionExtractor,
 ) -> Result<Response<Body>, ResponseError> {
     let share_id = share_id.0.replace(".json", "");
     let resp = context::get_instance()
@@ -668,8 +668,8 @@ async fn get_share_chat_continue(share_id: Path<String>) -> Result<Response<Body
 }
 
 async fn get_share_chat_continue_info(
-    extract: SessionExtractor,
     share_id: Path<String>,
+    extract: SessionExtractor,
 ) -> Result<Response<Body>, ResponseError> {
     let resp = context::get_instance()
         .client()
