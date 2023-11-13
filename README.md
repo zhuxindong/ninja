@@ -319,6 +319,10 @@ Options:
 - Linux compile, Ubuntu machine for example:
 
 ```shell
+apt install build-essential
+apt install cmake
+apt install libclang-dev
+
 git clone https://github.com/gngpp/ninja.git && cd ninja
 cargo build --release
 ```
