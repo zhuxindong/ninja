@@ -1,4 +1,4 @@
-use axum::http::header::CONTENT_TYPE;
+use axum::http::header::{CONTENT_TYPE, LOCATION};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::response::Response;
@@ -7,17 +7,22 @@ use serde_json::json;
 
 // Make our own error that wraps `anyhow::Error`.
 pub struct ResponseError {
-    msg: String,
+    msg: Option<String>,
     code: StatusCode,
+    path: Option<String>,
 }
 
 impl ResponseError {
     pub fn new(msg: String, code: StatusCode) -> Self {
-        Self { msg, code }
+        Self {
+            msg: Some(msg),
+            code,
+            path: None,
+        }
     }
 
-    pub fn msg(&self) -> &str {
-        &self.msg
+    pub fn msg(&self) -> Option<&str> {
+        self.msg.as_deref()
     }
 
     pub fn code(&self) -> &StatusCode {
@@ -28,6 +33,9 @@ impl ResponseError {
 // Tell axum how to convert `AppError` into a response.
 impl IntoResponse for ResponseError {
     fn into_response(self) -> Response {
+        if let Some(path) = self.path {
+            return (self.code, [(LOCATION, &path)], ()).into_response();
+        }
         let body = Json(json!({
             "code": self.code.as_str(),
             "msg": self.msg,
@@ -44,8 +52,9 @@ where
 {
     fn from(err: E) -> Self {
         Self {
-            msg: err.into().to_string(),
+            msg: Some(err.into().to_string()),
             code: StatusCode::INTERNAL_SERVER_ERROR,
+            path: None,
         }
     }
 }
@@ -58,14 +67,32 @@ macro_rules! static_err {
             E: Into<anyhow::Error>,
         {
             ResponseError {
-                msg: err.into().to_string(),
+                msg: Some(err.into().to_string()),
                 code: $status,
+                path: None,
+            }
+        }
+    };
+}
+
+macro_rules! static_3xx {
+    ($name:ident, $status:expr) => {
+        #[allow(non_snake_case, missing_docs)]
+        pub fn $name(path: &str) -> ResponseError {
+            ResponseError {
+                msg: None,
+                code: $status,
+                path: Some(path.to_string()),
             }
         }
     };
 }
 
 impl ResponseError {
+    // 3xx
+    static_3xx!(TempporaryRedirect, StatusCode::TEMPORARY_REDIRECT);
+
+    // 4xx
     static_err!(BadRequest, StatusCode::BAD_REQUEST);
     static_err!(NotFound, StatusCode::NOT_FOUND);
     static_err!(Unauthorized, StatusCode::UNAUTHORIZED);
@@ -99,6 +126,7 @@ impl ResponseError {
         StatusCode::UNAVAILABLE_FOR_LEGAL_REASONS
     );
 
+    // 5xx
     static_err!(InternalServerError, StatusCode::INTERNAL_SERVER_ERROR);
     static_err!(NotImplemented, StatusCode::NOT_IMPLEMENTED);
     static_err!(BadGateway, StatusCode::BAD_GATEWAY);
