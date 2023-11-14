@@ -17,6 +17,8 @@
 
 Reverse engineered `ChatGPT` proxy (bypass Cloudflare 403 Access Denied)
 
+> If the project is helpful to you, please consider [donating support](https://github.com/gngpp/gngpp/blob/main/SPONSOR.md#sponsor-my-open-source-works) for continued project maintenance, or you can Pay for consulting and technical support services.
+
 ### Features
 
 - API key acquisition

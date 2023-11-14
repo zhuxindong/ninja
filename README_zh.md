@@ -17,6 +17,8 @@
 
 逆向工程的 `ChatGPT` 代理（绕过 Cloudflare 403 Access Denied）
 
+> 如果项目对你有帮助，请考虑[捐赠支持](https://github.com/gngpp/gngpp/blob/main/SPONSOR.md#sponsor-my-open-source-works)项目持续维护，也可以付费获取咨询和技术支持服务。
+
 ### 特征
 
 - API密钥获取
