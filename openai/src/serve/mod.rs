@@ -1,3 +1,4 @@
+mod convert;
 mod error;
 mod extract;
 mod middleware;
@@ -10,7 +11,7 @@ mod signal;
 mod turnstile;
 
 use anyhow::anyhow;
-use axum::body::{Body, StreamBody};
+use axum::body::Body;
 use axum::headers::authorization::Bearer;
 use axum::headers::Authorization;
 use axum::http::Response;
@@ -19,6 +20,7 @@ use axum::routing::{any, get, post};
 use axum::{Json, TypedHeader};
 use axum_server::{AddrIncomingConfig, Handle};
 
+use self::convert::response_convert;
 use self::extract::SendRequestExt;
 use crate::auth::model::{AccessToken, AuthAccount, RefreshToken, SessionAccessToken};
 use crate::auth::provide::AuthProvider;
@@ -26,14 +28,12 @@ use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
 use crate::context::{self, ContextArgs};
 use crate::serve::error::ResponseError;
 use crate::serve::middleware::tokenbucket::{Strategy, TokenBucketLimitContext};
-use crate::{debug, info, warn};
+use crate::{info, warn};
 use crate::{URL_CHATGPT_API, URL_PLATFORM_API};
 use axum::http::header;
-use axum_extra::extract::cookie::Cookie;
 use axum_extra::extract::{cookie, CookieJar};
 use axum_server::tls_rustls::RustlsConfig;
 use axum_server::HttpConfig;
-use reqwest::header::HeaderMap;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -45,13 +45,44 @@ use tracing_subscriber::util::SubscriberInitExt;
 
 const EMPTY: &str = "";
 
-pub struct Launcher {
-    inner: ContextArgs,
+fn print_boot_message(inner: &ContextArgs) {
+    info!("OS: {}", std::env::consts::OS);
+    info!("Arch: {}", std::env::consts::ARCH);
+    info!("Version: {}", env!("CARGO_PKG_VERSION"));
+    info!("Worker threads: {}", inner.workers);
+    info!("Concurrent limit: {}", inner.concurrent_limit);
+    info!("Enabled cookie store: {}", inner.cookie_store);
+
+    if let Some((ref ipv6, len)) = inner.ipv6_subnet {
+        info!("Ipv6 subnet: {ipv6}/{len}");
+    } else {
+        info!("Keepalive {} seconds", inner.tcp_keepalive);
+        info!("Timeout {} seconds", inner.timeout);
+        info!("Connect timeout {} seconds", inner.connect_timeout);
+        if inner.disable_direct {
+            info!("Disable direct connection");
+        }
+    }
+
+    inner.arkose_solver.as_ref().map(|solver| {
+        info!("ArkoseLabs solver: {:?}", solver.solver);
+    });
+
+    inner
+        .interface
+        .as_ref()
+        .map(|i| info!("Bind address: {i} for outgoing connection"));
+    info!(
+        "Starting HTTP(S) server at http(s)://{:?}",
+        inner.bind.expect("bind address required")
+    );
 }
 
-impl Launcher {
+pub struct Serve(ContextArgs);
+
+impl Serve {
     pub fn new(inner: ContextArgs) -> Self {
-        Self { inner }
+        Self(inner)
     }
 
     pub fn run(self) -> anyhow::Result<()> {
@@ -63,36 +94,10 @@ impl Launcher {
             .with(tracing_subscriber::fmt::layer())
             .init();
 
-        info!(
-            "Starting HTTP(S) server at http(s)://{:?}",
-            self.inner.bind.expect("bind address required")
-        );
-        info!("Starting {} workers", self.inner.workers);
-        info!("Concurrent limit {}", self.inner.concurrent_limit);
-        info!("Enabled cookie store: {}", self.inner.cookie_store);
-
-        if let Some((ref ipv6, len)) = self.inner.ipv6_subnet {
-            info!("Ipv6 subnet: {ipv6}/{len}");
-        } else {
-            info!("Keepalive {} seconds", self.inner.tcp_keepalive);
-            info!("Timeout {} seconds", self.inner.timeout);
-            info!("Connect timeout {} seconds", self.inner.connect_timeout);
-            if self.inner.disable_direct {
-                info!("Disable direct connection");
-            }
-        }
-
-        self.inner.arkose_solver.as_ref().map(|solver| {
-            info!("ArkoseLabs solver: {:?}", solver.solver);
-        });
-
-        self.inner
-            .interface
-            .as_ref()
-            .map(|i| info!("Bind address: {i} for outgoing connection"));
+        print_boot_message(&self.0);
 
         // init context
-        context::init(self.inner.clone());
+        context::init(self.0.clone());
 
         let global_layer = tower::ServiceBuilder::new()
             .layer(
@@ -103,7 +108,7 @@ impl Launcher {
                     .on_failure(trace::DefaultOnFailure::new().level(Level::WARN)),
             )
             .layer(tower::limit::ConcurrencyLimitLayer::new(
-                self.inner.concurrent_limit,
+                self.0.concurrent_limit,
             ))
             .layer(
                 tower_http::cors::CorsLayer::new()
@@ -116,18 +121,18 @@ impl Launcher {
                 |_: axum::BoxError| async { axum::http::StatusCode::REQUEST_TIMEOUT },
             ))
             .layer(tower::timeout::TimeoutLayer::new(Duration::from_secs(
-                self.inner.timeout as u64,
+                self.0.timeout as u64,
             )))
             .layer(axum::extract::DefaultBodyLimit::max(200 * 1024 * 1024));
 
         let app_layer = {
             let limit_context = TokenBucketLimitContext::from((
-                Strategy::from_str(self.inner.tb_store_strategy.as_str())?,
-                self.inner.tb_enable,
-                self.inner.tb_capacity,
-                self.inner.tb_fill_rate,
-                self.inner.tb_expired,
-                self.inner.tb_redis_url.clone(),
+                Strategy::from_str(self.0.tb_store_strategy.as_str())?,
+                self.0.tb_enable,
+                self.0.tb_capacity,
+                self.0.tb_fill_rate,
+                self.0.tb_expired,
+                self.0.tb_redis_url.clone(),
             ));
 
             tower::ServiceBuilder::new()
@@ -155,37 +160,37 @@ impl Launcher {
             .route("/auth/revoke_token", post(post_revoke_token))
             .route("/api/auth/session", get(get_session));
 
-        let router = route::config(router, &self.inner).layer(global_layer);
+        let router = route::config(router, &self.0).layer(global_layer);
 
         let http_config = HttpConfig::new()
             .http1_keep_alive(true)
-            .http1_header_read_timeout(Duration::from_secs(self.inner.tcp_keepalive as u64))
-            .http2_keep_alive_timeout(Duration::from_secs(self.inner.tcp_keepalive as u64))
-            .http2_keep_alive_interval(Some(Duration::from_secs(self.inner.tcp_keepalive as u64)))
+            .http1_header_read_timeout(Duration::from_secs(self.0.tcp_keepalive as u64))
+            .http2_keep_alive_timeout(Duration::from_secs(self.0.tcp_keepalive as u64))
+            .http2_keep_alive_interval(Some(Duration::from_secs(self.0.tcp_keepalive as u64)))
             .build();
 
         let incoming_config = AddrIncomingConfig::new()
             .tcp_sleep_on_accept_errors(true)
-            .tcp_keepalive_interval(Some(Duration::from_secs(self.inner.tcp_keepalive as u64)))
-            .tcp_keepalive(Some(Duration::from_secs(self.inner.tcp_keepalive as u64)))
+            .tcp_keepalive_interval(Some(Duration::from_secs(self.0.tcp_keepalive as u64)))
+            .tcp_keepalive(Some(Duration::from_secs(self.0.tcp_keepalive as u64)))
             .build();
 
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_io()
             .enable_time()
-            .worker_threads(self.inner.workers)
+            .worker_threads(self.0.workers)
             .build()?;
 
         runtime.block_on(async move {
             let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
             // PreAuth mitm proxy
             #[cfg(feature = "preauth")]
-            if let Some(pbind) = self.inner.pbind.clone() {
+            if let Some(pbind) = self.0.pbind.clone() {
                 if let Some(err) = preauth::mitm_proxy(
                     pbind,
-                    self.inner.pupstream.clone(),
-                    self.inner.pcert.clone(),
-                    self.inner.pkey.clone(),
+                    self.0.pupstream.clone(),
+                    self.0.pcert.clone(),
+                    self.0.pkey.clone(),
                     rx,
                 )
                 .await
@@ -204,13 +209,13 @@ impl Launcher {
             // Spawn a task to check wan address.
             tokio::spawn(check_wan_address());
 
-            let result = match (self.inner.tls_cert, self.inner.tls_key) {
+            let result = match (self.0.tls_cert, self.0.tls_key) {
                 (Some(cert), Some(key)) => {
                     let tls_config = RustlsConfig::from_pem_file(cert, key)
                         .await
                         .expect("Failed to load TLS keypair");
 
-                    axum_server::bind_rustls(self.inner.bind.unwrap(), tls_config)
+                    axum_server::bind_rustls(self.0.bind.unwrap(), tls_config)
                         .handle(handle)
                         .addr_incoming_config(incoming_config)
                         .http_config(http_config)
@@ -218,7 +223,7 @@ impl Launcher {
                         .await
                 }
                 _ => {
-                    axum_server::bind(self.inner.bind.unwrap())
+                    axum_server::bind(self.0.bind.unwrap())
                         .handle(handle)
                         .addr_incoming_config(incoming_config)
                         .http_config(http_config)
@@ -235,7 +240,7 @@ impl Launcher {
                 warn!("Send shutdown signal error: {}", err);
             }
 
-            tokio::time::sleep(Duration::from_secs(3)).await;
+            tokio::time::sleep(Duration::from_secs(1)).await;
         });
 
         Ok(())
@@ -338,113 +343,9 @@ async fn unofficial_proxy(
     response_convert(resp)
 }
 
-/// Request headers convert
-fn header_convert(
-    h: &HeaderMap,
-    jar: &CookieJar,
-    origin: &'static str,
-) -> Result<HeaderMap, ResponseError> {
-    let authorization = match h.get(header::AUTHORIZATION) {
-        Some(v) => Some(v),
-        // support Pandora WebUI passing X-Authorization header
-        None => h.get("X-Authorization"),
-    };
-
-    let mut headers = HeaderMap::new();
-    if let Some(h) = authorization {
-        headers.insert(header::AUTHORIZATION, h.clone());
-    }
-    if let Some(content_type) = h.get(header::CONTENT_TYPE) {
-        headers.insert(header::CONTENT_TYPE, content_type.clone());
-    }
-    headers.insert(header::REFERER, header::HeaderValue::from_static(origin));
-    headers.insert(header::REFERER, header::HeaderValue::from_static(origin));
-
-    let mut cookies = Vec::new();
-
-    jar.iter()
-        .filter(|c| {
-            let name = c.name().to_lowercase();
-            name.eq("_puid") || name.eq("cf_clearance")
-        })
-        .for_each(|c| {
-            let c = format!("{}={}", c.name(), cookie_encoded(c.value()));
-            debug!("cookie: {}", c);
-            cookies.push(c);
-        });
-
-    // setting cookie
-    if !cookies.is_empty() {
-        headers.insert(
-            header::COOKIE,
-            header::HeaderValue::from_str(&cookies.join(";")).expect("setting cookie error"),
-        );
-    }
-    Ok(headers)
-}
-
-/// Response convert
-fn response_convert(resp: reqwest::Response) -> Result<impl IntoResponse, ResponseError> {
-    let mut builder = Response::builder().status(resp.status());
-    for kv in resp
-        .headers()
-        .into_iter()
-        .filter(|(k, _)| k.as_str().to_lowercase().ne("set-cookie"))
-    {
-        builder = builder.header(kv.0, kv.1);
-    }
-
-    for c in resp
-        .cookies()
-        .filter(|c| {
-            let name = c.name().to_lowercase();
-            name.eq("_puid") || name.eq("cf_clearance")
-        })
-        .into_iter()
-    {
-        if let Some(expires) = c.expires() {
-            let timestamp_secs = expires
-                .duration_since(UNIX_EPOCH)
-                .expect("Failed to get timestamp")
-                .as_secs_f64();
-            let cookie = Cookie::build(c.name(), c.value())
-                .path("/")
-                .max_age(time::Duration::seconds_f64(timestamp_secs))
-                .same_site(cookie::SameSite::Lax)
-                .secure(false)
-                .http_only(false)
-                .finish();
-            builder = builder.header(axum::http::header::SET_COOKIE, cookie.to_string());
-        }
-    }
-    Ok(builder
-        .body(StreamBody::new(resp.bytes_stream()))
-        .map_err(ResponseError::InternalServerError)?)
-}
-
 pub(crate) async fn try_login(account: &axum::Form<AuthAccount>) -> anyhow::Result<AccessToken> {
     let ctx = context::get_instance();
     ctx.auth_client().do_access_token(&account).await
-}
-
-fn cookie_encoded(input: &str) -> String {
-    let separator = ':';
-    if let Some((name, value)) = input.split_once(separator) {
-        let encoded_value = value
-            .chars()
-            .map(|ch| match ch {
-                '!' | '#' | '$' | '%' | '&' | '\'' | '(' | ')' | '*' | '+' | ',' | '/' | ':'
-                | ';' | '=' | '?' | '@' | '[' | ']' | '~' => {
-                    format!("%{:02X}", ch as u8)
-                }
-                _ => ch.to_string(),
-            })
-            .collect::<String>();
-
-        format!("{name}:{encoded_value}")
-    } else {
-        input.to_string()
-    }
 }
 
 impl TryInto<Response<Body>> for SessionAccessToken {

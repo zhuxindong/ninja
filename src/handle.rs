@@ -1,7 +1,7 @@
 use std::{ops::Not, path::PathBuf};
 
 use clap::CommandFactory;
-use openai::{arkose::funcaptcha::ArkoseSolver, context::ContextArgs};
+use openai::{arkose::funcaptcha::ArkoseSolver, context::ContextArgs, serve::Serve};
 
 use crate::{
     args::{self, ServeArgs},
@@ -89,8 +89,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .tb_fill_rate(args.tb_fill_rate)
         .tb_expired(args.tb_expired);
 
-    // openai::preauth::run(args.pbind.unwrap(), None, args.pcert, args.pkey)
-    openai::serve::Launcher::new(builder.build()).run()
+    Serve::new(builder.build()).run()
 }
 
 #[cfg(target_family = "unix")]

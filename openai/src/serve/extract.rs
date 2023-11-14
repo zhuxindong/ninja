@@ -15,9 +15,10 @@ use serde_json::{json, Value};
 use crate::arkose::Type;
 use crate::{arkose, context};
 
+use super::convert::header_convert;
 use super::error::ResponseError;
 use super::puid::{get_or_init_puid, reduce_cache_key};
-use super::{header_convert, EMPTY};
+use super::EMPTY;
 
 /// Extractor for request parts.
 pub(super) struct RequestExtractor {
