@@ -17,7 +17,7 @@ pub(super) fn reduce_cache_key(token: &str) -> Result<String, ResponseError> {
     Ok(token_profile.email().to_owned())
 }
 
-async fn puid_cache() -> &'static Cache<String, String> {
+async fn cache() -> &'static Cache<String, String> {
     PUID_CACHE
         .get_or_init(|| async {
             Cache::builder()
@@ -33,27 +33,29 @@ pub(super) async fn get_or_init_puid(
     cache_id: String,
 ) -> Result<Option<String>, ResponseError> {
     let token = token.trim_start_matches("Bearer ");
-    let mut m_puid = None;
-    if GPTModel::from_str(model)?.is_gpt4() {
-        let puid_cache = puid_cache().await;
-        if let Some(puid) = puid_cache.get(&cache_id) {
-            m_puid = Some(puid);
-        } else {
-            let resp = context::get_instance()
-                .client()
-                .get(format!("{URL_CHATGPT_API}/backend-api/models"))
-                .bearer_auth(token)
-                .send()
-                .await
-                .map_err(ResponseError::InternalServerError)?
-                .error_for_status()
-                .map_err(ResponseError::BadRequest)?;
+    let puid_cache = cache().await;
 
-            if let Some(c) = resp.cookies().into_iter().find(|c| c.name().eq("_puid")) {
-                m_puid = Some(c.value().to_owned());
-                puid_cache.insert(cache_id, m_puid.clone().expect("puid is none"));
-            };
-        }
+    if let Some(p) = puid_cache.get(&cache_id) {
+        return Ok(Some(p.clone()));
     }
-    Ok(m_puid)
+
+    if GPTModel::from_str(model)?.is_gpt4() {
+        let resp = context::get_instance()
+            .client()
+            .get(format!("{URL_CHATGPT_API}/backend-api/models"))
+            .bearer_auth(token)
+            .send()
+            .await
+            .map_err(ResponseError::InternalServerError)?
+            .error_for_status()
+            .map_err(ResponseError::BadRequest)?;
+
+        if let Some(c) = resp.cookies().into_iter().find(|c| c.name().eq("_puid")) {
+            let puid = c.value().to_owned();
+            puid_cache.insert(cache_id, puid.clone());
+            return Ok(Some(puid));
+        };
+    }
+
+    Ok(None)
 }
