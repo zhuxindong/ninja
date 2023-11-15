@@ -64,18 +64,16 @@ struct PreAuthHanlder;
 #[async_trait::async_trait]
 impl HttpHandler for PreAuthHanlder {
     async fn handle_request(&self, req: Request<Body>) -> RequestOrResponse {
-        // remove accept-encoding to avoid encoded body
-        if log::log_enabled!(log::Level::Debug) {
+        if log::log_enabled!(log::Level::Info) {
             log_req(&req).await;
         }
         // extract preauth cookie
         collect_preauth_cookie(req.headers());
-
         RequestOrResponse::Request(req)
     }
 
     async fn handle_response(&self, res: Response<Body>) -> Response<Body> {
-        if log::log_enabled!(log::Level::Debug) {
+        if log::log_enabled!(log::Level::Info) {
             log_res(&res).await;
         }
         collect_preauth_cookie(res.headers());
