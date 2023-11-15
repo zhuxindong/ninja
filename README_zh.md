@@ -145,6 +145,8 @@ opkg install luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
 
 - #### Docker
 
+> 镜像源支持`gngpp/ninja:latest`/`ghcr.io/gngpp/ninja:latest`
+
 ```shell
 docker run --rm -it -p 7999:7999 --name=ninja \
   -e WORKERS=1 \
