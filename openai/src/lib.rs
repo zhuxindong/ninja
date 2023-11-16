@@ -1,9 +1,4 @@
 #![recursion_limit = "256"]
-
-use std::time::Duration;
-
-use reqwest::impersonate::Impersonate;
-
 pub mod arkose;
 pub mod auth;
 pub mod balancer;
@@ -14,16 +9,18 @@ pub mod eventsource;
 pub mod homedir;
 pub mod log;
 pub mod platform;
+#[cfg(feature = "serve")]
+pub mod serve;
 pub mod token;
 pub mod unescape;
 pub mod urldecoding;
 pub mod uuid;
 
-#[cfg(feature = "serve")]
-pub mod serve;
+use reqwest::impersonate::Impersonate;
+use std::time::Duration;
 
+pub const LIB_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const HEADER_UA: &str = "okhttp/4.9.1";
-
 pub const URL_CHATGPT_API: &str = "https://chat.openai.com";
 pub const URL_PLATFORM_API: &str = "https://api.openai.com";
 

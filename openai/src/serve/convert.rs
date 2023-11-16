@@ -1,6 +1,6 @@
 use std::time::UNIX_EPOCH;
 
-use crate::debug;
+use crate::{debug, LIB_VERSION};
 use axum::body::StreamBody;
 use axum::http::header;
 use axum::response::{IntoResponse, Response};
@@ -59,7 +59,9 @@ pub(super) fn header_convert(
 pub(super) fn response_convert(
     resp: reqwest::Response,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let mut builder = Response::builder().status(resp.status());
+    let mut builder = Response::builder()
+        .status(resp.status())
+        .header("ninja-version", LIB_VERSION);
     for kv in resp
         .headers()
         .into_iter()
