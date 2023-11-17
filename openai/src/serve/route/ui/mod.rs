@@ -41,8 +41,8 @@ use crate::debug;
 use crate::info;
 use crate::now_duration;
 use crate::serve;
-use crate::serve::convert::header_convert;
 use crate::serve::error::ResponseError;
+use crate::serve::resp::header_convert;
 use crate::serve::route::ui::extract::SessionExtractor;
 use crate::serve::turnstile;
 use crate::serve::EMPTY;
@@ -213,7 +213,7 @@ async fn post_login(
                 .header(header::LOCATION, DEFAULT_INDEX);
 
             if let Some(value) = session.auth_session {
-                let auth_cookie = cookie::Cookie::build(API_AUTH_SESSION_COOKIE_KEY, value)
+                let session_cookie = cookie::Cookie::build(API_AUTH_SESSION_COOKIE_KEY, value)
                     .path(DEFAULT_INDEX)
                     .same_site(cookie::SameSite::Lax)
                     .expires(time::OffsetDateTime::from_unix_timestamp(session.expires)?)
@@ -221,7 +221,7 @@ async fn post_login(
                     .http_only(false)
                     .finish();
 
-                builder = builder.header(header::SET_COOKIE, auth_cookie.to_string())
+                builder = builder.header(header::SET_COOKIE, session_cookie.to_string())
             }
 
             Ok(builder

@@ -161,7 +161,7 @@ impl ArkoseToken {
 
     /// Check if the token is valid
     pub fn success(&self) -> bool {
-        self.token.contains("sup=1|rid=")
+        self.token.contains("sup=1")
     }
 
     #[inline]
@@ -339,8 +339,8 @@ async fn get_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<ArkoseToken> {
             let value = format!(
                 "{};{}={}",
                 h.value,
-                generate_random_string(32),
-                generate_random_string(32)
+                generate_random_string(16),
+                generate_random_string(96)
             );
             builder = builder.header(h.name, value);
             continue;
