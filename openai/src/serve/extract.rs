@@ -9,7 +9,7 @@ use axum::{
 };
 use axum_extra::extract::CookieJar;
 use http::header::{self, CONTENT_TYPE};
-use http::{HeaderMap, Uri};
+use http::{HeaderMap, Method, Uri};
 use serde_json::{json, Value};
 
 use crate::arkose::Type;
@@ -145,7 +145,7 @@ fn extract_authorization<'a>(headers: &'a HeaderMap) -> Result<&'a str, Response
 /// Handle request
 async fn handle_request(req: &mut RequestExtractor) -> Result<(), ResponseError> {
     // Only handle POST request
-    if !req.uri.path().contains("/backend-api/conversation") || !req.method.eq("POST") {
+    if !(req.uri.path().eq("/backend-api/conversation") && req.method.eq(&Method::POST)) {
         return Ok(());
     }
 

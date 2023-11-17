@@ -17,7 +17,8 @@ pub fn encrypt(data: &str, key: &str) -> anyhow::Result<String> {
 
 pub fn decrypt(data: Vec<u8>, key: &str) -> anyhow::Result<String> {
     let dec_data = ase_decrypt(data, key)?;
-    Ok(String::from_utf8(dec_data)?)
+    let data = String::from_utf8(dec_data)?;
+    Ok(data)
 }
 
 fn aes_encrypt(content: &str, password: &str) -> anyhow::Result<EncryptionData> {
@@ -71,7 +72,10 @@ fn ase_decrypt(content: Vec<u8>, password: &str) -> anyhow::Result<Vec<u8>> {
         .map(|i| u8::from_str_radix(&encode_data.s[i..i + 2], 16))
         .collect();
 
-    let (key, iv) = default_evp_kdf(password.as_bytes(), &salt?).map_err(|s| anyhow::anyhow!(s))?;
+    let ((key, _), iv) = (
+        default_evp_kdf(password.as_bytes(), &salt?).map_err(|s| anyhow::anyhow!(s))?,
+        hex_string_to_bytes(&encode_data.iv).ok_or(anyhow!("hex decode error"))?,
+    );
 
     use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
     type Aes256CbcDec = cbc::Decryptor<aes::Aes256>;
@@ -81,7 +85,6 @@ fn ase_decrypt(content: Vec<u8>, password: &str) -> anyhow::Result<Vec<u8>> {
     let decode_bytes = Aes256CbcDec::new_from_slices(&key, &iv)?
         .decrypt_padded_b2b_mut::<Pkcs7>(&decode_ct, &mut buf)
         .map_err(|err| anyhow::anyhow!(err))?;
-
     Ok(decode_bytes.to_vec())
 }
 
@@ -123,6 +126,33 @@ fn evp_kdf(
     }
 
     Ok(derived_key_bytes[..key_size * 4].to_vec())
+}
+
+fn hex_string_to_bytes(hex_string: &str) -> Option<Vec<u8>> {
+    let mut bytes = Vec::new();
+    let mut buffer = 0;
+    let mut buffer_length = 0;
+
+    for hex_char in hex_string.chars() {
+        if let Some(digit) = hex_char.to_digit(16) {
+            buffer = (buffer << 4) | digit;
+            buffer_length += 1;
+
+            if buffer_length == 2 {
+                bytes.push(buffer as u8);
+                buffer = 0;
+                buffer_length = 0;
+            }
+        } else {
+            return None;
+        }
+    }
+
+    if buffer_length > 0 {
+        return None;
+    }
+
+    Some(bytes)
 }
 
 fn default_evp_kdf(password: &[u8], salt: &[u8]) -> Result<(Vec<u8>, Vec<u8>), &'static str> {
