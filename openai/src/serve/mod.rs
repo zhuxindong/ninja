@@ -1,10 +1,11 @@
-mod convert;
 mod error;
 mod extract;
 mod middleware;
 #[cfg(feature = "preauth")]
 pub mod preauth;
 mod puid;
+mod req;
+mod resp;
 #[cfg(feature = "template")]
 mod route;
 mod signal;
@@ -20,8 +21,9 @@ use axum::routing::{any, get, post};
 use axum::{Json, TypedHeader};
 use axum_server::{AddrIncomingConfig, Handle};
 
-use self::convert::response_convert;
-use self::extract::SendRequestExt;
+use self::extract::RequestExtractor;
+use self::req::SendRequestExt;
+use self::resp::response_convert;
 use crate::auth::model::{AccessToken, AuthAccount, RefreshToken, SessionAccessToken};
 use crate::auth::provide::AuthProvider;
 use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
@@ -322,25 +324,21 @@ async fn post_revoke_token(
 ///
 /// platform API match path /v1/{tail.*}
 /// reference: https://platform.openai.com/docs/api-reference
-async fn official_proxy(
-    req: extract::RequestExtractor,
-) -> Result<impl IntoResponse, ResponseError> {
+async fn official_proxy(req: RequestExtractor) -> Result<impl IntoResponse, ResponseError> {
     let resp = context::get_instance()
         .client()
         .send_request(URL_PLATFORM_API, req)
         .await?;
-    response_convert(resp)
+    response_convert(resp).await
 }
 
 /// reference: doc/http.rest
-async fn unofficial_proxy(
-    req: extract::RequestExtractor,
-) -> Result<impl IntoResponse, ResponseError> {
+async fn unofficial_proxy(req: RequestExtractor) -> Result<impl IntoResponse, ResponseError> {
     let resp = context::get_instance()
         .client()
         .send_request(URL_CHATGPT_API, req)
         .await?;
-    response_convert(resp)
+    response_convert(resp).await
 }
 
 pub(crate) async fn try_login(account: &axum::Form<AuthAccount>) -> anyhow::Result<AccessToken> {
