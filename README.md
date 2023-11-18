@@ -119,6 +119,7 @@ Sending `GPT-4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` 
 - `--proxies`, Proxy, supports proxy pool, multiple proxies are separated by `,`, format: protocol://user:pass@ip:port, if the local IP is banned, you need to turn off the use of direct IP when using the proxy pool, `--disable-direct` turns off direct connection, otherwise your banned local IP will be used according to load balancing
 - `--workers`, worker threads: default 1
 - `--disable-webui`, if you don’t want to use the default built-in WebUI, use this parameter to turn it off
+- `--enable-file-proxy`, environment variable `ENABLE_FILE_PROXY`, turns on the file upload and download interface proxy
 
 [...](https://github.com/gngpp/ninja/blob/main/README.md#command-manual)
 
@@ -257,14 +258,16 @@ Options:
           TLS certificate file path [env: TLS_CERT=]
       --tls-key <TLS_KEY>
           TLS private key file path (EC/PKCS8/RSA) [env: TLS_KEY=]
-  -A, --auth-key <AUTH_KEY>
-          Login Authentication Key [env: AUTH_KEY=]
-  -D, --disable-webui
-          Disable WebUI [env: DISABLE_WEBUI=]
       --cf-site-key <CF_SITE_KEY>
           Cloudflare turnstile captcha site key [env: CF_SECRET_KEY=]
       --cf-secret-key <CF_SECRET_KEY>
           Cloudflare turnstile captcha secret key [env: CF_SITE_KEY=]
+  -A, --auth-key <AUTH_KEY>
+          Login Authentication Key [env: AUTH_KEY=]
+  -D, --disable-webui
+          Disable WebUI [env: DISABLE_WEBUI=]
+  -F, --enable-file-proxy
+          Enable file proxy [env: ENABLE_FILE_PROXY=]
       --arkose-endpoint <ARKOSE_ENDPOINT>
           Arkose endpoint, Example: https://client-api.arkoselabs.com
   -E, --arkose-gpt3-experiment

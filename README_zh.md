@@ -117,8 +117,9 @@
 - `--tls-cert`，环境变量 `TLS_CERT`，TLS证书公钥，支持格式: EC/PKCS8/RSA
 - `--tls-key`，环境变量 `TLS_KEY`，TLS证书私钥
 - `--proxies`，代理，支持代理池，多个代理使用`,`隔开，格式: protocol://user:pass@ip:port，如果本地IP被Ban，使用代理池时需要关闭直连IP使用，`--disable-direct`关闭直连，否则会根据负载均衡使用你被Ban的本地IP
-- `--workers`， 工作线程: 默认1
+- `--workers`，工作线程: 默认1
 - `--disable-webui`, 如果不想使用默认自带的WebUI，使用此参数关闭
+- `--enable-file-proxy`，环境变量`ENABLE_FILE_PROXY`，开启文件上下传接口代理
 
 [...](https://github.com/gngpp/ninja/blob/main/README_zh.md#%E5%91%BD%E4%BB%A4%E6%89%8B%E5%86%8C)
 
@@ -257,14 +258,16 @@ Options:
           TLS certificate file path [env: TLS_CERT=]
       --tls-key <TLS_KEY>
           TLS private key file path (EC/PKCS8/RSA) [env: TLS_KEY=]
-  -A, --auth-key <AUTH_KEY>
-          Login Authentication Key [env: AUTH_KEY=]
-  -D, --disable-webui
-          Disable WebUI [env: DISABLE_WEBUI=]
       --cf-site-key <CF_SITE_KEY>
           Cloudflare turnstile captcha site key [env: CF_SECRET_KEY=]
       --cf-secret-key <CF_SECRET_KEY>
           Cloudflare turnstile captcha secret key [env: CF_SITE_KEY=]
+  -A, --auth-key <AUTH_KEY>
+          Login Authentication Key [env: AUTH_KEY=]
+  -D, --disable-webui
+          Disable WebUI [env: DISABLE_WEBUI=]
+  -F, --enable-file-proxy
+          Enable file proxy [env: ENABLE_FILE_PROXY=]
       --arkose-endpoint <ARKOSE_ENDPOINT>
           Arkose endpoint, Example: https://client-api.arkoselabs.com
   -E, --arkose-gpt3-experiment
