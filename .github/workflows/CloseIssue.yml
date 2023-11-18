@@ -1,6 +1,7 @@
 name: CloseIssue
 
 on:
+  workflow_dispatch:
   issues:
     types: [opened]
 
