@@ -22,6 +22,19 @@ use self::{
     preauth::PreauthCookieProvider,
 };
 
+#[macro_export]
+macro_rules! with_context {
+    ($method:ident) => {{
+        crate::context::get_instance().$method()
+    }};
+    ($method:ident, $($arg:expr),*) => {{
+        crate::context::get_instance().$method($($arg),*)
+    }};
+    () => {
+        crate::context::get_instance()
+    };
+}
+
 /// Use Once to guarantee initialization only once
 pub fn init(args: ContextArgs) {
     if let Some(_) = CTX.set(Context::new(args)).err() {
@@ -99,6 +112,10 @@ pub struct ContextArgs {
     /// Disable web ui
     #[builder(setter(into), default = false)]
     pub(crate) disable_ui: bool,
+
+    /// Enable file proxy
+    #[builder(setter(into), default = false)]
+    pub(crate) enable_file_proxy: bool,
 
     /// Cloudflare captcha site key
     #[builder(setter(into), default)]
@@ -208,6 +225,8 @@ pub struct Context {
     arkose_solver: Option<ArkoseSolver>,
     /// HAR file upload authenticate key
     arkose_har_upload_key: Option<String>,
+    /// Enable files proxy
+    enable_file_proxy: bool,
     /// Login auth key
     auth_key: Option<String>,
     /// Cloudflare Turnstile
@@ -264,6 +283,7 @@ impl Context {
             arkose_solver: args.arkose_solver,
             arkose_har_upload_key: args.arkose_har_upload_key,
             arkose_gpt3_experiment: args.arkose_gpt3_experiment,
+            enable_file_proxy: args.enable_file_proxy,
             auth_key: args.auth_key,
             cf_turnstile: args.cf_site_key.and_then(|site_key| {
                 args.cf_secret_key.map(|secret_key| CfTurnstile {
@@ -346,5 +366,10 @@ impl Context {
     /// Get the arkose gpt3 experiment
     pub fn arkose_gpt3_experiment(&self) -> bool {
         self.arkose_gpt3_experiment
+    }
+
+    /// Enable file proxy
+    pub fn enable_file_proxy(&self) -> bool {
+        self.enable_file_proxy
     }
 }

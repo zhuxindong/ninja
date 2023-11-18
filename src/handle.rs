@@ -75,6 +75,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .arkose_gpt3_experiment(args.arkose_gpt3_experiment)
         .arkose_har_upload_key(args.arkose_har_upload_key)
         .arkose_solver(arkose_solver)
+        .enable_file_proxy(args.enable_file_proxy)
         .pbind(args.pbind)
         .pupstream(args.pupstream)
         .pcert(args.pcert)
@@ -266,6 +267,7 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
         pcert: PathBuf::from("ca/cert.crt"),
         pkey: PathBuf::from("ca/key.pem"),
         arkose_gpt3_experiment: false,
+        enable_file_proxy: false,
         ..args::ServeArgs::default()
     };
 

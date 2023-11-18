@@ -1,5 +1,6 @@
 use std::time::UNIX_EPOCH;
 
+use crate::with_context;
 use crate::{debug, LIB_VERSION};
 use axum::body::Body;
 use axum::body::StreamBody;
@@ -112,10 +113,9 @@ pub(super) async fn response_convert(
         }
     }
 
-    let url = resp.url().clone();
-    let is_files_endpoint = url.path().contains("/backend-api/files");
-
-    if is_files_endpoint {
+    // Modify files endpoint response
+    if with_context!(enable_file_proxy) && resp.url().path().contains("/backend-api/files") {
+        let url = resp.url().clone();
         // Files endpoint handling
         let mut json = resp
             .json::<Value>()

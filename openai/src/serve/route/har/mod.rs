@@ -3,9 +3,9 @@ mod token;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use crate::context::{self, ContextArgs};
+use crate::context::ContextArgs;
 use crate::serve::error::ResponseError;
-use crate::{arkose, warn};
+use crate::{arkose, warn, with_context};
 use anyhow::anyhow;
 use axum::body::Body;
 use axum::extract::{Multipart, Query};
@@ -56,7 +56,7 @@ fn success_html(title: &str, success_message: &str) -> Html<String> {
 
 /// Check session
 async fn check_session(jar: CookieJar) -> bool {
-    if context::get_instance().arkose_har_upload_key().is_none() {
+    if with_context!(arkose_har_upload_key).is_none() {
         return true;
     }
     if let Some(cookie) = jar.get(COOKIE_NAME) {
@@ -101,7 +101,7 @@ struct AuthenticateKey {
 async fn post_login(
     password: Option<Form<AuthenticateKey>>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    if let Some(key) = context::get_instance().arkose_har_upload_key() {
+    if let Some(key) = with_context!(arkose_har_upload_key) {
         if password.as_ref().map(|p| &p.0.password) == Some(key) {
             return Ok(generate_success_response().await.into_response());
         }
@@ -165,7 +165,7 @@ async fn post_upload(
             .into_response());
         }
 
-        let har_path = context::get_instance().arkose_har_path(&_type.0 .0);
+        let har_path = with_context!(arkose_har_path, &_type.0 .0);
         tokio::fs::write(har_path.dir_path.join(filename), data)
             .await
             .map_err(ResponseError::InternalServerError)?;
@@ -187,9 +187,7 @@ async fn get_files(
         return Ok(Redirect::temporary(LOGIN_PATH).into_response());
     }
 
-    let dir = context::get_instance()
-        .arkose_har_path(&_type.0 .0)
-        .dir_path;
+    let dir = with_context!(arkose_har_path, &_type.0 .0).dir_path;
 
     let mut dirs = tokio::fs::read_dir(&dir)
         .await
@@ -219,9 +217,7 @@ async fn delete_file(
         return Ok(Redirect::temporary(LOGIN_PATH).into_response());
     }
 
-    let dir = context::get_instance()
-        .arkose_har_path(&_type.0 .0)
-        .dir_path;
+    let dir = with_context!(arkose_har_path, &_type.0 .0).dir_path;
 
     let file = &dir.join(&filename.filename);
 
@@ -257,9 +253,7 @@ async fn rename_file(
         return Ok(Redirect::temporary(LOGIN_PATH).into_response());
     }
 
-    let dir = context::get_instance()
-        .arkose_har_path(&_type.0 .0)
-        .dir_path;
+    let dir = with_context!(arkose_har_path, &_type.0 .0).dir_path;
 
     let old_file = PathBuf::from(&dir).join(&filename.filename);
     let new_file = PathBuf::from(&dir).join(

@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use super::error::ResponseError;
 use crate::arkose::GPTModel;
-use crate::{context, URL_CHATGPT_API};
+use crate::{with_context, URL_CHATGPT_API};
 use moka::sync::Cache;
 use tokio::sync::OnceCell;
 
@@ -40,8 +40,7 @@ pub(super) async fn get_or_init_puid(
     }
 
     if GPTModel::from_str(model)?.is_gpt4() {
-        let resp = context::get_instance()
-            .client()
+        let resp = with_context!(client)
             .get(format!("{URL_CHATGPT_API}/backend-api/models"))
             .bearer_auth(token)
             .send()

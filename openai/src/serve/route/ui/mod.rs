@@ -35,7 +35,6 @@ use tower_http::ServiceBuilderExt;
 
 use crate::auth::model::AccessToken;
 use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
-use crate::context;
 use crate::context::ContextArgs;
 use crate::debug;
 use crate::info;
@@ -46,6 +45,7 @@ use crate::serve::resp::header_convert;
 use crate::serve::route::ui::extract::SessionExtractor;
 use crate::serve::turnstile;
 use crate::serve::EMPTY;
+use crate::with_context;
 use crate::{
     auth::{model::AuthAccount, provide::AuthProvider},
     token::model::AuthenticateToken,
@@ -73,7 +73,7 @@ static TEMPLATE: OnceLock<tera::Tera> = OnceLock::new();
 // this function could be located in a different module
 pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
     if !args.disable_ui {
-        if let Some(endpoint) = context::get_instance().arkose_endpoint() {
+        if let Some(endpoint) = with_context!(arkose_endpoint) {
             info!("WebUI site use Arkose endpoint: {endpoint}")
         }
 
@@ -93,7 +93,7 @@ pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
         let cookie_key = Key::generate();
         let config = CsrfConfig::default().with_key(Some(cookie_key));
 
-        let router = if context::get_instance().auth_key().is_some() {
+        let router = if with_context!(auth_key).is_some() {
             router
         } else {
             router.route("/auth", get(get_auth))
@@ -190,11 +190,11 @@ async fn get_login(token: CsrfToken) -> Result<impl IntoResponse, ResponseError>
 async fn post_login(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     token: CsrfToken,
-    mut account: axum::Form<AuthAccount>,
+    account: axum::Form<AuthAccount>,
 ) -> Result<impl IntoResponse, ResponseError> {
     turnstile::cf_turnstile_check(&addr.ip(), account.cf_turnstile_response.as_deref()).await?;
 
-    match serve::try_login(&mut account).await {
+    match with_context!(auth_client).do_access_token(&account).await {
         Ok(access_token) => {
             let authentication_token = AuthenticateToken::try_from(access_token)
                 .map_err(ResponseError::InternalServerError)?;
@@ -284,8 +284,13 @@ async fn post_login_token(
 async fn get_logout(extract: SessionExtractor) -> Result<Response<Body>, ResponseError> {
     // If the session is empty, then redirect to the login page
     if let Some(refresh_token) = extract.session.refresh_token {
-        let ctx = context::get_instance();
-        let _a = ctx.auth_client().do_revoke_token(&refresh_token).await;
+        if let Some(err) = with_context!(auth_client)
+            .do_revoke_token(&refresh_token)
+            .await
+            .err()
+        {
+            debug!("Revoke token error: {}", err);
+        }
     }
 
     // Clear session
@@ -325,7 +330,7 @@ async fn get_session(extract: SessionExtractor) -> Result<Response<Body>, Respon
 
     // Refresh session
     if extract.session.expires - current_timestamp <= 21600 {
-        let ctx = context::get_instance();
+        let ctx = with_context!();
         let new_session = if let Some(c) = extract.session_token {
             match ctx.auth_client().do_session(&c).await {
                 Ok(session_token) => {
@@ -395,8 +400,7 @@ async fn get_auth_me(
     headers: HeaderMap,
     jar: CookieJar,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let resp = context::get_instance()
-        .client()
+    let resp = with_context!(client)
         .get(format!("{URL_CHATGPT_API}/backend-api/me"))
         .headers(header_convert(&headers, &jar, URL_CHATGPT_API)?)
         .send()
@@ -514,8 +518,7 @@ async fn get_share_chat(
     extract: SessionExtractor,
 ) -> Result<Response<Body>, ResponseError> {
     let share_id = share_id.0;
-    let resp = context::get_instance()
-        .client()
+    let resp = with_context!(client)
         .get(format!("{URL_CHATGPT_API}/backend-api/share/{share_id}"))
         .headers(header_convert(
             &extract.headers,
@@ -602,8 +605,7 @@ async fn get_share_chat_info(
     extract: SessionExtractor,
 ) -> Result<Response<Body>, ResponseError> {
     let share_id = share_id.0.replace(".json", "");
-    let resp = context::get_instance()
-        .client()
+    let resp = with_context!(client)
         .get(format!("{URL_CHATGPT_API}/backend-api/share/{share_id}"))
         .headers(header_convert(
             &extract.headers,
@@ -671,8 +673,7 @@ async fn get_share_chat_continue_info(
     share_id: Path<String>,
     extract: SessionExtractor,
 ) -> Result<Response<Body>, ResponseError> {
-    let resp = context::get_instance()
-        .client()
+    let resp = with_context!(client)
         .get(format!(
             "{URL_CHATGPT_API}/backend-api/share/{}",
             share_id.0
@@ -800,7 +801,7 @@ fn render_template(name: &str, context: &tera::Context) -> Result<Response<Body>
 }
 
 fn settings_template_data(ctx: &mut tera::Context) {
-    let g_ctx = context::get_instance();
+    let g_ctx = with_context!();
 
     if g_ctx.auth_key().is_none() {
         ctx.insert("auth_key", "false");

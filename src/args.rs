@@ -136,6 +136,14 @@ pub struct ServeArgs {
     #[clap(long, env = "TLS_KEY", requires = "tls_cert")]
     pub(super) tls_key: Option<PathBuf>,
 
+    /// Cloudflare turnstile captcha site key
+    #[clap(long, env = "CF_SECRET_KEY", requires = "cf_secret_key")]
+    pub(super) cf_site_key: Option<String>,
+
+    /// Cloudflare turnstile captcha secret key
+    #[clap(long, env = "CF_SITE_KEY", requires = "cf_site_key")]
+    pub(super) cf_secret_key: Option<String>,
+
     /// Login Authentication Key
     #[clap(short = 'A', long, env = "AUTH_KEY")]
     pub(super) auth_key: Option<String>,
@@ -144,13 +152,9 @@ pub struct ServeArgs {
     #[clap(short = 'D', long, env = "DISABLE_WEBUI")]
     pub(super) disable_webui: bool,
 
-    /// Cloudflare turnstile captcha site key
-    #[clap(long, env = "CF_SECRET_KEY", requires = "cf_secret_key")]
-    pub(super) cf_site_key: Option<String>,
-
-    /// Cloudflare turnstile captcha secret key
-    #[clap(long, env = "CF_SITE_KEY", requires = "cf_site_key")]
-    pub(super) cf_secret_key: Option<String>,
+    /// Enable file proxy
+    #[clap(short = 'F', long, env = "ENABLE_FILE_PROXY")]
+    pub(super) enable_file_proxy: bool,
 
     /// Arkose endpoint, Example: https://client-api.arkoselabs.com
     #[clap(long, value_parser = parse::parse_url)]

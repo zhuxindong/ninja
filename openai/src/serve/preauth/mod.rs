@@ -6,8 +6,8 @@ use hyper::Body;
 
 use self::proxy::mitm::RequestOrResponse;
 use crate::{
-    context,
     serve::preauth::proxy::{handler::HttpHandler, CertificateAuthority},
+    with_context,
 };
 use log::info;
 
@@ -90,7 +90,7 @@ fn collect_preauth_cookie(headers: &http::HeaderMap<http::HeaderValue>) {
         .for_each(|(_, v)| {
             let _ = v
                 .to_str()
-                .map(|value| context::get_instance().push_preauth_cookie(value));
+                .map(|value| with_context!(push_preauth_cookie, value));
         });
 }
 

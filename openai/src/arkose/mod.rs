@@ -19,9 +19,9 @@ use serde::Serializer;
 use tokio::sync::OnceCell;
 
 use crate::arkose::crypto::encrypt;
-use crate::context;
 use crate::generate_random_string;
 use crate::warn;
+use crate::with_context;
 use crate::HEADER_UA;
 
 use self::funcaptcha::solver::SubmitSolver;
@@ -274,8 +274,7 @@ async fn get_from_bx_common(
         ("rnd", &(&rand::thread_rng().gen::<f64>().to_string())),
     ];
 
-    let resp = context::get_instance()
-        .client()
+    let resp = with_context!(client)
         .post(format!("https://{host}/fc/gt2/public_key/{public_key}"))
         .header(header::USER_AGENT, HEADER_UA)
         .header(header::ACCEPT, "*/*")
@@ -324,7 +323,7 @@ async fn get_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<ArkoseToken> {
         .push_str(&format!("&bda={}", general_purpose::STANDARD.encode(&bda)));
     entry.body.push_str(&format!("&rnd={rnd}"));
 
-    let client = context::get_instance().client();
+    let client = with_context!(client);
 
     let method = Method::from_bytes(entry.method.as_bytes())?;
 
@@ -361,7 +360,7 @@ async fn get_from_context(t: Type) -> anyhow::Result<ArkoseToken> {
             return submit_if_invalid(get, arkose_solver).await;
         };
 
-    let ctx = context::get_instance();
+    let ctx = with_context!();
 
     // Get arkose solver
     let arkose_solver = ctx.arkose_solver();
@@ -409,7 +408,7 @@ where
     if arkose_token.success() {
         // Submit token to funcaptcha callback
         tokio::spawn(funcaptcha::callback(
-            context::get_instance().client(),
+            with_context!(client),
             arkose_token.value().to_owned(),
         ));
     } else {

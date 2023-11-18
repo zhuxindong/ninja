@@ -30,7 +30,7 @@ use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
 use crate::context::{self, ContextArgs};
 use crate::serve::error::ResponseError;
 use crate::serve::middleware::tokenbucket::{Strategy, TokenBucketLimitContext};
-use crate::{info, warn};
+use crate::{info, warn, with_context};
 use crate::{URL_CHATGPT_API, URL_PLATFORM_API};
 use axum::http::header;
 use axum_extra::extract::{cookie, CookieJar};
@@ -53,8 +53,7 @@ fn print_boot_message(inner: &ContextArgs) {
     info!("Version: {}", env!("CARGO_PKG_VERSION"));
     info!("Worker threads: {}", inner.workers);
     info!("Concurrent limit: {}", inner.concurrent_limit);
-    info!("Enabled cookie store: {}", inner.cookie_store);
-
+    info!("Enable cookie store: {}", inner.cookie_store);
     if let Some((ref ipv6, len)) = inner.ipv6_subnet {
         info!("Ipv6 subnet: {ipv6}/{len}");
     } else {
@@ -70,10 +69,13 @@ fn print_boot_message(inner: &ContextArgs) {
         info!("ArkoseLabs solver: {:?}", solver.solver);
     });
 
+    info!("Enable file proxy: {}", inner.enable_file_proxy);
+
     inner
         .interface
         .as_ref()
         .map(|i| info!("Bind address: {i} for outgoing connection"));
+
     info!(
         "Starting HTTP(S) server at http(s)://{:?}",
         inner.bind.expect("bind address required")
@@ -253,8 +255,7 @@ impl Serve {
 async fn get_session(jar: CookieJar) -> Result<impl IntoResponse, ResponseError> {
     match jar.get(API_AUTH_SESSION_COOKIE_KEY) {
         Some(session) => {
-            let session_token = context::get_instance()
-                .auth_client()
+            let session_token = with_context!(auth_client)
                 .do_session(session.value())
                 .await
                 .map_err(ResponseError::BadRequest)?;
@@ -271,9 +272,9 @@ async fn get_session(jar: CookieJar) -> Result<impl IntoResponse, ResponseError>
 /// POST /auth/token
 async fn post_access_token(
     bearer: Option<TypedHeader<Authorization<Bearer>>>,
-    mut account: axum::Form<AuthAccount>,
+    account: axum::Form<AuthAccount>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    if let Some(key) = context::get_instance().auth_key() {
+    if let Some(key) = with_context!(auth_key) {
         let bearer = bearer.ok_or(ResponseError::Unauthorized(anyhow!(
             "Login Authentication Key required!"
         )))?;
@@ -284,7 +285,7 @@ async fn post_access_token(
         }
     }
 
-    match try_login(&mut account).await? {
+    match with_context!(auth_client).do_access_token(&account).await? {
         AccessToken::Session(session_token) => {
             let resp: Response<Body> = session_token.try_into()?;
             Ok(resp.into_response())
@@ -297,8 +298,10 @@ async fn post_access_token(
 async fn post_refresh_token(
     TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
 ) -> Result<Json<RefreshToken>, ResponseError> {
-    let ctx = context::get_instance();
-    match ctx.auth_client().do_refresh_token(bearer.token()).await {
+    match with_context!(auth_client)
+        .do_refresh_token(bearer.token())
+        .await
+    {
         Ok(refresh_token) => Ok(Json(refresh_token)),
         Err(err) => Err(ResponseError::BadRequest(err)),
     }
@@ -308,8 +311,10 @@ async fn post_refresh_token(
 async fn post_revoke_token(
     TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
 ) -> Result<axum::http::StatusCode, ResponseError> {
-    let ctx = context::get_instance();
-    match ctx.auth_client().do_revoke_token(bearer.token()).await {
+    match with_context!(auth_client)
+        .do_revoke_token(bearer.token())
+        .await
+    {
         Ok(_) => Ok(axum::http::StatusCode::OK),
         Err(err) => Err(ResponseError::BadRequest(err)),
     }
@@ -325,8 +330,7 @@ async fn post_revoke_token(
 /// platform API match path /v1/{tail.*}
 /// reference: https://platform.openai.com/docs/api-reference
 async fn official_proxy(req: RequestExtractor) -> Result<impl IntoResponse, ResponseError> {
-    let resp = context::get_instance()
-        .client()
+    let resp = with_context!(client)
         .send_request(URL_PLATFORM_API, req)
         .await?;
     response_convert(resp).await
@@ -334,16 +338,10 @@ async fn official_proxy(req: RequestExtractor) -> Result<impl IntoResponse, Resp
 
 /// reference: doc/http.rest
 async fn unofficial_proxy(req: RequestExtractor) -> Result<impl IntoResponse, ResponseError> {
-    let resp = context::get_instance()
-        .client()
+    let resp = with_context!(client)
         .send_request(URL_CHATGPT_API, req)
         .await?;
     response_convert(resp).await
-}
-
-pub(crate) async fn try_login(account: &axum::Form<AuthAccount>) -> anyhow::Result<AccessToken> {
-    let ctx = context::get_instance();
-    ctx.auth_client().do_access_token(&account).await
 }
 
 impl TryInto<Response<Body>> for SessionAccessToken {
@@ -384,8 +382,7 @@ impl TryInto<Response<Body>> for SessionAccessToken {
 }
 
 async fn check_wan_address() {
-    match context::get_instance()
-        .client()
+    match with_context!(client)
         .get("https://ifconfig.me")
         .timeout(Duration::from_secs(70))
         .header(header::ACCEPT, "application/json")
