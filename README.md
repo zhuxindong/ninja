@@ -119,7 +119,7 @@ Sending `GPT-4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` 
 - `--proxies`, Proxy, supports proxy pool, multiple proxies are separated by `,`, format: protocol://user:pass@ip:port, if the local IP is banned, you need to turn off the use of direct IP when using the proxy pool, `--disable-direct` turns off direct connection, otherwise your banned local IP will be used according to load balancing
 - `--workers`, worker threads: default 1
 - `--disable-webui`, if you don’t want to use the default built-in WebUI, use this parameter to turn it off
-- `--enable-file-proxy`, environment variable `ENABLE_FILE_PROXY`, turns on the file upload and download interface proxy
+- `--enable-file-proxy`, environment variable `ENABLE_FILE_PROXY`, turns on the file upload and download API proxy
 
 [...](https://github.com/gngpp/ninja/blob/main/README.md#command-manual)
 
@@ -130,8 +130,8 @@ Sending `GPT-4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` 
 Making [Releases](https://github.com/gngpp/ninja/releases/latest) has a precompiled deb package, binaries, in Ubuntu, for example:
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.8.3/ninja-0.8.3-x86_64-unknown-linux-musl.tar.gz
-tar -xf ninja-0.8.3-x86_64-unknown-linux-musl.tar.gz
+wget https://github.com/gngpp/ninja/releases/download/v0.8.4/ninja-0.8.4-x86_64-unknown-linux-musl.tar.gz
+tar -xf ninja-0.8.4-x86_64-unknown-linux-musl.tar.gz
 ./ninja run
 ```
 
@@ -140,11 +140,11 @@ tar -xf ninja-0.8.3-x86_64-unknown-linux-musl.tar.gz
 There are pre-compiled ipk files in GitHub [Releases](https://github.com/gngpp/ninja/releases/latest), which currently provide versions of aarch64/x86_64 and other architectures. After downloading, use opkg to install, and use nanopi r4s as example:
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.8.3/ninja_0.8.3_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.8.3/luci-app-ninja_1.1.6-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.8.3/luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.8.4/ninja_0.8.4_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.8.4/luci-app-ninja_1.1.6-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.8.4/luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
 
-opkg install ninja_0.8.3_aarch64_generic.ipk
+opkg install ninja_0.8.4_aarch64_generic.ipk
 opkg install luci-app-ninja_1.1.6-1_all.ipk
 opkg install luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
 ```

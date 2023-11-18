@@ -19,7 +19,7 @@
 
 > 如果项目对你有帮助，请考虑[捐赠支持](https://github.com/gngpp/gngpp/blob/main/SPONSOR.md#sponsor-my-open-source-works)项目持续维护，也可以付费获取咨询和技术支持服务。
 
-### 特征
+### 特性
 
 - API密钥获取
 - 电子邮件/密码帐户认证 (不支持Google/Microsoft第三方登录)
@@ -119,7 +119,7 @@
 - `--proxies`，代理，支持代理池，多个代理使用`,`隔开，格式: protocol://user:pass@ip:port，如果本地IP被Ban，使用代理池时需要关闭直连IP使用，`--disable-direct`关闭直连，否则会根据负载均衡使用你被Ban的本地IP
 - `--workers`，工作线程: 默认1
 - `--disable-webui`, 如果不想使用默认自带的WebUI，使用此参数关闭
-- `--enable-file-proxy`，环境变量`ENABLE_FILE_PROXY`，开启文件上下传接口代理
+- `--enable-file-proxy`，环境变量`ENABLE_FILE_PROXY`，开启文件上下传API代理
 
 [...](https://github.com/gngpp/ninja/blob/main/README_zh.md#%E5%91%BD%E4%BB%A4%E6%89%8B%E5%86%8C)
 
@@ -130,8 +130,8 @@
   GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 deb包，二进制文件，以Ubuntu为例：
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.8.3/ninja-0.8.3-x86_64-unknown-linux-musl.tar.gz
-tar -xf ninja-0.8.3-x86_64-unknown-linux-musl.tar.gz
+wget https://github.com/gngpp/ninja/releases/download/v0.8.4/ninja-0.8.4-x86_64-unknown-linux-musl.tar.gz
+tar -xf ninja-0.8.4-x86_64-unknown-linux-musl.tar.gz
 ./ninja run
 ```
 
@@ -140,11 +140,11 @@ tar -xf ninja-0.8.3-x86_64-unknown-linux-musl.tar.gz
 GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 ipk 文件， 目前提供了 aarch64/x86_64 等架构的版本，下载后使用 opkg 安装，以 nanopi r4s 为例：
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.8.3/ninja_0.8.3_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.8.3/luci-app-ninja_1.1.6-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.8.3/luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.8.4/ninja_0.8.4_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.8.4/luci-app-ninja_1.1.6-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.8.4/luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
 
-opkg install ninja_0.8.3_aarch64_generic.ipk
+opkg install ninja_0.8.4_aarch64_generic.ipk
 opkg install luci-app-ninja_1.1.6-1_all.ipk
 opkg install luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
 ```
