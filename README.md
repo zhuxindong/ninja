@@ -65,15 +65,22 @@ Sending `GPT-4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` 
 
 - Platform-API
   - `/dashboard/*`
+
 - ChatGPT-To-API
   - `/to/v1/chat/completions`
   > About using `ChatGPT` to `API`, use `AceessToken` directly as `API Key`, interface path: `/to/v1/chat/completions`
+
+- Files-API
+  - `/files/*`
+  > Image and file upload and download API proxy, the API returned by the `/backend-api/files` interface has been converted to `/files/*`
 
 - Authorization
   - Login: `/auth/token`, form `option` optional parameter, default is `web` login, returns `AccessToken` and `Session`; parameter is `apple`/`platform`, returns `AccessToken` and `RefreshToken`
   - Refresh `RefreshToken`: `/auth/refresh_token`
   - Revoke `RefreshToken`: `/auth/revoke_token`
   - Refresh `Session`: `/api/auth/session`, send a cookie named `__Secure-next-auth.session-token` to call refresh `Session`, and return a new `AccessToken`
+  
+  > `Web login`, a cookie named: `__Secure-next-auth.session-token` is returned by default. The client only needs to save this cookie. Calling `/api/auth/session` can also refresh `AccessToken`
 
   > About the method of obtaining `RefreshToken`, use the `ChatGPT App` login method of the `Apple` platform. The principle is to use the built-in MITM agent. When the `Apple device` is connected to the agent, you can log in to the `Apple platform` to obtain `RefreshToken`. It is only suitable for small quantities or personal use `(large quantities will seal the device, use with caution)`. For detailed usage, please see the startup parameter description.
 
@@ -86,8 +93,6 @@ Sending `GPT-4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` 
   # Set the network on your mobile phone to set your proxy listening address, for example: http://192.168.1.1:8888
   # Then open the browser http://192.168.1.1:8888/preauth/cert, download the certificate, install it and trust it, then open iOS ChatGPT and you can play happily
    ```
-
-  > `Web login`, a cookie named: `__Secure-next-auth.session-token` is returned by default. The client only needs to save this cookie. Calling `/api/auth/session` can also refresh `AccessToken`
 
 #### API documentation
 
