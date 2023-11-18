@@ -7,7 +7,7 @@ use crate::{
     },
     error::AuthError,
 };
-use crate::{context, warn};
+use crate::{warn, with_context};
 use anyhow::{bail, Context};
 use async_recursion::async_recursion;
 use axum::http::HeaderValue;
@@ -30,9 +30,7 @@ pub(crate) struct PreAuthProvider;
 
 impl PreAuthProvider {
     fn get_preauth_cookie(&self) -> AuthResult<String> {
-        context::get_instance()
-            .pop_preauth_cookie()
-            .context(AuthError::PreauthCookieNotFound)
+        with_context!(pop_preauth_cookie).context(AuthError::PreauthCookieNotFound)
     }
 }
 

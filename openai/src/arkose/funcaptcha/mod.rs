@@ -6,7 +6,7 @@ use self::model::{Challenge, ConciseChallenge, FunCaptcha, RequestChallenge};
 
 use super::crypto;
 use crate::arkose::funcaptcha::model::SubmitChallenge;
-use crate::{context, debug, now_duration, warn};
+use crate::{debug, now_duration, warn, with_context};
 use anyhow::{bail, Context};
 use reqwest::header;
 use serde::{Deserialize, Serialize};
@@ -143,7 +143,7 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
         session_token,
         funcaptcha: None,
         challenge: None,
-        client: context::get_instance().client(),
+        client: with_context!(client),
         game_type: 0,
         headers,
     };

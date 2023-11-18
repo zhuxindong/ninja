@@ -23,7 +23,7 @@ pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
     init_static_files();
     let router = arkose::config(router, args);
     let router = har::config(router, args);
-    let router = files::config(router);
+    let router = files::config(router, args);
     let router = toapi::config(router);
     let router = ui::config(router, args);
     router

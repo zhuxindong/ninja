@@ -6,9 +6,9 @@ use tokio::sync::OnceCell;
 
 use crate::{
     arkose::{self},
-    context, generate_random_string,
+    generate_random_string,
     homedir::home_dir,
-    now_duration,
+    now_duration, with_context,
 };
 
 static TOKEN_SECRET: OnceCell<String> = OnceCell::const_new();
@@ -20,8 +20,7 @@ async fn get_or_init_secret() -> &'static String {
             let path = home_dir()
                 .unwrap_or_else(|| PathBuf::from("."))
                 .join(".token_secret");
-            let key = context::get_instance()
-                .arkose_har_upload_key()
+            let key = with_context!(arkose_har_upload_key)
                 .cloned()
                 .unwrap_or(generate_random_string(31));
             let x = arkose::murmur::murmurhash3_x64_128(key.as_bytes(), 31);

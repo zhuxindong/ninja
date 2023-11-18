@@ -1,6 +1,5 @@
-use crate::context;
-
 use super::error::ResponseError;
+use crate::with_context;
 
 pub(super) async fn cf_turnstile_check(
     addr: &std::net::IpAddr,
@@ -14,7 +13,7 @@ pub(super) async fn cf_turnstile_check(
         idempotency_key: String,
     }
 
-    let ctx = context::get_instance();
+    let ctx = with_context!();
 
     if let Some(turnsile) = ctx.cf_turnstile() {
         let response = cf_response.filter(|r| !r.is_empty()).ok_or_else(|| {
@@ -28,7 +27,7 @@ pub(super) async fn cf_turnstile_check(
             idempotency_key: crate::uuid::uuid(),
         };
 
-        let resp = context::get_instance()
+        let resp = ctx
             .client()
             .post("https://challenges.cloudflare.com/turnstile/v0/siteverify")
             .form(&form)

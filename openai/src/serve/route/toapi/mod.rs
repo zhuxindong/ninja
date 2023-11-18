@@ -18,11 +18,11 @@ use crate::{
         req::{Content, Messages, PostConvoRequest},
         resp::{ConvoResponse, PostConvoResponse},
     },
-    context,
     serve::{
         error::ResponseError,
         puid::{get_or_init_puid, reduce_cache_key},
     },
+    with_context,
 };
 use crate::{chatgpt::model::Role, debug};
 
@@ -86,7 +86,7 @@ async fn chat_to_api(
         .arkose_token(&arkose_token)
         .build();
 
-    let client = context::get_instance().client();
+    let client = with_context!(client);
 
     // Try to get puid from cache
     let puid = get_or_init_puid(bearer.token(), &body.model, cache_id).await?;
@@ -336,14 +336,13 @@ async fn event_convert_handler(
 async fn model_mapper(model: &str) -> Result<(&str, &str, Option<ArkoseToken>), ResponseError> {
     let gpt_model = GPTModel::from_str(model)?;
 
-    let arkose_token = if (context::get_instance().arkose_gpt3_experiment() && gpt_model.is_gpt3())
-        || gpt_model.is_gpt4()
-    {
-        let arkose_token = ArkoseToken::new_from_context(gpt_model.into()).await?;
-        Some(arkose_token)
-    } else {
-        None
-    };
+    let arkose_token =
+        if (with_context!(arkose_gpt3_experiment) && gpt_model.is_gpt3()) || gpt_model.is_gpt4() {
+            let arkose_token = ArkoseToken::new_from_context(gpt_model.into()).await?;
+            Some(arkose_token)
+        } else {
+            None
+        };
 
     match model {
         model if model.starts_with("gpt-3.5") => {

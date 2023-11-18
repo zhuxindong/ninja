@@ -1,10 +1,10 @@
 use super::STATIC_FILES;
 use crate::arkose::ArkoseToken;
 use crate::arkose::Type;
-use crate::context;
 use crate::context::ContextArgs;
 use crate::serve::error::ResponseError;
 use crate::warn;
+use crate::with_context;
 use axum::body::Body;
 use axum::http::header;
 use axum::http::method::Method;
@@ -101,7 +101,7 @@ async fn proxy(
         headers.remove(header);
     }
 
-    let client = context::get_instance().client();
+    let client = with_context!(client);
     let url = format!("https://client-api.arkoselabs.com{}", req_path);
 
     let resp = match body {

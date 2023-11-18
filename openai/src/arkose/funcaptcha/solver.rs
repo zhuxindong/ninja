@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
-use crate::{context, warn};
+use crate::{warn, with_context};
 
 use super::Solver;
 
@@ -85,12 +85,7 @@ pub async fn submit_task(submit_task: SubmitSolver<'_>) -> anyhow::Result<Vec<i3
         }
     }
 
-    let resp = context::get_instance()
-        .client()
-        .post(url)
-        .json(&body)
-        .send()
-        .await?;
+    let resp = with_context!(client).post(url).json(&body).send().await?;
 
     match resp.error_for_status_ref() {
         Ok(_) => {

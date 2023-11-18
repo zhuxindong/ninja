@@ -10,7 +10,7 @@ use http::{HeaderMap, Method};
 use serde_json::{json, Value};
 
 use crate::arkose::Type;
-use crate::{arkose, context};
+use crate::{arkose, with_context};
 
 use super::error::ResponseError;
 use super::extract::RequestExtractor;
@@ -139,7 +139,7 @@ async fn handle_conv_request(req: &mut RequestExtractor) -> Result<(), ResponseE
     let model = arkose::GPTModel::from_str(model).map_err(ResponseError::BadRequest)?;
 
     // If model is gpt3 or gpt4, then add arkose_token
-    if (context::get_instance().arkose_gpt3_experiment() && model.is_gpt3()) || model.is_gpt4() {
+    if (with_context!(arkose_gpt3_experiment) && model.is_gpt3()) || model.is_gpt4() {
         let condition = match body.get("arkose_token") {
             Some(s) => {
                 let s = s.as_str().unwrap_or(EMPTY);
