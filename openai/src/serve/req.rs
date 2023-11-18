@@ -74,15 +74,13 @@ pub(super) fn has_puid(headers: &HeaderMap) -> Result<bool, ResponseError> {
 
 /// Extract token from Authorization header
 fn extract_authorization<'a>(headers: &'a HeaderMap) -> Result<&'a str, ResponseError> {
-    let token = match headers.get(header::AUTHORIZATION) {
-        Some(v) => Some(v),
-        None => headers.get("X-Authorization"),
-    }
-    .ok_or(ResponseError::Unauthorized(anyhow::anyhow!(
-        "AccessToken required!"
-    )))?
-    .to_str()
-    .map_err(ResponseError::BadGateway)?;
+    let token = headers
+        .get(header::AUTHORIZATION)
+        .ok_or(ResponseError::Unauthorized(anyhow::anyhow!(
+            "AccessToken required!"
+        )))?
+        .to_str()
+        .map_err(ResponseError::BadGateway)?;
     Ok(token)
 }
 

@@ -19,15 +19,7 @@ pub(super) fn header_convert(
     jar: &CookieJar,
     origin: &'static str,
 ) -> Result<HeaderMap, ResponseError> {
-    let authorization = match h.get(header::AUTHORIZATION) {
-        Some(v) => Some(v),
-        // support Pandora WebUI passing X-Authorization header
-        None => h.get("X-Authorization"),
-    };
-
     let mut headers = HeaderMap::new();
-
-    authorization.map(|h| headers.insert(header::AUTHORIZATION, h.clone()));
 
     h.get("Access-Control-Request-Headers")
         .map(|h| headers.insert("Access-Control-Request-Headers", h.clone()));
@@ -41,6 +33,9 @@ pub(super) fn header_convert(
 
     h.get("X-Ms-Version")
         .map(|v| headers.insert("X-Ms-Version", v.clone()));
+
+    h.get(header::AUTHORIZATION)
+        .map(|h| headers.insert(header::AUTHORIZATION, h.clone()));
 
     h.get(header::CONTENT_TYPE)
         .map(|h| headers.insert(header::CONTENT_TYPE, h.clone()));
