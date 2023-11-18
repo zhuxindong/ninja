@@ -74,7 +74,7 @@ fn ase_decrypt(content: Vec<u8>, password: &str) -> anyhow::Result<Vec<u8>> {
 
     let ((key, _), iv) = (
         default_evp_kdf(password.as_bytes(), &salt?).map_err(|s| anyhow::anyhow!(s))?,
-        hex_string_to_bytes(&encode_data.iv).ok_or(anyhow!("hex decode error"))?,
+        hex_to_bytes(&encode_data.iv).ok_or(anyhow!("hex decode error"))?,
     );
 
     use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
@@ -128,33 +128,6 @@ fn evp_kdf(
     Ok(derived_key_bytes[..key_size * 4].to_vec())
 }
 
-fn hex_string_to_bytes(hex_string: &str) -> Option<Vec<u8>> {
-    let mut bytes = Vec::new();
-    let mut buffer = 0;
-    let mut buffer_length = 0;
-
-    for hex_char in hex_string.chars() {
-        if let Some(digit) = hex_char.to_digit(16) {
-            buffer = (buffer << 4) | digit;
-            buffer_length += 1;
-
-            if buffer_length == 2 {
-                bytes.push(buffer as u8);
-                buffer = 0;
-                buffer_length = 0;
-            }
-        } else {
-            return None;
-        }
-    }
-
-    if buffer_length > 0 {
-        return None;
-    }
-
-    Some(bytes)
-}
-
 fn default_evp_kdf(password: &[u8], salt: &[u8]) -> Result<(Vec<u8>, Vec<u8>), &'static str> {
     let key_size = 256 / 32;
     let iv_size = 128 / 32;
@@ -163,4 +136,28 @@ fn default_evp_kdf(password: &[u8], salt: &[u8]) -> Result<(Vec<u8>, Vec<u8>), &
         derived_key_bytes[..key_size * 4].to_vec(),
         derived_key_bytes[key_size * 4..].to_vec(),
     ))
+}
+
+fn hex_to_bytes(hex_string: &str) -> Option<Vec<u8>> {
+    let mut bytes = Vec::new();
+    let mut buffer = 0;
+
+    for (i, hex_char) in hex_string.chars().enumerate() {
+        if let Some(digit) = hex_char.to_digit(16) {
+            buffer = (buffer << 4) | digit;
+
+            if i % 2 == 1 {
+                bytes.push(buffer as u8);
+                buffer = 0;
+            }
+        } else {
+            return None;
+        }
+    }
+
+    if hex_string.len() % 2 != 0 {
+        return None;
+    }
+
+    Some(bytes)
 }
