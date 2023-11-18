@@ -10,11 +10,13 @@ struct EncryptionData {
     s: String,
 }
 
+#[inline]
 pub fn encrypt(data: &str, key: &str) -> anyhow::Result<String> {
     let enc_data = aes_encrypt(data, key)?;
     Ok(serde_json::to_string(&enc_data)?)
 }
 
+#[inline]
 pub fn decrypt(data: Vec<u8>, key: &str) -> anyhow::Result<String> {
     let dec_data = ase_decrypt(data, key)?;
     let data = String::from_utf8(dec_data)?;
