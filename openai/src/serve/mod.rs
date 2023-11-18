@@ -20,6 +20,7 @@ use axum::response::IntoResponse;
 use axum::routing::{any, get, post};
 use axum::{Json, TypedHeader};
 use axum_server::{AddrIncomingConfig, Handle};
+use http::StatusCode;
 
 use self::extract::RequestExtractor;
 use self::req::SendRequestExt;
@@ -310,12 +311,12 @@ async fn post_refresh_token(
 /// POST /auth/revoke_token
 async fn post_revoke_token(
     TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
-) -> Result<axum::http::StatusCode, ResponseError> {
+) -> Result<StatusCode, ResponseError> {
     match with_context!(auth_client)
         .do_revoke_token(bearer.token())
         .await
     {
-        Ok(_) => Ok(axum::http::StatusCode::OK),
+        Ok(_) => Ok(StatusCode::OK),
         Err(err) => Err(ResponseError::BadRequest(err)),
     }
 }

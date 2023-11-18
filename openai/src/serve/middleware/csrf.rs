@@ -23,7 +23,7 @@ pub async fn auth_middleware(
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
         let value = serde_urlencoded::from_bytes(&bytes)
-            .map_err(|_| -> StatusCode { StatusCode::INTERNAL_SERVER_ERROR })?;
+            .map_err(|_| -> StatusCode { StatusCode::BAD_REQUEST })?;
         let payload: Form<AuthAccount> = Form(value);
         match payload.0.csrf_token {
             Some(csrf_token) => {
