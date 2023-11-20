@@ -1,8 +1,8 @@
+mod model;
+
 use axum::{
-    headers::{authorization::Bearer, Authorization},
     response::{sse::Event, IntoResponse, Sse},
-    routing::post,
-    Json, Router, TypedHeader,
+    Json,
 };
 use eventsource_stream::{EventStream, Eventsource};
 use futures::StreamExt;
@@ -15,17 +15,16 @@ use std::{convert::Infallible, str::FromStr};
 use crate::{
     arkose::{ArkoseToken, GPTModel},
     chatgpt::model::{
-        req::{Content, Messages, PostConvoRequest},
+        req::{Content, ConversationMode, Messages, PostConvoRequest},
         resp::{ConvoResponse, PostConvoResponse},
     },
     serve::{
         error::ResponseError,
-        puid::{get_or_init_puid, reduce_cache_key},
+        puid::{get_or_init, reduce_key},
     },
     with_context,
 };
 use crate::{chatgpt::model::Role, debug};
-
 use crate::{
     chatgpt::model::{
         req::{Action, ContentText},
@@ -34,22 +33,37 @@ use crate::{
     uuid::uuid,
 };
 
+use super::ext::{ContextExt, RequestExt, ResponseExt};
 use crate::URL_CHATGPT_API;
 
-mod req;
-mod resp;
-
-/// unofficial api to official api
-pub(super) fn config(router: Router) -> Router {
-    router.route("/to/v1/chat/completions", post(chat_to_api))
+/// Check if the request is supported
+pub(super) fn support(req: &RequestExt) -> bool {
+    if req.uri.path().eq("/v1/chat/completions") && req.method.eq(&http::Method::POST) {
+        if let Some(ref b) = req.bearer_auth() {
+            return !b.starts_with("sk-");
+        }
+    }
+    false
 }
 
-async fn chat_to_api(
-    TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
-    body: Json<req::Req>,
-) -> Result<impl IntoResponse, ResponseError> {
+/// Send request to ChatGPT API
+pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, ResponseError> {
     // Exstract the token from the Authorization header
-    let cache_id = reduce_cache_key(bearer.token())?;
+    let baerer = req
+        .bearer_auth()
+        .ok_or(ResponseError::BadRequest(anyhow::anyhow!(
+            "Authorization header is required!"
+        )))?;
+
+    // Exstract the token from the Authorization header
+    let cache_id = reduce_key(baerer)?;
+
+    let body = req
+        .body
+        .as_ref()
+        .ok_or_else(|| ResponseError::BadRequest(anyhow::anyhow!("body is empty")))?;
+
+    let body = serde_json::from_slice::<model::Req>(body)?;
 
     // Convert to ChatGPT API Message
     let mut messages = Vec::with_capacity(body.messages.len());
@@ -73,27 +87,30 @@ async fn chat_to_api(
     }
 
     // OpenAI API to ChatGPT API model mapper
-    let (model, map_model, arkose_token) = model_mapper(&body.model).await?;
+    let (raw_model, mapper_model, arkose_token) = model_mapper(&body.model).await?;
 
     // Create request
     let parent_message_id = uuid();
-    let req = PostConvoRequest::builder()
+    let req_body = PostConvoRequest::builder()
         .action(Action::Next)
         .parent_message_id(&parent_message_id)
         .messages(messages)
-        .model(model)
+        .model(raw_model)
         .history_and_training_disabled(true)
+        .force_paragen(false)
+        .force_rate_limit(false)
+        .conversation_mode(ConversationMode {
+            kind: "primary_assistant",
+        })
         .arkose_token(&arkose_token)
         .build();
 
-    let client = with_context!(client);
-
     // Try to get puid from cache
-    let puid = get_or_init_puid(bearer.token(), &body.model, cache_id).await?;
+    let puid = get_or_init(baerer, &body.model, cache_id).await?;
 
-    let mut builder = client
+    let mut builder = with_context!(client)
         .post(format!("{URL_CHATGPT_API}/backend-api/conversation"))
-        .bearer_auth(bearer.token());
+        .bearer_auth(baerer);
 
     if let Some(puid) = puid {
         builder = builder.header(header::COOKIE, format!("_puid={puid};"))
@@ -101,44 +118,47 @@ async fn chat_to_api(
 
     // Send request
     let resp = builder
-        .json(&req)
+        .json(&req_body)
         .send()
         .await
         .map_err(ResponseError::InternalServerError)?;
+    Ok(ResponseExt::builder()
+        .inner(resp)
+        .context(
+            ContextExt::builder()
+                .model(mapper_model.to_owned())
+                .stream(body.stream)
+                .build(),
+        )
+        .build())
+}
 
-    match resp.error_for_status() {
+/// Convert response to ChatGPT API
+pub(super) async fn response_convert(
+    resp_ext: ResponseExt,
+) -> Result<impl IntoResponse, ResponseError> {
+    match resp_ext.inner.error_for_status() {
         Ok(resp) => {
+            let config =
+                resp_ext
+                    .context
+                    .ok_or(ResponseError::InternalServerError(anyhow::anyhow!(
+                        "to_api is empty"
+                    )))?;
             let event_source = resp.bytes_stream().eventsource();
-            match body.stream {
-                true => Ok(
-                    Sse::new(stream_handler(event_source, map_model.to_owned())).into_response()
-                ),
-                false => {
-                    let res = not_stream_handler(event_source, map_model.to_owned())
-                        .await
-                        .map_err(ResponseError::InternalServerError)?;
-                    Ok(res.into_response())
-                }
+            if config.stream {
+                return Ok(Sse::new(stream_handler(event_source, config.model)).into_response());
+            } else {
+                let res = not_stream_handler(event_source, config.model)
+                    .await
+                    .map_err(ResponseError::InternalServerError)?;
+                return Ok(res.into_response());
             }
         }
-        Err(err) => match err.status() {
-                Some(
-                    status_code
-                    @
-                    // 4xx
-                    (StatusCode::UNAUTHORIZED
-                    | StatusCode::REQUEST_TIMEOUT
-                    | StatusCode::TOO_MANY_REQUESTS
-                    | StatusCode::BAD_REQUEST
-                    | StatusCode::PAYMENT_REQUIRED
-                    | StatusCode::FORBIDDEN
-                    // 5xx
-                    | StatusCode::INTERNAL_SERVER_ERROR
-                    | StatusCode::BAD_GATEWAY
-                    | StatusCode::SERVICE_UNAVAILABLE
-                    | StatusCode::GATEWAY_TIMEOUT),
-                ) => {
-                    if status_code == StatusCode::UNAUTHORIZED {
+        Err(err) => {
+            if let Some(status_code) = err.status() {
+                match status_code {
+                    StatusCode::UNAUTHORIZED => {
                         let body = serde_json::json!({
                             "error": {
                                 "message": "You didn't provide an API key. You need to provide your API key in an Authorization header using Bearer auth (i.e. Authorization: Bearer YOUR_KEY), or as the password field (with blank username) if you're accessing the API from your browser and are prompted for a username and password. You can obtain an API key from https://platform.openai.com/account/api-keys.",
@@ -147,12 +167,16 @@ async fn chat_to_api(
                                 "code": null
                             }
                         });
-                        return Ok(Json(body).into_response().into_response())
+                        return Ok(Json(body).into_response());
                     }
-                    Err(ResponseError::new(err.to_string(), status_code))
-                },
-                _ => Err(ResponseError::InternalServerError(err)),
-            },
+                    _ => {
+                        return Err(ResponseError::new(err.to_string(), status_code));
+                    }
+                }
+            } else {
+                return Err(ResponseError::InternalServerError(err));
+            }
+        }
     }
 }
 
@@ -193,23 +217,23 @@ async fn not_stream_handler(
     }
     drop(event_soure);
 
-    let message = resp::Message::builder()
-        .role(Role::Assistant.to_string())
+    let message = model::Message::builder()
+        .role(Role::Assistant)
         .content(previous_message)
         .build();
 
-    let resp = resp::Resp::builder()
+    let resp = model::Resp::builder()
         .id(&id)
         .object("chat.completion.chunk")
         .created(&timestamp)
         .model(&model)
-        .choices(vec![resp::Choice::builder()
+        .choices(vec![model::Choice::builder()
             .index(0)
             .message(Some(message))
             .finish_reason(finish_reason.as_deref())
             .build()])
         .usage(Some(
-            resp::Usage::builder()
+            model::Usage::builder()
                 .prompt_tokens(0)
                 .completion_tokens(0)
                 .total_tokens(0)
@@ -313,17 +337,17 @@ async fn event_convert_handler(
     previous_message.clear();
     previous_message.push_str(message);
 
-    let delta = resp::Delta::builder()
+    let delta = model::Delta::builder()
         .role(role)
         .content(return_message)
         .build();
 
-    let resp = resp::Resp::builder()
+    let resp = model::Resp::builder()
         .id(&id)
         .object("chat.completion.chunk")
         .created(timestamp)
         .model(&model)
-        .choices(vec![resp::Choice::builder()
+        .choices(vec![model::Choice::builder()
             .index(0)
             .delta(Some(delta))
             .finish_reason(finish_reason)
@@ -338,21 +362,23 @@ async fn model_mapper(model: &str) -> Result<(&str, &str, Option<ArkoseToken>), 
 
     let arkose_token =
         if (with_context!(arkose_gpt3_experiment) && gpt_model.is_gpt3()) || gpt_model.is_gpt4() {
-            let arkose_token = ArkoseToken::new_from_context(gpt_model.into()).await?;
+            let arkose_token = ArkoseToken::new_from_context(gpt_model.clone().into()).await?;
             Some(arkose_token)
         } else {
             None
         };
 
-    match model {
-        model if model.starts_with("gpt-3.5") => {
-            Ok(("text-davinci-002-render-sha", "gpt-3.5-turbo", arkose_token))
-        }
-        model if model.starts_with("gpt-4") => Ok(("gpt-4", "gpt-4", arkose_token)),
-        _ => Err(ResponseError::BadRequest(anyhow::anyhow!(
-            "not support model: {model}"
-        ))),
+    if gpt_model.is_gpt3() {
+        return Ok(("text-davinci-002-render-sha", "gpt-3.5-turbo", arkose_token));
     }
+
+    if gpt_model.is_gpt4() {
+        return Ok(("gpt-4", "gpt-4", arkose_token));
+    }
+
+    return Err(ResponseError::BadRequest(anyhow::anyhow!(
+        "not support model: {model}"
+    )));
 }
 
 fn generate_id(length: usize) -> String {

@@ -70,7 +70,7 @@ impl std::str::FromStr for Type {
     }
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum GPTModel {
     Gpt35Model,
     Gpt35Other,

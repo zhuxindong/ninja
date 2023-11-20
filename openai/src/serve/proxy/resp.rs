@@ -11,10 +11,13 @@ use axum_extra::extract::{cookie, CookieJar};
 use reqwest::header::HeaderMap;
 use serde_json::Value;
 
-use super::error::ResponseError;
+use crate::serve::error::ResponseError;
+
+use super::ext::ResponseExt;
+use super::toapi;
 
 /// Request headers convert
-pub(super) fn header_convert(
+pub(crate) fn header_convert(
     h: &HeaderMap,
     jar: &CookieJar,
     origin: &'static str,
@@ -70,16 +73,22 @@ pub(super) fn header_convert(
 }
 
 /// Response convert
-pub(super) async fn response_convert(
-    resp: reqwest::Response,
+pub(crate) async fn response_convert(
+    resp: ResponseExt,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let status = resp.status();
+    // If to api is some, then convert to api response
+    if resp.context.is_some() {
+        return Ok(toapi::response_convert(resp).await?.into_response());
+    }
+
+    // Build new response
     let mut builder = Response::builder()
-        .status(status)
+        .status(resp.inner.status())
         .header("ninja-version", LIB_VERSION);
 
     // Copy headers except for "set-cookie"
     for kv in resp
+        .inner
         .headers()
         .into_iter()
         .filter(|(k, _)| k.as_str().to_lowercase().ne("set-cookie"))
@@ -88,7 +97,7 @@ pub(super) async fn response_convert(
     }
 
     // Filter and transform cookies
-    for cookie in resp.cookies() {
+    for cookie in resp.inner.cookies() {
         let name = cookie.name().to_lowercase();
         if name == "_puid" || name == "cf_clearance" {
             if let Some(expires) = cookie.expires() {
@@ -109,10 +118,11 @@ pub(super) async fn response_convert(
     }
 
     // Modify files endpoint response
-    if with_context!(enable_file_proxy) && resp.url().path().contains("/backend-api/files") {
-        let url = resp.url().clone();
+    if with_context!(enable_file_proxy) && resp.inner.url().path().contains("/backend-api/files") {
+        let url = resp.inner.url().clone();
         // Files endpoint handling
         let mut json = resp
+            .inner
             .json::<Value>()
             .await
             .map_err(ResponseError::BadRequest)?;
@@ -141,7 +151,7 @@ pub(super) async fn response_convert(
     } else {
         // Non-files endpoint handling
         Ok(builder
-            .body(StreamBody::new(resp.bytes_stream()))
+            .body(StreamBody::new(resp.inner.bytes_stream()))
             .map_err(ResponseError::InternalServerError)?
             .into_response())
     }

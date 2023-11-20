@@ -3,7 +3,7 @@ use std::time::Duration;
 use inquire::{min_length, required, MultiSelect, Password, PasswordDisplayMode, Select, Text};
 use openai::auth::model::{AuthAccount, AuthStrategy};
 use openai::auth::provide::AuthProvider;
-use openai::token::model::AuthenticateToken;
+use openai::token::model::Token;
 
 use crate::inter::standard::Auth;
 use crate::inter::{json_to_table, new_spinner, render_config};
@@ -103,7 +103,7 @@ async fn sign_in() -> anyhow::Result<()> {
                 Ok(access_token) => {
                     pb.finish_and_clear();
                     println!("{} Login Success", auth_strategy);
-                    let token = AuthenticateToken::try_from(access_token)?;
+                    let token = Token::try_from(access_token)?;
                     let mut account = store
                         .read(Account::new(token.email()))?
                         .unwrap_or(Account::new(token.email()));

@@ -12,7 +12,6 @@ use super::error::ResponseError;
 mod arkose;
 mod files;
 mod har;
-mod toapi;
 mod ui;
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
@@ -24,7 +23,6 @@ pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
     let router = arkose::config(router, args);
     let router = har::config(router, args);
     let router = files::config(router, args);
-    let router = toapi::config(router);
     let router = ui::config(router, args);
     router
 }

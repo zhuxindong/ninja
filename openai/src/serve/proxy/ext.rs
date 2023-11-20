@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use axum::body::Bytes;
 use axum::response::{IntoResponse, Response};
 use axum::{
@@ -6,23 +8,41 @@ use axum::{
     http::{self, Request},
 };
 use axum_extra::extract::CookieJar;
-use http::header::{self, CONTENT_TYPE};
-use http::Uri;
-use std::str::FromStr;
+use http::header::CONTENT_TYPE;
+use http::{header, Uri};
+use typed_builder::TypedBuilder;
 
-use super::error::ResponseError;
+use crate::serve::error::ResponseError;
 
-/// Extractor for request parts.
-pub(super) struct RequestExtractor {
-    pub(super) uri: Uri,
-    pub(super) method: http::Method,
-    pub(super) headers: http::HeaderMap,
-    pub(super) jar: CookieJar,
-    pub(super) body: Option<Bytes>,
+/// Context extension.
+#[derive(TypedBuilder)]
+pub(super) struct ContextExt {
+    // Enable stream
+    pub(super) stream: bool,
+    // Mapper model
+    pub(super) model: String,
 }
 
-impl RequestExtractor {
-    pub(super) fn trim_start_path(&mut self, path: &str) -> Result<(), ResponseError> {
+/// Response extension.
+#[derive(TypedBuilder)]
+pub(crate) struct ResponseExt {
+    #[builder(setter(into), default)]
+    pub(super) context: Option<ContextExt>,
+    pub(crate) inner: reqwest::Response,
+}
+
+/// Extractor for request parts.
+pub(crate) struct RequestExt {
+    pub(crate) uri: Uri,
+    pub(crate) method: http::Method,
+    pub(crate) headers: http::HeaderMap,
+    pub(crate) jar: CookieJar,
+    pub(crate) body: Option<Bytes>,
+}
+
+impl RequestExt {
+    /// Trim start path.
+    pub(crate) fn trim_start_path(&mut self, path: &str) -> Result<(), ResponseError> {
         let path_and_query = self
             .uri
             .path_and_query()
@@ -33,7 +53,8 @@ impl RequestExtractor {
         Ok(())
     }
 
-    pub(super) fn append_haeder(
+    /// Append header.
+    pub(crate) fn append_haeder(
         &mut self,
         name: header::HeaderName,
         value: &str,
@@ -44,10 +65,38 @@ impl RequestExtractor {
         );
         Ok(())
     }
+
+    /// Get bearer auth.
+    pub(crate) fn bearer_auth(&self) -> Option<&str> {
+        let mut value = self.headers.get_all(header::AUTHORIZATION).iter();
+        let is_missing = value.size_hint() == (0, Some(0));
+        if is_missing {
+            return None;
+        }
+
+        value.find_map(|v| {
+            v.to_str().ok().and_then(|s| {
+                let parts: Vec<&str> = s.split_whitespace().collect();
+                match parts.as_slice() {
+                    ["Bearer", token] => Some(*token),
+                    _ => None,
+                }
+            })
+        })
+    }
 }
 
 #[async_trait]
-impl<S, B> FromRequest<S, B> for RequestExtractor
+pub(crate) trait SendRequestExt {
+    async fn send_request(
+        &self,
+        origin: &'static str,
+        req: RequestExt,
+    ) -> Result<ResponseExt, ResponseError>;
+}
+
+#[async_trait]
+impl<S, B> FromRequest<S, B> for RequestExt
 where
     Bytes: FromRequest<S, B>,
     B: Send + 'static,
@@ -83,10 +132,10 @@ where
             None
         };
 
-        Ok(RequestExtractor {
+        Ok(RequestExt {
             uri: parts.uri,
-            method: parts.method,
             jar: CookieJar::from_headers(&parts.headers),
+            method: parts.method,
             headers: parts.headers,
             body,
         })

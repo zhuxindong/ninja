@@ -33,6 +33,11 @@ pub enum Action {
 }
 
 #[derive(Serialize, TypedBuilder)]
+pub struct ConversationMode<'a> {
+    pub kind: &'a str,
+}
+
+#[derive(Serialize, TypedBuilder)]
 pub struct PatchConvoRequest<'a> {
     #[builder(setter(into, strip_option), default)]
     pub conversation_id: Option<&'a str>,
@@ -93,6 +98,14 @@ pub struct PostConvoRequest<'a> {
     conversation_id: Option<&'a str>,
     #[builder(default = false)]
     history_and_training_disabled: bool,
+    #[builder(setter(into), default)]
+    conversation_mode: Option<ConversationMode<'a>>,
+    #[builder(default = false)]
+    force_paragen: bool,
+    #[builder(default = false)]
+    force_rate_limit: bool,
+    #[builder(default = vec![])]
+    suggestions: Vec<String>,
     #[builder(setter(into), default)]
     arkose_token: Option<&'a ArkoseToken>,
 }

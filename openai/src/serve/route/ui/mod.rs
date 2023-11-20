@@ -41,14 +41,14 @@ use crate::info;
 use crate::now_duration;
 use crate::serve;
 use crate::serve::error::ResponseError;
-use crate::serve::resp::header_convert;
+use crate::serve::proxy::resp::header_convert;
 use crate::serve::route::ui::extract::SessionExtractor;
 use crate::serve::turnstile;
 use crate::serve::EMPTY;
 use crate::with_context;
 use crate::{
     auth::{model::AuthAccount, provide::AuthProvider},
-    token::model::AuthenticateToken,
+    token::model::Token,
     URL_CHATGPT_API,
 };
 
@@ -196,8 +196,8 @@ async fn post_login(
 
     match with_context!(auth_client).do_access_token(&account).await {
         Ok(access_token) => {
-            let authentication_token = AuthenticateToken::try_from(access_token)
-                .map_err(ResponseError::InternalServerError)?;
+            let authentication_token =
+                Token::try_from(access_token).map_err(ResponseError::InternalServerError)?;
             let session = Session::from(authentication_token);
 
             let cookie = cookie::Cookie::build(SESSION_ID, session.to_string())
@@ -212,7 +212,7 @@ async fn post_login(
                 .status(StatusCode::SEE_OTHER)
                 .header(header::LOCATION, DEFAULT_INDEX);
 
-            if let Some(value) = session.auth_session {
+            if let Some(value) = session.session_token {
                 let session_cookie = cookie::Cookie::build(API_AUTH_SESSION_COOKIE_KEY, value)
                     .path(DEFAULT_INDEX)
                     .same_site(cookie::SameSite::Lax)
@@ -262,7 +262,7 @@ async fn post_login_token(
         email: profile.email().to_owned(),
         expires: profile.expires(),
         refresh_token: None,
-        auth_session: None,
+        session_token: None,
     };
 
     let cookie = cookie::Cookie::build(SESSION_ID, session.to_string())
@@ -335,7 +335,7 @@ async fn get_session(extract: SessionExtractor) -> Result<Response<Body>, Respon
             match ctx.auth_client().do_session(&c).await {
                 Ok(session_token) => {
                     let authentication_token =
-                        AuthenticateToken::try_from(AccessToken::Session(session_token))?;
+                        Token::try_from(AccessToken::Session(session_token))?;
                     Some(Session::from(authentication_token))
                 }
                 Err(err) => {
@@ -346,7 +346,7 @@ async fn get_session(extract: SessionExtractor) -> Result<Response<Body>, Respon
         } else if let Some(refresh_token) = extract.session.refresh_token.as_ref() {
             match ctx.auth_client().do_refresh_token(&refresh_token).await {
                 Ok(new_refresh_token) => {
-                    let authentication_token = AuthenticateToken::try_from(new_refresh_token)?;
+                    let authentication_token = Token::try_from(new_refresh_token)?;
                     Some(Session::from(authentication_token))
                 }
                 Err(err) => {
