@@ -74,7 +74,7 @@ impl AuthClient {
         };
 
         let mut session_access_token = resp.json::<model::SessionAccessToken>().await?;
-        session_access_token.session = Some(session);
+        session_access_token.session_token = Some(session);
         Ok(session_access_token)
     }
 

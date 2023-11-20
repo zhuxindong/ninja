@@ -1,7 +1,16 @@
+use serde::Deserialize;
+
+use crate::chatgpt::model::Role;
 use serde::Serialize;
 use typed_builder::TypedBuilder;
 
-use crate::chatgpt::model::Role;
+#[derive(Deserialize)]
+pub struct Req {
+    pub model: String,
+    pub messages: Vec<Message>,
+    #[serde(default)]
+    pub stream: bool,
+}
 
 #[derive(Serialize, TypedBuilder, Clone)]
 pub struct Resp<'a> {
@@ -13,6 +22,12 @@ pub struct Resp<'a> {
     #[builder(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     usage: Option<Usage>,
+}
+
+#[derive(Serialize, Deserialize, TypedBuilder, Clone)]
+pub struct Message {
+    pub role: Role,
+    pub content: String,
 }
 
 #[derive(Serialize, TypedBuilder, Clone)]
@@ -33,12 +48,6 @@ pub struct Choice<'a> {
     pub delta: Option<Delta<'a>>,
     #[builder(default)]
     pub finish_reason: Option<&'a str>,
-}
-
-#[derive(Serialize, TypedBuilder, Clone)]
-pub struct Message {
-    pub role: String,
-    pub content: String,
 }
 
 #[derive(Serialize, TypedBuilder, Clone)]

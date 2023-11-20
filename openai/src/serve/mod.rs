@@ -1,11 +1,9 @@
 mod error;
-mod extract;
 mod middleware;
 #[cfg(feature = "preauth")]
 pub mod preauth;
+mod proxy;
 mod puid;
-mod req;
-mod resp;
 #[cfg(feature = "template")]
 mod route;
 mod signal;
@@ -22,9 +20,9 @@ use axum::{Json, TypedHeader};
 use axum_server::{AddrIncomingConfig, Handle};
 use http::StatusCode;
 
-use self::extract::RequestExtractor;
-use self::req::SendRequestExt;
-use self::resp::response_convert;
+use self::proxy::ext::RequestExt;
+use self::proxy::ext::SendRequestExt;
+use self::proxy::resp::response_convert;
 use crate::auth::model::{AccessToken, AuthAccount, RefreshToken, SessionAccessToken};
 use crate::auth::provide::AuthProvider;
 use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
@@ -330,7 +328,7 @@ async fn post_revoke_token(
 ///
 /// platform API match path /v1/{tail.*}
 /// reference: https://platform.openai.com/docs/api-reference
-async fn official_proxy(req: RequestExtractor) -> Result<impl IntoResponse, ResponseError> {
+async fn official_proxy(req: RequestExt) -> Result<impl IntoResponse, ResponseError> {
     let resp = with_context!(client)
         .send_request(URL_PLATFORM_API, req)
         .await?;
@@ -338,7 +336,7 @@ async fn official_proxy(req: RequestExtractor) -> Result<impl IntoResponse, Resp
 }
 
 /// reference: doc/http.rest
-async fn unofficial_proxy(req: RequestExtractor) -> Result<impl IntoResponse, ResponseError> {
+async fn unofficial_proxy(req: RequestExt) -> Result<impl IntoResponse, ResponseError> {
     let resp = with_context!(client)
         .send_request(URL_CHATGPT_API, req)
         .await?;
@@ -349,21 +347,21 @@ impl TryInto<Response<Body>> for SessionAccessToken {
     type Error = ResponseError;
 
     fn try_into(self) -> Result<Response<Body>, Self::Error> {
-        let s = self
-            .session
+        let session = self
+            .session_token
             .clone()
             .ok_or(ResponseError::InternalServerError(anyhow!(
                 "Session error!"
             )))?;
 
-        let timestamp_secs = s
+        let timestamp_secs = session
             .expires
             .unwrap_or_else(|| SystemTime::now())
             .duration_since(UNIX_EPOCH)
             .expect("Failed to get timestamp")
             .as_secs_f64();
 
-        let cookie = cookie::Cookie::build(API_AUTH_SESSION_COOKIE_KEY, s.value)
+        let cookie = cookie::Cookie::build(API_AUTH_SESSION_COOKIE_KEY, session.value)
             .path("/")
             .expires(time::OffsetDateTime::from_unix_timestamp(
                 timestamp_secs as i64,

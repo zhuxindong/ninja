@@ -62,8 +62,7 @@ pub struct SessionAccessToken {
     pub access_token: String,
     #[serde(rename = "authProvider")]
     pub auth_provider: String,
-    #[serde(skip_serializing)]
-    pub session: Option<Session>,
+    pub session_token: Option<Session>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -75,10 +74,19 @@ pub struct RefreshToken {
     pub expires_in: i64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Session {
     pub value: String,
     pub expires: Option<SystemTime>,
+}
+
+impl Serialize for Session {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.value)
+    }
 }
 
 #[derive(Deserialize)]

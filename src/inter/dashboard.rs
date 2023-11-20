@@ -5,7 +5,7 @@ use openai::{
         model::{ApiKeyAction, ApiKeyData},
         AuthClient,
     },
-    token::model::AuthenticateToken,
+    token::model::Token,
 };
 
 use crate::store::{account::Account, Store};
@@ -37,7 +37,7 @@ pub async fn prompt() -> anyhow::Result<()> {
                 _ => false,
             })
             .map(|(_, v)| v)
-            .collect::<Vec<&AuthenticateToken>>();
+            .collect::<Vec<&Token>>();
 
         if let Some(auth_token) = state.first() {
             let pb = new_spinner("Login Dashboard...");

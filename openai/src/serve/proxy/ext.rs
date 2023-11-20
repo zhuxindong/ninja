@@ -1,28 +1,47 @@
+use std::str::FromStr;
+
 use axum::body::Bytes;
+use axum::extract::FromRequestParts;
+use axum::headers::authorization::Bearer;
+use axum::headers::Authorization;
 use axum::response::{IntoResponse, Response};
+use axum::TypedHeader;
 use axum::{
     async_trait,
     extract::FromRequest,
     http::{self, Request},
 };
 use axum_extra::extract::CookieJar;
-use http::header::{self, CONTENT_TYPE};
-use http::Uri;
-use std::str::FromStr;
+use http::header::CONTENT_TYPE;
+use http::{header, Uri};
 
-use super::error::ResponseError;
+use crate::serve::error::ResponseError;
 
-/// Extractor for request parts.
-pub(super) struct RequestExtractor {
-    pub(super) uri: Uri,
-    pub(super) method: http::Method,
-    pub(super) headers: http::HeaderMap,
-    pub(super) jar: CookieJar,
-    pub(super) body: Option<Bytes>,
+/// ChatGPT To API extension.
+pub(super) struct ToApiExt {
+    // Enable stream
+    pub(super) stream: bool,
+    // Mapper model
+    pub(super) model: String,
 }
 
-impl RequestExtractor {
-    pub(super) fn trim_start_path(&mut self, path: &str) -> Result<(), ResponseError> {
+pub(crate) struct ResponseExt {
+    pub(super) to_api: Option<ToApiExt>,
+    pub(crate) inner: reqwest::Response,
+}
+
+/// Extractor for request parts.
+pub(crate) struct RequestExt {
+    pub(crate) uri: Uri,
+    pub(crate) method: http::Method,
+    pub(crate) headers: http::HeaderMap,
+    pub(crate) baerer: Option<TypedHeader<Authorization<Bearer>>>,
+    pub(crate) jar: CookieJar,
+    pub(crate) body: Option<Bytes>,
+}
+
+impl RequestExt {
+    pub(crate) fn trim_start_path(&mut self, path: &str) -> Result<(), ResponseError> {
         let path_and_query = self
             .uri
             .path_and_query()
@@ -33,7 +52,7 @@ impl RequestExtractor {
         Ok(())
     }
 
-    pub(super) fn append_haeder(
+    pub(crate) fn append_haeder(
         &mut self,
         name: header::HeaderName,
         value: &str,
@@ -47,7 +66,16 @@ impl RequestExtractor {
 }
 
 #[async_trait]
-impl<S, B> FromRequest<S, B> for RequestExtractor
+pub(crate) trait SendRequestExt {
+    async fn send_request(
+        &self,
+        origin: &'static str,
+        req: RequestExt,
+    ) -> Result<ResponseExt, ResponseError>;
+}
+
+#[async_trait]
+impl<S, B> FromRequest<S, B> for RequestExt
 where
     Bytes: FromRequest<S, B>,
     B: Send + 'static,
@@ -56,7 +84,16 @@ where
     type Rejection = Response;
 
     async fn from_request(req: Request<B>, state: &S) -> Result<Self, Self::Rejection> {
-        let (parts, body) = req.into_parts();
+        let (mut parts, body) = req.into_parts();
+
+        // Extract the baerer token from the request.
+        let baerer = match TypedHeader::from_request_parts(&mut parts, state)
+            .await
+            .map(|baerer: TypedHeader<Authorization<Bearer>>| baerer)
+        {
+            Ok(ok) => Some(ok),
+            Err(_) => None,
+        };
 
         let body = if parts
             .headers
@@ -83,11 +120,12 @@ where
             None
         };
 
-        Ok(RequestExtractor {
+        Ok(RequestExt {
             uri: parts.uri,
-            method: parts.method,
             jar: CookieJar::from_headers(&parts.headers),
+            method: parts.method,
             headers: parts.headers,
+            baerer,
             body,
         })
     }

@@ -1,69 +1,19 @@
 use crate::{
-    auth::{self, model::AccessToken},
+    auth::model::{AccessToken, RefreshToken},
     now_duration,
 };
 use base64::{engine::general_purpose, Engine};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct AuthenticateToken {
-    access_token: String,
-    refresh_token: Option<String>,
-    auth_session: Option<String>,
-    expires: i64,
-    user_id: String,
-    name: String,
-    email: String,
-    picture: String,
-}
-
-impl AuthenticateToken {
-    pub fn user_id(&self) -> &str {
-        &self.user_id
-    }
-
-    pub fn email(&self) -> &str {
-        &self.email
-    }
-
-    pub fn picture(&self) -> &str {
-        &self.picture
-    }
-
-    pub fn access_token(&self) -> &str {
-        &self.access_token
-    }
-
-    pub fn bearer_access_token(&self) -> String {
-        format!("Bearer {}", &self.access_token)
-    }
-    pub fn refresh_token(&self) -> Option<&str> {
-        self.refresh_token.as_deref()
-    }
-
-    pub fn is_expired(&self) -> bool {
-        let duration = now_duration().expect("Time went backwards");
-        (duration.as_secs() as i64) > self.expires
-    }
-
-    pub fn expires(&self) -> i64 {
-        self.expires
-    }
-
-    pub fn auth_session(&self) -> Option<&String> {
-        self.auth_session.as_ref()
-    }
-}
-
-impl TryFrom<auth::model::AccessToken> for AuthenticateToken {
+impl TryFrom<AccessToken> for Token {
     type Error = anyhow::Error;
 
-    fn try_from(value: auth::model::AccessToken) -> Result<Self, Self::Error> {
+    fn try_from(value: AccessToken) -> Result<Self, Self::Error> {
         match value {
             AccessToken::Session(value) => {
                 let expires_time = value
-                    .session
+                    .session_token
                     .clone()
                     .ok_or(anyhow::anyhow!("session is none"))?
                     .expires
@@ -72,7 +22,7 @@ impl TryFrom<auth::model::AccessToken> for AuthenticateToken {
                 Ok(Self {
                     access_token: value.access_token,
                     refresh_token: None,
-                    auth_session: value.session.map(|s| s.value),
+                    session_token: value.session_token.map(|s| s.value),
                     expires: expires_time
                         .duration_since(std::time::UNIX_EPOCH)?
                         .as_secs() as i64,
@@ -92,17 +42,17 @@ impl TryFrom<auth::model::AccessToken> for AuthenticateToken {
                     name: profile.name,
                     email: profile.email,
                     picture: profile.picture,
-                    auth_session: None,
+                    session_token: None,
                 })
             }
         }
     }
 }
 
-impl TryFrom<auth::model::RefreshToken> for AuthenticateToken {
+impl TryFrom<RefreshToken> for Token {
     type Error = anyhow::Error;
 
-    fn try_from(value: auth::model::RefreshToken) -> Result<Self, Self::Error> {
+    fn try_from(value: RefreshToken) -> Result<Self, Self::Error> {
         let profile = Profile::try_from(value.id_token)?;
         let expires = now_duration()?.as_secs() as i64 + value.expires_in;
         Ok(Self {
@@ -113,8 +63,55 @@ impl TryFrom<auth::model::RefreshToken> for AuthenticateToken {
             name: profile.name,
             email: profile.email,
             picture: profile.picture,
-            auth_session: None,
+            session_token: None,
         })
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Token {
+    access_token: String,
+    refresh_token: Option<String>,
+    session_token: Option<String>,
+    expires: i64,
+    user_id: String,
+    name: String,
+    email: String,
+    picture: String,
+}
+
+impl Token {
+    pub fn user_id(&self) -> &str {
+        &self.user_id
+    }
+
+    pub fn email(&self) -> &str {
+        &self.email
+    }
+
+    pub fn picture(&self) -> &str {
+        &self.picture
+    }
+
+    pub fn access_token(&self) -> &str {
+        &self.access_token
+    }
+
+    pub fn refresh_token(&self) -> Option<&str> {
+        self.refresh_token.as_deref()
+    }
+
+    pub fn session_token(&self) -> Option<&str> {
+        self.session_token.as_deref()
+    }
+
+    pub fn is_expired(&self) -> bool {
+        let duration = now_duration().expect("Time went backwards");
+        (duration.as_secs() as i64) > self.expires
+    }
+
+    pub fn expires(&self) -> i64 {
+        self.expires
     }
 }
 

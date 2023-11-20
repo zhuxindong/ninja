@@ -12,28 +12,25 @@ use serde_json::{json, Value};
 use crate::arkose::Type;
 use crate::{arkose, with_context};
 
-use super::error::ResponseError;
-use super::extract::RequestExtractor;
-use super::puid::{get_or_init_puid, reduce_cache_key};
+use super::ext::{RequestExt, ResponseExt, SendRequestExt};
 use super::resp::header_convert;
-use super::EMPTY;
-
-#[async_trait]
-pub(super) trait SendRequestExt {
-    async fn send_request(
-        &self,
-        origin: &'static str,
-        req: RequestExtractor,
-    ) -> Result<reqwest::Response, ResponseError>;
-}
+use super::toapi;
+use crate::serve::error::ResponseError;
+use crate::serve::puid::{get_or_init_puid, reduce_cache_key};
+use crate::serve::EMPTY;
 
 #[async_trait]
 impl SendRequestExt for reqwest::Client {
     async fn send_request(
         &self,
         origin: &'static str,
-        mut req: RequestExtractor,
-    ) -> Result<reqwest::Response, ResponseError> {
+        mut req: RequestExt,
+    ) -> Result<ResponseExt, ResponseError> {
+        // If to_api is true, then send request to api
+        if toapi::support(&req) {
+            return toapi::send_request(req).await;
+        }
+
         // Build rqeuest path and query
         let path_and_query = req
             .uri
@@ -58,7 +55,10 @@ impl SendRequestExt for reqwest::Client {
             builder = builder.body(body);
         }
         // Send request
-        Ok(builder.send().await?)
+        Ok(ResponseExt {
+            to_api: None,
+            inner: builder.send().await?,
+        })
     }
 }
 
@@ -85,7 +85,7 @@ fn extract_authorization<'a>(headers: &'a HeaderMap) -> Result<&'a str, Response
 }
 
 /// Handle conversation request
-async fn handle_conv_request(req: &mut RequestExtractor) -> Result<(), ResponseError> {
+async fn handle_conv_request(req: &mut RequestExt) -> Result<(), ResponseError> {
     // Only handle POST request
     if !(req.uri.path().eq("/backend-api/conversation") && req.method.eq(&Method::POST)) {
         return Ok(());
@@ -162,7 +162,7 @@ async fn handle_conv_request(req: &mut RequestExtractor) -> Result<(), ResponseE
 }
 
 /// Handle dashboard request
-async fn handle_dashboard_request(req: &mut RequestExtractor) -> Result<(), ResponseError> {
+async fn handle_dashboard_request(req: &mut RequestExt) -> Result<(), ResponseError> {
     // Only handle POST request
     if !(req.uri.path().eq("/dashboard/user/api_keys") && req.method.eq(&Method::POST)) {
         return Ok(());

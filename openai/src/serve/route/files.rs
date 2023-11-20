@@ -4,8 +4,8 @@ use http::header;
 use crate::{
     context::ContextArgs,
     serve::{
-        error::ResponseError, extract::RequestExtractor, req::SendRequestExt,
-        resp::response_convert,
+        error::ResponseError, proxy::ext::RequestExt, proxy::ext::SendRequestExt,
+        proxy::resp::response_convert,
     },
     with_context,
 };
@@ -19,7 +19,7 @@ pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
     }
 }
 
-async fn proxy(mut req: RequestExtractor) -> Result<impl IntoResponse, ResponseError> {
+async fn proxy(mut req: RequestExt) -> Result<impl IntoResponse, ResponseError> {
     req.trim_start_path("/files")?;
     req.append_haeder(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")?;
     let resp = with_context!(client)

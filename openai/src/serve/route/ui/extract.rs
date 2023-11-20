@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     auth::API_AUTH_SESSION_COOKIE_KEY,
     serve::{error::ResponseError, route::ui::LOGIN_INDEX, route::ui::SESSION_ID},
-    token::model::AuthenticateToken,
+    token::model::Token,
 };
 
 #[derive(Serialize, Deserialize)]
@@ -17,7 +17,7 @@ pub(super) struct Session {
     pub access_token: String,
     pub refresh_token: Option<String>,
     #[serde(skip_serializing)]
-    pub auth_session: Option<String>,
+    pub session_token: Option<String>,
     pub user_id: String,
     pub email: String,
     pub expires: i64,
@@ -42,15 +42,15 @@ impl FromStr for Session {
     }
 }
 
-impl From<AuthenticateToken> for Session {
-    fn from(value: AuthenticateToken) -> Self {
+impl From<Token> for Session {
+    fn from(value: Token) -> Self {
         Session {
             user_id: value.user_id().to_owned(),
             email: value.email().to_owned(),
-            access_token: value.access_token().to_owned(),
             expires: value.expires(),
+            access_token: value.access_token().to_owned(),
             refresh_token: value.refresh_token().map(|v| v.to_owned()),
-            auth_session: value.auth_session().map(|v| v.to_owned()),
+            session_token: value.session_token().map(|v| v.to_owned()),
         }
     }
 }
