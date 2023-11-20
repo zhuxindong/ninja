@@ -81,9 +81,9 @@ pub(crate) async fn response_convert(
         return Ok(toapi::response_convert(resp).await?.into_response());
     }
 
-    let status = resp.inner.status();
+    // Build new response
     let mut builder = Response::builder()
-        .status(status)
+        .status(resp.inner.status())
         .header("ninja-version", LIB_VERSION);
 
     // Copy headers except for "set-cookie"
