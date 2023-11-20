@@ -16,18 +16,18 @@ use crate::serve::error::ResponseError;
 
 /// Context extension.
 #[derive(TypedBuilder)]
-pub(super) struct ContextExt {
+pub(crate) struct ContextExt {
     // Enable stream
-    pub(super) stream: bool,
+    pub(crate) stream: bool,
     // Mapper model
-    pub(super) model: String,
+    pub(crate) model: String,
 }
 
 /// Response extension.
 #[derive(TypedBuilder)]
 pub(crate) struct ResponseExt {
     #[builder(setter(into), default)]
-    pub(super) context: Option<ContextExt>,
+    pub(crate) context: Option<ContextExt>,
     pub(crate) inner: reqwest::Response,
 }
 
