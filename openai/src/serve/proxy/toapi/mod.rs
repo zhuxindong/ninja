@@ -20,7 +20,7 @@ use crate::{
     },
     serve::{
         error::ResponseError,
-        puid::{get_or_init_puid, reduce_cache_key},
+        puid::{get_or_init, reduce_key},
     },
     with_context,
 };
@@ -33,26 +33,30 @@ use crate::{
     uuid::uuid,
 };
 
-use super::ext::{RequestExt, ResponseExt, ToApiExt};
+use super::ext::{ContextExt, RequestExt, ResponseExt};
 use crate::URL_CHATGPT_API;
 
+/// Check if the request is supported
 pub(super) fn support(req: &RequestExt) -> bool {
     if req.uri.path().eq("/v1/chat/completions") && req.method.eq(&http::Method::POST) {
-        if let Some(ref b) = req.baerer {
-            return !b.token().starts_with("sk-");
+        if let Some(ref b) = req.bearer_auth() {
+            return !b.starts_with("sk-");
         }
     }
     false
 }
 
+/// Send request to ChatGPT API
 pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, ResponseError> {
     // Exstract the token from the Authorization header
-    let baerer = req.baerer.ok_or(ResponseError::BadRequest(anyhow::anyhow!(
-        "baerer is empty"
-    )))?;
+    let baerer = req
+        .bearer_auth()
+        .ok_or(ResponseError::BadRequest(anyhow::anyhow!(
+            "Authorization header is required!"
+        )))?;
 
     // Exstract the token from the Authorization header
-    let cache_id = reduce_cache_key(baerer.token())?;
+    let cache_id = reduce_key(baerer)?;
 
     let body = req
         .body
@@ -83,7 +87,7 @@ pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, Respons
     }
 
     // OpenAI API to ChatGPT API model mapper
-    let (model, map_model, arkose_token) = model_mapper(&body.model).await?;
+    let (raw_model, mapper_model, arkose_token) = model_mapper(&body.model).await?;
 
     // Create request
     let parent_message_id = uuid();
@@ -91,7 +95,7 @@ pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, Respons
         .action(Action::Next)
         .parent_message_id(&parent_message_id)
         .messages(messages)
-        .model(model)
+        .model(raw_model)
         .history_and_training_disabled(true)
         .force_paragen(false)
         .force_rate_limit(false)
@@ -101,14 +105,12 @@ pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, Respons
         .arkose_token(&arkose_token)
         .build();
 
-    let client = with_context!(client);
-
     // Try to get puid from cache
-    let puid = get_or_init_puid(baerer.token(), &body.model, cache_id).await?;
+    let puid = get_or_init(baerer, &body.model, cache_id).await?;
 
-    let mut builder = client
+    let mut builder = with_context!(client)
         .post(format!("{URL_CHATGPT_API}/backend-api/conversation"))
-        .bearer_auth(baerer.token());
+        .bearer_auth(baerer);
 
     if let Some(puid) = puid {
         builder = builder.header(header::COOKIE, format!("_puid={puid};"))
@@ -120,15 +122,18 @@ pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, Respons
         .send()
         .await
         .map_err(ResponseError::InternalServerError)?;
-    Ok(ResponseExt {
-        to_api: Some(ToApiExt {
-            model: map_model.to_owned(),
-            stream: body.stream,
-        }),
-        inner: resp,
-    })
+    Ok(ResponseExt::builder()
+        .inner(resp)
+        .context(
+            ContextExt::builder()
+                .model(mapper_model.to_owned())
+                .stream(body.stream)
+                .build(),
+        )
+        .build())
 }
 
+/// Convert response to ChatGPT API
 pub(super) async fn response_convert(
     resp_ext: ResponseExt,
 ) -> Result<impl IntoResponse, ResponseError> {
@@ -136,7 +141,7 @@ pub(super) async fn response_convert(
         Ok(resp) => {
             let config =
                 resp_ext
-                    .to_api
+                    .context
                     .ok_or(ResponseError::InternalServerError(anyhow::anyhow!(
                         "to_api is empty"
                     )))?;

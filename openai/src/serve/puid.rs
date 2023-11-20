@@ -8,7 +8,7 @@ use tokio::sync::OnceCell;
 
 static PUID_CACHE: OnceCell<Cache<String, String>> = OnceCell::const_new();
 
-pub(super) fn reduce_cache_key(token: &str) -> Result<String, ResponseError> {
+pub(super) fn reduce_key(token: &str) -> Result<String, ResponseError> {
     let token_profile = crate::token::check(token)
         .map_err(ResponseError::Unauthorized)?
         .ok_or(ResponseError::BadRequest(anyhow::anyhow!(
@@ -27,7 +27,7 @@ async fn cache() -> &'static Cache<String, String> {
         .await
 }
 
-pub(super) async fn get_or_init_puid(
+pub(super) async fn get_or_init(
     token: &str,
     model: &str,
     cache_id: String,

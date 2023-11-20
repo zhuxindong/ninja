@@ -77,7 +77,7 @@ pub(crate) async fn response_convert(
     resp: ResponseExt,
 ) -> Result<impl IntoResponse, ResponseError> {
     // If to api is some, then convert to api response
-    if resp.to_api.is_some() {
+    if resp.context.is_some() {
         return Ok(toapi::response_convert(resp).await?.into_response());
     }
 

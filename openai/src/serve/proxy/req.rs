@@ -16,7 +16,7 @@ use super::ext::{RequestExt, ResponseExt, SendRequestExt};
 use super::resp::header_convert;
 use super::toapi;
 use crate::serve::error::ResponseError;
-use crate::serve::puid::{get_or_init_puid, reduce_cache_key};
+use crate::serve::puid::{get_or_init, reduce_key};
 use crate::serve::EMPTY;
 
 #[async_trait]
@@ -54,11 +54,9 @@ impl SendRequestExt for reqwest::Client {
         if let Some(body) = req.body {
             builder = builder.body(body);
         }
+
         // Send request
-        Ok(ResponseExt {
-            to_api: None,
-            inner: builder.send().await?,
-        })
+        Ok(ResponseExt::builder().inner(builder.send().await?).build())
     }
 }
 
@@ -119,10 +117,10 @@ async fn handle_conv_request(req: &mut RequestExt) -> Result<(), ResponseError> 
         let token = extract_authorization(&req.headers)?;
 
         // Exstract the token from the Authorization header
-        let cache_id = reduce_cache_key(token)?;
+        let cache_id = reduce_key(token)?;
 
         // Get or init puid
-        let puid = get_or_init_puid(token, model, cache_id).await?;
+        let puid = get_or_init(token, model, cache_id).await?;
 
         if let Some(puid) = puid {
             req.headers.insert(

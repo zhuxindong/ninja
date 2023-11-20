@@ -1,11 +1,7 @@
 use std::str::FromStr;
 
 use axum::body::Bytes;
-use axum::extract::FromRequestParts;
-use axum::headers::authorization::Bearer;
-use axum::headers::Authorization;
 use axum::response::{IntoResponse, Response};
-use axum::TypedHeader;
 use axum::{
     async_trait,
     extract::FromRequest,
@@ -14,19 +10,24 @@ use axum::{
 use axum_extra::extract::CookieJar;
 use http::header::CONTENT_TYPE;
 use http::{header, Uri};
+use typed_builder::TypedBuilder;
 
 use crate::serve::error::ResponseError;
 
-/// ChatGPT To API extension.
-pub(super) struct ToApiExt {
+/// Context extension.
+#[derive(TypedBuilder)]
+pub(super) struct ContextExt {
     // Enable stream
     pub(super) stream: bool,
     // Mapper model
     pub(super) model: String,
 }
 
+/// Response extension.
+#[derive(TypedBuilder)]
 pub(crate) struct ResponseExt {
-    pub(super) to_api: Option<ToApiExt>,
+    #[builder(setter(into), default)]
+    pub(super) context: Option<ContextExt>,
     pub(crate) inner: reqwest::Response,
 }
 
@@ -35,12 +36,12 @@ pub(crate) struct RequestExt {
     pub(crate) uri: Uri,
     pub(crate) method: http::Method,
     pub(crate) headers: http::HeaderMap,
-    pub(crate) baerer: Option<TypedHeader<Authorization<Bearer>>>,
     pub(crate) jar: CookieJar,
     pub(crate) body: Option<Bytes>,
 }
 
 impl RequestExt {
+    /// Trim start path.
     pub(crate) fn trim_start_path(&mut self, path: &str) -> Result<(), ResponseError> {
         let path_and_query = self
             .uri
@@ -52,6 +53,7 @@ impl RequestExt {
         Ok(())
     }
 
+    /// Append header.
     pub(crate) fn append_haeder(
         &mut self,
         name: header::HeaderName,
@@ -62,6 +64,25 @@ impl RequestExt {
             header::HeaderValue::from_str(value).map_err(ResponseError::BadRequest)?,
         );
         Ok(())
+    }
+
+    /// Get bearer auth.
+    pub(crate) fn bearer_auth(&self) -> Option<&str> {
+        let mut value = self.headers.get_all(header::AUTHORIZATION).iter();
+        let is_missing = value.size_hint() == (0, Some(0));
+        if is_missing {
+            return None;
+        }
+
+        value.find_map(|v| {
+            v.to_str().ok().and_then(|s| {
+                let parts: Vec<&str> = s.split_whitespace().collect();
+                match parts.as_slice() {
+                    ["Bearer", token] => Some(*token),
+                    _ => None,
+                }
+            })
+        })
     }
 }
 
@@ -84,16 +105,7 @@ where
     type Rejection = Response;
 
     async fn from_request(req: Request<B>, state: &S) -> Result<Self, Self::Rejection> {
-        let (mut parts, body) = req.into_parts();
-
-        // Extract the baerer token from the request.
-        let baerer = match TypedHeader::from_request_parts(&mut parts, state)
-            .await
-            .map(|baerer: TypedHeader<Authorization<Bearer>>| baerer)
-        {
-            Ok(ok) => Some(ok),
-            Err(_) => None,
-        };
+        let (parts, body) = req.into_parts();
 
         let body = if parts
             .headers
@@ -125,7 +137,6 @@ where
             jar: CookieJar::from_headers(&parts.headers),
             method: parts.method,
             headers: parts.headers,
-            baerer,
             body,
         })
     }
