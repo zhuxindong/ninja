@@ -1,5 +1,7 @@
 mod model;
 
+use axum::http::header;
+use axum::http::Method;
 use axum::{
     response::{sse::Event, IntoResponse, Sse},
     Json,
@@ -7,7 +9,6 @@ use axum::{
 use eventsource_stream::{EventStream, Eventsource};
 use futures::StreamExt;
 use futures_core::Stream;
-use http::header;
 use reqwest::StatusCode;
 use serde_json::Value;
 use std::{convert::Infallible, str::FromStr};
@@ -38,7 +39,7 @@ use crate::URL_CHATGPT_API;
 
 /// Check if the request is supported
 pub(super) fn support(req: &RequestExt) -> bool {
-    if req.uri.path().eq("/v1/chat/completions") && req.method.eq(&http::Method::POST) {
+    if req.uri.path().eq("/v1/chat/completions") && req.method.eq(&Method::POST) {
         if let Some(ref b) = req.bearer_auth() {
             return !b.starts_with("sk-");
         }

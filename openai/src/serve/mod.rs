@@ -1,7 +1,7 @@
 mod error;
 mod middleware;
 #[cfg(feature = "preauth")]
-pub mod preauth;
+mod preauth;
 mod proxy;
 mod puid;
 #[cfg(feature = "template")]
@@ -14,11 +14,11 @@ use axum::body::Body;
 use axum::headers::authorization::Bearer;
 use axum::headers::Authorization;
 use axum::http::Response;
+use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{any, get, post};
 use axum::{Json, TypedHeader};
 use axum_server::{AddrIncomingConfig, Handle};
-use http::StatusCode;
 
 use self::proxy::ext::RequestExt;
 use self::proxy::ext::SendRequestExt;
@@ -189,16 +189,17 @@ impl Serve {
             // PreAuth mitm proxy
             #[cfg(feature = "preauth")]
             if let Some(pbind) = self.0.pbind.clone() {
-                if let Some(err) = preauth::mitm_proxy(
-                    pbind,
-                    self.0.pupstream.clone(),
-                    self.0.pcert.clone(),
-                    self.0.pkey.clone(),
-                    rx,
-                )
-                .await
-                .err()
-                {
+                let builder = mitm::Builder::builder()
+                    .bind(pbind)
+                    .upstream_proxy(self.0.pupstream.clone())
+                    .cert(self.0.pcert.clone())
+                    .key(self.0.pkey.clone())
+                    .graceful_shutdown(rx)
+                    .cerificate_cache_size(1_000)
+                    .mitm_filters(vec![String::from("ios.chat.openai.com")])
+                    .handler(preauth::PreAuthHanlder)
+                    .build();
+                if let Some(err) = builder.mitm_proxy().await.err() {
                     crate::error!("PreAuth proxy error: {}", err);
                 }
             }

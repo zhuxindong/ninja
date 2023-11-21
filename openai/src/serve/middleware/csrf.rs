@@ -1,3 +1,4 @@
+use axum::http::{Method, Request, StatusCode};
 use axum::{
     body::{self, BoxBody, Full},
     middleware::Next,
@@ -5,7 +6,7 @@ use axum::{
     Form,
 };
 use axum_csrf::CsrfToken;
-use http::{Method, Request, StatusCode};
+use mitm::proxy::hyper;
 
 use crate::{auth::model::AuthAccount, warn};
 
