@@ -1,3 +1,4 @@
+mod cookier;
 mod extract;
 
 use anyhow::anyhow;
@@ -23,7 +24,6 @@ use axum_csrf::CsrfConfig;
 use axum_csrf::CsrfLayer;
 use axum_csrf::CsrfToken;
 use axum_csrf::Key;
-use axum_extra::extract::cookie;
 use axum_extra::extract::CookieJar;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -33,7 +33,6 @@ use time::format_description::well_known::Rfc3339;
 use tower::ServiceBuilder;
 use tower_http::ServiceBuilderExt;
 
-use crate::auth::model::AccessToken;
 use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
 use crate::context::ContextArgs;
 use crate::debug;
@@ -44,7 +43,6 @@ use crate::serve::error::ResponseError;
 use crate::serve::proxy::resp::header_convert;
 use crate::serve::route::ui::extract::SessionExtractor;
 use crate::serve::turnstile;
-use crate::serve::EMPTY;
 use crate::with_context;
 use crate::{
     auth::{model::AuthAccount, provide::AuthProvider},
@@ -187,6 +185,7 @@ async fn get_login(token: CsrfToken) -> Result<impl IntoResponse, ResponseError>
     Ok((token, tm))
 }
 
+/// Login from username and password
 async fn post_login(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     token: CsrfToken,
@@ -200,32 +199,20 @@ async fn post_login(
                 Token::try_from(access_token).map_err(ResponseError::InternalServerError)?;
             let session = Session::from(authentication_token);
 
-            let cookie = cookie::Cookie::build(SESSION_ID, session.to_string())
-                .path(DEFAULT_INDEX)
-                .same_site(cookie::SameSite::Lax)
-                .expires(time::OffsetDateTime::from_unix_timestamp(session.expires)?)
-                .secure(false)
-                .http_only(false)
-                .finish();
+            let cookie = cookier::build_cookie(SESSION_ID, session.to_string(), session.expires)?;
 
             let mut builder = Response::builder()
                 .status(StatusCode::SEE_OTHER)
-                .header(header::LOCATION, DEFAULT_INDEX);
+                .header(header::LOCATION, DEFAULT_INDEX)
+                .header(header::SET_COOKIE, cookie.to_string());
 
             if let Some(value) = session.session_token {
-                let session_cookie = cookie::Cookie::build(API_AUTH_SESSION_COOKIE_KEY, value)
-                    .path(DEFAULT_INDEX)
-                    .same_site(cookie::SameSite::Lax)
-                    .expires(time::OffsetDateTime::from_unix_timestamp(session.expires)?)
-                    .secure(true)
-                    .http_only(false)
-                    .finish();
-
+                let session_cookie =
+                    cookier::build_cookie(API_AUTH_SESSION_COOKIE_KEY, value, session.expires)?;
                 builder = builder.header(header::SET_COOKIE, session_cookie.to_string())
             }
 
             Ok(builder
-                .header(header::SET_COOKIE, cookie.to_string())
                 .body(Body::empty())
                 .map_err(ResponseError::InternalServerError)?
                 .into_response())
@@ -241,44 +228,68 @@ async fn post_login(
     }
 }
 
+/// Login from access token / refresh token / session token
 async fn post_login_token(
     TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
-) -> Result<Response<Body>, ResponseError> {
+) -> Result<impl IntoResponse, ResponseError> {
     let access_token = bearer.token();
 
     if access_token.is_empty() {
         return Err(ResponseError::TempporaryRedirect(LOGIN_INDEX));
     }
 
-    let profile = crate::token::check(bearer.token())
-        .map_err(ResponseError::Unauthorized)?
-        .ok_or(ResponseError::InternalServerError(anyhow!(
-            "Get Profile Erorr"
-        )))?;
+    let mut builder = Response::builder()
+        .status(StatusCode::OK)
+        .header(header::LOCATION, DEFAULT_INDEX);
 
-    let session = Session {
-        access_token: access_token.to_owned(),
-        user_id: profile.user_id().to_owned(),
-        email: profile.email().to_owned(),
-        expires: profile.expires(),
-        refresh_token: None,
-        session_token: None,
+    // Check input token type
+    let session = match access_token {
+        s if s.split('.').count() == 3 => {
+            let token_prefile = crate::token::check(s)
+                .map_err(ResponseError::Unauthorized)?
+                .ok_or(ResponseError::InternalServerError(anyhow!(
+                    "get access token profile error"
+                )))?;
+            Session::from((s, token_prefile))
+        }
+        s if s.len() > 40 && s.len() < 100 => {
+            let refresh_token = with_context!(auth_client)
+                .do_refresh_token(access_token)
+                .await
+                .map_err(ResponseError::BadRequest)?;
+            let authentication_token =
+                Token::try_from(refresh_token).map_err(ResponseError::InternalServerError)?;
+            Session::from(authentication_token)
+        }
+        _ => {
+            let access_token = with_context!(auth_client)
+                .do_session(access_token)
+                .await
+                .map_err(ResponseError::BadRequest)?;
+            let authentication_token =
+                Token::try_from(access_token).map_err(ResponseError::InternalServerError)?;
+            Session::from(authentication_token)
+        }
     };
 
-    let cookie = cookie::Cookie::build(SESSION_ID, session.to_string())
-        .path(DEFAULT_INDEX)
-        .same_site(cookie::SameSite::Lax)
-        .expires(time::OffsetDateTime::from_unix_timestamp(session.expires)?)
-        .secure(false)
-        .http_only(false)
-        .finish();
+    // Consider using secure(true) based on your security requirements
+    let cookie = cookier::build_cookie(SESSION_ID, session.to_string(), session.expires)?;
 
-    return Ok(Response::builder()
-        .status(StatusCode::OK)
-        .header(header::LOCATION, DEFAULT_INDEX)
-        .header(header::SET_COOKIE, cookie.to_string())
+    // Set session cookie
+    builder = builder.header(header::SET_COOKIE, cookie.to_string());
+
+    // If the session not empty, then set session token
+    if let Some(value) = session.session_token {
+        let session_cookie =
+            cookier::build_cookie(API_AUTH_SESSION_COOKIE_KEY, value, session.expires)?;
+        builder = builder.header(header::SET_COOKIE, session_cookie.to_string())
+    }
+
+    let response = builder
         .body(Body::empty())
-        .map_err(ResponseError::InternalServerError)?);
+        .map_err(ResponseError::InternalServerError)?;
+
+    Ok(response)
 }
 
 async fn get_logout(extract: SessionExtractor) -> Result<Response<Body>, ResponseError> {
@@ -294,22 +305,10 @@ async fn get_logout(extract: SessionExtractor) -> Result<Response<Body>, Respons
     }
 
     // Clear session
-    let session_cookie = cookie::Cookie::build(SESSION_ID, EMPTY)
-        .path(DEFAULT_INDEX)
-        .same_site(cookie::SameSite::Lax)
-        .max_age(time::Duration::seconds(0))
-        .secure(false)
-        .http_only(false)
-        .finish();
+    let session_cookie = cookier::clear_cookie(SESSION_ID);
 
     // Clear puid
-    let puid_cookie = cookie::Cookie::build(PUID_ID, EMPTY)
-        .path(DEFAULT_INDEX)
-        .same_site(cookie::SameSite::Lax)
-        .max_age(time::Duration::seconds(0))
-        .secure(false)
-        .http_only(false)
-        .finish();
+    let puid_cookie = cookier::clear_cookie(PUID_ID);
 
     // Redirect to login page
     Ok(Response::builder()
@@ -333,9 +332,8 @@ async fn get_session(extract: SessionExtractor) -> Result<Response<Body>, Respon
         let ctx = with_context!();
         let new_session = if let Some(c) = extract.session_token {
             match ctx.auth_client().do_session(&c).await {
-                Ok(session_token) => {
-                    let authentication_token =
-                        Token::try_from(AccessToken::Session(session_token))?;
+                Ok(access_token) => {
+                    let authentication_token = Token::try_from(access_token)?;
                     Some(Session::from(authentication_token))
                 }
                 Err(err) => {

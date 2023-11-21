@@ -253,18 +253,22 @@ impl Serve {
 
 /// GET /api/auth/session
 async fn get_session(jar: CookieJar) -> Result<impl IntoResponse, ResponseError> {
-    match jar.get(API_AUTH_SESSION_COOKIE_KEY) {
-        Some(session) => {
-            let session_token = with_context!(auth_client)
-                .do_session(session.value())
-                .await
-                .map_err(ResponseError::BadRequest)?;
+    let session = jar.get(API_AUTH_SESSION_COOKIE_KEY).ok_or_else(|| {
+        ResponseError::Unauthorized(anyhow!("Session: {API_AUTH_SESSION_COOKIE_KEY} required!"))
+    })?;
 
+    let session_token = with_context!(auth_client)
+        .do_session(session.value())
+        .await
+        .map_err(ResponseError::BadRequest)?;
+
+    match session_token {
+        AccessToken::Session(session_token) => {
             let resp: Response<Body> = session_token.try_into()?;
             Ok(resp.into_response())
         }
-        None => Err(ResponseError::Unauthorized(anyhow!(
-            "Session: {API_AUTH_SESSION_COOKIE_KEY} required!"
+        _ => Err(ResponseError::InternalServerError(anyhow!(
+            "Session error!"
         ))),
     }
 }
@@ -274,11 +278,12 @@ async fn post_access_token(
     bearer: Option<TypedHeader<Authorization<Bearer>>>,
     account: axum::Form<AuthAccount>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    if let Some(key) = with_context!(auth_key) {
-        let bearer = bearer.ok_or(ResponseError::Unauthorized(anyhow!(
-            "Login Authentication Key required!"
-        )))?;
-        if bearer.token().ne(key) {
+    let key = with_context!(auth_key).ok_or(ResponseError::Unauthorized(anyhow!(
+        "Login Authentication Key required!"
+    )))?;
+
+    if let Some(bearer_token) = bearer {
+        if key.ne(&bearer_token.token()) {
             return Err(ResponseError::Unauthorized(anyhow!(
                 "Authentication Key error!"
             )));

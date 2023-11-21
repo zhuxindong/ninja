@@ -6,6 +6,7 @@ use axum_extra::extract::CookieJar;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 
+use crate::token::TokenProfile;
 use crate::{
     auth::API_AUTH_SESSION_COOKIE_KEY,
     serve::{error::ResponseError, route::ui::LOGIN_INDEX, route::ui::SESSION_ID},
@@ -51,6 +52,19 @@ impl From<Token> for Session {
             access_token: value.access_token().to_owned(),
             refresh_token: value.refresh_token().map(|v| v.to_owned()),
             session_token: value.session_token().map(|v| v.to_owned()),
+        }
+    }
+}
+
+impl From<(&str, TokenProfile)> for Session {
+    fn from(value: (&str, TokenProfile)) -> Self {
+        Session {
+            user_id: value.1.user_id().to_owned(),
+            email: value.1.email().to_owned(),
+            expires: value.1.expires(),
+            access_token: value.0.to_owned(),
+            refresh_token: None,
+            session_token: None,
         }
     }
 }

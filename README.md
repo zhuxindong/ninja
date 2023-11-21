@@ -67,8 +67,8 @@ Sending `GPT-4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` 
   - `/dashboard/*`
 
 - ChatGPT-To-API
-  - `/to/v1/chat/completions`
-  > About using `ChatGPT` to `API`, use `AceessToken` directly as `API Key`, interface path: `/to/v1/chat/completions`
+  - `/v1/chat/completions`
+  > About using `ChatGPT` to `API`, use `AceessToken` directly as `API Key`
 
 - Files-API
   - `/files/*`
