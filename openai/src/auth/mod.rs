@@ -51,7 +51,7 @@ pub struct AuthClient {
 }
 
 impl AuthClient {
-    pub async fn do_session(&self, session: &str) -> AuthResult<model::SessionAccessToken> {
+    pub async fn do_session(&self, session: &str) -> AuthResult<model::AccessToken> {
         let resp = self
             .inner
             .get(format!("{URL_CHATGPT_API}/api/auth/session"))
@@ -75,7 +75,7 @@ impl AuthClient {
 
         let mut session_access_token = resp.json::<model::SessionAccessToken>().await?;
         session_access_token.session_token = Some(session);
-        Ok(session_access_token)
+        Ok(model::AccessToken::Session(session_access_token))
     }
 
     pub async fn do_dashboard_login(&self, access_token: &str) -> AuthResult<model::DashSession> {

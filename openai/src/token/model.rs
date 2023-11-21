@@ -6,68 +6,6 @@ use base64::{engine::general_purpose, Engine};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-impl TryFrom<AccessToken> for Token {
-    type Error = anyhow::Error;
-
-    fn try_from(value: AccessToken) -> Result<Self, Self::Error> {
-        match value {
-            AccessToken::Session(value) => {
-                let expires_time = value
-                    .session_token
-                    .clone()
-                    .ok_or(anyhow::anyhow!("session is none"))?
-                    .expires
-                    .ok_or(anyhow::anyhow!("session expires is none"))?;
-
-                Ok(Self {
-                    access_token: value.access_token,
-                    refresh_token: None,
-                    session_token: value.session_token.map(|s| s.value),
-                    expires: expires_time
-                        .duration_since(std::time::UNIX_EPOCH)?
-                        .as_secs() as i64,
-                    user_id: value.user.id,
-                    name: value.user.name,
-                    email: value.user.email,
-                    picture: value.user.picture,
-                })
-            }
-            AccessToken::OAuth(value) => {
-                let profile = Profile::try_from(value.id_token)?;
-                Ok(Self {
-                    access_token: value.access_token,
-                    refresh_token: Some(value.refresh_token),
-                    expires: profile.exp,
-                    user_id: profile.https_api_openai_com_auth.user_id,
-                    name: profile.name,
-                    email: profile.email,
-                    picture: profile.picture,
-                    session_token: None,
-                })
-            }
-        }
-    }
-}
-
-impl TryFrom<RefreshToken> for Token {
-    type Error = anyhow::Error;
-
-    fn try_from(value: RefreshToken) -> Result<Self, Self::Error> {
-        let profile = Profile::try_from(value.id_token)?;
-        let expires = now_duration()?.as_secs() as i64 + value.expires_in;
-        Ok(Self {
-            access_token: value.access_token,
-            refresh_token: Some(value.refresh_token),
-            expires,
-            user_id: profile.https_api_openai_com_auth.user_id,
-            name: profile.name,
-            email: profile.email,
-            picture: profile.picture,
-            session_token: None,
-        })
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Token {
     access_token: String,
@@ -135,6 +73,21 @@ struct Profile {
     auth_time: i64,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+struct HttpsApiOpenaiComAuth {
+    groups: Vec<Value>,
+    organizations: Vec<Organization>,
+    user_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct Organization {
+    id: String,
+    is_default: bool,
+    role: String,
+    title: String,
+}
+
 impl TryFrom<String> for Profile {
     type Error = anyhow::Error;
 
@@ -150,17 +103,64 @@ impl TryFrom<String> for Profile {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-struct HttpsApiOpenaiComAuth {
-    groups: Vec<Value>,
-    organizations: Vec<Organization>,
-    user_id: String,
+impl TryFrom<AccessToken> for Token {
+    type Error = anyhow::Error;
+
+    fn try_from(value: AccessToken) -> Result<Self, Self::Error> {
+        match value {
+            AccessToken::Session(value) => {
+                let expires_time = value
+                    .session_token
+                    .clone()
+                    .ok_or(anyhow::anyhow!("session is none"))?
+                    .expires
+                    .ok_or(anyhow::anyhow!("session expires is none"))?;
+
+                Ok(Self {
+                    access_token: value.access_token,
+                    refresh_token: None,
+                    session_token: value.session_token.map(|s| s.value),
+                    expires: expires_time
+                        .duration_since(std::time::UNIX_EPOCH)?
+                        .as_secs() as i64,
+                    user_id: value.user.id,
+                    name: value.user.name,
+                    email: value.user.email,
+                    picture: value.user.picture,
+                })
+            }
+            AccessToken::OAuth(value) => {
+                let profile = Profile::try_from(value.id_token)?;
+                Ok(Self {
+                    access_token: value.access_token,
+                    refresh_token: Some(value.refresh_token),
+                    expires: profile.exp,
+                    user_id: profile.https_api_openai_com_auth.user_id,
+                    name: profile.name,
+                    email: profile.email,
+                    picture: profile.picture,
+                    session_token: None,
+                })
+            }
+        }
+    }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct Organization {
-    id: String,
-    is_default: bool,
-    role: String,
-    title: String,
+impl TryFrom<RefreshToken> for Token {
+    type Error = anyhow::Error;
+
+    fn try_from(value: RefreshToken) -> Result<Self, Self::Error> {
+        let profile = Profile::try_from(value.id_token)?;
+        let expires = now_duration()?.as_secs() as i64 + value.expires_in;
+        Ok(Self {
+            access_token: value.access_token,
+            refresh_token: Some(value.refresh_token),
+            expires,
+            user_id: profile.https_api_openai_com_auth.user_id,
+            name: profile.name,
+            email: profile.email,
+            picture: profile.picture,
+            session_token: None,
+        })
+    }
 }
