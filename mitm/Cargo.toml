@@ -1,0 +1,29 @@
+[package]
+name = "mitm"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+log = "0.4.20"
+anyhow = "1.0.75"
+thiserror = "1.0.48"
+async-trait = "0.1.73"
+reqwest = { package = "reqwest-impersonate", version ="0.11.30", default-features = false, features = [
+    "boring-tls", "impersonate", "stream", "socks"
+] }
+typed-builder = "0.18.0"
+time = "0.3.30"
+rand = "0.8.5"
+moka = { version = "0.12.1", default-features = false, features = ["sync"] }
+tokio = { version = "1.15.0", default-features = false }
+rcgen = { version = "0.10", features = ["x509-parser"] }
+hyper = { version = "0.14.27", default-features = false }
+tokio-rustls = { version = "0.24.1", default-features = false, features = ["tls12"] }
+rustls = { version = "0.21.8", features = ["dangerous_configuration"] }
+wildmatch = "2.1"
+http = "0.2.11"
+pin-project = "1"
+byteorder = "1.4"
+rustls-pemfile = "1.0"

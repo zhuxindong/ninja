@@ -1,5 +1,5 @@
 use http::{response::Builder, Request, Response};
-use hyper::Body;
+use hyper::{body, Body};
 use reqwest::impersonate::Impersonate;
 
 use super::error::Error;
@@ -33,7 +33,7 @@ impl HttpClient {
             .request(method, url)
             .headers(parts.headers)
             .version(parts.version)
-            .body(hyper::body::to_bytes(body).await?)
+            .body(body::to_bytes(body).await?)
             .send()
             .await?;
 
@@ -46,6 +46,6 @@ impl HttpClient {
             .headers_mut()
             .map(|h| h.extend(resp.headers().clone()));
 
-        Ok(builder.body(hyper::body::Body::wrap_stream(resp.bytes_stream()))?)
+        Ok(builder.body(body::Body::wrap_stream(resp.bytes_stream()))?)
     }
 }

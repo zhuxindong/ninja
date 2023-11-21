@@ -29,10 +29,4 @@ uploads
 ./vendor
 upgrade
 ca
-chat3.openai.com.har
-chat4.openai.com.har
-platform.openai.com.har
-login.chat.openai.com.har
-4.har
-auth0.openai.com_Archive.har
-auth0.openai.com.har
+*.har

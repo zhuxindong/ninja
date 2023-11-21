@@ -305,8 +305,8 @@ fn check_file_extension(file: &PathBuf) -> Result<(), Html<String>> {
 }
 
 use axum::headers::{Header, HeaderName, HeaderValue};
+use axum::http::header;
 use axum_extra::extract::CookieJar;
-use http::header;
 
 struct PlatformType(arkose::Type);
 

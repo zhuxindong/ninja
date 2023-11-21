@@ -1,9 +1,9 @@
 use std::str::FromStr;
 
+use axum::http::{HeaderMap, Request};
 use axum::{async_trait, extract::FromRequest};
 use axum_extra::extract::CookieJar;
 use base64::Engine;
-use http::{HeaderMap, Request};
 use serde::{Deserialize, Serialize};
 
 use crate::{

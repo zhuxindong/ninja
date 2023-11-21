@@ -1,8 +1,9 @@
+use log::error;
 use rcgen::Certificate;
 
-use crate::{error, serve::preauth::proxy::CertificateAuthority};
-
 use std::fs;
+
+use crate::proxy::CertificateAuthority;
 
 pub fn gen_ca() -> Certificate {
     let cert = CertificateAuthority::gen_ca().expect("preauth generate cert");
