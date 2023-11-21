@@ -67,7 +67,7 @@
   - `/dashboard/*`
   
 - ChatGPT-To-API
-  - `/to/v1/chat/completions`
+  - `/v1/chat/completions`
   > 关于`ChatGPT`转`API`使用方法，`AceessToken`当`API Key`使用
 
 - Files-API
