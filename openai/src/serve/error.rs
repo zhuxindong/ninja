@@ -5,6 +5,22 @@ use axum::response::Response;
 use axum::Json;
 use serde_json::json;
 
+#[derive(thiserror::Error, Debug)]
+pub enum ProxyError {
+    #[error("Session not found")]
+    SessionNotFound,
+    #[error("Authentication Key error")]
+    AuthKeyError,
+    #[error("AccessToken required")]
+    AccessTokenRequired,
+    #[error("Model required")]
+    ModelRequired,
+    #[error("Body required")]
+    BodyRequired,
+    #[error("Body must be a json object")]
+    BodyMustBeJsonObject,
+}
+
 // Make our own error that wraps `anyhow::Error`.
 pub struct ResponseError {
     msg: Option<String>,

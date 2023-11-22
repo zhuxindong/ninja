@@ -21,7 +21,7 @@ pub struct Builder<T: HttpHandler + Clone> {
 }
 
 impl<T: HttpHandler + Clone> Builder<T> {
-    pub async fn mitm_proxy(self) -> anyhow::Result<()> {
+    pub async fn proxy(self) -> anyhow::Result<()> {
         info!("PreAuth CA Private key use: {}", self.key.display());
         let private_key_bytes =
             fs::read(self.key).context("ca private key file path not valid!")?;

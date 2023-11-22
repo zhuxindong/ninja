@@ -1,21 +1,18 @@
-use crate::{
-    auth::{
-        model::{self, AuthStrategy},
-        provide::AuthenticateData,
-        AuthClient, API_AUTH_SESSION_COOKIE_KEY, OPENAI_OAUTH_URL,
-    },
-    error::AuthError,
+use super::{
+    AuthProvider, AuthResult, AuthenticateMfaData, GetAuthorizedUrlData, IdentifierData,
+    RequestContext, RequestContextExt,
+};
+use crate::auth::error::AuthError;
+use crate::auth::{
+    model::{self, AuthStrategy},
+    provide::AuthenticateData,
+    AuthClient, API_AUTH_SESSION_COOKIE_KEY, OPENAI_OAUTH_URL,
 };
 use crate::{debug, warn, URL_CHATGPT_API};
 use anyhow::{bail, Context};
 use reqwest::{Client, StatusCode};
 use serde_json::Value;
 use url::Url;
-
-use super::{
-    AuthProvider, AuthResult, AuthenticateMfaData, GetAuthorizedUrlData, IdentifierData,
-    RequestContext, RequestContextExt,
-};
 
 pub(crate) struct WebAuthProvider {
     inner: Client,

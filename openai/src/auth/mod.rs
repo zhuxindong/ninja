@@ -1,3 +1,4 @@
+mod error;
 pub mod model;
 pub mod provide;
 
@@ -21,9 +22,9 @@ use reqwest::{Client, Proxy, StatusCode, Url};
 use sha2::{Digest, Sha256};
 use tokio::sync::OnceCell;
 
-use crate::error::AuthError;
 use crate::URL_CHATGPT_API;
 use crate::{debug, random_impersonate};
+use error::AuthError;
 
 use self::model::{ApiKeyData, AuthStrategy};
 #[cfg(feature = "preauth")]

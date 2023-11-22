@@ -8,8 +8,6 @@ pub enum AuthError {
     Unauthorized(String),
     #[error("Server error ({0:?})")]
     ServerError(String),
-    #[error("failed to get public key")]
-    FailedPubKeyRequest,
     #[error("failed login")]
     FailedLogin,
     #[error(transparent)]
@@ -42,14 +40,10 @@ pub enum AuthError {
     InvalidEmail,
     #[error("invalid Location")]
     InvalidLocation,
-    #[error("invalid access token")]
-    InvalidAccessToken,
     #[error("invalid refresh token")]
     InvalidRefreshToken,
     #[error("invalid location path")]
     InvalidLocationPath,
-    #[error("token expired")]
-    TokenExpired,
     #[error("MFA failed")]
     MFAFailed,
     #[error("MFA required")]
@@ -60,18 +54,4 @@ pub enum AuthError {
     NotSupportedImplementation,
     #[error("failed to get preauth cookie")]
     PreauthCookieNotFound,
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum TokenStoreError {
-    #[error("failed to access token")]
-    AccessError,
-    #[error("token not found error")]
-    NotFoundError,
-    #[error("failed token deserialize")]
-    DeserializeError(#[from] serde_json::error::Error),
-    #[error("failed to verify access_token")]
-    AccessTokenVerifyError,
-    #[error("failed to create default token store file")]
-    CreateDefaultTokenFileError,
 }

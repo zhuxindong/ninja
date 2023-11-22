@@ -1,11 +1,9 @@
+use crate::auth::error::AuthError;
 use crate::auth::provide::{AuthenticateData, GrantType};
 use crate::auth::AuthClient;
-use crate::{
-    auth::{
-        model::{self, AuthStrategy},
-        OPENAI_OAUTH_REVOKE_URL, OPENAI_OAUTH_TOKEN_URL, OPENAI_OAUTH_URL,
-    },
-    error::AuthError,
+use crate::auth::{
+    model::{self, AuthStrategy},
+    OPENAI_OAUTH_REVOKE_URL, OPENAI_OAUTH_TOKEN_URL, OPENAI_OAUTH_URL,
 };
 use crate::{warn, with_context};
 use anyhow::{bail, Context};
