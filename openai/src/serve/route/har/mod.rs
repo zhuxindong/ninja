@@ -101,8 +101,8 @@ struct AuthenticateKey {
 async fn post_login(
     password: Option<Form<AuthenticateKey>>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    if let Some(key) = with_context!(arkose_har_upload_key) {
-        if password.as_ref().map(|p| &p.0.password) == Some(key) {
+    if let Some(upload_key) = with_context!(arkose_har_upload_key) {
+        if password.as_ref().map(|p| p.0.password.as_ref()) == Some(upload_key) {
             return Ok(generate_success_response().await.into_response());
         }
     } else {

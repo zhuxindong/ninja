@@ -70,18 +70,6 @@ pub(super) fn has_puid(headers: &HeaderMap) -> Result<bool, ResponseError> {
     }
 }
 
-/// Extract token from Authorization header
-fn extract_authorization<'a>(headers: &'a HeaderMap) -> Result<&'a str, ResponseError> {
-    let token = headers
-        .get(header::AUTHORIZATION)
-        .ok_or(ResponseError::Unauthorized(anyhow::anyhow!(
-            "AccessToken required!"
-        )))?
-        .to_str()
-        .map_err(ResponseError::BadGateway)?;
-    Ok(token)
-}
-
 /// Handle conversation request
 async fn handle_conv_request(req: &mut RequestExt) -> Result<(), ResponseError> {
     // Only handle POST request
@@ -114,7 +102,11 @@ async fn handle_conv_request(req: &mut RequestExt) -> Result<(), ResponseError> 
     // If puid is exist, then return
     if !has_puid(&req.headers)? {
         // extract token from Authorization header
-        let token = extract_authorization(&req.headers)?;
+        let token = req
+            .bearer_auth()
+            .ok_or(ResponseError::Unauthorized(anyhow::anyhow!(
+                "AccessToken required!"
+            )))?;
 
         // Exstract the token from the Authorization header
         let cache_id = reduce_key(token)?;

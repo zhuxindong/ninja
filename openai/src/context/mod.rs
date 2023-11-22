@@ -314,8 +314,8 @@ impl Context {
     }
 
     /// Get the arkoselabs har file upload authenticate key
-    pub fn arkose_har_upload_key(&self) -> Option<&String> {
-        self.arkose_har_upload_key.as_ref()
+    pub fn arkose_har_upload_key(&self) -> Option<&str> {
+        self.arkose_har_upload_key.as_deref()
     }
 
     /// Get the arkoselabs solver
@@ -342,13 +342,13 @@ impl Context {
     }
 
     /// Arkoselabs endpoint
-    pub fn arkose_endpoint(&self) -> Option<&String> {
-        self.arkose_endpoint.as_ref()
+    pub fn arkose_endpoint(&self) -> Option<&str> {
+        self.arkose_endpoint.as_deref()
     }
 
     /// Login auth key
-    pub fn auth_key(&self) -> Option<&String> {
-        self.auth_key.as_ref()
+    pub fn auth_key(&self) -> Option<&str> {
+        self.auth_key.as_deref()
     }
 
     /// Push a preauth cookie

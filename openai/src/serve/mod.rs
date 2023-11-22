@@ -278,12 +278,10 @@ async fn post_access_token(
     bearer: Option<TypedHeader<Authorization<Bearer>>>,
     account: axum::Form<AuthAccount>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let key = with_context!(auth_key).ok_or(ResponseError::Unauthorized(anyhow!(
-        "Login Authentication Key required!"
-    )))?;
-
-    if let Some(bearer_token) = bearer {
-        if key.ne(&bearer_token.token()) {
+    if let Some(auth_key) = with_context!(auth_key) {
+        // check bearer token exist
+        let bearer = bearer.ok_or(ResponseError::Unauthorized(anyhow!("Auth Key required!")))?;
+        if auth_key.ne(bearer.token()) {
             return Err(ResponseError::Unauthorized(anyhow!(
                 "Authentication Key error!"
             )));
