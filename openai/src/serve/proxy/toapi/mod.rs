@@ -13,6 +13,8 @@ use reqwest::StatusCode;
 use serde_json::Value;
 use std::{convert::Infallible, str::FromStr};
 
+use crate::chatgpt::model::req::Metadata;
+use crate::serve::error::ProxyError;
 use crate::{
     arkose::{ArkoseToken, GPTModel},
     chatgpt::model::{
@@ -52,9 +54,7 @@ pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, Respons
     // Exstract the token from the Authorization header
     let baerer = req
         .bearer_auth()
-        .ok_or(ResponseError::BadRequest(anyhow::anyhow!(
-            "Authorization header is required!"
-        )))?;
+        .ok_or(ResponseError::BadRequest(ProxyError::AccessTokenRequired))?;
 
     // Exstract the token from the Authorization header
     let cache_id = reduce_key(baerer)?;
@@ -62,7 +62,7 @@ pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, Respons
     let body = req
         .body
         .as_ref()
-        .ok_or_else(|| ResponseError::BadRequest(anyhow::anyhow!("body is empty")))?;
+        .ok_or_else(|| ResponseError::BadRequest(ProxyError::BodyRequired))?;
 
     let body = serde_json::from_slice::<model::Req>(body)?;
 
@@ -83,6 +83,7 @@ pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, Respons
                     .parts(vec![&body_msg.content])
                     .build(),
             )
+            .metadata(Metadata {})
             .build();
         messages.push(message)
     }

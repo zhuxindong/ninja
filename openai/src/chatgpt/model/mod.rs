@@ -31,7 +31,7 @@ impl ToString for Role {
     }
 }
 
-#[derive(Serialize, Deserialize, TypedBuilder, Clone, Debug)]
+#[derive(Serialize, Deserialize, TypedBuilder, Debug)]
 pub struct Author {
     pub role: Role,
 }
