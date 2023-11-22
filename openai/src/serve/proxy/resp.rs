@@ -66,7 +66,8 @@ pub(crate) fn header_convert(
     if !cookies.is_empty() {
         headers.insert(
             header::COOKIE,
-            header::HeaderValue::from_str(&cookies.join(";")).expect("setting cookie error"),
+            header::HeaderValue::from_str(&cookies.join(";"))
+                .map_err(ResponseError::InternalServerError)?,
         );
     }
     Ok(headers)

@@ -1,4 +1,5 @@
 pub mod crypto;
+mod error;
 pub mod funcaptcha;
 pub mod har;
 pub mod murmur;
@@ -23,6 +24,7 @@ use crate::generate_random_string;
 use crate::warn;
 use crate::with_context;
 use crate::HEADER_UA;
+use error::ArkoseError;
 
 use self::funcaptcha::solver::SubmitSolver;
 use self::funcaptcha::ArkoseSolver;
@@ -65,7 +67,7 @@ impl std::str::FromStr for Type {
             "gpt4" => Ok(Type::GPT4),
             "auth" => Ok(Type::Auth),
             "platform" => Ok(Type::Platform),
-            _ => anyhow::bail!("Invalid type"),
+            _ => anyhow::bail!(ArkoseError::InvalidPlatformType(s.to_owned())),
         }
     }
 }
@@ -114,7 +116,7 @@ impl std::str::FromStr for GPTModel {
             s if s.starts_with("gpt-3.5") || s.starts_with("text-davinci") => {
                 Ok(GPTModel::Gpt35Other)
             }
-            _ => anyhow::bail!("Invalid GPT model"),
+            _ => anyhow::bail!(ArkoseError::InvalidGptModel(value.to_owned())),
         }
     }
 }
@@ -391,7 +393,7 @@ async fn get_from_context(t: Type) -> anyhow::Result<ArkoseToken> {
         }
     }
 
-    anyhow::bail!("No solver available")
+    anyhow::bail!(ArkoseError::NoSolverAvailable)
 }
 
 #[inline]
@@ -434,9 +436,9 @@ async fn submit_captcha(
 ) -> anyhow::Result<ArkoseToken> {
     let session = funcaptcha::start_challenge(arkose_token.value())
         .await
-        .map_err(|error| anyhow::anyhow!("Error creating session: {error}"))?;
+        .map_err(ArkoseError::CreateSessionError)?;
 
-    let funs = anyhow::Context::context(session.funcaptcha(), "Valid funcaptcha error")?;
+    let funs = session.funcaptcha().ok_or(ArkoseError::InvalidFunCaptcha)?;
     let mut rx = match solver {
         Solver::Yescaptcha => {
             let (tx, rx) = tokio::sync::mpsc::channel(funs.len());
@@ -528,6 +530,6 @@ async fn submit_captcha(
             let new_token = arkose_token.value().replace("at=40", "at=40|sup=1");
             Ok(ArkoseToken::from(new_token))
         }
-        Err(err) => anyhow::bail!("submit funcaptcha answer error: {err}"),
+        Err(err) => anyhow::bail!(ArkoseError::SubmitAnswerError(err)),
     };
 }

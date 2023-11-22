@@ -5,12 +5,12 @@ pub mod web;
 
 use std::collections::HashSet;
 
-use crate::{
-    arkose::{self, ArkoseToken, Type},
-    error::AuthError,
-};
+use crate::arkose::{self, ArkoseToken, Type};
 
-use super::model::{self, AuthStrategy};
+use super::{
+    error::AuthError,
+    model::{self, AuthStrategy},
+};
 use reqwest::header;
 use serde::Serialize;
 use typed_builder::TypedBuilder;

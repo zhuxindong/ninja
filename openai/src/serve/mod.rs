@@ -27,6 +27,7 @@ use crate::auth::model::{AccessToken, AuthAccount, RefreshToken, SessionAccessTo
 use crate::auth::provide::AuthProvider;
 use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
 use crate::context::{self, ContextArgs};
+use crate::serve::error::ProxyError;
 use crate::serve::error::ResponseError;
 use crate::serve::middleware::tokenbucket::{Strategy, TokenBucketLimitContext};
 use crate::{info, warn, with_context};
@@ -199,8 +200,8 @@ impl Serve {
                     .mitm_filters(vec![String::from("ios.chat.openai.com")])
                     .handler(preauth::PreAuthHanlder)
                     .build();
-                if let Some(err) = builder.mitm_proxy().await.err() {
-                    crate::error!("PreAuth proxy error: {}", err);
+                if let Some(err) = builder.proxy().await.err() {
+                    warn!("PreAuth proxy error: {}", err);
                 }
             }
 
@@ -267,9 +268,9 @@ async fn get_session(jar: CookieJar) -> Result<impl IntoResponse, ResponseError>
             let resp: Response<Body> = session_token.try_into()?;
             Ok(resp.into_response())
         }
-        _ => Err(ResponseError::InternalServerError(anyhow!(
-            "Session error!"
-        ))),
+        _ => Err(ResponseError::InternalServerError(
+            ProxyError::SessionNotFound,
+        )),
     }
 }
 
@@ -282,9 +283,7 @@ async fn post_access_token(
         // check bearer token exist
         let bearer = bearer.ok_or(ResponseError::Unauthorized(anyhow!("Auth Key required!")))?;
         if auth_key.ne(bearer.token()) {
-            return Err(ResponseError::Unauthorized(anyhow!(
-                "Authentication Key error!"
-            )));
+            return Err(ResponseError::Unauthorized(ProxyError::AuthKeyError));
         }
     }
 
@@ -354,15 +353,15 @@ impl TryInto<Response<Body>> for SessionAccessToken {
         let session = self
             .session_token
             .clone()
-            .ok_or(ResponseError::InternalServerError(anyhow!(
-                "Session error!"
-            )))?;
+            .ok_or(ResponseError::InternalServerError(
+                ProxyError::SessionNotFound,
+            ))?;
 
         let timestamp_secs = session
             .expires
             .unwrap_or_else(|| SystemTime::now())
             .duration_since(UNIX_EPOCH)
-            .expect("Failed to get timestamp")
+            .map_err(ResponseError::InternalServerError)?
             .as_secs_f64();
 
         let cookie = cookie::Cookie::build(API_AUTH_SESSION_COOKIE_KEY, session.value)
@@ -378,7 +377,7 @@ impl TryInto<Response<Body>> for SessionAccessToken {
         Ok(Response::builder()
             .status(axum::http::StatusCode::OK)
             .header(header::SET_COOKIE, cookie.to_string())
-            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
             .body(Body::from(serde_json::to_string(&self)?))
             .map_err(ResponseError::InternalServerError)?)
     }
@@ -388,7 +387,7 @@ async fn check_wan_address() {
     match with_context!(client)
         .get("https://ifconfig.me")
         .timeout(Duration::from_secs(70))
-        .header(header::ACCEPT, "application/json")
+        .header(header::ACCEPT, mime::APPLICATION_JSON.as_ref())
         .send()
         .await
     {

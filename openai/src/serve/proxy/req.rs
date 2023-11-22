@@ -15,7 +15,7 @@ use crate::{arkose, with_context};
 use super::ext::{RequestExt, ResponseExt, SendRequestExt};
 use super::resp::header_convert;
 use super::toapi;
-use crate::serve::error::ResponseError;
+use crate::serve::error::{ProxyError, ResponseError};
 use crate::serve::puid::{get_or_init, reduce_key};
 use crate::serve::EMPTY;
 
@@ -81,32 +81,26 @@ async fn handle_conv_request(req: &mut RequestExt) -> Result<(), ResponseError> 
     let body = req
         .body
         .as_ref()
-        .ok_or(ResponseError::BadRequest(anyhow::anyhow!(
-            "Body can not be empty!"
-        )))?;
+        .ok_or(ResponseError::BadRequest(ProxyError::BodyRequired))?;
 
     // Use serde_json to parse body
     let mut json = serde_json::from_slice::<Value>(&body).map_err(ResponseError::BadRequest)?;
     let body = json
         .as_object_mut()
-        .ok_or(ResponseError::BadRequest(anyhow::anyhow!("Body is empty")))?;
+        .ok_or(ResponseError::BadRequest(ProxyError::BodyMustBeJsonObject))?;
 
     // If model is not exist, then return error
     let model = body
         .get("model")
         .and_then(|m| m.as_str())
-        .ok_or(ResponseError::BadRequest(anyhow::anyhow!(
-            "Model is not exist in body!"
-        )))?;
+        .ok_or(ResponseError::BadRequest(ProxyError::ModelRequired))?;
 
     // If puid is exist, then return
     if !has_puid(&req.headers)? {
         // extract token from Authorization header
         let token = req
             .bearer_auth()
-            .ok_or(ResponseError::Unauthorized(anyhow::anyhow!(
-                "AccessToken required!"
-            )))?;
+            .ok_or(ResponseError::Unauthorized(ProxyError::AccessTokenRequired))?;
 
         // Exstract the token from the Authorization header
         let cache_id = reduce_key(token)?;
@@ -162,15 +156,13 @@ async fn handle_dashboard_request(req: &mut RequestExt) -> Result<(), ResponseEr
     let body = req
         .body
         .as_ref()
-        .ok_or(ResponseError::BadRequest(anyhow::anyhow!(
-            "Body can not be empty!"
-        )))?;
+        .ok_or(ResponseError::BadRequest(ProxyError::BodyRequired))?;
 
     // Use serde_json to parse body
     let mut json = serde_json::from_slice::<Value>(&body).map_err(ResponseError::BadRequest)?;
     let body = json
         .as_object_mut()
-        .ok_or(ResponseError::BadRequest(anyhow::anyhow!("Body is empty")))?;
+        .ok_or(ResponseError::BadRequest(ProxyError::BodyMustBeJsonObject))?;
 
     // If arkose_token is not exist, then add it
     if body.get("arkose_token").is_none() {

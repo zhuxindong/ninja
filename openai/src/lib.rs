@@ -4,7 +4,6 @@ pub mod auth;
 pub mod balancer;
 pub mod chatgpt;
 pub mod context;
-pub mod error;
 pub mod eventsource;
 pub mod homedir;
 pub mod log;
