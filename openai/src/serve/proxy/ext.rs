@@ -107,27 +107,12 @@ where
     async fn from_request(req: Request<B>, state: &S) -> Result<Self, Self::Rejection> {
         let (parts, body) = req.into_parts();
 
-        let body = if parts
-            .headers
-            .get(CONTENT_TYPE)
-            .filter(|&value| {
-                value.eq(mime::APPLICATION_JSON.as_ref())
-                    || value.eq(mime::APPLICATION_JAVASCRIPT.as_ref())
-                    || value.eq(mime::APPLICATION_JAVASCRIPT_UTF_8.as_ref())
-                    || value.eq(mime::APPLICATION_OCTET_STREAM.as_ref())
-                    || value.eq(mime::APPLICATION_MSGPACK.as_ref())
-                    || value.eq(mime::APPLICATION_PDF.as_ref())
-                    || value.eq(mime::APPLICATION_WWW_FORM_URLENCODED.as_ref())
-                    || value.eq(mime::MULTIPART_FORM_DATA.as_ref())
-                    || value.is_empty()
-            })
-            .is_some()
-        {
-            let request = Request::new(body);
-            let bytes = Bytes::from_request(request, state)
-                .await
-                .map_err(IntoResponse::into_response)?;
-            Some(bytes)
+        let body = if parts.headers.get(CONTENT_TYPE).is_some() {
+            Some(
+                Bytes::from_request(Request::new(body), state)
+                    .await
+                    .map_err(IntoResponse::into_response)?,
+            )
         } else {
             None
         };
