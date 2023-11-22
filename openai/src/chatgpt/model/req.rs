@@ -1,30 +1,33 @@
 use serde::Serialize;
 use typed_builder::TypedBuilder;
 
+use super::{Author, Role};
 use crate::arkose::ArkoseToken;
 
-use super::{Author, Role};
-
-#[derive(Serialize, TypedBuilder, Clone)]
+#[derive(Serialize, TypedBuilder)]
 pub struct Content<'a> {
     content_type: ContentText,
     parts: Vec<&'a str>,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ContentText {
     Text,
 }
 
-#[derive(Serialize, TypedBuilder, Clone)]
+#[derive(Serialize, TypedBuilder)]
 pub struct Messages<'a> {
     id: String,
     author: Author,
     content: Content<'a>,
+    metadata: Metadata,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Serialize)]
+pub struct Metadata {}
+
+#[derive(Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Action {
     Next,
@@ -71,7 +74,7 @@ pub struct MessageFeedbackRequest<'a> {
     conversation_id: &'a str,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize)]
 pub enum Rating {
     ThumbsUp,
     ThumbsDown,
@@ -124,6 +127,7 @@ impl<'a> From<PostNextConvoRequest<'a>> for PostConvoRequest<'a> {
                         .parts(vec![value.prompt])
                         .build(),
                 )
+                .metadata(Metadata {})
                 .build()])
             .model(value.model)
             .conversation_id(value.conversation_id)
@@ -160,6 +164,7 @@ impl<'a> From<PostVaraintConvoRequest<'a>> for PostConvoRequest<'a> {
                         .parts(vec![value.prompt])
                         .build(),
                 )
+                .metadata(Metadata {})
                 .build()])
             .model(value.model)
             .arkose_token(value.arkose_token)
