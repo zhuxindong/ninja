@@ -211,6 +211,10 @@ impl ConvoResponse {
             .collect()
     }
 
+    pub fn raw_messages(&self) -> &[String] {
+        self.message.content.parts.as_slice()
+    }
+
     pub fn message_id(&self) -> &str {
         &self.message.id
     }

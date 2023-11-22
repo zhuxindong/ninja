@@ -311,7 +311,7 @@ async fn event_convert_handler(
     set_role: &mut bool,
     convo: ConvoResponse,
 ) -> anyhow::Result<Event> {
-    let messages = convo.messages();
+    let messages = convo.raw_messages();
     let message = messages
         .first()
         .ok_or(anyhow::anyhow!("message is empty"))?;
