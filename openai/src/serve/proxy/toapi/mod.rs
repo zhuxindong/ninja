@@ -107,8 +107,6 @@ pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, Respons
         .arkose_token(&arkose_token)
         .build();
 
-    println!("json: {}", serde_json::to_string(&req_body)?);
-
     // Try to get puid from cache
     let puid = get_or_init(baerer, &body.model, cache_id).await?;
 
