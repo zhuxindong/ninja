@@ -37,14 +37,23 @@ pub(crate) fn header_convert(
     h.get("X-Ms-Version")
         .map(|v| headers.insert("X-Ms-Version", v.clone()));
 
+    h.get(header::ACCEPT)
+        .map(|h| headers.insert(header::ACCEPT, h.clone()));
+
+    h.get(header::ACCEPT_LANGUAGE)
+        .map(|h| headers.insert(header::ACCEPT_LANGUAGE, h.clone()));
+
+    h.get(header::ACCEPT_ENCODING)
+        .map(|h| headers.insert(header::ACCEPT_ENCODING, h.clone()));
+
+    h.get(header::DNT)
+        .map(|h| headers.insert(header::DNT, h.clone()));
+
     h.get(header::AUTHORIZATION)
         .map(|h| headers.insert(header::AUTHORIZATION, h.clone()));
 
     h.get(header::CONTENT_TYPE)
         .map(|h| headers.insert(header::CONTENT_TYPE, h.clone()));
-
-    h.get(header::DNT)
-        .map(|v| headers.insert(header::DNT, v.clone()));
 
     headers.insert(header::ORIGIN, header::HeaderValue::from_static(origin));
     headers.insert(header::REFERER, header::HeaderValue::from_static(origin));
@@ -104,7 +113,7 @@ pub(crate) async fn response_convert(
             if let Some(expires) = cookie.expires() {
                 let timestamp_secs = expires
                     .duration_since(UNIX_EPOCH)
-                    .expect("Failed to get timestamp")
+                    .map_err(ResponseError::InternalServerError)?
                     .as_secs_f64();
                 let cookie = Cookie::build(cookie.name(), cookie.value())
                     .path("/")

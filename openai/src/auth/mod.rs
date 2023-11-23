@@ -22,8 +22,8 @@ use reqwest::{Client, Proxy, StatusCode, Url};
 use sha2::{Digest, Sha256};
 use tokio::sync::OnceCell;
 
+use crate::debug;
 use crate::URL_CHATGPT_API;
-use crate::{debug, random_impersonate};
 use error::AuthError;
 
 use self::model::{ApiKeyData, AuthStrategy};
@@ -452,7 +452,6 @@ impl AuthClientBuilder {
     pub fn builder() -> AuthClientBuilder {
         AuthClientBuilder {
             inner: Client::builder()
-                .impersonate(random_impersonate())
                 .danger_accept_invalid_certs(true)
                 .connect_timeout(Duration::from_secs(30))
                 .redirect(Policy::none()),

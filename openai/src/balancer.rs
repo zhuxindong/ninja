@@ -1,12 +1,12 @@
 use rand::Rng;
-use reqwest::Client;
+use reqwest::{impersonate::Impersonate, Client};
 use std::{
     net::IpAddr,
     sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
 };
 
-use crate::{auth::AuthClient, context, random_impersonate};
+use crate::{auth::AuthClient, context, debug};
 use crate::{
     auth::{self},
     info,
@@ -262,4 +262,26 @@ fn build_auth_client(
         .connect_timeout(Duration::from_secs(inner.connect_timeout))
         .proxy(proxy_url.cloned())
         .build()
+}
+
+const RANDOM_IMPERSONATE: [Impersonate; 7] = [
+    Impersonate::OkHttp3_9,
+    Impersonate::OkHttp3_11,
+    Impersonate::OkHttp3_13,
+    Impersonate::OkHttp3_14,
+    Impersonate::OkHttp4_9,
+    Impersonate::OkHttp4_10,
+    Impersonate::OkHttp5,
+];
+
+/// Randomly select a user agent from a list of known user agents.
+pub(crate) fn random_impersonate() -> Impersonate {
+    use rand::seq::IteratorRandom;
+
+    let target = RANDOM_IMPERSONATE
+        .into_iter()
+        .choose(&mut rand::thread_rng())
+        .unwrap_or(Impersonate::OkHttp5);
+    debug!("Using user agent: {:?}", target);
+    Impersonate::Chrome104
 }

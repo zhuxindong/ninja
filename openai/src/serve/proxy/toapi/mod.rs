@@ -59,12 +59,12 @@ pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, Respons
     // Exstract the token from the Authorization header
     let cache_id = reduce_key(baerer)?;
 
-    let body = req
+    // Exstract the body
+    let bytes = req
         .body
         .as_ref()
         .ok_or_else(|| ResponseError::BadRequest(ProxyError::BodyRequired))?;
-
-    let body = serde_json::from_slice::<model::Req>(body)?;
+    let body = serde_json::from_slice::<model::Req>(bytes)?;
 
     // Convert to ChatGPT API Message
     let mut messages = Vec::with_capacity(body.messages.len());
@@ -107,13 +107,14 @@ pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, Respons
         .arkose_token(&arkose_token)
         .build();
 
-    // Try to get puid from cache
-    let puid = get_or_init(baerer, &body.model, cache_id).await?;
-
     let mut builder = with_context!(client)
         .post(format!("{URL_CHATGPT_API}/backend-api/conversation"))
+        .header(header::ORIGIN, URL_CHATGPT_API)
+        .header(header::REFERER, URL_CHATGPT_API)
         .bearer_auth(baerer);
 
+    // Try to get puid from cache
+    let puid = get_or_init(baerer, &body.model, cache_id).await?;
     if let Some(puid) = puid {
         builder = builder.header(header::COOKIE, format!("_puid={puid};"))
     }
