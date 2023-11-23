@@ -269,7 +269,7 @@ fn stream_handler(
                     if let Ok(res) = serde_json::from_str::<PostConvoResponse>(&message.data) {
                         if let PostConvoResponse::Conversation(convo) = res {
 
-                            if (convo.role().ne(&Role::Assistant) || convo.messages().is_empty())
+                            if (convo.role().ne(&Role::Assistant) || convo.raw_messages().is_empty() || convo.raw_messages()[0].is_empty())
                                 || (convo.metadata_message_type().ne("next") && convo.metadata_message_type().ne("continue")) {
                                 continue;
                             }
@@ -316,7 +316,7 @@ async fn event_convert_handler(
     let messages = convo.raw_messages();
     let message = messages
         .first()
-        .ok_or(anyhow::anyhow!("message is empty"))?;
+        .ok_or(anyhow::anyhow!(ProxyError::BodyMessageIsEmpty))?;
 
     let finish_reason = convo
         .end_turn()
