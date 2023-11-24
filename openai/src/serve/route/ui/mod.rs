@@ -34,7 +34,7 @@ use tower::ServiceBuilder;
 use tower_http::ServiceBuilderExt;
 
 use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
-use crate::context::ContextArgs;
+use crate::context::Args;
 use crate::debug;
 use crate::info;
 use crate::now_duration;
@@ -69,7 +69,7 @@ const TEMP_SHARE: &str = "share.htm";
 static TEMPLATE: OnceLock<tera::Tera> = OnceLock::new();
 
 // this function could be located in a different module
-pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
+pub(super) fn config(router: Router, args: &Args) -> Router {
     if !args.disable_ui {
         if let Some(endpoint) = with_context!(arkose_endpoint) {
             info!("WebUI site use Arkose endpoint: {endpoint}")
@@ -398,7 +398,7 @@ async fn get_auth_me(
     headers: HeaderMap,
     jar: CookieJar,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let resp = with_context!(client)
+    let resp = with_context!(api_client)
         .get(format!("{URL_CHATGPT_API}/backend-api/me"))
         .headers(header_convert(&headers, &jar, URL_CHATGPT_API)?)
         .send()
@@ -516,7 +516,7 @@ async fn get_share_chat(
     extract: SessionExtractor,
 ) -> Result<Response<Body>, ResponseError> {
     let share_id = share_id.0;
-    let resp = with_context!(client)
+    let resp = with_context!(api_client)
         .get(format!("{URL_CHATGPT_API}/backend-api/share/{share_id}"))
         .headers(header_convert(
             &extract.headers,
@@ -603,7 +603,7 @@ async fn get_share_chat_info(
     extract: SessionExtractor,
 ) -> Result<Response<Body>, ResponseError> {
     let share_id = share_id.0.replace(".json", "");
-    let resp = with_context!(client)
+    let resp = with_context!(api_client)
         .get(format!("{URL_CHATGPT_API}/backend-api/share/{share_id}"))
         .headers(header_convert(
             &extract.headers,
@@ -671,7 +671,7 @@ async fn get_share_chat_continue_info(
     share_id: Path<String>,
     extract: SessionExtractor,
 ) -> Result<Response<Body>, ResponseError> {
-    let resp = with_context!(client)
+    let resp = with_context!(api_client)
         .get(format!(
             "{URL_CHATGPT_API}/backend-api/share/{}",
             share_id.0

@@ -1,6 +1,6 @@
 use crate::parse;
 use clap::{Args, Subcommand};
-use openai::arkose::funcaptcha::Solver;
+use openai::{arkose::funcaptcha::Solver, proxy};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -92,21 +92,17 @@ pub struct ServeArgs {
     #[clap(long, default_value = "1024")]
     pub(super) concurrent_limit: usize,
 
-    /// Server proxies pool, Only support http/https/socks5 protocol
-    #[clap(short = 'x',long, env = "PROXIES", value_parser = parse::parse_proxies_url, group = "proxy")]
-    pub(super) proxies: Option<std::vec::Vec<String>>,
+    /// Enable direct connection
+    #[clap(long, env = "ENABLE_DIRECT")]
+    pub(super) enable_direct: bool,
 
-    /// Bind address for outgoing connections (or IPv6 subnet fallback to Ipv4)
-    #[clap(short = 'i', long, env = "INTERFACE", value_parser = parse::parse_host)]
-    pub(super) interface: Option<std::net::IpAddr>,
-
-    /// IPv6 subnet, Example: 2001:19f0:6001:48e4::/64
-    #[clap(long, short = 'I', env = "IPV6_SUBNET", value_parser = parse::parse_ipv6_subnet, group = "proxy")]
-    pub(super) ipv6_subnet: Option<(std::net::Ipv6Addr, u8)>,
-
-    /// Disable direct connection
-    #[clap(long, env = "DISABLE_DIRECT")]
-    pub(super) disable_direct: bool,
+    /// Request client proxy, support multiple proxy, use ',' to separate
+    /// Format: proto|type
+    /// Proto: all/api/auth/arkose, default: all
+    /// Type: interface/proxy/ipv6 subnet，proxy type only support: socks5/http/https
+    /// Example: all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081
+    #[clap(short = 'x',long, env = "PROXIES", value_parser = parse::parse_proxies_url, verbatim_doc_comment)]
+    pub(super) proxies: Option<std::vec::Vec<proxy::Proxy>>,
 
     /// Enabled Cookie Store
     #[clap(long, env = "COOKIE_STORE")]

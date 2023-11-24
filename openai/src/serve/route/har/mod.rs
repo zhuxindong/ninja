@@ -3,7 +3,7 @@ mod token;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use crate::context::ContextArgs;
+use crate::context::Args;
 use crate::serve::error::ResponseError;
 use crate::{arkose, warn, with_context};
 use anyhow::anyhow;
@@ -28,7 +28,7 @@ const ERROR_PAGE: &'static str = include_str!("../../../../ui/har/error.html");
 const FAILED_UPLOAD_TITLE: &'static str = "Failed to upload file";
 const FAILED_AUTH_TITLE: &'static str = "Failed Authenticate";
 
-pub(super) fn config(router: Router, _: &ContextArgs) -> Router {
+pub(super) fn config(router: Router, _: &Args) -> Router {
     router
         .route("/har/login", get(login).post(post_login))
         .route("/har/upload", get(upload).post(post_upload))

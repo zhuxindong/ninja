@@ -2,7 +2,7 @@ level = "info"
 bind = "0.0.0.0:7999"
 workers = 1
 concurrent_limit = 65535
-disable_direct = false
+enable_direct = false
 cookie_store = true
 timeout = 600
 connect_timeout = 60
@@ -20,3 +20,23 @@ tb_fill_rate = 1
 tb_expired = 86400
 pcert = "ca/cert.crt"
 pkey = "ca/key.pem"
+
+[[proxies]]
+
+[proxies.all]
+proxy = "socks5://127.0.0.1:8888"
+
+[[proxies]]
+
+[proxies.all]
+proxy = "http://127.0.0.1:8889/"
+
+[[proxies]]
+
+[proxies.api]
+interface = "192.168.1.1"
+
+[[proxies]]
+
+[proxies.api]
+ipv6subnet = "2001:db8::/32"

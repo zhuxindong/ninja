@@ -1,33 +1,29 @@
 mod model;
+mod stream;
 
 use axum::http::header;
 use axum::http::Method;
 use axum::{
-    response::{sse::Event, IntoResponse, Sse},
+    response::{IntoResponse, Sse},
     Json,
 };
-use eventsource_stream::{EventStream, Eventsource};
-use futures::StreamExt;
-use futures_core::Stream;
+use eventsource_stream::Eventsource;
 use reqwest::StatusCode;
-use serde_json::Value;
-use std::{convert::Infallible, str::FromStr};
+use std::str::FromStr;
 
 use crate::chatgpt::model::req::Metadata;
+use crate::chatgpt::model::Role;
+use crate::now_duration;
 use crate::serve::error::ProxyError;
 use crate::{
     arkose::{ArkoseToken, GPTModel},
-    chatgpt::model::{
-        req::{Content, ConversationMode, Messages, PostConvoRequest},
-        resp::{ConvoResponse, PostConvoResponse},
-    },
+    chatgpt::model::req::{Content, ConversationMode, Messages, PostConvoRequest},
     serve::{
         error::ResponseError,
         puid::{get_or_init, reduce_key},
     },
     with_context,
 };
-use crate::{chatgpt::model::Role, debug};
 use crate::{
     chatgpt::model::{
         req::{Action, ContentText},
@@ -107,7 +103,7 @@ pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, Respons
         .arkose_token(&arkose_token)
         .build();
 
-    let mut builder = with_context!(client)
+    let mut builder = with_context!(api_client)
         .post(format!("{URL_CHATGPT_API}/backend-api/conversation"))
         .header(header::ORIGIN, URL_CHATGPT_API)
         .header(header::REFERER, URL_CHATGPT_API)
@@ -150,9 +146,11 @@ pub(super) async fn response_convert(
                     )))?;
             let event_source = resp.bytes_stream().eventsource();
             if config.stream {
-                return Ok(Sse::new(stream_handler(event_source, config.model)).into_response());
+                return Ok(
+                    Sse::new(stream::stream_handler(event_source, config.model)).into_response()
+                );
             } else {
-                let res = not_stream_handler(event_source, config.model)
+                let res = stream::not_stream_handler(event_source, config.model)
                     .await
                     .map_err(ResponseError::InternalServerError)?;
                 return Ok(res.into_response());
@@ -181,183 +179,6 @@ pub(super) async fn response_convert(
             }
         }
     }
-}
-
-async fn not_stream_handler(
-    mut event_soure: EventStream<
-        impl Stream<Item = Result<bytes::Bytes, reqwest::Error>> + std::marker::Unpin,
-    >,
-    model: String,
-) -> anyhow::Result<Json<Value>> {
-    let id = generate_id(29);
-    let timestamp = current_timestamp();
-    let mut previous_message = String::new();
-    let mut finish_reason = None;
-    while let Some(event_result) = event_soure.next().await {
-        match event_result {
-            Ok(message) => {
-                if message.data.eq("[DONE]") {
-                    break;
-                }
-                if let Ok(res) = serde_json::from_str::<PostConvoResponse>(&message.data) {
-                    if let PostConvoResponse::Conversation(convo) = res {
-                        let finish = convo.metadata_finish_details_type();
-                        if !finish.is_empty() {
-                            finish_reason = Some(finish.to_owned())
-                        }
-                        let messages = convo.messages();
-                        if let Some(message) = messages.first() {
-                            previous_message.clear();
-                            previous_message.push_str(message);
-                        }
-                    }
-                }
-            }
-            Err(err) => {
-                debug!("event-source stream error: {}", err);
-            }
-        }
-    }
-    drop(event_soure);
-
-    let message = model::Message::builder()
-        .role(Role::Assistant)
-        .content(previous_message)
-        .build();
-
-    let resp = model::Resp::builder()
-        .id(&id)
-        .object("chat.completion.chunk")
-        .created(&timestamp)
-        .model(&model)
-        .choices(vec![model::Choice::builder()
-            .index(0)
-            .message(Some(message))
-            .finish_reason(finish_reason.as_deref())
-            .build()])
-        .usage(Some(
-            model::Usage::builder()
-                .prompt_tokens(0)
-                .completion_tokens(0)
-                .total_tokens(0)
-                .build(),
-        ))
-        .build();
-    let value = serde_json::to_value(&resp)?;
-    Ok(Json(value))
-}
-
-fn stream_handler(
-    mut event_soure: EventStream<
-        impl Stream<Item = Result<bytes::Bytes, reqwest::Error>> + std::marker::Unpin,
-    >,
-    model: String,
-) -> impl Stream<Item = Result<Event, Infallible>> {
-    let id = generate_id(29);
-    let timestamp = current_timestamp();
-    async_stream::stream! {
-        let mut previous_message = String::new();
-        let mut set_role = true;
-        let mut stop: u8 = 0;
-        while let Some(event_result) = event_soure.next().await {
-            match event_result {
-                Ok(message) =>  {
-                    if message.data.eq("[DONE]") {
-                        yield Ok(Event::default().data(message.data));
-                        break;
-                    }
-                    if let Ok(res) = serde_json::from_str::<PostConvoResponse>(&message.data) {
-                        if let PostConvoResponse::Conversation(convo) = res {
-
-                            if (convo.role().ne(&Role::Assistant) || convo.raw_messages().is_empty() || convo.raw_messages()[0].is_empty())
-                                || (convo.metadata_message_type().ne("next") && convo.metadata_message_type().ne("continue")) {
-                                continue;
-                            }
-
-                            match event_convert_handler(
-                                &mut stop,
-                                &id,
-                                &timestamp,
-                                &model,
-                                &mut previous_message,
-                                &mut set_role,
-                                convo).await {
-                                Ok(event) => {
-                                    if stop == 0 {
-                                        yield Ok(event)
-                                    } else if stop <= 1 {
-                                        yield Ok(event)
-                                    }
-                                },
-                                Err(err) => {
-                                    debug!("event source json serialize error: {}", err);
-                                }
-                            }
-                        }
-                    }
-                },
-                Err(err) => {
-                    debug!("event-source stream error: {}", err);
-                }
-            }
-        }
-    }
-}
-
-async fn event_convert_handler(
-    stop: &mut u8,
-    id: &String,
-    timestamp: &i64,
-    model: &String,
-    previous_message: &mut String,
-    set_role: &mut bool,
-    convo: ConvoResponse,
-) -> anyhow::Result<Event> {
-    let messages = convo.raw_messages();
-    let message = messages
-        .first()
-        .ok_or(anyhow::anyhow!(ProxyError::BodyMessageIsEmpty))?;
-
-    let finish_reason = convo
-        .end_turn()
-        .filter(|&end| end)
-        .map(|_| convo.metadata_finish_details_type());
-
-    let role = if *set_role {
-        *set_role = false;
-        Some(convo.role())
-    } else {
-        None
-    };
-
-    let return_message = if finish_reason.is_some_and(|finish| finish.eq("stop")) {
-        *stop += 1;
-        None
-    } else {
-        Some(message.trim_start_matches(previous_message.as_str()))
-    };
-
-    previous_message.clear();
-    previous_message.push_str(message);
-
-    let delta = model::Delta::builder()
-        .role(role)
-        .content(return_message)
-        .build();
-
-    let resp = model::Resp::builder()
-        .id(&id)
-        .object("chat.completion.chunk")
-        .created(timestamp)
-        .model(&model)
-        .choices(vec![model::Choice::builder()
-            .index(0)
-            .delta(Some(delta))
-            .finish_reason(finish_reason)
-            .build()])
-        .build();
-    let data = format!(" {}", serde_json::to_string(&resp)?);
-    Ok(Event::default().data(data))
 }
 
 async fn model_mapper(model: &str) -> Result<(&str, &str, Option<ArkoseToken>), ResponseError> {
@@ -390,10 +211,7 @@ fn generate_id(length: usize) -> String {
 }
 
 fn current_timestamp() -> i64 {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let current_time = SystemTime::now();
-    let since_epoch = current_time
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards");
-    since_epoch.as_secs() as i64
+    now_duration()
+        .expect("System time before UNIX EPOCH!")
+        .as_secs() as i64
 }

@@ -1,7 +1,7 @@
 use super::STATIC_FILES;
 use crate::arkose::ArkoseToken;
 use crate::arkose::Type;
-use crate::context::ContextArgs;
+use crate::context::Args;
 use crate::serve::error::ResponseError;
 use crate::warn;
 use crate::with_context;
@@ -20,7 +20,7 @@ use axum::{
 use bytes::Bytes;
 use std::collections::HashMap;
 
-pub(super) fn config(router: Router, args: &ContextArgs) -> Router {
+pub(super) fn config(router: Router, args: &Args) -> Router {
     if args.arkose_endpoint.is_none() {
         return router
             .route("/cdn/*path", any(proxy))
@@ -101,7 +101,7 @@ async fn proxy(
         headers.remove(header);
     }
 
-    let client = with_context!(client);
+    let client = with_context!(api_client);
     let url = format!("https://client-api.arkoselabs.com{}", req_path);
 
     let resp = match body {

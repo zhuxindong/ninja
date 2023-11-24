@@ -28,7 +28,7 @@ pub(super) async fn cf_turnstile_check(
         };
 
         let resp = ctx
-            .client()
+            .api_client()
             .post("https://challenges.cloudflare.com/turnstile/v0/siteverify")
             .form(&form)
             .send()

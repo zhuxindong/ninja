@@ -26,7 +26,8 @@ use self::proxy::resp::response_convert;
 use crate::auth::model::{AccessToken, AuthAccount, RefreshToken, SessionAccessToken};
 use crate::auth::provide::AuthProvider;
 use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
-use crate::context::{self, ContextArgs};
+use crate::context::{self, Args};
+use crate::proxy::{InnerProxy, Proxy};
 use crate::serve::error::ProxyError;
 use crate::serve::error::ResponseError;
 use crate::serve::middleware::tokenbucket::{Strategy, TokenBucketLimitContext};
@@ -44,37 +45,38 @@ use tower_http::trace;
 use tracing::Level;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-
 const EMPTY: &str = "";
 
-fn print_boot_message(inner: &ContextArgs) {
+fn print_boot_message(inner: &Args) {
     info!("OS: {}", std::env::consts::OS);
     info!("Arch: {}", std::env::consts::ARCH);
     info!("Version: {}", env!("CARGO_PKG_VERSION"));
     info!("Worker threads: {}", inner.workers);
     info!("Concurrent limit: {}", inner.concurrent_limit);
     info!("Enable cookie store: {}", inner.cookie_store);
-    if let Some((ref ipv6, len)) = inner.ipv6_subnet {
-        info!("Ipv6 subnet: {ipv6}/{len}");
-    } else {
-        info!("Keepalive {} seconds", inner.tcp_keepalive);
-        info!("Timeout {} seconds", inner.timeout);
-        info!("Connect timeout {} seconds", inner.connect_timeout);
-        if inner.disable_direct {
-            info!("Disable direct connection");
-        }
-    }
-
+    info!("Keepalive {} seconds", inner.tcp_keepalive);
+    info!("Timeout {} seconds", inner.timeout);
+    info!("Connect timeout {} seconds", inner.connect_timeout);
+    info!("Enable file proxy: {}", inner.enable_file_proxy);
+    info!("Enable direct connection: {}", inner.enable_direct);
     inner.arkose_solver.as_ref().map(|solver| {
         info!("ArkoseLabs solver: {:?}", solver.solver);
     });
-
-    info!("Enable file proxy: {}", inner.enable_file_proxy);
-
-    inner
-        .interface
-        .as_ref()
-        .map(|i| info!("Bind address: {i} for outgoing connection"));
+    inner.proxies.iter().for_each(|p| match p {
+        Proxy::All(inner) | Proxy::Api(inner) | Proxy::Auth(inner) | Proxy::Arkose(inner) => {
+            match inner {
+                InnerProxy::Interface(ipaddr) => {
+                    info!("{} | Interface bind: {ipaddr}", p.proto());
+                }
+                InnerProxy::Proxy(url) => {
+                    info!("{} | Upstream proxy: {url}", p.proto());
+                }
+                InnerProxy::IPv6Subnet(ipv6_subnet) => {
+                    info!("{} | IPv6 subnet: {ipv6_subnet}", p.proto());
+                }
+            }
+        }
+    });
 
     info!(
         "Starting HTTP(S) server at http(s)://{:?}",
@@ -82,10 +84,10 @@ fn print_boot_message(inner: &ContextArgs) {
     );
 }
 
-pub struct Serve(ContextArgs);
+pub struct Serve(Args);
 
 impl Serve {
-    pub fn new(inner: ContextArgs) -> Self {
+    pub fn new(inner: Args) -> Self {
         Self(inner)
     }
 
@@ -332,7 +334,7 @@ async fn post_revoke_token(
 /// platform API match path /v1/{tail.*}
 /// reference: https://platform.openai.com/docs/api-reference
 async fn official_proxy(req: RequestExt) -> Result<impl IntoResponse, ResponseError> {
-    let resp = with_context!(client)
+    let resp = with_context!(api_client)
         .send_request(URL_PLATFORM_API, req)
         .await?;
     response_convert(resp).await
@@ -340,7 +342,7 @@ async fn official_proxy(req: RequestExt) -> Result<impl IntoResponse, ResponseEr
 
 /// reference: doc/http.rest
 async fn unofficial_proxy(req: RequestExt) -> Result<impl IntoResponse, ResponseError> {
-    let resp = with_context!(client)
+    let resp = with_context!(api_client)
         .send_request(URL_CHATGPT_API, req)
         .await?;
     response_convert(resp).await
@@ -384,7 +386,7 @@ impl TryInto<Response<Body>> for SessionAccessToken {
 }
 
 async fn check_wan_address() {
-    match with_context!(client)
+    match with_context!(api_client)
         .get("https://ifconfig.me")
         .timeout(Duration::from_secs(70))
         .header(header::ACCEPT, mime::APPLICATION_JSON.as_ref())

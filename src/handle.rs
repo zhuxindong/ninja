@@ -1,15 +1,12 @@
-use std::{ops::Not, path::PathBuf};
-
-use clap::CommandFactory;
-use openai::{arkose::funcaptcha::ArkoseSolver, context::ContextArgs, serve::Serve};
-
+#[cfg(target_family = "unix")]
+use crate::utils;
 use crate::{
     args::{self, ServeArgs},
     utils::unix::fix_relative_path,
 };
-
-#[cfg(target_family = "unix")]
-use crate::utils;
+use openai::{arkose::funcaptcha::ArkoseSolver, context::Args, proxy, serve::Serve};
+use std::{net::IpAddr, ops::Not, path::PathBuf, str::FromStr};
+use url::Url;
 
 pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<()> {
     if relative_path {
@@ -22,38 +19,35 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         args = toml::from_str::<ServeArgs>(&data)?;
     }
 
-    #[cfg(target_os = "linux")]
-    utils::unix::sysctl_route_add_ipv6_subnet(args.ipv6_subnet);
-
-    #[cfg(target_os = "linux")]
-    utils::unix::sysctl_ipv6_no_local_bind(args.ipv6_subnet.is_some());
-
-    // disable_direct and proxies are mutually exclusive
-    if args.disable_direct
-        && (args.proxies.is_none() || args.proxies.clone().is_some_and(|x| x.is_empty()))
-    {
-        let mut cmd = args::cmd::Opt::command();
-        cmd.error(
-            clap::error::ErrorKind::ArgumentConflict,
-            "Cannot disable direct connection and not set proxies",
-        )
-        .exit();
-    }
-
     let arkose_solver = match args.arkose_solver_key.as_ref() {
         Some(key) => Some(ArkoseSolver::new(args.arkose_solver.clone(), key.clone())),
         None => None,
     };
 
+    #[cfg(target_os = "linux")]
+    if let Some(ref proxies) = args.proxies {
+        proxies.iter().for_each(|p| {
+            let inner = match p {
+                proxy::Proxy::All(v) => v,
+                proxy::Proxy::Api(v) => v,
+                proxy::Proxy::Auth(v) => v,
+                proxy::Proxy::Arkose(v) => v,
+            };
+
+            if let proxy::InnerProxy::IPv6Subnet(cidr) = inner {
+                utils::unix::sysctl_ipv6_no_local_bind();
+                utils::unix::sysctl_route_add_ipv6_subnet(cidr);
+            }
+        });
+    }
+
     // Set the log level
     std::env::set_var("RUST_LOG", args.level);
 
-    let builder = ContextArgs::builder()
+    let builder = Args::builder()
         .bind(args.bind)
-        .interface(args.interface)
-        .ipv6_subnet(args.ipv6_subnet)
         .proxies(args.proxies.unwrap_or_default())
-        .disable_direct(args.disable_direct)
+        .enable_direct(args.enable_direct)
         .cookie_store(args.cookie_store)
         .tcp_keepalive(args.tcp_keepalive)
         .pool_idle_timeout(args.pool_idle_timeout)
@@ -268,6 +262,12 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
         pkey: PathBuf::from("ca/key.pem"),
         arkose_gpt3_experiment: false,
         enable_file_proxy: false,
+        proxies: Some(vec![
+            proxy::Proxy::try_from(("all", "socks5://127.0.0.1:8888".parse::<Url>()?))?,
+            proxy::Proxy::try_from(("all", "http://127.0.0.1:8889".parse::<Url>()?))?,
+            proxy::Proxy::try_from(("api", "192.168.1.1".parse::<IpAddr>()?))?,
+            proxy::Proxy::try_from(("api", cidr::Ipv6Cidr::from_str("2001:db8::/32")?))?,
+        ]),
         ..args::ServeArgs::default()
     };
 

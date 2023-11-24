@@ -37,11 +37,11 @@ msgstr "工作线程"
 msgid "Proxies"
 msgstr "代理"
 
-msgid "Turn off direct connection"
-msgstr "关闭直连"
+msgid "Turn on direct connection"
+msgstr "开启直连"
 
-msgid "Turn off direct connection using proxy"
-msgstr "关闭直连使用代理"
+msgid "Turn on direct connection using proxy"
+msgstr "开启直连使用代理"
 
 msgid "TCP Keep-Alive (seconds)"
 msgstr "TCP保活机制 (秒)"
@@ -201,9 +201,6 @@ msgstr "连接池空闲超时"
 
 msgid "Set an optional timeout for idle sockets being kept-alive"
 msgstr "设置保持活动的空闲套接字的可选超时"
-
-msgid "Interface"
-msgstr "绑定网卡"
 
 msgid "Bind address for outgoing connections"
 msgstr "出站连接绑定地址"

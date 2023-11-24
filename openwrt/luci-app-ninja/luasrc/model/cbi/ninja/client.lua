@@ -14,11 +14,8 @@ o.rmempty = false
 
 o = s:option(Value, "proxies", translate("Proxies"), translate("Supports http/https/socks5, format: protocol://user:pass@ip:port"))
 
-o = s:option(Value, "interface", translate("Interface"), translate("Bind address for outgoing connections"))
 
-o = s:option(Value, "ipv6_subnet", translate("Ipv6 Subnet"), translate("IPv6 subnet, Example: 2001:19f0:6001:48e4::/64"))
-
-o = s:option(Flag, "disable_direct", translate("Turn off direct connection"), translate("Turn off direct connection using proxy"))
+o = s:option(Flag, "enable_direct", translate("Turn on direct connection"), translate("Turn on direct connection using proxy"))
 o.rmempty = false
 
 o = s:option(Value, "level", translate("Log Level"), translate("info/debug/warn/trace/error"))

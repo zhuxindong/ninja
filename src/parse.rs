@@ -1,4 +1,6 @@
 use anyhow::Context;
+use openai::proxy;
+use std::net::IpAddr;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -7,14 +9,6 @@ pub fn parse_socket_addr(s: &str) -> anyhow::Result<std::net::SocketAddr> {
     let addr = s
         .parse::<std::net::SocketAddr>()
         .map_err(|_| anyhow::anyhow!(format!("`{}` isn't a socket address", s)))?;
-    Ok(addr)
-}
-
-// address parse
-pub fn parse_host(s: &str) -> anyhow::Result<std::net::IpAddr> {
-    let addr = s
-        .parse::<std::net::IpAddr>()
-        .map_err(|_| anyhow::anyhow!(format!("`{}` isn't a ip address", s)))?;
     Ok(addr)
 }
 
@@ -29,28 +23,30 @@ pub fn parse_url(s: &str) -> anyhow::Result<String> {
     }
 }
 
-pub fn parse_ipv6_subnet(s: &str) -> anyhow::Result<(std::net::Ipv6Addr, u8)> {
-    match s.parse::<cidr::Ipv6Cidr>() {
-        Ok(cidr) => Ok((cidr.first_address(), cidr.network_length())),
-        Err(_) => {
-            anyhow::bail!(format!("`{}` isn't a ipv6 subnet", s))
-        }
-    }
-}
-
-// proxy proto
-pub fn parse_proxies_url(s: &str) -> anyhow::Result<Vec<String>> {
+// proxy proto, format: proto|url, support proto: all/api/auth/arkose
+pub fn parse_proxies_url(s: &str) -> anyhow::Result<Vec<proxy::Proxy>> {
     let split = s.split(',');
     let mut proxies: Vec<_> = vec![];
+
     for ele in split {
-        let url = url::Url::parse(ele)
-            .context("The Proxy Url format must be `protocol://user:pass@ip:port`")?;
-        let protocol = url.scheme().to_string();
-        match protocol.as_str() {
-            "http" | "https" | "socks5" | "redis" | "rediss" => proxies.push(ele.to_string()),
-            _ => anyhow::bail!("Unsupported protocol: {}", protocol),
+        let parts: Vec<_> = ele.split('|').collect();
+        let (proto, ele) = if parts.len() != 2 {
+            ("all", ele)
+        } else {
+            (parts[0], parts[1])
         };
+        match (
+            ele.parse::<IpAddr>(),
+            url::Url::parse(ele),
+            ele.parse::<cidr::Ipv6Cidr>(),
+        ) {
+            (Ok(ip_addr), _, _) => proxies.push(proxy::Proxy::try_from((proto, ip_addr))?),
+            (_, Ok(url), _) => proxies.push(proxy::Proxy::try_from((proto, url))?),
+            (_, _, Ok(cidr)) => proxies.push(proxy::Proxy::try_from((proto, cidr))?),
+            _ => anyhow::bail!("Invalid proxy format: {}", ele),
+        }
     }
+
     Ok(proxies)
 }
 
