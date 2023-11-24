@@ -85,7 +85,11 @@ pub async fn submit_task(submit_task: SubmitSolver<'_>) -> anyhow::Result<Vec<i3
         }
     }
 
-    let resp = with_context!(client).post(url).json(&body).send().await?;
+    let resp = with_context!(arkose_client)
+        .post(url)
+        .json(&body)
+        .send()
+        .await?;
 
     match resp.error_for_status_ref() {
         Ok(_) => {

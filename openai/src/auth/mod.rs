@@ -337,11 +337,11 @@ pub struct AuthClientBuilder {
 
 impl AuthClientBuilder {
     // Proxy options
-    pub fn proxy(mut self, proxy: Option<String>) -> Self {
+    pub fn proxy(mut self, proxy: Option<Url>) -> Self {
         if let Some(url) = proxy {
-            self.inner = self.inner.proxy(
-                Proxy::all(url.clone()).expect(&format!("reqwest: invalid proxy url: {url}")),
-            );
+            self.inner = self
+                .inner
+                .proxy(Proxy::all(url).expect("reqwest: invalid proxy url"));
         } else {
             self.inner = self.inner.no_proxy();
         }

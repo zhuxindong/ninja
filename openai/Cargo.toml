@@ -17,7 +17,7 @@ serde_json = "1.0.107"
 serde = {version = "1.0.188", features = ["derive"] }
 regex = "1.9.5"
 async-recursion = "1.0.5"
-url = "2.4.1"
+url = { version = "2.5.0", features = ["serde"] }
 base64 = "0.21.4"
 rand = "0.8.5"
 async-trait = "0.1.73"
@@ -28,6 +28,7 @@ futures-core = { version = "0.3.28", optional = true}
 tera = { version = "1.19.1", default-features = false, optional = true }
 hotwatch = "0.5.0"
 moka = { version = "0.12.1", default-features = false, features = ["sync"], optional = true }
+cidr = { version = "0.2.2", features = ["serde"] }
 
 # redis limit
 redis = { version = "0.23.3", features = ["tokio-comp", "tokio-rustls-comp"], optional = true }

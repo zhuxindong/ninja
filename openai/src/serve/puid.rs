@@ -40,7 +40,7 @@ pub(super) async fn get_or_init(
     }
 
     if GPTModel::from_str(model)?.is_gpt4() {
-        let resp = with_context!(client)
+        let resp = with_context!(api_client)
             .get(format!("{URL_CHATGPT_API}/backend-api/models"))
             .bearer_auth(token)
             .send()

@@ -103,7 +103,7 @@ pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, Respons
         .arkose_token(&arkose_token)
         .build();
 
-    let mut builder = with_context!(client)
+    let mut builder = with_context!(api_client)
         .post(format!("{URL_CHATGPT_API}/backend-api/conversation"))
         .header(header::ORIGIN, URL_CHATGPT_API)
         .header(header::REFERER, URL_CHATGPT_API)

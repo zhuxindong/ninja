@@ -8,7 +8,7 @@ services:
     environment:
       - TZ=Asia/Shanghai
       - PROXIES=socks5://warp:10000
-    command: run --disable-direct
+    command: run
     ports:
       - "8081:7999"
     depends_on:

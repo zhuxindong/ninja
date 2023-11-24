@@ -276,7 +276,7 @@ async fn get_from_bx_common(
         ("rnd", &(&rand::thread_rng().gen::<f64>().to_string())),
     ];
 
-    let resp = with_context!(client)
+    let resp = with_context!(arkose_client)
         .post(format!("https://{host}/fc/gt2/public_key/{public_key}"))
         .header(header::USER_AGENT, HEADER_UA)
         .header(header::ACCEPT, "*/*")
@@ -325,7 +325,7 @@ async fn get_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<ArkoseToken> {
         .push_str(&format!("&bda={}", general_purpose::STANDARD.encode(&bda)));
     entry.body.push_str(&format!("&rnd={rnd}"));
 
-    let client = with_context!(client);
+    let client = with_context!(arkose_client);
 
     let method = Method::from_bytes(entry.method.as_bytes())?;
 
@@ -410,7 +410,7 @@ where
     if arkose_token.success() {
         // Submit token to funcaptcha callback
         tokio::spawn(funcaptcha::callback(
-            with_context!(client),
+            with_context!(arkose_client),
             arkose_token.value().to_owned(),
         ));
     } else {

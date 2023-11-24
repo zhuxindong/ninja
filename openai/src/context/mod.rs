@@ -12,7 +12,7 @@ use crate::{
     arkose::{self, funcaptcha::ArkoseSolver},
     auth::AuthClient,
     balancer::ClientRoundRobinBalancer,
-    error,
+    error, proxy,
 };
 use reqwest::Client;
 use typed_builder::TypedBuilder;
@@ -36,7 +36,7 @@ macro_rules! with_context {
 }
 
 /// Use Once to guarantee initialization only once
-pub fn init(args: ContextArgs) {
+pub fn init(args: Args) {
     if let Some(_) = CTX.set(Context::new(args)).err() {
         error!("Failed to initialize context");
     };
@@ -44,11 +44,11 @@ pub fn init(args: ContextArgs) {
 
 /// Get the program context
 pub fn get_instance() -> &'static Context {
-    CTX.get_or_init(|| Context::new(ContextArgs::builder().build()))
+    CTX.get_or_init(|| Context::new(Args::builder().build()))
 }
 
 #[derive(TypedBuilder, Clone, Default)]
-pub struct ContextArgs {
+pub struct Args {
     /// Server bind address
     #[builder(setter(into), default = Some(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 7999)))]
     pub(crate) bind: Option<SocketAddr>,
@@ -63,7 +63,7 @@ pub struct ContextArgs {
 
     /// Disable direct connection
     #[builder(default = false)]
-    pub(crate) disable_direct: bool,
+    pub(crate) enable_direct: bool,
 
     /// Enabled Cookie Store
     #[builder(default = false)]
@@ -87,15 +87,7 @@ pub struct ContextArgs {
 
     /// Server proxies
     #[builder(setter(into), default)]
-    pub(crate) proxies: Vec<String>,
-
-    /// Bind address for outgoing connections
-    #[builder(setter(into), default)]
-    pub(crate) interface: Option<std::net::IpAddr>,
-
-    /// Ipv6 Subnet
-    #[builder(setter(into), default)]
-    pub(crate) ipv6_subnet: Option<(std::net::Ipv6Addr, u8)>,
+    pub(crate) proxies: Vec<proxy::Proxy>,
 
     /// TLS cert
     #[builder(setter(into), default)]
@@ -218,9 +210,11 @@ static CTX: OnceLock<Context> = OnceLock::new();
 
 pub struct Context {
     /// Requesting client
-    client_load: Option<ClientRoundRobinBalancer>,
+    api_client: ClientRoundRobinBalancer,
     /// Requesting oauth client
-    auth_client_load: Option<ClientRoundRobinBalancer>,
+    auth_client: ClientRoundRobinBalancer,
+    /// Requesting arkose client
+    arkose_client: ClientRoundRobinBalancer,
     /// arkoselabs solver
     arkose_solver: Option<ArkoseSolver>,
     /// HAR file upload authenticate key
@@ -240,7 +234,7 @@ pub struct Context {
 }
 
 impl Context {
-    fn new(args: ContextArgs) -> Self {
+    fn new(args: Args) -> Self {
         let gpt3_har_provider = HarProvider::new(
             arkose::Type::GPT3,
             args.arkose_gpt3_har_dir.as_ref(),
@@ -271,14 +265,12 @@ impl Context {
             .expect("Failed to set har map");
 
         Context {
-            client_load: Some(
-                ClientRoundRobinBalancer::new_client(&args)
-                    .expect("Failed to initialize the requesting client"),
-            ),
-            auth_client_load: Some(
-                ClientRoundRobinBalancer::new_auth_client(&args)
-                    .expect("Failed to initialize the requesting oauth client"),
-            ),
+            api_client: ClientRoundRobinBalancer::new_client(&args)
+                .expect("Failed to initialize the requesting client"),
+            auth_client: ClientRoundRobinBalancer::new_auth_client(&args)
+                .expect("Failed to initialize the requesting oauth client"),
+            arkose_client: ClientRoundRobinBalancer::new_arkose_client(&args)
+                .expect("Failed to initialize the requesting arkose client"),
             arkose_endpoint: args.arkose_endpoint,
             arkose_solver: args.arkose_solver,
             arkose_har_upload_key: args.arkose_har_upload_key,
@@ -296,21 +288,18 @@ impl Context {
     }
 
     /// Get the reqwest client
-    pub fn client(&self) -> Client {
-        self.client_load
-            .as_ref()
-            .expect("The load balancer client is not initialized")
-            .next()
-            .into()
+    pub fn api_client(&self) -> Client {
+        self.api_client.next().into()
     }
 
     /// Get the reqwest auth client
     pub fn auth_client(&self) -> AuthClient {
-        self.auth_client_load
-            .as_ref()
-            .expect("The load balancer auth client is not initialized")
-            .next()
-            .into()
+        self.auth_client.next().into()
+    }
+
+    /// Get the reqwest arkose client
+    pub fn arkose_client(&self) -> Client {
+        self.arkose_client.next().into()
     }
 
     /// Get the arkoselabs har file upload authenticate key

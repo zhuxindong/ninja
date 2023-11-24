@@ -1,4 +1,4 @@
-mod api_breaker;
+mod breaker;
 pub mod model;
 pub mod solver;
 
@@ -136,14 +136,14 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
         .unwrap_or_default();
     let mut headers = header::HeaderMap::new();
 
-    headers.insert(header::REFERER, format!("https://client-api.arkoselabs.com/fc/assets/ec-game-core/game-core/1.15.0/standard/index.html?session={}", arkose_token.replace("|", "&")).parse()?);
+    headers.insert(header::REFERER, format!("https://client-api.arkoselabs.com/fc/assets/ec-game-core/game-core/2.2.2/standard/index.html?session={}", arkose_token.replace("|", "&")).parse()?);
     headers.insert(header::DNT, header::HeaderValue::from_static("1"));
     let mut session = Session {
         sid: sid.to_owned(),
         session_token,
         funcaptcha: None,
         challenge: None,
-        client: with_context!(client),
+        client: with_context!(arkose_client),
         game_type: 0,
         headers,
     };
@@ -278,7 +278,7 @@ impl Session {
             .custom_gui;
 
         for answer in answers {
-            let answer = api_breaker::hanlde_answer(
+            let answer = breaker::hanlde_answer(
                 c_ui.api_breaker_v2_enabled != 0,
                 self.game_type,
                 &c_ui.api_breaker,
