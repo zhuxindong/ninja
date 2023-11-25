@@ -2,18 +2,6 @@
 
 如果项目对你有帮助，请考虑[捐赠支持](https://github.com/gngpp/gngpp/blob/main/SPONSOR.md#sponsor-my-open-source-works)项目持续维护，也可以付费获取咨询和技术支持服务。
 
-### 特性
-
-- API密钥获取
-- 电子邮件/密码帐户认证 (不支持Google/Microsoft第三方登录)
-- 支持获取RefreshToken
-- `ChatGPT-API`/`OpenAI-API`/`ChatGPT-to-API` Http API 代理 (供第三方客户端接入)
-- 支持IP代理池（支持使用Ipv6子网作为代理池）
-- ChatGPT WebUI
-- 极少的内存占用
-
-> 局限性: 无法绕过 OpenAI 的彻底 IP 禁令
-
 ### ArkoseLabs
 
 发送`GPT-4/GPT-3.5/创建API-Key`对话需要`Arkose Token`作为参数发送，支持的解决方案暂时只有两种
@@ -22,18 +10,18 @@
 
 - 支持HAR特征池化，可同时上传多个HAR，使用轮训策略
 
-> `ChatGPT` 官网发送一次 `GPT-4` 会话消息，浏览器 `F12` 下载 `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` 接口的HAR日志记录文件，使用启动参数 `--arkose-gpt4-har-dir` 指定HAR目录路径使用（不指定路径则使用默认路径`~/.gpt4`，可直接上传更新HAR），同理`GPT-3.5`和其他类型也是一样方法。支持WebUI上传更新HAR，请求路径:`/har/upload`，可选上传身份验证参数:`--arkose-har-upload-key`
+`ChatGPT` 官网发送一次 `GPT-4` 会话消息，浏览器 `F12` 下载 `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` 接口的HAR日志记录文件，使用启动参数 `--arkose-gpt4-har-dir` 指定HAR目录路径使用（不指定路径则使用默认路径`~/.gpt4`，可直接上传更新HAR），同理`GPT-3.5`和其他类型也是一样方法。支持WebUI上传更新HAR，请求路径:`/har/upload`，可选上传身份验证参数:`--arkose-har-upload-key`
 
 2) 使用[YesCaptcha](https://yescaptcha.com/i/1Cc5i4) / [CapSolver](https://dashboard.capsolver.com/passport/register?inviteCode=y7CtB_a-3X6d)
 
-> 平台进行验证码解析，启动参数`--arkose-solver`选择平台（默认使用`YesCaptcha`），`--arkose-solver-key` 填写`Client Key`
+平台进行验证码解析，启动参数`--arkose-solver`选择平台（默认使用`YesCaptcha`），`--arkose-solver-key` 填写`Client Key`
 
 - 两种方案都使用，优先级是：`HAR` > `YesCaptcha` / `CapSolver`
 - `YesCaptcha` / `CapSolver`推荐搭配HAR使用，出验证码则调用解析器处理，验证后HAR使用更持久
 
-> 目前OpenAI已经更新`登录`需要验证`Arkose Token`，解决方式同`GPT-4`，填写启动参数指定HAR文件`--arkose-auth-har-dir`。创建API-Key需要上传Platform相关的HAR特征文件，获取方式同上。
+目前OpenAI已经更新`登录`需要验证`Arkose Token`，解决方式同`GPT-4`，填写启动参数指定HAR文件`--arkose-auth-har-dir`。创建API-Key需要上传Platform相关的HAR特征文件，获取方式同上。
 
-> 近日，`OpenAI`取消对`GPT-3.5`进行`Arkose`验证，可以不上传HAR特征文件使用（已上传的不影响），兼容后续可能会再次开启`Arkose`验证，需要加上启动参数`--arkose-gpt3-experiment`进行开启`GPT-3.5`模型`Arkose`验证处理，WebUI不受影响.
+近日，`OpenAI`取消对`GPT-3.5`进行`Arkose`验证，可以不上传HAR特征文件使用（已上传的不影响），兼容后续可能会再次开启`Arkose`验证，需要加上启动参数`--arkose-gpt3-experiment`进行开启`GPT-3.5`模型`Arkose`验证处理，WebUI不受影响.
 
 ### Http 服务
 
@@ -63,9 +51,9 @@
   - 撤销 `RefreshToken`: `/auth/revoke_token`
   - 刷新 `Session`: `/api/auth/session`，发送名为`__Secure-next-auth.session-token`的Cookie调用刷新`Session`，同时返回新的`AccessToken`
   
-  > `Web登录`默认返回一个名为: `__Secure-next-auth.session-token`的cookie，客户端只需要保存这个cookie，调用`/api/auth/session`也可以刷新`AccessToken`
+  `Web登录`默认返回一个名为: `__Secure-next-auth.session-token`的cookie，客户端只需要保存这个cookie，调用`/api/auth/session`也可以刷新`AccessToken`
 
-  > `RefreshToken`获取的方式，采用`Apple`平台`ChatGPT App`登录方式，原理是使用内置MITM代理。`Apple设备`连上代理即可开启`Apple平台`登录获取`RefreshToken`，仅适用于量小或者个人使用`（量大会封设备，慎用）`，详细使用请看启动参数说明。
+  `RefreshToken`获取的方式，采用`Apple`平台`ChatGPT App`登录方式，原理是使用内置MITM代理。`Apple设备`连上代理即可开启`Apple平台`登录获取`RefreshToken`，仅适用于量小或者个人使用`（量大会封设备，慎用）`，详细使用请看启动参数说明。
 
   ```shell
   # 生成证书
@@ -104,11 +92,39 @@
 - `--enable-file-proxy`，环境变量`ENABLE_FILE_PROXY`，开启文件上下传API代理
 - `--enable-direct`，开启直连，将绑定`interface`出口的IP的加入代理池
 - `--proxies`，代理，支持代理池，多个代理使用`,`隔开，格式: protocol://user:pass@ip:port
-  > 高阶用法，分代理内置协议和类型使用，内置协议: `all/api/auth/arkose`，其中`all`针对所有客户端，`api`针对所有`OpenAI API`，`auth`针对授权/登录，`arkose`针对ArkoseLabs；代理的类型: `interface/proxy/ipv6_subnet`，其中`interface`表示绑定的出口`IP`地址，`proxy`表示上游代理协议: `http/https/socks5`，`ipv6_subnet`表示用Ipv6字网网段内随机IP地址作为代理。例子: `all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081`，不带内置协议，则默认为`all`。`interface` \ `proxy` \ `ipv6_subnet`都存在时默认使用`proxy`，`interface`作为出口绑定地址；存在`interface` \ `ipv6_subnet`时，`interface`作为fallback地址。
+
+##### 代理高阶用法
+分代理内置协议和代理类型，内置协议: `all/api/auth/arkose`，其中`all`针对所有客户端，`api`针对所有`OpenAI API`，`auth`针对授权/登录，`arkose`针对ArkoseLabs；代理类型: `interface/proxy/ipv6_subnet`，其中`interface`表示绑定的出口`IP`地址，`proxy`表示上游代理协议: `http/https/socks5`，`ipv6_subnet`表示用Ipv6子网段内随机IP地址作为代理。格式为`proto|proxy`，例子: **`all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081`**，不带内置协议，协议默认为`all`。
+  
+##### 代理使用规则
+1)  `interface` \ `proxy` \ `ipv6_subnet`
+
+当开启`--enable-direct`，那么将使用`proxy` + `interface`作为代理池；未开启`--enable-direct`，只有`proxy`数量大于等于2才使用`proxy`，否则将使用 `ipv6_subnet`作为代理池，`interface`作为fallback地址。
+
+2) 存在`interface`、`proxy`
+
+当开启`--enable-direct`，那么将使用`proxy` + `interface`作为代理池；未开启`--enable-direct`，只使用`proxy`作为代理池。
+  
+3) 存在`proxy` \ `ipv6_subnet`
+
+规则同(1)，只是没有`interface`作为fallback地址。
+
+4) 存在`interface` \ `ipv6_subnet`
+当开启`--enable-direct`，同时`interface`数量大于等于2似，`interface`作为代理池；未开启`--enable-direct`，将使用 `ipv6_subnet`作为代理池，`interface`作为fallback地址。
+
+5) 存在`proxy`
+
+当开启`--enable-direct`,使用`proxy` + 默认直连作为代理池；未开启`--enable-direct`，只使用`proxy`作为代理池
+
+6) 存在`ipv6_subnet`
+
+无论是否开启`--enable-direct`，都将使用`ipv6_subnet`作为代理池
+
+
 
 ### 安装
 
-- ### 平台支持
+- #### 平台支持
   - `x86_64-unknown-linux-musl`
   - `aarch64-unknown-linux-musl`
   - `armv7-unknown-linux-musleabi`

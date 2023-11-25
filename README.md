@@ -35,6 +35,19 @@ Reverse engineered `ChatGPT` proxy (bypass Cloudflare 403 Access Denied)
 
 If you need more detailed installation and usage information, please check [Installation Document](https://github.com/gngpp/ninja/blob/main/doc/readme.md))
 
+- Platform
+
+  - `x86_64-unknown-linux-musl`
+  - `aarch64-unknown-linux-musl`
+  - `armv7-unknown-linux-musleabi`
+  - `armv7-unknown-linux-musleabihf`
+  - `arm-unknown-linux-musleabi`
+  - `arm-unknown-linux-musleabihf`
+  - `armv5te-unknown-linux-musleabi`
+  - `x86_64-pc-windows-msvc`
+  - `x86_64-apple-darwin`
+  - `aarch64-apple-darwin`
+
 ### Contributing
 
 If you would like to submit your contribution, please open a [Pull Request](https://github.com/gngpp/ninja/pulls).

@@ -10,18 +10,18 @@ Sending `GPT-4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` 
 
 - Supports HAR feature pooling, can upload multiple HARs at the same time, and use rotation training strategy
 
-> The `ChatGPT` official website sends a `GPT-4` session message, and the browser `F12` downloads the `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` interface. HAR log file, use the startup parameter `--arkose-gpt4-har-dir` to specify the HAR directory path to use (if you do not specify a path, use the default path `~/.gpt4`, you can directly upload and update HAR ), the same method applies to `GPT-3.5` and other types. Supports WebUI to upload and update HAR, request path: `/har/upload`, optional upload authentication parameter: `--arkose-har-upload-key`
+The `ChatGPT` official website sends a `GPT-4` session message, and the browser `F12` downloads the `https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147` interface. HAR log file, use the startup parameter `--arkose-gpt4-har-dir` to specify the HAR directory path to use (if you do not specify a path, use the default path `~/.gpt4`, you can directly upload and update HAR ), the same method applies to `GPT-3.5` and other types. Supports WebUI to upload and update HAR, request path: `/har/upload`, optional upload authentication parameter: `--arkose-har-upload-key`
 
 2) Use [YesCaptcha](https://yescaptcha.com/i/1Cc5i4) / [CapSolver](https://dashboard.capsolver.com/passport/register?inviteCode=y7CtB_a-3X6d)
 
-> The platform performs verification code parsing, start the parameter `--arkose-solver` to select the platform (use `YesCaptcha` by default), `--arkose-solver-key` fill in `Client Key`
+The platform performs verification code parsing, start the parameter `--arkose-solver` to select the platform (use `YesCaptcha` by default), `--arkose-solver-key` fill in `Client Key`
 
 - Both solutions are used, the priority is: `HAR` > `YesCaptcha` / `CapSolver`
 - `YesCaptcha` / `CapSolver` is recommended to be used with HAR. When the verification code is generated, the parser is called for processing. After verification, HAR is more durable.
 
-> Currently OpenAI has updated `Login` which requires verification of `Arkose Token`. The solution is the same as `GPT-4`. Fill in the startup parameters and specify the HAR file `--arkose-auth-har-dir`. To create an API-Key, you need to upload the HAR feature file related to the Platform. The acquisition method is the same as above.
+Currently OpenAI has updated `Login` which requires verification of `Arkose Token`. The solution is the same as `GPT-4`. Fill in the startup parameters and specify the HAR file `--arkose-auth-har-dir`. To create an API-Key, you need to upload the HAR feature file related to the Platform. The acquisition method is the same as above.
 
-> Recently, `OpenAI` has canceled the `Arkose` verification for `GPT-3.5`. It can be used without uploading HAR feature files (uploaded ones will not be affected). After compatibility, `Arkose` verification may be turned on again, and startup parameters need to be added. `--arkose-gpt3-experiment` enables the `GPT-3.5` model `Arkose` verification processing, and the WebUI is not affected.
+Recently, `OpenAI` has canceled the `Arkose` verification for `GPT-3.5`. It can be used without uploading HAR feature files (uploaded ones will not be affected). After compatibility, `Arkose` verification may be turned on again, and startup parameters need to be added. `--arkose-gpt3-experiment` enables the `GPT-3.5` model `Arkose` verification processing, and the WebUI is not affected.
 
 ### Http Server
 
@@ -51,9 +51,9 @@ Sending `GPT-4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` 
   - Revoke `RefreshToken`: `/auth/revoke_token`
   - Refresh `Session`: `/api/auth/session`, send a cookie named `__Secure-next-auth.session-token` to call refresh `Session`, and return a new `AccessToken`
   
-  > `Web login`, a cookie named: `__Secure-next-auth.session-token` is returned by default. The client only needs to save this cookie. Calling `/api/auth/session` can also refresh `AccessToken`
+  `Web login`, a cookie named: `__Secure-next-auth.session-token` is returned by default. The client only needs to save this cookie. Calling `/api/auth/session` can also refresh `AccessToken`
 
-  > About the method of obtaining `RefreshToken`, use the `ChatGPT App` login method of the `Apple` platform. The principle is to use the built-in MITM agent. When the `Apple device` is connected to the agent, you can log in to the `Apple platform` to obtain `RefreshToken`. It is only suitable for small quantities or personal use `(large quantities will seal the device, use with caution)`. For detailed usage, please see the startup parameter description.
+  About the method of obtaining `RefreshToken`, use the `ChatGPT App` login method of the `Apple` platform. The principle is to use the built-in MITM agent. When the `Apple device` is connected to the agent, you can log in to the `Apple platform` to obtain `RefreshToken`. It is only suitable for small quantities or personal use `(large quantities will seal the device, use with caution)`. For detailed usage, please see the startup parameter description.
 
   ```shell
   # Generate certificate
@@ -92,11 +92,37 @@ Sending `GPT-4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` 
 - `--enable-file-proxy`, environment variable `ENABLE_FILE_PROXY`, turns on the file upload and download API proxy
 - `--enable-direct`, enable direct connection, add the IP bound to the `interface` export to the proxy pool
 - `--proxies`, proxy, supports proxy pool, multiple proxies are separated by `,`, format: protocol://user:pass@ip:port
-  > Advanced usage, Used by built-in protocols and types of agents, built-in protocols: `all/api/auth/arkose`, where `all` is for all clients, `api` is for all `OpenAI API`, `auth` is for authorization/login, `arkose` is for ArkoseLabs; the type of proxy: `interface/proxy/ipv6_subnet`, where `interface` represents the bound export `IP` address, `proxy` represents the upstream proxy protocol: `http/https/socks5`, `ipv6_subnet` Indicates that a random IP address in the Ipv6 network segment is used as a proxy. Example: `all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081`, without built-in protocol, the default is `all`. When `interface` \ `proxy` \ `ipv6_subnet` all exist, `proxy` is used by default, and `interface` is used as the egress binding address; when `interface` \ `ipv6_subnet` exists, `interface` is used as the fallback address.
+
+##### Advanced proxy usage
+The built-in protocols and proxy types of agents are divided into built-in protocols: `all/api/auth/arkose`, where `all` is for all clients, `api` is for all `OpenAI API`, `auth` is for authorization/login, `arkose` For ArkoseLabs; proxy type: `interface/proxy/ipv6_subnet`, where `interface` represents the bound export `IP` address, `proxy` represents the upstream proxy protocol: `http/https/socks5`, `ipv6_subnet` represents the A random IP address within the IPv6 subnet acts as a proxy. The format is `proto|proxy`, example: **`all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081 `**, without built-in protocol, the protocol defaults to `all`.
+
+##### Agent usage rules
+1) The existence of `interface` \ `proxy` \ `ipv6_subnet`
+
+When `--enable-direct` is turned on, `proxy` + `interface` will be used as the proxy pool; if `--enable-direct` is not turned on, `proxy` will be used only if the number of `proxy` is greater than or equal to 2, otherwise it will Use `ipv6_subnet` as the proxy pool and `interface` as the fallback address.
+
+2) The existence of `interface` \ `proxy`
+
+When `--enable-direct` is turned on, `proxy` + `interface` will be used as the proxy pool; if `--enable-direct` is not turned on, only `proxy` will be used as the proxy pool.
+  
+3) The existence of `proxy` \ `ipv6_subnet`
+
+The rules are the same as (1), except that there is no `interface` as the fallback address.
+
+4) The existence of `interface` \ `ipv6_subnet`
+When `--enable-direct` is turned on and the number of `interface` is greater than or equal to 2, `interface` will be used as the proxy pool; if `--enable-direct` is not turned on, `ipv6_subnet` will be used as the proxy pool and `interface` will be used as the proxy pool. fallback address.
+
+5) The existence of `proxy`
+
+When `--enable-direct` is enabled, `proxy` + default direct connection is used as the proxy pool; when `--enable-direct` is not enabled, only `proxy` is used as the proxy pool
+
+6) The existence of `ipv6_subnet`
+
+Regardless of whether `--enable-direct` is turned on, `ipv6_subnet` will be used as the proxy pool
 
 ### Install
 
-- ### Platform
+- #### Platform
 
   - `x86_64-unknown-linux-musl`
   - `aarch64-unknown-linux-musl`
