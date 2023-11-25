@@ -138,52 +138,58 @@ pub(super) async fn response_convert(
 ) -> Result<impl IntoResponse, ResponseError> {
     match resp_ext.inner.error_for_status() {
         Ok(resp) => {
-            let config =
-                resp_ext
-                    .context
-                    .ok_or(ResponseError::InternalServerError(anyhow::anyhow!(
-                        "to_api is empty"
-                    )))?;
+            // Get config from request context
+            let config = resp_ext.context.ok_or(ResponseError::InternalServerError(
+                ProxyError::RequestContentIsEmpty,
+            ))?;
+
+            // Get response body event source
             let event_source = resp.bytes_stream().eventsource();
+
             if config.stream {
-                return Ok(
-                    Sse::new(stream::stream_handler(event_source, config.model)).into_response()
-                );
+                // Create a  stream response
+                let stream = stream::stream_handler(event_source, config.model);
+                Ok(Sse::new(stream).into_response())
             } else {
-                let res = stream::not_stream_handler(event_source, config.model)
+                // Create a not stream response
+                let no_stream = stream::not_stream_handler(event_source, config.model)
                     .await
                     .map_err(ResponseError::InternalServerError)?;
-                return Ok(res.into_response());
+                Ok(no_stream.into_response())
             }
         }
-        Err(err) => {
-            if let Some(status_code) = err.status() {
-                match status_code {
-                    StatusCode::UNAUTHORIZED => {
-                        let body = serde_json::json!({
-                            "error": {
-                                "message": "You didn't provide an API key. You need to provide your API key in an Authorization header using Bearer auth (i.e. Authorization: Bearer YOUR_KEY), or as the password field (with blank username) if you're accessing the API from your browser and are prompted for a username and password. You can obtain an API key from https://platform.openai.com/account/api-keys.",
-                                "type": "invalid_request_error",
-                                "param": null,
-                                "code": null
-                            }
-                        });
-                        return Ok(Json(body).into_response());
-                    }
-                    _ => {
-                        return Err(ResponseError::new(err.to_string(), status_code));
-                    }
-                }
-            } else {
-                return Err(ResponseError::InternalServerError(err));
-            }
-        }
+        Err(err) => Ok(handle_error_response(err)?.into_response()),
     }
 }
 
+/// Handle error response
+fn handle_error_response(err: reqwest::Error) -> Result<impl IntoResponse, ResponseError> {
+    if let Some(status_code) = err.status() {
+        match status_code {
+            StatusCode::UNAUTHORIZED => {
+                let body = serde_json::json!({
+                    "error": {
+                        "message": "You didn't provide an API key...",
+                        "type": "invalid_request_error",
+                        "param": null,
+                        "code": null
+                    }
+                });
+                Ok(Json(body).into_response())
+            }
+            _ => Err(ResponseError::new(err.to_string(), status_code)),
+        }
+    } else {
+        Err(ResponseError::InternalServerError(err))
+    }
+}
+
+/// OpenAI API to ChatGPT API model mapper
 async fn model_mapper(model: &str) -> Result<(&str, &str, Option<ArkoseToken>), ResponseError> {
+    // check model is supported
     let gpt_model = GPTModel::from_str(model)?;
 
+    // check if arkose token is required
     let arkose_token =
         if (with_context!(arkose_gpt3_experiment) && gpt_model.is_gpt3()) || gpt_model.is_gpt4() {
             let arkose_token = ArkoseToken::new_from_context(gpt_model.clone().into()).await?;
@@ -192,17 +198,13 @@ async fn model_mapper(model: &str) -> Result<(&str, &str, Option<ArkoseToken>), 
             None
         };
 
-    if gpt_model.is_gpt3() {
-        return Ok(("text-davinci-002-render-sha", "gpt-3.5-turbo", arkose_token));
-    }
-
+    // if model is gpt-4
     if gpt_model.is_gpt4() {
         return Ok(("gpt-4", "gpt-4", arkose_token));
     }
 
-    return Err(ResponseError::BadRequest(anyhow::anyhow!(
-        "not support model: {model}"
-    )));
+    // fallback to gpt-3.5
+    Ok(("text-davinci-002-render-sha", "gpt-3.5-turbo", arkose_token))
 }
 
 fn generate_id(length: usize) -> String {

@@ -503,6 +503,7 @@ async fn submit_captcha(
     let mut r = Vec::new();
     let mut mr = Vec::new();
 
+    // Get answers
     while let Some((i, res)) = rx.recv().await {
         let answers = res?;
         if answers.len() == 1 {
@@ -512,19 +513,23 @@ async fn submit_captcha(
         }
     }
 
+    // Sort by vec index
     mr.sort_by_key(|&(i, _)| i);
     for (_, answers) in mr {
         for answer in answers {
             r.push((0, answer));
         }
     }
+    // Sort by index
     r.sort_by_key(|&(i, _)| i);
 
+    // Convert to answers
     let answers = r
         .into_iter()
         .map(|(_, answer)| answer)
         .collect::<Vec<i32>>();
 
+    // Submit answers
     return match session.submit_answer(answers).await {
         Ok(_) => {
             let new_token = arkose_token.value().replace("at=40", "at=40|sup=1");

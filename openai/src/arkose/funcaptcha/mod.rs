@@ -134,10 +134,11 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
         .split('=')
         .nth(1)
         .unwrap_or_default();
-    let mut headers = header::HeaderMap::new();
 
+    let mut headers = header::HeaderMap::new();
     headers.insert(header::REFERER, format!("https://client-api.arkoselabs.com/fc/assets/ec-game-core/game-core/2.2.2/standard/index.html?session={}", arkose_token.replace("|", "&")).parse()?);
     headers.insert(header::DNT, header::HeaderValue::from_static("1"));
+
     let mut session = Session {
         sid: sid.to_owned(),
         session_token,
@@ -263,7 +264,7 @@ impl Session {
             }
             None => {
                 warn!("unknown challenge type: {challenge:#?}");
-                bail!("unknown challenge type: {key}")
+                bail!("unknown challenge type key: {key}")
             }
         }
     }
@@ -306,7 +307,6 @@ impl Session {
         self.headers
             .insert(header::DNT, header::HeaderValue::from_static("1"));
         self.headers.insert("X-Requested-ID", request_id.parse()?);
-
         self.headers
             .insert("X-NewRelic-Timestamp", get_time_stamp().parse()?);
 
@@ -352,9 +352,7 @@ impl Session {
 
                 Ok(())
             }
-            Err(err) => {
-                anyhow::bail!(err)
-            }
+            Err(err) => Err(anyhow::anyhow!(err)),
         }
     }
 
@@ -379,8 +377,6 @@ impl Session {
 }
 
 fn get_time_stamp() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let now = SystemTime::now();
-    let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+    let since_the_epoch = now_duration().expect("Time went backwards");
     since_the_epoch.as_millis().to_string()
 }

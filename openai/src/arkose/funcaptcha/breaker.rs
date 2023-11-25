@@ -103,7 +103,7 @@ fn handle_v2_game4_api_breaker_key(key: &str) -> Box<dyn Fn(i32) -> serde_json::
                 "req_timestamp": get_time_stamp(),
             })
         }),
-        "delta" => Box::new(|answer| json!({"index":answer})),
+        "delta" => Box::new(|answer| json!({ "index": answer })),
         "epsilon" => Box::new(|answer| {
             let mut arr: Vec<i32> = Vec::new();
             let len = rand::thread_rng().gen_range(0..5) + 1;
@@ -161,7 +161,7 @@ pub(super) fn hanlde_answer(
     }
 
     if !v2 && game_type == 4 {
-        return Ok(json!({"index": answer}));
+        return Ok(json!({ "index": answer }));
     }
 
     if v2 && game_type == 3 {

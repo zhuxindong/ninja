@@ -5,11 +5,12 @@ use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 use url::Url;
 
-pub trait RandomIpv6 {
+/// RandomIpv6 trait
+pub trait Ipv6CidrExt {
     fn random_ipv6(&self) -> IpAddr;
 }
 
-impl RandomIpv6 for cidr::Ipv6Cidr {
+impl Ipv6CidrExt for Ipv6Cidr {
     fn random_ipv6(&self) -> IpAddr {
         let ipv6: u128 = self.first_address().into();
         let prefix_len = self.network_length();
@@ -23,11 +24,15 @@ impl RandomIpv6 for cidr::Ipv6Cidr {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum InnerProxy {
-    Interface(IpAddr),
+    /// Upstream proxy, supports http, https, socks5
     Proxy(Url),
+    /// Bind to interface, supports ipv4, ipv6
+    Interface(IpAddr),
+    /// Bind to ipv6 subnet, ramdomly generate ipv6 address
     IPv6Subnet(Ipv6Cidr),
 }
 
+/// Proxy configuration
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Proxy {
@@ -35,6 +40,17 @@ pub enum Proxy {
     Api(InnerProxy),
     Auth(InnerProxy),
     Arkose(InnerProxy),
+}
+
+impl Proxy {
+    pub fn proto(&self) -> &'static str {
+        match self {
+            Proxy::All(_) => "All",
+            Proxy::Api(_) => "Api",
+            Proxy::Auth(_) => "Auth",
+            Proxy::Arkose(_) => "Arkose",
+        }
+    }
 }
 
 const UNSUPPORTED_PROTOCOL: &str = "Unsupported protocol";
@@ -82,16 +98,5 @@ impl TryFrom<(&str, cidr::Ipv6Cidr)> for Proxy {
     fn try_from((proto, cidr): (&str, cidr::Ipv6Cidr)) -> Result<Self, Error> {
         let inner_proxy = InnerProxy::IPv6Subnet(cidr);
         make_proxy(inner_proxy, proto)
-    }
-}
-
-impl Proxy {
-    pub fn proto(&self) -> &'static str {
-        match self {
-            Proxy::All(_) => "All",
-            Proxy::Api(_) => "Api",
-            Proxy::Auth(_) => "Auth",
-            Proxy::Arkose(_) => "Arkose",
-        }
     }
 }

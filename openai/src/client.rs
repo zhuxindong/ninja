@@ -2,7 +2,7 @@ use crate::auth::{self};
 use crate::{
     auth::AuthClient,
     context, debug,
-    proxy::{self, RandomIpv6},
+    proxy::{self, Ipv6CidrExt},
 };
 use reqwest::{impersonate::Impersonate, Client};
 use std::{
@@ -12,27 +12,28 @@ use std::{
 };
 use url::Url;
 
+/// Client type
 #[derive(Clone)]
-pub enum ClientType {
+pub enum ClientAgent {
     Api(Client),
-    Auth(AuthClient),
     Arkose(Client),
+    Auth(AuthClient),
 }
 
-impl Into<AuthClient> for ClientType {
+impl Into<AuthClient> for ClientAgent {
     fn into(self) -> AuthClient {
         match self {
-            ClientType::Auth(client) => client,
+            ClientAgent::Auth(client) => client,
             _ => panic!("Attempted to convert a non-Auth client into AuthClient"),
         }
     }
 }
 
-impl Into<Client> for ClientType {
+impl Into<Client> for ClientAgent {
     fn into(self) -> Client {
         match self {
-            ClientType::Api(client) => client,
-            ClientType::Arkose(client) => client,
+            ClientAgent::Api(client) => client,
+            ClientAgent::Arkose(client) => client,
             _ => panic!("Attempted to convert a non-Regular client into Client"),
         }
     }
@@ -81,8 +82,9 @@ impl Config {
     }
 }
 
+/// Client round robin balancer
 pub struct ClientRoundRobinBalancer {
-    pool: Vec<ClientType>,
+    pool: Vec<ClientAgent>,
     index: AtomicUsize,
     config: Config,
 }
@@ -99,7 +101,7 @@ impl ClientRoundRobinBalancer {
                 _ => None,
             })
             .collect();
-        Self::new_client_generic(args, ClientType::Api, p, build_client)
+        Self::new_client_generic(args, ClientAgent::Api, p, build_client)
     }
 
     pub fn new_auth_client(args: &context::Args) -> anyhow::Result<Self> {
@@ -113,7 +115,7 @@ impl ClientRoundRobinBalancer {
                 _ => None,
             })
             .collect();
-        Self::new_client_generic(args, ClientType::Auth, p, build_auth_client)
+        Self::new_client_generic(args, ClientAgent::Auth, p, build_auth_client)
     }
 
     pub fn new_arkose_client(args: &context::Args) -> anyhow::Result<Self> {
@@ -127,12 +129,12 @@ impl ClientRoundRobinBalancer {
                 _ => None,
             })
             .collect();
-        Self::new_client_generic(args, ClientType::Arkose, p, build_client)
+        Self::new_client_generic(args, ClientAgent::Arkose, p, build_client)
     }
 
     fn new_client_generic<F, T>(
         args: &context::Args,
-        client_type: fn(T) -> ClientType,
+        client_type: fn(T) -> ClientAgent,
         proxy: Vec<proxy::InnerProxy>,
         build_fn: F,
     ) -> anyhow::Result<Self>
@@ -190,6 +192,7 @@ impl ClientRoundRobinBalancer {
 
         // Join proxy clients to pool
         proxies.into_iter().for_each(|proxy| {
+            // if no interface is specified, join a client with no bind address
             join_client(config.get_next_interface(), Some(proxy));
         });
 
@@ -207,25 +210,27 @@ impl ClientRoundRobinBalancer {
 }
 
 impl ClientRoundRobinBalancer {
-    fn rebuild_client_with_ipv6(&self, client: &ClientType) -> ClientType {
+    // rebuild client with ipv6
+    fn rebuild_client_with_ipv6(&self, client: &ClientAgent) -> ClientAgent {
         let bind_addr = self.config.get_next_ipv6();
+        // if interface is not specified, use fallback bind address
         let fallback_bind_addr = self.config.get_next_interface();
         match client {
-            ClientType::Auth(_) => ClientType::Auth(build_auth_client(
+            ClientAgent::Auth(_) => ClientAgent::Auth(build_auth_client(
                 &self.config,
                 bind_addr,
                 fallback_bind_addr,
                 None,
                 true,
             )),
-            ClientType::Api(_) => ClientType::Api(build_client(
+            ClientAgent::Api(_) => ClientAgent::Api(build_client(
                 &self.config,
                 bind_addr,
                 fallback_bind_addr,
                 None,
                 true,
             )),
-            ClientType::Arkose(_) => ClientType::Arkose(build_client(
+            ClientAgent::Arkose(_) => ClientAgent::Arkose(build_client(
                 &self.config,
                 bind_addr,
                 fallback_bind_addr,
@@ -235,27 +240,24 @@ impl ClientRoundRobinBalancer {
         }
     }
 
-    pub fn next(&self) -> ClientType {
+    pub fn next(&self) -> ClientAgent {
         // if there is only one client, return it
-        match self.pool.len() {
-            1 => {
-                let client = self.pool.first().expect("Init client failed");
-                if !self.config.ipv6_subnets.is_empty() {
-                    return self.rebuild_client_with_ipv6(client);
-                }
-                client.clone()
+        if self.pool.len() == 1 {
+            let client = self.pool.first().expect("Init client failed");
+            if !self.config.ipv6_subnets.is_empty() {
+                return self.rebuild_client_with_ipv6(client);
             }
-            _ => {
-                let len = self.pool.len();
-                let new = get_next_index(len, &self.index);
-                self.pool[new].clone()
-            }
+            return client.clone();
         }
+
+        let new = get_next_index(self.pool.len(), &self.index);
+        self.pool[new].clone()
     }
 }
 
+/// Build a client
 fn build_client(
-    inner: &Config,
+    config: &Config,
     preferred_addrs: Option<IpAddr>,
     fallback_addrs: Option<IpAddr>,
     proxy_url: Option<Url>,
@@ -267,7 +269,7 @@ fn build_client(
         builder = builder.proxy(proxy)
     }
 
-    if inner.cookie_store {
+    if config.cookie_store {
         builder = builder.cookie_store(true);
     }
 
@@ -275,8 +277,8 @@ fn build_client(
         builder = builder.tcp_keepalive(None);
     } else {
         builder = builder
-            .tcp_keepalive(Duration::from_secs(inner.tcp_keepalive))
-            .pool_idle_timeout(Duration::from_secs(inner.pool_idle_timeout));
+            .tcp_keepalive(Duration::from_secs(config.tcp_keepalive))
+            .pool_idle_timeout(Duration::from_secs(config.pool_idle_timeout));
     }
 
     match (preferred_addrs, fallback_addrs) {
@@ -290,15 +292,16 @@ fn build_client(
     let client = builder
         .impersonate(random_impersonate())
         .danger_accept_invalid_certs(true)
-        .connect_timeout(Duration::from_secs(inner.connect_timeout))
-        .timeout(Duration::from_secs(inner.timeout))
+        .connect_timeout(Duration::from_secs(config.connect_timeout))
+        .timeout(Duration::from_secs(config.timeout))
         .build()
         .expect("Failed to build API client");
     client
 }
 
+/// Build an authenticated client.
 fn build_auth_client(
-    inner: &Config,
+    config: &Config,
     preferred_addrs: Option<IpAddr>,
     fallback_addrs: Option<IpAddr>,
     proxy_url: Option<Url>,
@@ -310,8 +313,8 @@ fn build_auth_client(
         builder = builder.tcp_keepalive(None);
     } else {
         builder = builder
-            .tcp_keepalive(Duration::from_secs(inner.tcp_keepalive))
-            .pool_idle_timeout(Duration::from_secs(inner.pool_idle_timeout));
+            .tcp_keepalive(Duration::from_secs(config.tcp_keepalive))
+            .pool_idle_timeout(Duration::from_secs(config.pool_idle_timeout));
     }
 
     match (preferred_addrs, fallback_addrs) {
@@ -324,32 +327,10 @@ fn build_auth_client(
 
     builder
         .impersonate(random_impersonate())
-        .timeout(Duration::from_secs(inner.timeout))
-        .connect_timeout(Duration::from_secs(inner.connect_timeout))
+        .timeout(Duration::from_secs(config.timeout))
+        .connect_timeout(Duration::from_secs(config.connect_timeout))
         .proxy(proxy_url)
         .build()
-}
-
-const RANDOM_IMPERSONATE: [Impersonate; 7] = [
-    Impersonate::OkHttp3_9,
-    Impersonate::OkHttp3_11,
-    Impersonate::OkHttp3_13,
-    Impersonate::OkHttp3_14,
-    Impersonate::OkHttp4_9,
-    Impersonate::OkHttp4_10,
-    Impersonate::OkHttp5,
-];
-
-/// Randomly select a user agent from a list of known user agents.
-pub(crate) fn random_impersonate() -> Impersonate {
-    use rand::seq::IteratorRandom;
-
-    let target = RANDOM_IMPERSONATE
-        .into_iter()
-        .choose(&mut rand::thread_rng())
-        .unwrap_or(Impersonate::OkHttp5);
-    debug!("Using user agent: {:?}", target);
-    Impersonate::Chrome104
 }
 
 // get next index for round robin
@@ -364,4 +345,26 @@ fn get_next_index(len: usize, counter: &AtomicUsize) -> usize {
         }
     }
     new
+}
+
+const RANDOM_IMPERSONATE: [Impersonate; 7] = [
+    Impersonate::OkHttp3_9,
+    Impersonate::OkHttp3_11,
+    Impersonate::OkHttp3_13,
+    Impersonate::OkHttp3_14,
+    Impersonate::OkHttp5,
+    Impersonate::OkHttp4_9,
+    Impersonate::OkHttp4_10,
+];
+
+/// Randomly select a user agent from a list of known user agents.
+fn random_impersonate() -> Impersonate {
+    use rand::seq::IteratorRandom;
+
+    let target = RANDOM_IMPERSONATE
+        .into_iter()
+        .choose(&mut rand::thread_rng())
+        .unwrap_or(Impersonate::OkHttp5);
+    debug!("Using user agent: {:?}", target);
+    Impersonate::Chrome104
 }

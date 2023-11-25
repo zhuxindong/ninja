@@ -23,27 +23,27 @@ pub fn parse_url(s: &str) -> anyhow::Result<String> {
     }
 }
 
-// proxy proto, format: proto|url, support proto: all/api/auth/arkose
+// proxy proto, format: proto|type, support proto: all/api/auth/arkose, support type: ip/url/cidr
 pub fn parse_proxies_url(s: &str) -> anyhow::Result<Vec<proxy::Proxy>> {
     let split = s.split(',');
     let mut proxies: Vec<_> = vec![];
 
     for ele in split {
         let parts: Vec<_> = ele.split('|').collect();
-        let (proto, ele) = if parts.len() != 2 {
+        let (proto, typer) = if parts.len() != 2 {
             ("all", ele)
         } else {
             (parts[0], parts[1])
         };
         match (
-            ele.parse::<IpAddr>(),
-            url::Url::parse(ele),
-            ele.parse::<cidr::Ipv6Cidr>(),
+            typer.parse::<IpAddr>(),
+            url::Url::parse(typer),
+            typer.parse::<cidr::Ipv6Cidr>(),
         ) {
             (Ok(ip_addr), _, _) => proxies.push(proxy::Proxy::try_from((proto, ip_addr))?),
             (_, Ok(url), _) => proxies.push(proxy::Proxy::try_from((proto, url))?),
             (_, _, Ok(cidr)) => proxies.push(proxy::Proxy::try_from((proto, cidr))?),
-            _ => anyhow::bail!("Invalid proxy format: {}", ele),
+            _ => anyhow::bail!("Invalid proxy format: {}", typer),
         }
     }
 

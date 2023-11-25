@@ -21,6 +21,8 @@ pub enum ProxyError {
     BodyMustBeJsonObject,
     #[error("Body message is empty")]
     BodyMessageIsEmpty,
+    #[error("Request Content is empty")]
+    RequestContentIsEmpty,
 }
 
 // Make our own error that wraps `anyhow::Error`.

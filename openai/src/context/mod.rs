@@ -11,7 +11,7 @@ use std::{
 use crate::{
     arkose::{self, funcaptcha::ArkoseSolver},
     auth::AuthClient,
-    balancer::ClientRoundRobinBalancer,
+    client::ClientRoundRobinBalancer,
     error, proxy,
 };
 use reqwest::Client;
