@@ -2,6 +2,92 @@
 
 If the project is helpful to you, please consider [donating support](https://github.com/gngpp/gngpp/blob/main/SPONSOR.md#sponsor-my-open-source-works) for continued project maintenance, or you can Pay for consulting and technical support services.
 
+### Install
+
+- #### Platform
+
+  - `x86_64-unknown-linux-musl`
+  - `aarch64-unknown-linux-musl`
+  - `armv7-unknown-linux-musleabi`
+  - `armv7-unknown-linux-musleabihf`
+  - `arm-unknown-linux-musleabi`
+  - `arm-unknown-linux-musleabihf`
+  - `armv5te-unknown-linux-musleabi`
+  - `x86_64-pc-windows-msvc`
+  - `x86_64-apple-darwin`
+  - `aarch64-apple-darwin`
+
+- #### Ubuntu(Other Linux)
+
+Making [Releases](https://github.com/gngpp/ninja/releases/latest) has a precompiled deb package, binaries, in Ubuntu, for example:
+
+```shell
+wget https://github.com/gngpp/ninja/releases/download/v0.8.8/ninja-0.8.8-x86_64-unknown-linux-musl.tar.gz
+tar -xf ninja-0.8.8-x86_64-unknown-linux-musl.tar.gz
+./ninja run
+```
+
+- #### OpenWrt
+
+There are pre-compiled ipk files in GitHub [Releases](https://github.com/gngpp/ninja/releases/latest), which currently provide versions of aarch64/x86_64 and other architectures. After downloading, use opkg to install, and use nanopi r4s as example:
+
+```shell
+wget https://github.com/gngpp/ninja/releases/download/v0.8.8/ninja_0.8.8_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.8.8/luci-app-ninja_1.1.6-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.8.8/luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
+
+opkg install ninja_0.8.8_aarch64_generic.ipk
+opkg install luci-app-ninja_1.1.6-1_all.ipk
+opkg install luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
+```
+
+- #### Docker
+
+> Mirror source supports `gngpp/ninja:latest`/`ghcr.io/gngpp/ninja:latest`
+
+```shell
+docker run --rm -it -p 7999:7999 --name=ninja \
+  -e WORKERS=1 \
+  -e LOG=info \
+  ghcr.io/gngpp/ninja:latest run
+```
+
+- Docker Compose
+
+> `CloudFlare Warp` is not supported in your region (China), please delete it, or if your `VPS` IP can be directly connected to `OpenAI`, you can also delete it
+
+```yaml
+version: '3'
+
+services:
+  ninja:
+    image: gngpp/ninja:latest
+    container_name: ninja
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai
+      - PROXIES=socks5://warp:10000
+    command: run
+    ports:
+      - "8080:7999"
+    depends_on:
+      - warp
+
+  warp:
+    container_name: warp
+    image: ghcr.io/gngpp/warp:latest
+    restart: unless-stopped
+
+  watchtower:
+    container_name: watchtower
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 3600 --cleanup
+    restart: unless-stopped
+
+```
+
 ### ArkoseLabs
 
 Sending `GPT-4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` as a parameter. There are only two supported solutions for the time being.
@@ -94,9 +180,11 @@ Recently, `OpenAI` has canceled the `Arkose` verification for `GPT-3.5`. It can 
 - `--proxies`, proxy, supports proxy pool, multiple proxies are separated by `,`, format: protocol://user:pass@ip:port
 
 ##### Advanced proxy usage
-The built-in protocols and proxy types of agents are divided into built-in protocols: `all/api/auth/arkose`, where `all` is for all clients, `api` is for all `OpenAI API`, `auth` is for authorization/login, `arkose` For ArkoseLabs; proxy type: `interface/proxy/ipv6_subnet`, where `interface` represents the bound export `IP` address, `proxy` represents the upstream proxy protocol: `http/https/socks5`, `ipv6_subnet` represents the A random IP address within the IPv6 subnet acts as a proxy. The format is `proto|proxy`, example: **`all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081 `**, without built-in protocol, the protocol defaults to `all`.
+
+The built-in protocols and proxy types of agents are divided into built-in protocols: `all/api/auth/arkose`, where `all` is for all clients, `api` is for all `OpenAI API`, `auth` is for authorization/login, `arkose` For ArkoseLabs; proxy type: `interface/proxy/ipv6_subnet`, where `interface` represents the bound export `IP` address, `proxy` represents the upstream proxy protocol: `http/https/socks5`, `ipv6_subnet` represents the A random IP address within the IPv6 subnet acts as a proxy. The format is `proto|proxy`, example: **`all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081`**, without built-in protocol, the protocol defaults to `all`.
 
 ##### Agent usage rules
+
 1) The existence of `interface` \ `proxy` \ `ipv6_subnet`
 
 When `--enable-direct` is turned on, `proxy` + `interface` will be used as the proxy pool; if `--enable-direct` is not turned on, `proxy` will be used only if the number of `proxy` is greater than or equal to 2, otherwise it will Use `ipv6_subnet` as the proxy pool and `interface` as the fallback address.
@@ -119,92 +207,6 @@ When `--enable-direct` is enabled, `proxy` + default direct connection is used a
 6) The existence of `ipv6_subnet`
 
 Regardless of whether `--enable-direct` is turned on, `ipv6_subnet` will be used as the proxy pool
-
-### Install
-
-- #### Platform
-
-  - `x86_64-unknown-linux-musl`
-  - `aarch64-unknown-linux-musl`
-  - `armv7-unknown-linux-musleabi`
-  - `armv7-unknown-linux-musleabihf`
-  - `arm-unknown-linux-musleabi`
-  - `arm-unknown-linux-musleabihf`
-  - `armv5te-unknown-linux-musleabi`
-  - `x86_64-pc-windows-msvc`
-  - `x86_64-apple-darwin`
-  - `aarch64-apple-darwin`
-
-- #### Ubuntu(Other Linux)
-
-Making [Releases](https://github.com/gngpp/ninja/releases/latest) has a precompiled deb package, binaries, in Ubuntu, for example:
-
-```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.8.7/ninja-0.8.7-x86_64-unknown-linux-musl.tar.gz
-tar -xf ninja-0.8.7-x86_64-unknown-linux-musl.tar.gz
-./ninja run
-```
-
-- #### OpenWrt
-
-There are pre-compiled ipk files in GitHub [Releases](https://github.com/gngpp/ninja/releases/latest), which currently provide versions of aarch64/x86_64 and other architectures. After downloading, use opkg to install, and use nanopi r4s as example:
-
-```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.8.7/ninja_0.8.7_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.8.7/luci-app-ninja_1.1.6-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.8.7/luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
-
-opkg install ninja_0.8.7_aarch64_generic.ipk
-opkg install luci-app-ninja_1.1.6-1_all.ipk
-opkg install luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
-```
-
-- #### Docker
-
-> Mirror source supports `gngpp/ninja:latest`/`ghcr.io/gngpp/ninja:latest`
-
-```shell
-docker run --rm -it -p 7999:7999 --name=ninja \
-  -e WORKERS=1 \
-  -e LOG=info \
-  ghcr.io/gngpp/ninja:latest run
-```
-
-- Docker Compose
-
-> `CloudFlare Warp` is not supported in your region (China), please delete it, or if your `VPS` IP can be directly connected to `OpenAI`, you can also delete it
-
-```yaml
-version: '3'
-
-services:
-  ninja:
-    image: gngpp/ninja:latest
-    container_name: ninja
-    restart: unless-stopped
-    environment:
-      - TZ=Asia/Shanghai
-      - PROXIES=socks5://warp:10000
-    command: run
-    ports:
-      - "8080:7999"
-    depends_on:
-      - warp
-
-  warp:
-    container_name: warp
-    image: ghcr.io/gngpp/warp:latest
-    restart: unless-stopped
-
-  watchtower:
-    container_name: watchtower
-    image: containrrr/watchtower
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 3600 --cleanup
-    restart: unless-stopped
-
-```
 
 ### Command Manual
 

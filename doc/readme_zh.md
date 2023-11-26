@@ -2,6 +2,92 @@
 
 如果项目对你有帮助，请考虑[捐赠支持](https://github.com/gngpp/gngpp/blob/main/SPONSOR.md#sponsor-my-open-source-works)项目持续维护，也可以付费获取咨询和技术支持服务。
 
+### 安装
+
+- #### 平台支持
+
+  - `x86_64-unknown-linux-musl`
+  - `aarch64-unknown-linux-musl`
+  - `armv7-unknown-linux-musleabi`
+  - `armv7-unknown-linux-musleabihf`
+  - `arm-unknown-linux-musleabi`
+  - `arm-unknown-linux-musleabihf`
+  - `armv5te-unknown-linux-musleabi`
+  - `x86_64-pc-windows-msvc`
+  - `x86_64-apple-darwin`
+  - `aarch64-apple-darwin`
+
+- #### Ubuntu(Other Linux)
+
+  GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 deb包，二进制文件，以Ubuntu为例：
+
+```shell
+wget https://github.com/gngpp/ninja/releases/download/v0.8.8/ninja-0.8.8-x86_64-unknown-linux-musl.tar.gz
+tar -xf ninja-0.8.8-x86_64-unknown-linux-musl.tar.gz
+./ninja run
+```
+
+- #### OpenWrt
+
+GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 ipk 文件， 目前提供了 aarch64/x86_64 等架构的版本，下载后使用 opkg 安装，以 nanopi r4s 为例：
+
+```shell
+wget https://github.com/gngpp/ninja/releases/download/v0.8.8/ninja_0.8.8_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.8.8/luci-app-ninja_1.1.6-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.8.8/luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
+
+opkg install ninja_0.8.8_aarch64_generic.ipk
+opkg install luci-app-ninja_1.1.6-1_all.ipk
+opkg install luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
+```
+
+- #### Docker
+
+> 镜像源支持`gngpp/ninja:latest`/`ghcr.io/gngpp/ninja:latest`
+
+```shell
+docker run --rm -it -p 7999:7999 --name=ninja \
+  -e WORKERS=1 \
+  -e LOG=info \
+  ghcr.io/gngpp/ninja:latest run
+```
+
+- Docker Compose
+
+> `CloudFlare Warp`你的地区不支持（China）请把它删掉，或者你的`VPS`IP可直连`OpenAI`，那么也可以删掉
+
+```yaml
+version: '3'
+
+services:
+  ninja:
+    image: gngpp/ninja:latest
+    container_name: ninja
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Shanghai
+      - PROXIES=socks5://warp:10000
+    command: run
+    ports:
+      - "8080:7999"
+    depends_on:
+      - warp
+
+  warp:
+    container_name: warp
+    image: ghcr.io/gngpp/warp:latest
+    restart: unless-stopped
+
+  watchtower:
+    container_name: watchtower
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 3600 --cleanup
+    restart: unless-stopped
+
+```
+
 ### ArkoseLabs
 
 发送`GPT-4/GPT-3.5/创建API-Key`对话需要`Arkose Token`作为参数发送，支持的解决方案暂时只有两种
@@ -94,10 +180,12 @@
 - `--proxies`，代理，支持代理池，多个代理使用`,`隔开，格式: protocol://user:pass@ip:port
 
 ##### 代理高阶用法
+
 分代理内置协议和代理类型，内置协议: `all/api/auth/arkose`，其中`all`针对所有客户端，`api`针对所有`OpenAI API`，`auth`针对授权/登录，`arkose`针对ArkoseLabs；代理类型: `interface/proxy/ipv6_subnet`，其中`interface`表示绑定的出口`IP`地址，`proxy`表示上游代理协议: `http/https/socks5`，`ipv6_subnet`表示用Ipv6子网段内随机IP地址作为代理。格式为`proto|proxy`，例子: **`all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081`**，不带内置协议，协议默认为`all`。
   
 ##### 代理使用规则
-1)  `interface` \ `proxy` \ `ipv6_subnet`
+
+1) 存在`interface` \ `proxy` \ `ipv6_subnet`
 
 当开启`--enable-direct`，那么将使用`proxy` + `interface`作为代理池；未开启`--enable-direct`，只有`proxy`数量大于等于2才使用`proxy`，否则将使用 `ipv6_subnet`作为代理池，`interface`作为fallback地址。
 
@@ -119,93 +207,6 @@
 6) 存在`ipv6_subnet`
 
 无论是否开启`--enable-direct`，都将使用`ipv6_subnet`作为代理池
-
-
-
-### 安装
-
-- #### 平台支持
-  - `x86_64-unknown-linux-musl`
-  - `aarch64-unknown-linux-musl`
-  - `armv7-unknown-linux-musleabi`
-  - `armv7-unknown-linux-musleabihf`
-  - `arm-unknown-linux-musleabi`
-  - `arm-unknown-linux-musleabihf`
-  - `armv5te-unknown-linux-musleabi`
-  - `x86_64-pc-windows-msvc`
-  - `x86_64-apple-darwin`
-  - `aarch64-apple-darwin`
-
-- #### Ubuntu(Other Linux)
-
-  GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 deb包，二进制文件，以Ubuntu为例：
-
-```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.8.7/ninja-0.8.7-x86_64-unknown-linux-musl.tar.gz
-tar -xf ninja-0.8.7-x86_64-unknown-linux-musl.tar.gz
-./ninja run
-```
-
-- #### OpenWrt
-
-GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 ipk 文件， 目前提供了 aarch64/x86_64 等架构的版本，下载后使用 opkg 安装，以 nanopi r4s 为例：
-
-```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.8.7/ninja_0.8.7_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.8.7/luci-app-ninja_1.1.6-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.8.7/luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
-
-opkg install ninja_0.8.7_aarch64_generic.ipk
-opkg install luci-app-ninja_1.1.6-1_all.ipk
-opkg install luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
-```
-
-- #### Docker
-
-> 镜像源支持`gngpp/ninja:latest`/`ghcr.io/gngpp/ninja:latest`
-
-```shell
-docker run --rm -it -p 7999:7999 --name=ninja \
-  -e WORKERS=1 \
-  -e LOG=info \
-  ghcr.io/gngpp/ninja:latest run
-```
-
-- Docker Compose
-
-> `CloudFlare Warp`你的地区不支持（China）请把它删掉，或者你的`VPS`IP可直连`OpenAI`，那么也可以删掉
-
-```yaml
-version: '3'
-
-services:
-  ninja:
-    image: gngpp/ninja:latest
-    container_name: ninja
-    restart: unless-stopped
-    environment:
-      - TZ=Asia/Shanghai
-      - PROXIES=socks5://warp:10000
-    command: run
-    ports:
-      - "8080:7999"
-    depends_on:
-      - warp
-
-  warp:
-    container_name: warp
-    image: ghcr.io/gngpp/warp:latest
-    restart: unless-stopped
-
-  watchtower:
-    container_name: watchtower
-    image: containrrr/watchtower
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 3600 --cleanup
-    restart: unless-stopped
-
-```
 
 ### 命令手册
 
