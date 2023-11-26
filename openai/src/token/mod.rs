@@ -101,12 +101,18 @@ pub fn await_check(token: &str) -> TokenResult<Option<TokenProfile>> {
     Ok(Some(check_info(token, pub_key.as_bytes(), alg)))
 }
 
+/// Check token
 pub fn check(token: &str) -> TokenResult<Option<TokenProfile>> {
     let token = token.trim_start_matches("Bearer ");
-    if token.starts_with("sk-") || token.starts_with("sess-") {
+    if check_sk_or_sess(token) {
         return Ok(None);
     }
     Ok(Some(check_info(token, PUBLIC_KEY, AlgorithmID::RS256)?))
+}
+
+/// Check if token is sk- or sess-
+pub fn check_sk_or_sess(token: &str) -> bool {
+    token.starts_with("sk-") || token.starts_with("sess-")
 }
 
 #[derive(Default, Serialize, Deserialize)]

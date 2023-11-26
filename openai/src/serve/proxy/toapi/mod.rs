@@ -15,6 +15,7 @@ use crate::chatgpt::model::req::Metadata;
 use crate::chatgpt::model::Role;
 use crate::now_duration;
 use crate::serve::error::ProxyError;
+use crate::token;
 use crate::{
     arkose::{ArkoseToken, GPTModel},
     chatgpt::model::req::{Content, ConversationMode, Messages, PostConvoRequest},
@@ -38,8 +39,8 @@ use crate::URL_CHATGPT_API;
 /// Check if the request is supported
 pub(super) fn support(req: &RequestExt) -> bool {
     if req.uri.path().eq("/v1/chat/completions") && req.method.eq(&Method::POST) {
-        if let Some(ref b) = req.bearer_auth() {
-            return !b.starts_with("sk-");
+        if let Some(ref token) = req.bearer_auth() {
+            return !token::check_sk_or_sess(token);
         }
     }
     false
