@@ -6,12 +6,15 @@ use axum_extra::extract::CookieJar;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 
+use crate::error;
 use crate::token::TokenProfile;
 use crate::{
     auth::API_AUTH_SESSION_COOKIE_KEY,
     serve::{error::ResponseError, route::ui::LOGIN_INDEX, route::ui::SESSION_ID},
     token::model::Token,
 };
+
+use super::LOGOUT_INDEX;
 
 #[derive(Serialize, Deserialize)]
 pub(super) struct Session {
@@ -107,14 +110,12 @@ where
 
 fn extract_session(cookie_value: &str) -> Result<Session, ResponseError> {
     Session::from_str(cookie_value)
-        .map_err(|_| ResponseError::Unauthorized(anyhow::anyhow!("invalid session")))
-        .and_then(|session| match check_token(&session.access_token) {
+        .map_err(|_| ResponseError::TempporaryRedirect(LOGIN_INDEX))
+        .and_then(|session| match crate::token::check(&session.access_token) {
             Ok(_) => Ok(session),
-            Err(err) => Err(err),
+            Err(err) => {
+                error!("Session token is invalid: {}", err);
+                Err(ResponseError::TempporaryRedirect(LOGOUT_INDEX))
+            }
         })
-}
-
-fn check_token(token: &str) -> Result<(), ResponseError> {
-    let _ = crate::token::check(token).map_err(ResponseError::Unauthorized)?;
-    Ok(())
 }
