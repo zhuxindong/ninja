@@ -149,13 +149,11 @@ pub(super) async fn response_convert(
 
             if config.stream {
                 // Create a  stream response
-                let stream = stream::stream_handler(event_source, config.model);
+                let stream = stream::stream_handler(event_source, config.model)?;
                 Ok(Sse::new(stream).into_response())
             } else {
                 // Create a not stream response
-                let no_stream = stream::not_stream_handler(event_source, config.model)
-                    .await
-                    .map_err(ResponseError::InternalServerError)?;
+                let no_stream = stream::not_stream_handler(event_source, config.model).await?;
                 Ok(no_stream.into_response())
             }
         }
@@ -213,8 +211,9 @@ fn generate_id(length: usize) -> String {
     format!("chatcmpl-{rand_str}")
 }
 
-fn current_timestamp() -> i64 {
-    now_duration()
-        .expect("System time before UNIX EPOCH!")
-        .as_secs() as i64
+fn current_timestamp() -> anyhow::Result<i64> {
+    let time = now_duration()
+        .map_err(ProxyError::SystemTimeBeforeEpoch)?
+        .as_secs();
+    Ok(time as i64)
 }

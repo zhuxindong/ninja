@@ -12,4 +12,8 @@ pub enum ArkoseError {
     CreateSessionError(anyhow::Error),
     #[error("invalid funcaptcha error")]
     InvalidFunCaptcha,
+    #[error("hex decode error")]
+    HexDecodeError,
+    #[error("unsupported hash algorithm")]
+    UnsupportedHashAlgorithm,
 }

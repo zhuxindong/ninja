@@ -4,9 +4,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use crate::context::Args;
-use crate::serve::error::ResponseError;
+use crate::serve::error::{ProxyError, ResponseError};
 use crate::{arkose, warn, with_context};
-use anyhow::anyhow;
 use axum::body::Body;
 use axum::extract::{Multipart, Query};
 use axum::response::{IntoResponse, Redirect, Response};
@@ -138,7 +137,7 @@ async fn post_upload(
         // only accept file field
         if field
             .name()
-            .ok_or(ResponseError::BadRequest(anyhow!("invalid field")))?
+            .ok_or(ResponseError::BadRequest(ProxyError::InvalidUploadField))?
             != FIELD_FILE
         {
             return Ok(error_html(FAILED_UPLOAD_TITLE, "Upload failed", false).into_response());
@@ -147,7 +146,7 @@ async fn post_upload(
         // require file name
         let filename = field
             .file_name()
-            .ok_or(ResponseError::BadRequest(anyhow!("invalid file name")))?
+            .ok_or(ResponseError::BadRequest(ProxyError::FilenameIsInvalid))?
             .to_string();
 
         let data = field
@@ -260,7 +259,7 @@ async fn rename_file(
         &filename
             .new_filename
             .as_ref()
-            .ok_or(ResponseError::BadRequest(anyhow!("new filename is empty")))?,
+            .ok_or(ResponseError::BadRequest(ProxyError::NewFilenameIsEmpty))?,
     );
 
     // only accept har file

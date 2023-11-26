@@ -6,7 +6,7 @@ use axum_extra::extract::CookieJar;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 
-use crate::error;
+use crate::debug;
 use crate::token::TokenProfile;
 use crate::{
     auth::API_AUTH_SESSION_COOKIE_KEY,
@@ -114,7 +114,7 @@ fn extract_session(cookie_value: &str) -> Result<Session, ResponseError> {
         .and_then(|session| match crate::token::check(&session.access_token) {
             Ok(_) => Ok(session),
             Err(err) => {
-                error!("Session token is invalid: {}", err);
+                debug!("Session token is invalid: {}", err);
                 Err(ResponseError::TempporaryRedirect(LOGOUT_INDEX))
             }
         })

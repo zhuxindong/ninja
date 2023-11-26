@@ -7,7 +7,7 @@ use serde_json::Value;
 use std::convert::Infallible;
 
 use crate::chatgpt::model::resp::{ConvoResponse, PostConvoResponse};
-use crate::serve::error::ProxyError;
+use crate::serve::error::{ProxyError, ResponseError};
 use crate::{chatgpt::model::Role, debug};
 
 use super::model;
@@ -37,10 +37,10 @@ pub(super) fn stream_handler(
         impl Stream<Item = Result<bytes::Bytes, reqwest::Error>> + std::marker::Unpin,
     >,
     model: String,
-) -> impl Stream<Item = Result<Event, Infallible>> {
+) -> Result<impl Stream<Item = Result<Event, Infallible>>, ResponseError> {
     let id = super::generate_id(29);
-    let timestamp = super::current_timestamp();
-    async_stream::stream! {
+    let timestamp = super::current_timestamp()?;
+    let stream = async_stream::stream! {
         let mut previous_message = String::new();
         let mut set_role = true;
         let mut stop: u8 = 0;
@@ -82,7 +82,8 @@ pub(super) fn stream_handler(
                 }
             }
         }
-    }
+    };
+    Ok(stream)
 }
 
 async fn event_convert_handler(
@@ -144,7 +145,7 @@ pub(super) async fn not_stream_handler(
     model: String,
 ) -> anyhow::Result<Json<Value>> {
     let id = super::generate_id(29);
-    let timestamp = super::current_timestamp();
+    let timestamp = super::current_timestamp()?;
     let mut previous_message = String::new();
     let mut finish_reason = None;
     while let Some(event_result) = event_soure.next().await {

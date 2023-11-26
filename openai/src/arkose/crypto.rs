@@ -3,6 +3,8 @@ use base64::{engine::general_purpose, Engine};
 use rand::random;
 use serde::{Deserialize, Serialize};
 
+use crate::arkose::error::ArkoseError;
+
 #[derive(Serialize, Deserialize, Debug)]
 struct EncryptionData {
     ct: String,
@@ -76,7 +78,7 @@ fn ase_decrypt(content: Vec<u8>, password: &str) -> anyhow::Result<Vec<u8>> {
 
     let ((key, _), iv) = (
         default_evp_kdf(password.as_bytes(), &salt?).map_err(|s| anyhow::anyhow!(s))?,
-        hex_to_bytes(&encode_data.iv).ok_or(anyhow!("hex decode error"))?,
+        hex_to_bytes(&encode_data.iv).ok_or(ArkoseError::HexDecodeError)?,
     );
 
     use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyIvInit};
@@ -96,7 +98,7 @@ fn evp_kdf(
     key_size: usize,
     iterations: usize,
     hash_algorithm: &str,
-) -> Result<Vec<u8>, &'static str> {
+) -> Result<Vec<u8>, ArkoseError> {
     let mut derived_key_bytes = Vec::new();
     match hash_algorithm {
         "md5" => {
@@ -124,13 +126,13 @@ fn evp_kdf(
                 derived_key_bytes.extend_from_slice(&block);
             }
         }
-        _ => return Err("unsupported hash algorithm"),
+        _ => return Err(ArkoseError::UnsupportedHashAlgorithm),
     }
 
     Ok(derived_key_bytes[..key_size * 4].to_vec())
 }
 
-fn default_evp_kdf(password: &[u8], salt: &[u8]) -> Result<(Vec<u8>, Vec<u8>), &'static str> {
+fn default_evp_kdf(password: &[u8], salt: &[u8]) -> Result<(Vec<u8>, Vec<u8>), ArkoseError> {
     let key_size = 256 / 32;
     let iv_size = 128 / 32;
     let derived_key_bytes = evp_kdf(password, salt, key_size + iv_size, 1, "md5")?;
