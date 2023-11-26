@@ -32,7 +32,7 @@
 
 ### 安装
 
-如果您需要更详细的安装与使用信息，请查看[安装文档](https://github.com/gngpp/ninja/blob/main/doc/readme_zh.md))
+如果您需要更详细的安装与使用信息，请查看[安装文档](https://github.com/gngpp/ninja/blob/main/doc/readme_zh.md)
 
 ### 贡献
 

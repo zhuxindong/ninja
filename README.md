@@ -33,7 +33,7 @@ Reverse engineered `ChatGPT` proxy (bypass Cloudflare 403 Access Denied)
 
 ### Installation
 
-If you need more detailed installation and usage information, please check [Installation Document](https://github.com/gngpp/ninja/blob/main/doc/readme.md))
+If you need more detailed installation and usage information, please check [Installation Document](https://github.com/gngpp/ninja/blob/main/doc/readme.md)
 
 - Platform
 

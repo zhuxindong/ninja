@@ -112,6 +112,8 @@ impl<'a> RequestContext<'a> {
 
         self.cookie
             .insert(format!("arkoseToken={}", arkose_token.value()));
+        self.cookie
+            .insert(format!("arkose_token={}", arkose_token.value()));
         Ok(())
     }
 }

@@ -1,57 +1,57 @@
 #[derive(thiserror::Error, Debug)]
 pub enum AuthError {
-    #[error("bad request (error {0:?})")]
+    #[error("Bad request (error {0:?})")]
     BadRequest(String),
-    #[error("too many requests (error {0:?})")]
+    #[error("Too many requests (error {0:?})")]
     TooManyRequests(String),
     #[error("Unauthorized request (error {0:?})")]
     Unauthorized(String),
     #[error("Server error ({0:?})")]
     ServerError(String),
-    #[error("failed login")]
+    #[error("Failed login")]
     FailedLogin,
     #[error(transparent)]
     FailedRequest(#[from] reqwest::Error),
-    #[error("invalid client request (error {0:?})")]
-    InvalidClientRequest(String),
-    #[error("failed to get access token (error {0:?})")]
+    #[error("Failed to get access token (error {0:?})")]
     FailedAccessToken(String),
-    #[error("invalid arkose token ({0:?})")]
-    InvalidArkoseToken(anyhow::Error),
-    #[error("failed get code from callback url")]
+    #[error("Failed get code from callback url")]
     FailedCallbackCode,
-    #[error("failed callback url")]
+    #[error("Failed callback url")]
     FailedCallbackURL,
-    #[error("failed to get authorized url")]
+    #[error("Failed to get authorized url")]
     FailedAuthorizedUrl,
     #[error("Failed to get state")]
     FailedState,
-    #[error("failed get csrf token")]
+    #[error("Failed get csrf token")]
     FailedCsrfToken,
-    #[error("failed to get auth session cookie")]
+    #[error("Failed to get auth session cookie")]
     FailedAuthSessionCookie,
-    #[error("invalid request login url (error {0:?})")]
+    #[error("Invalid client request (error {0:?})")]
+    InvalidClientRequest(String),
+    #[error("Invalid arkose token ({0:?})")]
+    InvalidArkoseToken(anyhow::Error),
+    #[error("Invalid request login url (error {0:?})")]
     InvalidLoginUrl(String),
-    #[error("invalid email or password")]
+    #[error("Invalid email or password")]
     InvalidEmailOrPassword,
-    #[error("invalid request (error {0:?})")]
+    #[error("Invalid request (error {0:?})")]
     InvalidRequest(String),
-    #[error("invalid email")]
+    #[error("Invalid email")]
     InvalidEmail,
-    #[error("invalid Location")]
+    #[error("Invalid Location")]
     InvalidLocation,
-    #[error("invalid refresh token")]
+    #[error("Invalid refresh token")]
     InvalidRefreshToken,
-    #[error("invalid location path")]
+    #[error("Accidentally jumped back to the login homepage, please try again.")]
     InvalidLocationPath,
     #[error("MFA failed")]
     MFAFailed,
     #[error("MFA required")]
     MFARequired,
-    #[error("json deserialize error (error {0:?})")]
+    #[error("Json deserialize error (error {0:?})")]
     DeserializeError(String),
-    #[error("implementation is not supported")]
+    #[error("Implementation is not supported")]
     NotSupportedImplementation,
-    #[error("failed to get preauth cookie")]
+    #[error("Failed to get preauth cookie")]
     PreauthCookieNotFound,
 }
