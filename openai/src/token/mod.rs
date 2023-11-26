@@ -87,7 +87,7 @@ pub async fn await_check_for_u8(token: &[u8]) -> TokenResult<Option<TokenProfile
 #[cfg(feature = "remote-token")]
 pub fn await_check(token: &str) -> TokenResult<Option<TokenProfile>> {
     let token = token.trim_start_matches("Bearer ");
-    if token.starts_with("sk-") || token.starts_with("sess-") {
+    if check_sk_or_sess(token) {
         return Ok(None);
     }
     let key_result = keys().await?;

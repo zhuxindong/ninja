@@ -453,7 +453,15 @@ impl AuthClientBuilder {
         AuthClientBuilder {
             inner: Client::builder()
                 .danger_accept_invalid_certs(true)
-                .connect_timeout(Duration::from_secs(30))
+                .connect_timeout(Duration::from_secs(10))
+                .timeout(Duration::from_secs(30))
+                .default_headers({
+                    let mut headers = HeaderMap::new();
+                    headers.insert(header::DNT, HeaderValue::from_static("1"));
+                    headers.insert(header::ORIGIN, HeaderValue::from_static(OPENAI_OAUTH_URL));
+                    headers.insert(header::REFERER, HeaderValue::from_static(OPENAI_OAUTH_URL));
+                    headers
+                })
                 .redirect(Policy::none()),
         }
     }
