@@ -325,15 +325,10 @@ async fn get_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<ArkoseToken> {
         .push_str(&format!("&bda={}", general_purpose::STANDARD.encode(&bda)));
     entry.body.push_str(&format!("&rnd={rnd}"));
 
-    let client = with_context!(arkose_client);
-
-    let method = Method::from_bytes(entry.method.as_bytes())?;
-
-    let mut builder = client
-        .request(method, entry.url)
-        .timeout(std::time::Duration::from_secs(10));
-
-    builder = builder.body(entry.body);
+    let mut builder = with_context!(arkose_client)
+        .request(Method::from_bytes(entry.method.as_bytes())?, entry.url)
+        .timeout(std::time::Duration::from_secs(10))
+        .body(entry.body);
 
     for h in entry.headers.into_iter() {
         if h.name.eq_ignore_ascii_case("cookie") {
