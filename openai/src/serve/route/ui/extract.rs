@@ -115,7 +115,7 @@ fn extract_session(cookie_value: &str) -> Result<Session, ResponseError> {
             Ok(_) => Ok(session),
             Err(err) => {
                 debug!("Session token is invalid: {}", err);
-                Err(ResponseError::TempporaryRedirect(LOGOUT_INDEX))
+                Err(ResponseError::TempporaryRedirect(LOGIN_INDEX))
             }
         })
 }
