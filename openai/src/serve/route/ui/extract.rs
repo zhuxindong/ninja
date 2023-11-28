@@ -14,8 +14,6 @@ use crate::{
     token::model::Token,
 };
 
-use super::LOGOUT_INDEX;
-
 #[derive(Serialize, Deserialize)]
 pub(super) struct Session {
     pub access_token: String,

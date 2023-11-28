@@ -56,7 +56,6 @@ use super::get_static_resource;
 
 const DEFAULT_INDEX: &str = "/";
 const LOGIN_INDEX: &str = "/auth/login";
-const LOGOUT_INDEX: &str = "/auth/logout";
 const SESSION_ID: &str = "ninja_session";
 const PUID_ID: &str = "_puid";
 const BUILD_ID: &str = "eFlZtDCQUjuHAccnRY3au";
