@@ -18,10 +18,19 @@ struct HandlerContext<'a> {
     timestamp: &'a i64,
     model: &'a str,
     previous_message: &'a mut String,
+    pin_message_id: &'a mut String,
     set_role: &'a mut bool,
 }
 
-fn should_skip_conversion(convo: &ConvoResponse) -> bool {
+/// Check if should skip conversion
+fn should_skip_conversion(convo: &ConvoResponse, pin_message_id: &str) -> bool {
+    if !pin_message_id.is_empty() {
+        // Skip if message id is not equal to pin message id
+        if convo.message_id() != pin_message_id {
+            return false;
+        }
+    }
+
     let role_check = convo.role().ne(&Role::Assistant)
         || convo.raw_messages().is_empty()
         || convo.raw_messages()[0].is_empty();
@@ -42,6 +51,7 @@ pub(super) fn stream_handler(
     let timestamp = super::current_timestamp()?;
     let stream = async_stream::stream! {
         let mut previous_message = String::new();
+        let mut pin_message_id = String::new();
         let mut set_role = true;
         let mut stop: u8 = 0;
 
@@ -56,7 +66,7 @@ pub(super) fn stream_handler(
                         if let PostConvoResponse::Conversation(convo) = res {
 
                             // Skip if role is not assistant
-                            if should_skip_conversion(&convo) {
+                            if should_skip_conversion(&convo, &pin_message_id) {
                                 continue;
                             }
 
@@ -66,6 +76,7 @@ pub(super) fn stream_handler(
                                 timestamp: &timestamp,
                                 model: &model,
                                 previous_message: &mut previous_message,
+                                pin_message_id: &mut pin_message_id,
                                 set_role: &mut set_role,
                             };
 
@@ -90,8 +101,13 @@ async fn event_convert_handler(
     context: &mut HandlerContext<'_>,
     convo: ConvoResponse,
 ) -> anyhow::Result<Event> {
-    let messages = &convo.raw_messages();
-    let message = messages
+    // Set pin message id
+    if context.pin_message_id.is_empty() {
+        context.pin_message_id.push_str(convo.message_id())
+    }
+
+    let message = convo
+        .raw_messages()
         .first()
         .ok_or_else(|| ProxyError::BodyMessageIsEmpty)?;
 
