@@ -31,9 +31,9 @@ pub fn parse_proxies_url(s: &str) -> anyhow::Result<Vec<proxy::Proxy>> {
     for ele in split {
         let parts: Vec<_> = ele.split('|').collect();
         let (proto, typer) = if parts.len() != 2 {
-            ("all", ele)
+            ("all", ele.trim())
         } else {
-            (parts[0], parts[1])
+            (parts[0].trim(), parts[1].trim())
         };
         match (
             typer.parse::<IpAddr>(),
