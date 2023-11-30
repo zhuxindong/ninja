@@ -113,7 +113,7 @@ pub struct ServeArgs {
     pub(super) timeout: usize,
 
     /// Client connect timeout (seconds)
-    #[clap(long, default_value = "20")]
+    #[clap(long, default_value = "5")]
     pub(super) connect_timeout: usize,
 
     /// TCP keepalive (seconds)
