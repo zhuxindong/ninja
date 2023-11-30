@@ -176,11 +176,14 @@ pub(super) async fn not_stream_handler(
                         if !finish.is_empty() {
                             finish_reason = Some(finish.to_owned())
                         }
-                        let messages = convo.messages();
-                        if let Some(message) = messages.first() {
+
+                        // If message is not empty, set previous message
+                        if let Some(message) = convo.messages().first() {
                             previous_message.clear();
                             previous_message.push_str(message);
                         }
+
+                        drop(convo)
                     }
                 }
             }

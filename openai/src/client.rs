@@ -1,16 +1,20 @@
 use crate::auth::{self};
+use crate::dns;
 use crate::{
     auth::AuthClient,
     context, debug,
     proxy::{self, Ipv6CidrExt},
 };
 use reqwest::{impersonate::Impersonate, Client};
+use std::sync::{Arc, OnceLock};
 use std::{
     net::IpAddr,
     sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
 };
 use url::Url;
+
+static DNS_RESOLVER: OnceLock<Arc<dns::TrustDnsResolver>> = OnceLock::new();
 
 /// Client type
 #[derive(Clone)]
@@ -294,6 +298,7 @@ fn build_client(
         .danger_accept_invalid_certs(true)
         .connect_timeout(Duration::from_secs(config.connect_timeout))
         .timeout(Duration::from_secs(config.timeout))
+        .dns_resolver(get_dns_resolver())
         .build()
         .expect("Failed to build API client");
     client
@@ -345,6 +350,13 @@ fn get_next_index(len: usize, counter: &AtomicUsize) -> usize {
         }
     }
     new
+}
+
+fn get_dns_resolver() -> Arc<dns::TrustDnsResolver> {
+    let dns = DNS_RESOLVER
+        .get_or_init(|| Arc::new(dns::TrustDnsResolver::default()))
+        .clone();
+    dns
 }
 
 const RANDOM_IMPERSONATE: [Impersonate; 7] = [

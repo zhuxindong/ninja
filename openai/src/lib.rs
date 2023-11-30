@@ -4,11 +4,13 @@ pub mod auth;
 pub mod chatgpt;
 pub mod client;
 pub mod context;
+mod dns;
 pub mod eventsource;
 pub mod homedir;
 pub mod log;
 pub mod platform;
 pub mod proxy;
+
 #[cfg(feature = "serve")]
 pub mod serve;
 pub mod token;
