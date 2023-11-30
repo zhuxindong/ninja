@@ -47,7 +47,6 @@ opkg install luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
 
 ```shell
 docker run --rm -it -p 7999:7999 --name=ninja \
-  -e WORKERS=1 \
   -e LOG=info \
   ghcr.io/gngpp/ninja:latest run
 ```
@@ -173,7 +172,6 @@ services:
 - `--bind`，环境变量 `BIND`， 服务监听地址: 默认0.0.0.0:7999，
 - `--tls-cert`，环境变量 `TLS_CERT`，TLS证书公钥，支持格式: EC/PKCS8/RSA
 - `--tls-key`，环境变量 `TLS_KEY`，TLS证书私钥
-- `--workers`，工作线程: 默认1
 - `--disable-webui`, 如果不想使用默认自带的WebUI，使用此参数关闭
 - `--enable-file-proxy`，环境变量`ENABLE_FILE_PROXY`，开启文件上下传API代理
 - `--enable-direct`，开启直连，将绑定`interface`出口的IP的加入代理池
@@ -244,8 +242,6 @@ Options:
           Configuration file path (toml format file) [env: CONFIG=]
   -b, --bind <BIND>
           Server bind address [env: BIND=] [default: 0.0.0.0:7999]
-  -W, --workers <WORKERS>
-          Server worker-pool size (Recommended number of CPU cores) [default: 1]
       --concurrent-limit <CONCURRENT_LIMIT>
           Enforces a limit on the concurrent number of requests the underlying [default: 1024]
       --enable-direct

@@ -1,6 +1,5 @@
 level = "info"
 bind = "0.0.0.0:7999"
-workers = 1
 concurrent_limit = 65535
 enable_direct = false
 cookie_store = true

@@ -24,9 +24,6 @@ o.default = "info"
 o = s:option(Value, "bind", translate("Bind Address"), translate("Default listening address: 0.0.0.0:7999"))
 o.default = "0.0.0.0:7999"
 
-o = s:option(Value, "workers", translate("Workers"), translate("Default 1 worker thread"))
-o.default = "1"
-
 o = s:option(Value, "concurrent_limit", translate("Concurrent Limit"), translate("Default 100 concurrent connections"))
 o.default = "100"
 

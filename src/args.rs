@@ -84,10 +84,6 @@ pub struct ServeArgs {
     #[clap(short, long, env = "BIND", default_value = "0.0.0.0:7999", value_parser = parse::parse_socket_addr)]
     pub(super) bind: Option<std::net::SocketAddr>,
 
-    /// Server worker-pool size (Recommended number of CPU cores)
-    #[clap(short = 'W', long, default_value = "1")]
-    pub(super) workers: usize,
-
     /// Enforces a limit on the concurrent number of requests the underlying
     #[clap(long, default_value = "1024")]
     pub(super) concurrent_limit: usize,
