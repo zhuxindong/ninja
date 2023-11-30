@@ -11,6 +11,7 @@ use std::time::Duration;
 
 use anyhow::{bail, Context};
 use regex::Regex;
+use reqwest::dns::Resolve;
 use reqwest::header::{self, HeaderMap, HeaderValue};
 use reqwest::impersonate::Impersonate;
 use reqwest::redirect::Policy;
@@ -431,6 +432,16 @@ impl AuthClientBuilder {
     /// preferences) before connection.
     pub fn local_addresses(mut self, addr_ipv4: Ipv4Addr, addr_ipv6: Ipv6Addr) -> Self {
         self.inner = self.inner.local_addresses(addr_ipv4, addr_ipv6);
+        self
+    }
+
+    /// Override the DNS resolver implementation.
+    ///
+    /// Pass an `Arc` wrapping a trait object implementing `Resolve`.
+    /// Overrides for specific names passed to `resolve` and `resolve_to_addrs` will
+    /// still be applied on top of this resolver.
+    pub fn dns_resolver<R: Resolve + 'static>(mut self, resolver: Arc<R>) -> Self {
+        self.inner = self.inner.dns_resolver(resolver);
         self
     }
 

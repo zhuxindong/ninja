@@ -20,19 +20,17 @@ use super::{
 const PLATFORM_CLIENT_ID: &str = "DRivsnm2Mu42T3KOpqdtwB3NYviHYzwD";
 const OPENAI_OAUTH_PLATFORM_CALLBACK_URL: &str = "https://platform.openai.com/auth/callback";
 
-pub(crate) struct PlatformAuthProvider {
-    inner: Client,
-}
+pub(crate) struct PlatformAuthProvider(pub(crate) Client);
 
 impl PlatformAuthProvider {
     pub fn new(inner: Client) -> impl AuthProvider + Send + Sync {
-        Self { inner }
+        Self(inner)
     }
 
     async fn authorize(&self, ctx: &mut RequestContext<'_>) -> AuthResult<()> {
         let url = format!("{OPENAI_OAUTH_URL}/authorize?client_id={PLATFORM_CLIENT_ID}&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write&audience=https://api.openai.com/v1&redirect_uri=https://platform.openai.com/auth/callback&response_type=code");
         let resp = self
-            .inner
+            .0
             .get(&url)
             .send()
             .await
@@ -41,7 +39,7 @@ impl PlatformAuthProvider {
 
         let identifier_location = AuthClient::get_location_path(resp.headers())?;
         let resp = self
-            .inner
+            .0
             .get(format!("{OPENAI_OAUTH_URL}{identifier_location}"))
             .ext_context(ctx)
             .send()
@@ -60,7 +58,7 @@ impl PlatformAuthProvider {
     async fn authenticate_username(&self, ctx: &mut RequestContext<'_>) -> AuthResult<()> {
         let url = format!("{OPENAI_OAUTH_URL}/u/login/identifier?state={}", ctx.state);
         let resp = self
-            .inner
+            .0
             .post(&url)
             .ext_context(ctx)
             .json(
@@ -89,7 +87,7 @@ impl PlatformAuthProvider {
     ) -> AuthResult<model::AccessToken> {
         ctx.load_arkose_token().await?;
         let resp = self
-            .inner
+            .0
             .post(format!(
                 "{OPENAI_OAUTH_URL}/u/login/password?state={}",
                 ctx.state
@@ -126,7 +124,7 @@ impl PlatformAuthProvider {
         location: &str,
     ) -> AuthResult<model::AccessToken> {
         let resp = self
-            .inner
+            .0
             .get(&format!("{OPENAI_OAUTH_URL}{location}"))
             .ext_context(ctx)
             .send()
@@ -162,7 +160,7 @@ impl PlatformAuthProvider {
             .build();
 
         let resp = self
-            .inner
+            .0
             .post(&url)
             .ext_context(ctx)
             .json(&data)
@@ -195,7 +193,7 @@ impl PlatformAuthProvider {
             .build();
 
         let resp = self
-            .inner
+            .0
             .post(OPENAI_OAUTH_TOKEN_URL)
             .json(&data)
             .send()
@@ -238,7 +236,7 @@ impl AuthProvider for PlatformAuthProvider {
             .build();
 
         let resp = self
-            .inner
+            .0
             .post(OPENAI_OAUTH_TOKEN_URL)
             .json(&data)
             .send()
@@ -257,7 +255,7 @@ impl AuthProvider for PlatformAuthProvider {
             .build();
 
         let resp = self
-            .inner
+            .0
             .post(OPENAI_OAUTH_REVOKE_URL)
             .json(&data)
             .send()

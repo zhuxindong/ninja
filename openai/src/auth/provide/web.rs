@@ -14,18 +14,16 @@ use reqwest::{Client, StatusCode};
 use serde_json::Value;
 use url::Url;
 
-pub(crate) struct WebAuthProvider {
-    inner: Client,
-}
+pub(crate) struct WebAuthProvider(pub(crate) Client);
 
 impl WebAuthProvider {
     pub fn new(inner: Client) -> impl AuthProvider + Send + Sync {
-        Self { inner }
+        Self(inner)
     }
 
     async fn csrf_token(&self, ctx: &mut RequestContext<'_>) -> AuthResult<()> {
         let resp = self
-            .inner
+            .0
             .get(format!("{URL_CHATGPT_API}/api/auth/csrf"))
             .send()
             .await
@@ -52,7 +50,7 @@ impl WebAuthProvider {
 
     async fn authorized(&self, ctx: &mut RequestContext<'_>) -> AuthResult<()> {
         let resp = self
-            .inner
+            .0
             .post(format!(
                 "{URL_CHATGPT_API}/api/auth/signin/auth0?prompt=login"
             ))
@@ -88,7 +86,7 @@ impl WebAuthProvider {
 
     async fn state(&self, url: &str, ctx: &mut RequestContext<'_>) -> AuthResult<()> {
         let resp = self
-            .inner
+            .0
             .get(url)
             .ext_context(ctx)
             .send()
@@ -98,7 +96,7 @@ impl WebAuthProvider {
 
         let identifier_location = AuthClient::get_location_path(resp.headers())?;
         let resp = self
-            .inner
+            .0
             .get(format!("{OPENAI_OAUTH_URL}{identifier_location}"))
             .ext_context(ctx)
             .send()
@@ -116,7 +114,7 @@ impl WebAuthProvider {
     async fn authenticate_username(&self, ctx: &mut RequestContext<'_>) -> AuthResult<()> {
         let url = format!("{OPENAI_OAUTH_URL}/u/login/identifier?state={}", ctx.state);
         let resp = self
-            .inner
+            .0
             .post(&url)
             .ext_context(ctx)
             .form(
@@ -146,7 +144,7 @@ impl WebAuthProvider {
         ctx.load_arkose_token().await?;
 
         let resp = self
-            .inner
+            .0
             .post(format!(
                 "{OPENAI_OAUTH_URL}/u/login/password?state={}",
                 ctx.state
@@ -173,7 +171,7 @@ impl WebAuthProvider {
             }
 
             let resp = self
-                .inner
+                .0
                 .get(format!("{OPENAI_OAUTH_URL}{location}"))
                 .ext_context(ctx)
                 .send()
@@ -189,7 +187,7 @@ impl WebAuthProvider {
                 }
 
                 let resp = self
-                    .inner
+                    .0
                     .get(location)
                     .ext_context(ctx)
                     .send()
@@ -226,7 +224,7 @@ impl WebAuthProvider {
             .build();
 
         let resp = self
-            .inner
+            .0
             .post(&url)
             .ext_context(ctx)
             .json(&data)
@@ -247,7 +245,7 @@ impl WebAuthProvider {
         ctx: &mut RequestContext<'_>,
     ) -> AuthResult<model::AccessToken> {
         let resp = self
-            .inner
+            .0
             .get(format!("{URL_CHATGPT_API}/api/auth/session"))
             .ext_context(ctx)
             .send()

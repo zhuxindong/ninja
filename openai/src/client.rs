@@ -334,6 +334,7 @@ fn build_auth_client(
         .impersonate(random_impersonate())
         .timeout(Duration::from_secs(config.timeout))
         .connect_timeout(Duration::from_secs(config.connect_timeout))
+        .dns_resolver(get_dns_resolver())
         .proxy(proxy_url)
         .build()
 }
