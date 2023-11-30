@@ -51,12 +51,11 @@ fn print_boot_message(inner: &Args) {
     info!("OS: {}", std::env::consts::OS);
     info!("Arch: {}", std::env::consts::ARCH);
     info!("Version: {}", env!("CARGO_PKG_VERSION"));
-    info!("Worker threads: {}", inner.workers);
     info!("Concurrent limit: {}", inner.concurrent_limit);
-    info!("Enable cookie store: {}", inner.cookie_store);
     info!("Keepalive {} seconds", inner.tcp_keepalive);
     info!("Timeout {} seconds", inner.timeout);
     info!("Connect timeout {} seconds", inner.connect_timeout);
+    info!("Enable cookie store: {}", inner.cookie_store);
     info!("Enable file proxy: {}", inner.enable_file_proxy);
     info!("Enable direct connection: {}", inner.enable_direct);
     inner.arkose_solver.as_ref().map(|solver| {
@@ -91,7 +90,9 @@ impl Serve {
         Self(inner)
     }
 
-    pub fn run(self) -> anyhow::Result<()> {
+    /// from issue: https://github.com/hyperium/hyper/issues/3140
+    #[tokio::main]
+    pub async fn run(self) -> anyhow::Result<()> {
         tracing_subscriber::registry()
             .with(
                 tracing_subscriber::EnvFilter::try_from_default_env()
@@ -100,6 +101,7 @@ impl Serve {
             .with(tracing_subscriber::fmt::layer())
             .init();
 
+        // print boot message
         print_boot_message(&self.0);
 
         // init context
@@ -178,75 +180,66 @@ impl Serve {
             .tcp_keepalive(Some(Duration::from_secs(self.0.tcp_keepalive as u64)))
             .build();
 
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_io()
-            .enable_time()
-            .worker_threads(self.0.workers)
-            .build()?;
-
-        runtime.block_on(async move {
-            let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
-            // PreAuth mitm proxy
-            #[cfg(feature = "preauth")]
-            if let Some(pbind) = self.0.pbind.clone() {
-                let builder = mitm::Builder::builder()
-                    .bind(pbind)
-                    .upstream_proxy(self.0.pupstream.clone())
-                    .cert(self.0.pcert.clone())
-                    .key(self.0.pkey.clone())
-                    .graceful_shutdown(rx)
-                    .cerificate_cache_size(1_000)
-                    .mitm_filters(vec![String::from("ios.chat.openai.com")])
-                    .handler(preauth::PreAuthHanlder)
-                    .build();
-                if let Some(err) = builder.proxy().await.err() {
-                    warn!("PreAuth proxy error: {}", err);
-                }
+        let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
+        // PreAuth mitm proxy
+        #[cfg(feature = "preauth")]
+        if let Some(pbind) = self.0.pbind.clone() {
+            let builder = mitm::Builder::builder()
+                .bind(pbind)
+                .upstream_proxy(self.0.pupstream.clone())
+                .cert(self.0.pcert.clone())
+                .key(self.0.pkey.clone())
+                .graceful_shutdown(rx)
+                .cerificate_cache_size(1_000)
+                .mitm_filters(vec![String::from("ios.chat.openai.com")])
+                .handler(preauth::PreAuthHanlder)
+                .build();
+            if let Some(err) = builder.proxy().await.err() {
+                warn!("PreAuth proxy error: {}", err);
             }
+        }
 
-            // Signal the server to shutdown using Handle.
-            let handle = Handle::new();
+        // Signal the server to shutdown using Handle.
+        let handle = Handle::new();
 
-            // Spawn a task to gracefully shutdown server.
-            tokio::spawn(signal::graceful_shutdown(handle.clone()));
+        // Spawn a task to gracefully shutdown server.
+        tokio::spawn(signal::graceful_shutdown(handle.clone()));
 
-            // Spawn a task to check wan address.
-            tokio::spawn(check_wan_address());
+        // Spawn a task to check wan address.
+        tokio::spawn(check_wan_address());
 
-            let result = match (self.0.tls_cert, self.0.tls_key) {
-                (Some(cert), Some(key)) => {
-                    let tls_config = RustlsConfig::from_pem_file(cert, key)
-                        .await
-                        .expect("Failed to load TLS keypair");
+        let result = match (self.0.tls_cert, self.0.tls_key) {
+            (Some(cert), Some(key)) => {
+                let tls_config = RustlsConfig::from_pem_file(cert, key)
+                    .await
+                    .expect("Failed to load TLS keypair");
 
-                    axum_server::bind_rustls(self.0.bind.unwrap(), tls_config)
-                        .handle(handle)
-                        .addr_incoming_config(incoming_config)
-                        .http_config(http_config)
-                        .serve(router.into_make_service_with_connect_info::<SocketAddr>())
-                        .await
-                }
-                _ => {
-                    axum_server::bind(self.0.bind.unwrap())
-                        .handle(handle)
-                        .addr_incoming_config(incoming_config)
-                        .http_config(http_config)
-                        .serve(router.into_make_service_with_connect_info::<SocketAddr>())
-                        .await
-                }
-            };
-
-            if let Some(err) = result.err() {
-                warn!("Http Server error: {}", err);
+                axum_server::bind_rustls(self.0.bind.unwrap(), tls_config)
+                    .handle(handle)
+                    .addr_incoming_config(incoming_config)
+                    .http_config(http_config)
+                    .serve(router.into_make_service_with_connect_info::<SocketAddr>())
+                    .await
             }
-
-            if let Some(err) = tx.send(()).await.err() {
-                warn!("Send shutdown signal error: {}", err);
+            _ => {
+                axum_server::bind(self.0.bind.unwrap())
+                    .handle(handle)
+                    .addr_incoming_config(incoming_config)
+                    .http_config(http_config)
+                    .serve(router.into_make_service_with_connect_info::<SocketAddr>())
+                    .await
             }
+        };
 
-            tokio::time::sleep(Duration::from_secs(1)).await;
-        });
+        if let Some(err) = result.err() {
+            warn!("Http Server error: {}", err);
+        }
 
+        if let Some(err) = tx.send(()).await.err() {
+            warn!("Send shutdown signal error: {}", err);
+        }
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
         Ok(())
     }
 }

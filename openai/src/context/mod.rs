@@ -53,10 +53,6 @@ pub struct Args {
     #[builder(setter(into), default = Some(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 7999)))]
     pub(crate) bind: Option<SocketAddr>,
 
-    /// Machine worker pool
-    #[builder(setter(into), default = 1)]
-    pub(crate) workers: usize,
-
     /// Concurrent limit (Enforces a limit on the concurrent number of requests the underlying)
     #[builder(setter(into), default = 65535)]
     pub(crate) concurrent_limit: usize,

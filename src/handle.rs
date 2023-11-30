@@ -53,7 +53,6 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .pool_idle_timeout(args.pool_idle_timeout)
         .timeout(args.timeout)
         .connect_timeout(args.connect_timeout)
-        .workers(args.workers)
         .concurrent_limit(args.concurrent_limit)
         .tls_cert(args.tls_cert)
         .tls_key(args.tls_key)
@@ -244,7 +243,6 @@ pub(super) fn generate_template(out: Option<PathBuf>) -> anyhow::Result<()> {
 
     let args = args::ServeArgs {
         bind: Some("0.0.0.0:7999".parse()?),
-        workers: 1,
         concurrent_limit: 65535,
         timeout: 600,
         connect_timeout: 60,

@@ -47,7 +47,6 @@ opkg install luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
 
 ```shell
 docker run --rm -it -p 7999:7999 --name=ninja \
-  -e WORKERS=1 \
   -e LOG=info \
   ghcr.io/gngpp/ninja:latest run
 ```
@@ -173,7 +172,6 @@ Recently, `OpenAI` has canceled the `Arkose` verification for `GPT-3.5`. It can 
 - `--bind`, environment variable `BIND`, service listening address: default 0.0.0.0:7999,
 - `--tls-cert`, environment variable `TLS_CERT`', TLS certificate public key. Supported format: EC/PKCS8/RSA
 - `--tls-key`, environment variable `TLS_KEY`, TLS certificate private key
-- `--workers`, worker threads: default 1
 - `--disable-webui`, if you don’t want to use the default built-in WebUI, use this parameter to turn it off
 - `--enable-file-proxy`, environment variable `ENABLE_FILE_PROXY`, turns on the file upload and download API proxy
 - `--enable-direct`, enable direct connection, add the IP bound to the `interface` export to the proxy pool
@@ -244,8 +242,6 @@ Options:
           Configuration file path (toml format file) [env: CONFIG=]
   -b, --bind <BIND>
           Server bind address [env: BIND=] [default: 0.0.0.0:7999]
-  -W, --workers <WORKERS>
-          Server worker-pool size (Recommended number of CPU cores) [default: 1]
       --concurrent-limit <CONCURRENT_LIMIT>
           Enforces a limit on the concurrent number of requests the underlying [default: 1024]
       --enable-direct
