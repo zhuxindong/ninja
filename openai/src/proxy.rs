@@ -83,7 +83,7 @@ impl TryFrom<(&str, Url)> for Proxy {
 
     fn try_from((proto, url): (&str, Url)) -> Result<Self, Error> {
         match url.scheme() {
-            "http" | "https" | "socks5" => {
+            "http" | "https" | "socks5" | "socks5h" => {
                 let inner_proxy = InnerProxy::Proxy(url);
                 make_proxy(inner_proxy, proto)
             }

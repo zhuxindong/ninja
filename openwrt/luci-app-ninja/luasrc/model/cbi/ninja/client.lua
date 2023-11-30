@@ -12,7 +12,7 @@ s.anonymous = true
 o = s:option(Flag, "enabled", translate("Enabled"))
 o.rmempty = false
 
-o = s:option(Value, "proxies", translate("Proxies"), translate("Supports http/https/socks5, format: protocol://user:pass@ip:port"))
+o = s:option(Value, "proxies", translate("Proxies"), translate("Supports http/https/socks5/socks5h, format: protocol://user:pass@ip:port"))
 
 
 o = s:option(Flag, "enable_direct", translate("Turn on direct connection"), translate("Turn on direct connection using proxy"))
@@ -101,7 +101,7 @@ o.default = "86400"
 
 o = s:option(Value, "pbind", translate("Preauth MITM server bind address"))
 
-o = s:option(Value, "pupstream", translate("MITM Upstream proxy"), translate("Supports http/https/socks5, format: protocol://user:pass@ip:port"))
+o = s:option(Value, "pupstream", translate("MITM Upstream proxy"), translate("Supports http/https/socks5/socks5h, format: protocol://user:pass@ip:port"))
 
 o = s:option(Value, "pcert", translate("Preauth MITM server CA certificate file path"))
 
