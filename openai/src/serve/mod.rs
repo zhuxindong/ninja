@@ -169,15 +169,12 @@ impl Serve {
         let router = route::config(router, &self.0).layer(global_layer);
 
         let http_config = HttpConfig::new()
-            .http1_keep_alive(true)
-            .http1_header_read_timeout(Duration::from_secs(self.0.tcp_keepalive as u64))
-            .http2_keep_alive_timeout(Duration::from_secs(self.0.tcp_keepalive as u64))
-            .http2_keep_alive_interval(Some(Duration::from_secs(self.0.tcp_keepalive as u64)))
+            .http1_title_case_headers(true)
+            .http1_preserve_header_case(true)
             .build();
 
         let incoming_config = AddrIncomingConfig::new()
             .tcp_sleep_on_accept_errors(true)
-            .tcp_keepalive_interval(Some(Duration::from_secs(self.0.tcp_keepalive as u64)))
             .tcp_keepalive(Some(Duration::from_secs(self.0.tcp_keepalive as u64)))
             .build();
 

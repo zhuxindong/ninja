@@ -91,8 +91,8 @@ msgstr "默认监听端口: 7999"
 msgid "Default 1 worker thread"
 msgstr "默认 1 个工作线程"
 
-msgid "Supports http/https/socks5, format: protocol://user:pass@ip:port"
-msgstr "支持http/https/socks5，格式: protocol://user:pass@ip:port"
+msgid "Supports http/https/socks5/socks5h, format: protocol://user:pass@ip:port"
+msgstr "支持http/https/socks5/socks5h，格式: protocol://user:pass@ip:port"
 
 msgid "Default 60 seconds"
 msgstr "默认 60 秒"
@@ -223,8 +223,8 @@ msgstr "Preauth MITM 服务绑定地址"
 msgid "MITM Upstream proxy"
 msgstr "MITM 上游代理"
 
-msgid "Supports http/https/socks5, format: protocol://user:pass@ip:port"
-msgstr "支持http/https/socks5，格式: protocol://user:pass@ip:port"
+msgid "Supports http/https/socks5/socks5h, format: protocol://user:pass@ip:port"
+msgstr "支持http/https/socks5/socks5h，格式: protocol://user:pass@ip:port"
 
 msgid "Preauth MITM server CA certificate file path"
 msgstr "Preauth MITM 服务 CA 证书文件路径"

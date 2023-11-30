@@ -181,7 +181,7 @@ Recently, `OpenAI` has canceled the `Arkose` verification for `GPT-3.5`. It can 
 
 ##### Advanced proxy usage
 
-The built-in protocols and proxy types of agents are divided into built-in protocols: `all/api/auth/arkose`, where `all` is for all clients, `api` is for all `OpenAI API`, `auth` is for authorization/login, `arkose` For ArkoseLabs; proxy type: `interface/proxy/ipv6_subnet`, where `interface` represents the bound export `IP` address, `proxy` represents the upstream proxy protocol: `http/https/socks5`, `ipv6_subnet` represents the A random IP address within the IPv6 subnet acts as a proxy. The format is `proto|proxy`, example: **`all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081`**, without built-in protocol, the protocol defaults to `all`.
+The built-in protocols and proxy types of agents are divided into built-in protocols: `all/api/auth/arkose`, where `all` is for all clients, `api` is for all `OpenAI API`, `auth` is for authorization/login, `arkose` For ArkoseLabs; proxy type: `interface/proxy/ipv6_subnet`, where `interface` represents the bound export `IP` address, `proxy` represents the upstream proxy protocol: `http/https/socks5/socks5h`, `ipv6_subnet` represents the A random IP address within the IPv6 subnet acts as a proxy. The format is `proto|proxy`, example: **`all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081`**, without built-in protocol, the protocol defaults to `all`.
 
 ##### Agent usage rules
 
@@ -313,7 +313,7 @@ Options:
   -B, --pbind <PBIND>
           Preauth MITM server bind address [env: PREAUTH_BIND=]
   -X, --pupstream <PUPSTREAM>
-          Preauth MITM server upstream proxy, Only support http/https/socks5 protocol [env: PREAUTH_UPSTREAM=]
+          Preauth MITM server upstream proxy, Only support http/https/socks5/socks5h protocol [env: PREAUTH_UPSTREAM=]
       --pcert <PCERT>
           Preauth MITM server CA certificate file path [default: ca/cert.crt]
       --pkey <PKEY>

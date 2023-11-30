@@ -181,7 +181,7 @@ services:
 
 ##### 代理高阶用法
 
-分代理内置协议和代理类型，内置协议: `all/api/auth/arkose`，其中`all`针对所有客户端，`api`针对所有`OpenAI API`，`auth`针对授权/登录，`arkose`针对ArkoseLabs；代理类型: `interface/proxy/ipv6_subnet`，其中`interface`表示绑定的出口`IP`地址，`proxy`表示上游代理协议: `http/https/socks5`，`ipv6_subnet`表示用Ipv6子网段内随机IP地址作为代理。格式为`proto|proxy`，例子: **`all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081`**，不带内置协议，协议默认为`all`。
+分代理内置协议和代理类型，内置协议: `all/api/auth/arkose`，其中`all`针对所有客户端，`api`针对所有`OpenAI API`，`auth`针对授权/登录，`arkose`针对ArkoseLabs；代理类型: `interface/proxy/ipv6_subnet`，其中`interface`表示绑定的出口`IP`地址，`proxy`表示上游代理协议: `http/https/socks5/socks5h`，`ipv6_subnet`表示用Ipv6子网段内随机IP地址作为代理。格式为`proto|proxy`，例子: **`all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081`**，不带内置协议，协议默认为`all`。
   
 ##### 代理使用规则
 
@@ -313,7 +313,7 @@ Options:
   -B, --pbind <PBIND>
           Preauth MITM server bind address [env: PREAUTH_BIND=]
   -X, --pupstream <PUPSTREAM>
-          Preauth MITM server upstream proxy, Only support http/https/socks5 protocol [env: PREAUTH_UPSTREAM=]
+          Preauth MITM server upstream proxy, Only support http/https/socks5/socks5h protocol [env: PREAUTH_UPSTREAM=]
       --pcert <PCERT>
           Preauth MITM server CA certificate file path [default: ca/cert.crt]
       --pkey <PKEY>
