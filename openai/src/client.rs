@@ -6,15 +6,14 @@ use crate::{
     proxy::{self, Ipv6CidrExt},
 };
 use reqwest::{impersonate::Impersonate, Client};
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use std::{
     net::IpAddr,
     sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
 };
+use trust_dns_resolver::config::LookupIpStrategy;
 use url::Url;
-
-static DNS_RESOLVER: OnceLock<Arc<dns::TrustDnsResolver>> = OnceLock::new();
 
 /// Client type
 #[derive(Clone)]
@@ -285,20 +284,29 @@ fn build_client(
             .pool_idle_timeout(Duration::from_secs(config.pool_idle_timeout));
     }
 
-    match (preferred_addrs, fallback_addrs) {
-        (None, Some(_)) => builder = builder.local_address(fallback_addrs),
-        (Some(_), None) => builder = builder.local_address(preferred_addrs),
+    let ip_strategy = match (preferred_addrs, fallback_addrs) {
+        (None, Some(ip_addr)) | (Some(ip_addr), None) => {
+            builder = builder.local_address(fallback_addrs);
+            if ip_addr.is_ipv4() {
+                LookupIpStrategy::Ipv4Only
+            } else {
+                LookupIpStrategy::Ipv6Only
+            }
+        }
         (Some(IpAddr::V4(v4)), Some(IpAddr::V6(v6)))
-        | (Some(IpAddr::V6(v6)), Some(IpAddr::V4(v4))) => builder = builder.local_addresses(v4, v6),
-        _ => {}
-    }
+        | (Some(IpAddr::V6(v6)), Some(IpAddr::V4(v4))) => {
+            builder = builder.local_addresses(v4, v6);
+            LookupIpStrategy::Ipv6thenIpv4
+        }
+        _ => LookupIpStrategy::Ipv4AndIpv6,
+    };
 
     let client = builder
         .impersonate(random_impersonate())
         .danger_accept_invalid_certs(true)
         .connect_timeout(Duration::from_secs(config.connect_timeout))
         .timeout(Duration::from_secs(config.timeout))
-        .dns_resolver(get_dns_resolver())
+        .dns_resolver(create_dns_resolver(ip_strategy))
         .build()
         .expect("Failed to build API client");
     client
@@ -322,19 +330,29 @@ fn build_auth_client(
             .pool_idle_timeout(Duration::from_secs(config.pool_idle_timeout));
     }
 
-    match (preferred_addrs, fallback_addrs) {
-        (None, Some(_)) => builder = builder.local_address(fallback_addrs),
-        (Some(_), None) => builder = builder.local_address(preferred_addrs),
+    // Lookup ip strategy
+    let ip_strategy = match (preferred_addrs, fallback_addrs) {
+        (None, Some(ip_addr)) | (Some(ip_addr), None) => {
+            builder = builder.local_address(fallback_addrs);
+            if ip_addr.is_ipv4() {
+                LookupIpStrategy::Ipv4Only
+            } else {
+                LookupIpStrategy::Ipv6Only
+            }
+        }
         (Some(IpAddr::V4(v4)), Some(IpAddr::V6(v6)))
-        | (Some(IpAddr::V6(v6)), Some(IpAddr::V4(v4))) => builder = builder.local_addresses(v4, v6),
-        _ => {}
-    }
+        | (Some(IpAddr::V6(v6)), Some(IpAddr::V4(v4))) => {
+            builder = builder.local_addresses(v4, v6);
+            LookupIpStrategy::Ipv6thenIpv4
+        }
+        _ => LookupIpStrategy::Ipv4AndIpv6,
+    };
 
     builder
         .impersonate(random_impersonate())
         .timeout(Duration::from_secs(config.timeout))
         .connect_timeout(Duration::from_secs(config.connect_timeout))
-        .dns_resolver(get_dns_resolver())
+        .dns_resolver(create_dns_resolver(ip_strategy))
         .proxy(proxy_url)
         .build()
 }
@@ -353,11 +371,8 @@ fn get_next_index(len: usize, counter: &AtomicUsize) -> usize {
     new
 }
 
-fn get_dns_resolver() -> Arc<dns::TrustDnsResolver> {
-    let dns = DNS_RESOLVER
-        .get_or_init(|| Arc::new(dns::TrustDnsResolver::default()))
-        .clone();
-    dns
+fn create_dns_resolver(ip_: LookupIpStrategy) -> Arc<dns::TrustDnsResolver> {
+    Arc::new(dns::TrustDnsResolver::new(ip_))
 }
 
 const RANDOM_IMPERSONATE: [Impersonate; 7] = [
@@ -373,11 +388,8 @@ const RANDOM_IMPERSONATE: [Impersonate; 7] = [
 /// Randomly select a user agent from a list of known user agents.
 fn random_impersonate() -> Impersonate {
     use rand::seq::IteratorRandom;
-
-    let target = RANDOM_IMPERSONATE
+    RANDOM_IMPERSONATE
         .into_iter()
         .choose(&mut rand::thread_rng())
-        .unwrap_or(Impersonate::OkHttp5);
-    debug!("Using user agent: {:?}", target);
-    Impersonate::Chrome104
+        .unwrap_or(Impersonate::OkHttp5)
 }
