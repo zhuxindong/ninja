@@ -93,6 +93,10 @@ pub struct Args {
     #[builder(setter(into), default)]
     pub(crate) tls_key: Option<PathBuf>,
 
+    /// Visitor email whitelist
+    #[builder(setter(into), default)]
+    pub(super) visitor_email_whitelist: Option<Vec<String>>,
+
     /// Login auth key
     #[builder(setter(into), default)]
     auth_key: Option<String>,
@@ -219,6 +223,8 @@ pub struct Context {
     enable_file_proxy: bool,
     /// Login auth key
     auth_key: Option<String>,
+    /// visitor_email_whitelist
+    visitor_email_whitelist: Option<Vec<String>>,
     /// Cloudflare Turnstile
     cf_turnstile: Option<CfTurnstile>,
     /// Arkose endpoint
@@ -273,6 +279,7 @@ impl Context {
             arkose_gpt3_experiment: args.arkose_gpt3_experiment,
             enable_file_proxy: args.enable_file_proxy,
             auth_key: args.auth_key,
+            visitor_email_whitelist: args.visitor_email_whitelist,
             cf_turnstile: args.cf_site_key.and_then(|site_key| {
                 args.cf_secret_key.map(|secret_key| CfTurnstile {
                     site_key,
@@ -356,5 +363,10 @@ impl Context {
     /// Enable file proxy
     pub fn enable_file_proxy(&self) -> bool {
         self.enable_file_proxy
+    }
+
+    /// Get the visitor email whitelist
+    pub fn visitor_email_whitelist(&self) -> Option<&[String]> {
+        self.visitor_email_whitelist.as_deref()
     }
 }

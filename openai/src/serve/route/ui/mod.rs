@@ -43,6 +43,7 @@ use crate::serve::error::ResponseError;
 use crate::serve::proxy::resp::header_convert;
 use crate::serve::route::ui::extract::SessionExtractor;
 use crate::serve::turnstile;
+use crate::serve::whitelist;
 use crate::with_context;
 use crate::{
     auth::{model::AuthAccount, provide::AuthProvider},
@@ -101,7 +102,7 @@ pub(super) fn config(router: Router, args: &Args) -> Router {
             .route(
                 "/auth/login",
                 post(post_login).layer(ServiceBuilder::new().map_request_body(body::boxed).layer(
-                    axum::middleware::from_fn(serve::middleware::csrf::auth_middleware),
+                    axum::middleware::from_fn(serve::middleware::csrf::csrf_middleware),
                 )),
             )
             .route("/auth/login", get(get_login))
@@ -191,6 +192,10 @@ async fn post_login(
     token: CsrfToken,
     account: axum::Form<AuthAccount>,
 ) -> Result<impl IntoResponse, ResponseError> {
+    // Check if the request is in the whitelist
+    whitelist::check_whitelist(&account.username)?;
+
+    // Check if the request is in the turnstile
     turnstile::cf_turnstile_check(&addr.ip(), account.cf_turnstile_response.as_deref()).await?;
 
     match with_context!(auth_client).do_access_token(&account).await {
@@ -250,6 +255,8 @@ async fn post_login_token(
                 .ok_or(ResponseError::InternalServerError(anyhow!(
                     "get access token profile error"
                 )))?;
+            // Check if the request is in the whitelist
+            whitelist::check_whitelist(&token_prefile.email())?;
             Session::from((s, token_prefile))
         }
         s if s.len() > 40 && s.len() < 100 => {

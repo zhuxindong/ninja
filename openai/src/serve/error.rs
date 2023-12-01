@@ -11,7 +11,7 @@ pub enum ProxyError {
     SessionNotFound,
     #[error("Authentication Key error")]
     AuthKeyError,
-    #[error("AccessToken required")]
+    #[error("AccessToken is required")]
     AccessTokenRequired,
     #[error("Model required")]
     ModelRequired,
@@ -31,6 +31,10 @@ pub enum ProxyError {
     FilenameIsInvalid,
     #[error("invalid upload field")]
     InvalidUploadField,
+    #[error("Too Many Requests")]
+    TooManyRequests,
+    #[error("Your access is not in the whitelist")]
+    AccessNotInWhitelist,
 }
 
 // Make our own error that wraps `anyhow::Error`.
