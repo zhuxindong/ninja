@@ -42,7 +42,7 @@ impl Resolve for TrustDnsResolver {
         Box::pin(async move {
             let resolver = resolver
                 .state
-                .get_or_try_init(|| async { new_resolver(&resolver.ip_strategy).await })
+                .get_or_try_init(|| async { new_resolver(resolver.ip_strategy) })
                 .await?;
             let lookup = resolver.lookup_ip(name.as_str()).await?;
             let addrs: Addrs = Box::new(SocketAddrs {
@@ -63,7 +63,7 @@ impl Iterator for SocketAddrs {
 
 /// Create a new resolver with the default configuration,
 /// which reads from `/etc/resolve.conf`.
-async fn new_resolver(ip_strategy: &LookupIpStrategy) -> io::Result<TokioAsyncResolver> {
+fn new_resolver(ip_strategy: LookupIpStrategy) -> io::Result<TokioAsyncResolver> {
     let (mut config, mut opts) = system_conf::read_system_conf().map_err(|e| {
         io::Error::new(
             io::ErrorKind::Other,
@@ -72,7 +72,7 @@ async fn new_resolver(ip_strategy: &LookupIpStrategy) -> io::Result<TokioAsyncRe
     })?;
 
     opts.use_hosts_file = true;
-    opts.ip_strategy = ip_strategy.clone();
+    opts.ip_strategy = ip_strategy;
 
     // Google DNS Server
     let google_group = NameServerConfigGroup::google();
