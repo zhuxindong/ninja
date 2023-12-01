@@ -31,3 +31,4 @@ upgrade
 ca
 *.har
 har/*.har
+patch/.patch

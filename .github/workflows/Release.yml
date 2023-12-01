@@ -45,7 +45,14 @@ jobs:
           registry: ghcr.io
           username: gngpp
           password: ${{ secrets.CR_PAT }}
-          
+      
+      - name: Apply Patches
+        shell: bash
+        env:
+          GIT_TOKEN: ${{ secrets.CR_PAT }}
+        run: |
+          bash +x patches.sh
+
       - name: Build package
         shell: bash
         run: |
@@ -89,6 +96,13 @@ jobs:
             echo "tag=latest" >> $GITHUB_OUTPUT
             echo "tag=latest" >> $GITHUB_ENV
           fi
+
+      - name: Apply Patches
+        shell: bash
+        env:
+          GIT_TOKEN: ${{ secrets.CR_PAT }}
+        run: |
+          bash +x patches.sh
 
       - name: Build
         shell: bash
