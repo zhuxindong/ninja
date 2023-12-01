@@ -148,6 +148,10 @@ pub struct ServeArgs {
     #[clap(short = 'F', long, env = "ENABLE_FILE_PROXY")]
     pub(super) enable_file_proxy: bool,
 
+    /// Visitor email whitelist
+    #[clap(short = 'W', long, env = "VISITOR_EMAIL_WHITELIST", value_parser = parse::parse_email_whitelist)]
+    pub(super) visitor_email_whitelist: Option<std::vec::Vec<String>>,
+
     /// Arkose endpoint, Example: https://client-api.arkoselabs.com
     #[clap(long, value_parser = parse::parse_url)]
     pub(super) arkose_endpoint: Option<String>,

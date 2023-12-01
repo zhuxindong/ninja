@@ -8,6 +8,7 @@ mod puid;
 mod route;
 mod signal;
 mod turnstile;
+mod whitelist;
 
 use anyhow::anyhow;
 use axum::body::Body;
@@ -151,6 +152,9 @@ impl Serve {
                     Arc::new(limit_context),
                     middleware::token_bucket_limit_middleware,
                 ))
+                .layer(axum::middleware::from_fn(
+                    middleware::whitelist::whitelist_middleware,
+                ))
         };
 
         let router = axum::Router::new()
@@ -271,6 +275,9 @@ async fn post_access_token(
     bearer: Option<TypedHeader<Authorization<Bearer>>>,
     account: axum::Form<AuthAccount>,
 ) -> Result<impl IntoResponse, ResponseError> {
+    // check username/email in whitelist
+    whitelist::check_whitelist(&account.username)?;
+
     if let Some(auth_key) = with_context!(auth_key) {
         // check bearer token exist
         let bearer = bearer.ok_or(ResponseError::Unauthorized(anyhow!("Auth Key required!")))?;

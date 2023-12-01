@@ -1,12 +1,11 @@
 pub mod csrf;
 #[cfg(feature = "limit")]
 pub mod tokenbucket;
+pub mod whitelist;
 
-use anyhow::anyhow;
+use super::error::{ProxyError, ResponseError};
 use axum::http::header;
 use axum::{http::Request, middleware::Next, response::Response};
-
-use super::error::ResponseError;
 
 pub(super) async fn token_authorization_middleware<B>(
     request: Request<B>,
@@ -23,9 +22,7 @@ pub(super) async fn token_authorization_middleware<B>(
             Ok(_) => Ok(next.run(request).await),
             Err(err) => Err(ResponseError::Unauthorized(err)),
         },
-        None => Err(ResponseError::Unauthorized(anyhow!(
-            "access_token is required!"
-        ))),
+        None => Err(ResponseError::Unauthorized(ProxyError::AccessTokenRequired)),
     }
 }
 
@@ -43,8 +40,8 @@ pub(super) async fn token_bucket_limit_middleware<B>(
     match limit.acquire(addr).await {
         Ok(condition) => match condition {
             true => Ok(next.run(request).await),
-            false => Err(ResponseError::TooManyRequests(anyhow!("Too Many Requests"))),
+            false => Err(ResponseError::TooManyRequests(ProxyError::TooManyRequests)),
         },
-        Err(err) => Err(ResponseError::InternalServerError(err)),
+        Err(err) => Err(ResponseError::BadGateway(err)),
     }
 }

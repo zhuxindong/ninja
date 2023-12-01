@@ -8,10 +8,10 @@ use axum::{
 use axum_csrf::CsrfToken;
 use mitm::proxy::hyper;
 
-use crate::{auth::model::AuthAccount, warn};
+use crate::auth::model::AuthAccount;
 
 /// Can only be done with the feature layer enabled
-pub async fn auth_middleware(
+pub async fn csrf_middleware(
     token: CsrfToken,
     method: Method,
     mut request: Request<BoxBody>,
@@ -29,12 +29,10 @@ pub async fn auth_middleware(
         match payload.0.csrf_token {
             Some(csrf_token) => {
                 if token.verify(&csrf_token).is_err() {
-                    warn!("csrf token verify failed: {csrf_token}");
                     return Err(StatusCode::UNAUTHORIZED);
                 }
             }
             None => {
-                warn!("csrf token not found");
                 return Err(StatusCode::UNAUTHORIZED);
             }
         }

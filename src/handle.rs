@@ -57,6 +57,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .tls_cert(args.tls_cert)
         .tls_key(args.tls_key)
         .auth_key(args.auth_key)
+        .visitor_email_whitelist(args.visitor_email_whitelist)
         .cf_site_key(args.cf_site_key)
         .cf_secret_key(args.cf_secret_key)
         .disable_ui(args.disable_webui)

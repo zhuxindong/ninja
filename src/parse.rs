@@ -81,3 +81,25 @@ pub fn parse_dir_path(s: &str) -> anyhow::Result<PathBuf> {
 
     Ok(path)
 }
+
+/// parse email whitelist
+/// format: email1,email2,email3
+pub fn parse_email_whitelist(s: &str) -> anyhow::Result<Vec<String>> {
+    let split = s.split(',');
+    let mut emails: Vec<_> = vec![];
+
+    for ele in split {
+        let email = ele.trim();
+        if email.is_empty() {
+            continue;
+        }
+
+        if email.contains('@') {
+            emails.push(email.to_string());
+        } else {
+            anyhow::bail!("Invalid email format: {}", email)
+        }
+    }
+
+    Ok(emails)
+}
