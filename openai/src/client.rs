@@ -2,7 +2,7 @@ use crate::auth::{self};
 use crate::dns;
 use crate::{
     auth::AuthClient,
-    context, debug,
+    context,
     proxy::{self, Ipv6CidrExt},
 };
 use reqwest::{impersonate::Impersonate, Client};
