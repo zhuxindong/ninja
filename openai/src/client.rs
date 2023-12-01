@@ -1,12 +1,13 @@
 use crate::auth::{self};
-use crate::dns;
+use crate::dns::{self, TrustDnsResolver};
 use crate::{
     auth::AuthClient,
     context,
     proxy::{self, Ipv6CidrExt},
 };
+use moka::sync::Cache;
 use reqwest::{impersonate::Impersonate, Client};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::{
     net::IpAddr,
     sync::atomic::{AtomicUsize, Ordering},
@@ -41,6 +42,34 @@ impl Into<Client> for ClientAgent {
         }
     }
 }
+
+#[derive(Hash, PartialEq, Eq)]
+enum LookupIpStrategyExt {
+    /// Only query for A (Ipv4) records
+    Ipv4Only,
+    /// Only query for AAAA (Ipv6) records
+    Ipv6Only,
+    /// Query for A and AAAA in parallel
+    Ipv4AndIpv6,
+    /// Query for Ipv6 if that fails, query for Ipv4
+    Ipv6thenIpv4,
+    /// Query for Ipv4 if that fails, query for Ipv6 (default)
+    Ipv4thenIpv6,
+}
+
+impl LookupIpStrategyExt {
+    fn from_strategy(strategy: LookupIpStrategy) -> Self {
+        match strategy {
+            LookupIpStrategy::Ipv4Only => Self::Ipv4Only,
+            LookupIpStrategy::Ipv6Only => Self::Ipv6Only,
+            LookupIpStrategy::Ipv4AndIpv6 => Self::Ipv4AndIpv6,
+            LookupIpStrategy::Ipv6thenIpv4 => Self::Ipv6thenIpv4,
+            LookupIpStrategy::Ipv4thenIpv6 => Self::Ipv4thenIpv6,
+        }
+    }
+}
+
+static DNS_RESOLVER: OnceLock<Cache<LookupIpStrategyExt, Arc<TrustDnsResolver>>> = OnceLock::new();
 
 struct Config {
     /// Enable cookie store.
@@ -149,8 +178,8 @@ impl ClientRoundRobinBalancer {
             (vec![], vec![], vec![]),
             |(mut interfaces, mut proxies, mut ipv6_subnets), p| {
                 match p {
-                    proxy::InnerProxy::Interface(v) => interfaces.push(v),
                     proxy::InnerProxy::Proxy(v) => proxies.push(v),
+                    proxy::InnerProxy::Interface(v) => interfaces.push(v),
                     proxy::InnerProxy::IPv6Subnet(v) => ipv6_subnets.push(v),
                 }
                 (interfaces, proxies, ipv6_subnets)
@@ -213,7 +242,7 @@ impl ClientRoundRobinBalancer {
 }
 
 impl ClientRoundRobinBalancer {
-    // rebuild client with ipv6
+    /// rebuild client with ipv6
     fn rebuild_client_with_ipv6(&self, client: &ClientAgent) -> ClientAgent {
         let bind_addr = self.config.get_next_ipv6();
         // if interface is not specified, use fallback bind address
@@ -243,6 +272,7 @@ impl ClientRoundRobinBalancer {
         }
     }
 
+    /// Get next client
     pub fn next(&self) -> ClientAgent {
         // if there is only one client, return it
         if self.pool.len() == 1 {
@@ -267,15 +297,19 @@ fn build_client(
     disable_keep_alive: bool,
 ) -> Client {
     let mut builder = Client::builder();
+
+    // set proxy
     if let Some(url) = proxy_url {
         let proxy = reqwest::Proxy::all(url).expect("Failed to build proxy");
         builder = builder.proxy(proxy)
     }
 
+    // enable cookie store
     if config.cookie_store {
         builder = builder.cookie_store(true);
     }
 
+    // disable keep alive
     if disable_keep_alive {
         builder = builder.tcp_keepalive(None);
     } else {
@@ -284,9 +318,10 @@ fn build_client(
             .pool_idle_timeout(Duration::from_secs(config.pool_idle_timeout));
     }
 
-    let ip_strategy = match (preferred_addrs, fallback_addrs) {
+    // return lookup ip strategy
+    let ip_s = match (preferred_addrs, fallback_addrs) {
         (None, Some(ip_addr)) | (Some(ip_addr), None) => {
-            builder = builder.local_address(fallback_addrs);
+            builder = builder.local_address(ip_addr);
             if ip_addr.is_ipv4() {
                 LookupIpStrategy::Ipv4Only
             } else {
@@ -301,15 +336,17 @@ fn build_client(
         _ => LookupIpStrategy::Ipv4AndIpv6,
     };
 
-    let client = builder
+    // init dns resolver
+    let trust_dns_resolver = get_or_init_dns_resolver(ip_s);
+
+    builder
         .impersonate(random_impersonate())
         .danger_accept_invalid_certs(true)
         .connect_timeout(Duration::from_secs(config.connect_timeout))
         .timeout(Duration::from_secs(config.timeout))
-        .dns_resolver(create_dns_resolver(ip_strategy))
+        .dns_resolver(trust_dns_resolver)
         .build()
-        .expect("Failed to build API client");
-    client
+        .expect("Failed to build API client")
 }
 
 /// Build an authenticated client.
@@ -322,6 +359,7 @@ fn build_auth_client(
 ) -> AuthClient {
     let mut builder = auth::AuthClientBuilder::builder();
 
+    // disable keep alive
     if disable_keep_alive {
         builder = builder.tcp_keepalive(None);
     } else {
@@ -330,10 +368,10 @@ fn build_auth_client(
             .pool_idle_timeout(Duration::from_secs(config.pool_idle_timeout));
     }
 
-    // Lookup ip strategy
-    let ip_strategy = match (preferred_addrs, fallback_addrs) {
+    // return lookup ip strategy
+    let ip_s = match (preferred_addrs, fallback_addrs) {
         (None, Some(ip_addr)) | (Some(ip_addr), None) => {
-            builder = builder.local_address(fallback_addrs);
+            builder = builder.local_address(ip_addr);
             if ip_addr.is_ipv4() {
                 LookupIpStrategy::Ipv4Only
             } else {
@@ -348,11 +386,14 @@ fn build_auth_client(
         _ => LookupIpStrategy::Ipv4AndIpv6,
     };
 
+    // init dns resolver
+    let trust_dns_resolver = get_or_init_dns_resolver(ip_s);
+
     builder
         .impersonate(random_impersonate())
         .timeout(Duration::from_secs(config.timeout))
         .connect_timeout(Duration::from_secs(config.connect_timeout))
-        .dns_resolver(create_dns_resolver(ip_strategy))
+        .dns_resolver(trust_dns_resolver)
         .proxy(proxy_url)
         .build()
 }
@@ -371,8 +412,18 @@ fn get_next_index(len: usize, counter: &AtomicUsize) -> usize {
     new
 }
 
-fn create_dns_resolver(ip_: LookupIpStrategy) -> Arc<dns::TrustDnsResolver> {
-    Arc::new(dns::TrustDnsResolver::new(ip_))
+/// Create a DNS resolver
+fn get_or_init_dns_resolver(ip_strategy: LookupIpStrategy) -> Arc<dns::TrustDnsResolver> {
+    // maybe DNS_RESOLVER is not initialized
+    let cache = DNS_RESOLVER.get_or_init(|| {
+        let cache: Cache<LookupIpStrategyExt, Arc<TrustDnsResolver>> =
+            Cache::builder().max_capacity(100).build();
+        cache
+    });
+    // init dns resolver cache
+    cache.get_with(LookupIpStrategyExt::from_strategy(ip_strategy), || {
+        Arc::new(dns::TrustDnsResolver::new(ip_strategy))
+    })
 }
 
 const RANDOM_IMPERSONATE: [Impersonate; 7] = [
