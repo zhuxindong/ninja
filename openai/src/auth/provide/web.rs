@@ -6,8 +6,9 @@ use crate::auth::error::AuthError;
 use crate::auth::{
     model::{self, AuthStrategy},
     provide::AuthenticateData,
-    AuthClient, API_AUTH_SESSION_COOKIE_KEY, OPENAI_OAUTH_URL,
+    AuthClient, OPENAI_OAUTH_URL,
 };
+use crate::constant::API_AUTH_SESSION_COOKIE_KEY;
 use crate::{debug, warn, URL_CHATGPT_API};
 use anyhow::{bail, Context};
 use reqwest::{Client, StatusCode};

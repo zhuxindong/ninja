@@ -1,5 +1,6 @@
 use std::time::UNIX_EPOCH;
 
+use crate::constant::{CF_CLEARANCE, NINJA_VERSION, PUID, SET_COOKIE};
 use crate::with_context;
 use crate::{debug, LIB_VERSION};
 use axum::body::Body;
@@ -94,14 +95,14 @@ pub(crate) async fn response_convert(
     // Build new response
     let mut builder = Response::builder()
         .status(resp.inner.status())
-        .header("ninja-version", LIB_VERSION);
+        .header(NINJA_VERSION, LIB_VERSION);
 
     // Copy headers except for "set-cookie"
     for kv in resp
         .inner
         .headers()
         .into_iter()
-        .filter(|(k, _)| k.as_str().to_lowercase().ne("set-cookie"))
+        .filter(|(k, _)| k.as_str().to_lowercase().ne(SET_COOKIE))
     {
         builder = builder.header(kv.0, kv.1);
     }
@@ -109,7 +110,7 @@ pub(crate) async fn response_convert(
     // Filter and transform cookies
     for cookie in resp.inner.cookies() {
         let name = cookie.name().to_lowercase();
-        if name == "_puid" || name == "cf_clearance" {
+        if name.eq(PUID) || name.eq(CF_CLEARANCE) {
             if let Some(expires) = cookie.expires() {
                 let timestamp_secs = expires
                     .duration_since(UNIX_EPOCH)

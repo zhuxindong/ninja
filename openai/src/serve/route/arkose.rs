@@ -44,8 +44,8 @@ async fn proxy(
         .iter()
         .find(|(k, _v)| k.contains(req_path))
     {
-        let mime_type = if v.mime_type == "application/octet-stream" {
-            "text/html"
+        let mime_type = if v.mime_type.eq(mime::APPLICATION_OCTET_STREAM.as_ref()) {
+            mime::TEXT_HTML.as_ref()
         } else {
             v.mime_type
         };
@@ -82,7 +82,7 @@ async fn proxy(
                     });
                     return create_response(
                         StatusCode::OK,
-                        "text/plain; charset=utf-8",
+                        mime::TEXT_HTML_UTF_8.as_ref(),
                         target.to_string(),
                     );
                 }

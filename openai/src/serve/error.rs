@@ -35,6 +35,12 @@ pub enum ProxyError {
     TooManyRequests,
     #[error("Your access is not in the whitelist")]
     AccessNotInWhitelist,
+    #[error("Auth Key required!")]
+    AuthKeyRequired,
+    #[error("Session: {0} required")]
+    SessionRequired(&'static str),
+    #[error("Missing cf_captcha_response")]
+    MissingCfCaptchaResponse,
 }
 
 // Make our own error that wraps `anyhow::Error`.

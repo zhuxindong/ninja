@@ -14,6 +14,7 @@ use axum::http::response::Builder;
 use axum::http::HeaderMap;
 use axum::http::Response;
 use axum::http::StatusCode;
+use axum::middleware;
 use axum::response::IntoResponse;
 use axum::routing::any;
 use axum::routing::{get, post};
@@ -33,13 +34,22 @@ use time::format_description::well_known::Rfc3339;
 use tower::ServiceBuilder;
 use tower_http::ServiceBuilderExt;
 
-use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
+use crate::constant::API_AUTH_SESSION_COOKIE_KEY;
+use crate::constant::ARKOSE_ENDPOINT;
+use crate::constant::AUTH_KEY;
+use crate::constant::CSRF_TOKEN;
+use crate::constant::EMPTY;
+use crate::constant::ERROR;
+use crate::constant::PICTURE;
+use crate::constant::SITE_KEY;
+use crate::constant::SUPPORT_APPLE;
+use crate::constant::USERNAME;
 use crate::context::Args;
 use crate::debug;
 use crate::info;
 use crate::now_duration;
-use crate::serve;
 use crate::serve::error::ResponseError;
+use crate::serve::middleware::csrf;
 use crate::serve::proxy::resp::header_convert;
 use crate::serve::route::ui::extract::SessionExtractor;
 use crate::serve::turnstile;
@@ -71,106 +81,108 @@ static TEMPLATE: OnceLock<tera::Tera> = OnceLock::new();
 
 // this function could be located in a different module
 pub(super) fn config(router: Router, args: &Args) -> Router {
-    if !args.disable_ui {
-        if let Some(endpoint) = with_context!(arkose_endpoint) {
-            info!("WebUI site use Arkose endpoint: {endpoint}")
-        }
-
-        let mut tera = tera::Tera::default();
-        tera.add_raw_templates(vec![
-            (TEMP_404, include_str!("../../../../ui/404.htm")),
-            (TEMP_AUTH, include_str!("../../../../ui/auth.htm")),
-            (TEMP_LOGIN, include_str!("../../../../ui/login.htm")),
-            (TEMP_CHAT, include_str!("../../../../ui/chat.htm")),
-            (TEMP_DETAIL, include_str!("../../../../ui/detail.htm")),
-            (TEMP_SHARE, include_str!("../../../../ui/share.htm")),
-        ])
-        .expect("The static template failed to load");
-
-        let _ = TEMPLATE.set(tera);
-
-        let cookie_key = Key::generate();
-        let config = CsrfConfig::default().with_key(Some(cookie_key));
-
-        let router = if with_context!(auth_key).is_some() {
-            router
-        } else {
-            router.route("/auth", get(get_auth))
-        };
-
-        router
-            .route(
-                "/auth/login",
-                post(post_login).layer(ServiceBuilder::new().map_request_body(body::boxed).layer(
-                    axum::middleware::from_fn(serve::middleware::csrf::csrf_middleware),
-                )),
-            )
-            .route("/auth/login", get(get_login))
-            .layer(CsrfLayer::new(config))
-            .route("/auth/login/token", post(post_login_token))
-            .route("/auth/logout", get(get_logout))
-            .route("/auth/session", get(get_session))
-            .route("/auth/me", get(get_auth_me))
-            .route("/", get(get_chat))
-            .route("/c", get(get_chat))
-            .route("/c/:conversation_id", get(get_chat))
-            .route(
-                "/chat",
-                any(|| async {
-                    Response::builder()
-                        .status(StatusCode::FOUND)
-                        .header(header::LOCATION, "/")
-                        .body(Body::empty())
-                        .expect("An error occurred while redirecting")
-                }),
-            )
-            .route(
-                "/chat/:conversation_id",
-                any(|| async {
-                    Response::builder()
-                        .status(StatusCode::FOUND)
-                        .header(header::LOCATION, "/")
-                        .body(Body::empty())
-                        .expect("An error occurred while redirecting")
-                }),
-            )
-            .route("/share/e/:share_id", get(get_share_chat))
-            .route("/share/:share_id", get(get_share_chat))
-            .route("/share/:share_id/continue", get(get_share_chat_continue))
-            .route(
-                &format!("/_next/data/{BUILD_ID}/index.json"),
-                get(get_chat_info),
-            )
-            .route(
-                // {conversation_id}.json
-                &format!("/_next/data/{BUILD_ID}/c/:conversation_id"),
-                get(get_chat_info),
-            )
-            .route(
-                // {share_id}.json
-                &format!("/_next/data/{BUILD_ID}/share/:share_id"),
-                get(get_share_chat_info),
-            )
-            .route(
-                &format!("/_next/data/{BUILD_ID}/share/:share_id/continue.json"),
-                get(get_share_chat_continue_info),
-            )
-            // static resource endpoints
-            .route("/resources/*path", get(get_static_resource))
-            .route("/_next/static/*path", get(get_static_resource))
-            .route("/fonts/*path", get(get_static_resource))
-            .route("/ulp/*path", get(get_static_resource))
-            .route("/sweetalert2/*path", get(get_static_resource))
-            // 404 endpoint
-            .fallback(error_404)
-    } else {
-        router
+    // If the UI is disabled, then return the router directly
+    if args.disable_ui {
+        return router;
     }
+
+    if let Some(endpoint) = with_context!(arkose_endpoint) {
+        info!("WebUI site use Arkose endpoint: {endpoint}")
+    }
+
+    let mut tera = tera::Tera::default();
+    tera.add_raw_templates(vec![
+        (TEMP_404, include_str!("../../../../ui/404.htm")),
+        (TEMP_AUTH, include_str!("../../../../ui/auth.htm")),
+        (TEMP_LOGIN, include_str!("../../../../ui/login.htm")),
+        (TEMP_CHAT, include_str!("../../../../ui/chat.htm")),
+        (TEMP_DETAIL, include_str!("../../../../ui/detail.htm")),
+        (TEMP_SHARE, include_str!("../../../../ui/share.htm")),
+    ])
+    .expect("The static template failed to load");
+
+    let _ = TEMPLATE.set(tera);
+
+    let config = CsrfConfig::default().with_key(Some(Key::generate()));
+
+    let router = if with_context!(auth_key).is_some() {
+        router
+    } else {
+        router.route("/auth", get(get_auth))
+    };
+
+    router
+        .route(
+            "/auth/login",
+            post(post_login).layer(
+                ServiceBuilder::new()
+                    .map_request_body(body::boxed)
+                    .layer(middleware::from_fn(csrf::csrf_middleware)),
+            ),
+        )
+        .route("/auth/login", get(get_login))
+        .layer(CsrfLayer::new(config))
+        .route("/auth/login/token", post(post_login_token))
+        .route("/auth/logout", get(get_logout))
+        .route("/auth/session", get(get_session))
+        .route("/auth/me", get(get_auth_me))
+        .route("/", get(get_chat))
+        .route("/c", get(get_chat))
+        .route("/c/:conversation_id", get(get_chat))
+        .route(
+            "/chat",
+            any(|| async {
+                Response::builder()
+                    .status(StatusCode::FOUND)
+                    .header(header::LOCATION, "/")
+                    .body(Body::empty())
+                    .expect("An error occurred while redirecting")
+            }),
+        )
+        .route(
+            "/chat/:conversation_id",
+            any(|| async {
+                Response::builder()
+                    .status(StatusCode::FOUND)
+                    .header(header::LOCATION, "/")
+                    .body(Body::empty())
+                    .expect("An error occurred while redirecting")
+            }),
+        )
+        .route("/share/e/:share_id", get(get_share_chat))
+        .route("/share/:share_id", get(get_share_chat))
+        .route("/share/:share_id/continue", get(get_share_chat_continue))
+        .route(
+            &format!("/_next/data/{BUILD_ID}/index.json"),
+            get(get_chat_info),
+        )
+        .route(
+            // {conversation_id}.json
+            &format!("/_next/data/{BUILD_ID}/c/:conversation_id"),
+            get(get_chat_info),
+        )
+        .route(
+            // {share_id}.json
+            &format!("/_next/data/{BUILD_ID}/share/:share_id"),
+            get(get_share_chat_info),
+        )
+        .route(
+            &format!("/_next/data/{BUILD_ID}/share/:share_id/continue.json"),
+            get(get_share_chat_continue_info),
+        )
+        // static resource endpoints
+        .route("/resources/*path", get(get_static_resource))
+        .route("/_next/static/*path", get(get_static_resource))
+        .route("/fonts/*path", get(get_static_resource))
+        .route("/ulp/*path", get(get_static_resource))
+        .route("/sweetalert2/*path", get(get_static_resource))
+        // 404 endpoint
+        .fallback(error_404)
 }
 
 async fn get_auth(token: CsrfToken) -> Result<impl IntoResponse, ResponseError> {
     let mut ctx = tera::Context::new();
-    ctx.insert("csrf_token", &token.authenticity_token()?);
+    ctx.insert(CSRF_TOKEN, &token.authenticity_token()?);
     settings_template_data(&mut ctx);
     let tm = render_template(TEMP_AUTH, &ctx)?;
     Ok((token, tm))
@@ -178,9 +190,9 @@ async fn get_auth(token: CsrfToken) -> Result<impl IntoResponse, ResponseError> 
 
 async fn get_login(token: CsrfToken) -> Result<impl IntoResponse, ResponseError> {
     let mut ctx = tera::Context::new();
-    ctx.insert("csrf_token", &token.authenticity_token()?);
-    ctx.insert("error", "");
-    ctx.insert("username", "");
+    ctx.insert(CSRF_TOKEN, &token.authenticity_token()?);
+    ctx.insert(ERROR, EMPTY);
+    ctx.insert(USERNAME, EMPTY);
     settings_template_data(&mut ctx);
     let tm = render_template(TEMP_LOGIN, &ctx)?;
     Ok((token, tm))
@@ -224,9 +236,9 @@ async fn post_login(
         }
         Err(err) => {
             let mut ctx = tera::Context::new();
-            ctx.insert("csrf_token", &token.authenticity_token()?);
-            ctx.insert("username", &account.username);
-            ctx.insert("error", &err.to_string());
+            ctx.insert(CSRF_TOKEN, &token.authenticity_token()?);
+            ctx.insert(USERNAME, &account.username);
+            ctx.insert(ERROR, &err.to_string());
             let tm = render_template(TEMP_LOGIN, &ctx)?;
             Ok((token, tm).into_response())
         }
@@ -377,7 +389,7 @@ fn create_response_from_session(session: &Session) -> Result<Response<Body>, Res
         .status(StatusCode::OK)
         .header(header::LOCATION, LOGIN_INDEX)
         .header(header::SET_COOKIE, session.to_string()) // Note: This might not be what you want
-        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
         .body(Body::from(body))
         .map_err(ResponseError::InternalServerError)?)
 }
@@ -423,7 +435,7 @@ async fn get_auth_me(
     match serde_json::from_slice::<Value>(&bytes) {
         Ok(mut json) => {
             json.as_object_mut()
-                .map(|v| v.insert("picture".to_owned(), Value::Null));
+                .map(|v| v.insert(PICTURE.to_owned(), Value::Null));
             Ok(Json(json).into_response())
         }
         Err(_err) => {
@@ -513,7 +525,7 @@ async fn get_chat_info(extract: SessionExtractor) -> Result<Response<Body>, Resp
 
     Ok(Response::builder()
         .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
         .body(Body::from(body.to_string()))
         .map_err(ResponseError::InternalServerError)?)
 }
@@ -609,7 +621,7 @@ async fn get_share_chat_info(
     share_id: Path<String>,
     extract: SessionExtractor,
 ) -> Result<Response<Body>, ResponseError> {
-    let share_id = share_id.0.replace(".json", "");
+    let share_id = share_id.0.replace(".json", EMPTY);
     let resp = with_context!(api_client)
         .get(format!("{URL_CHATGPT_API}/backend-api/share/{share_id}"))
         .headers(header_convert(
@@ -649,7 +661,7 @@ async fn get_share_chat_info(
             );
             Ok(Response::builder()
                 .status(StatusCode::OK)
-                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                 .body(Body::from(
                     serde_json::to_string(&props).map_err(ResponseError::InternalServerError)?,
                 ))
@@ -657,7 +669,7 @@ async fn get_share_chat_info(
         }
         Err(_) => Ok(Response::builder()
             .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
             .body(Body::from(
                 serde_json::to_string(&serde_json::json!({"notFound": true}))
                     .map_err(ResponseError::InternalServerError)?,
@@ -750,7 +762,7 @@ async fn get_share_chat_continue_info(
             });
             Ok(Response::builder()
                 .status(StatusCode::OK)
-                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
                 .body(Body::from(
                     serde_json::to_string(&props).map_err(ResponseError::InternalServerError)?,
                 ))
@@ -791,6 +803,7 @@ async fn error_404() -> Result<Response<Body>, ResponseError> {
     render_template(TEMP_404, &ctx)
 }
 
+/// Render html template
 fn render_template(name: &str, context: &tera::Context) -> Result<Response<Body>, ResponseError> {
     let tm = TEMPLATE
         .get()
@@ -800,32 +813,28 @@ fn render_template(name: &str, context: &tera::Context) -> Result<Response<Body>
 
     Ok(Response::builder()
         .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
+        .header(header::CONTENT_TYPE, mime::TEXT_HTML_UTF_8.as_ref())
         .body(Body::from(tm))
         .map_err(ResponseError::InternalServerError)?)
 }
 
+/// Settings html template data
 fn settings_template_data(ctx: &mut tera::Context) {
     let g_ctx = with_context!();
 
-    if g_ctx.auth_key().is_none() {
-        ctx.insert("auth_key", "false");
-    }
-    if g_ctx.pop_preauth_cookie().is_some() {
-        ctx.insert("support_apple", "true");
-    }
-    if let Some(site_key) = g_ctx.cf_turnstile() {
-        ctx.insert("site_key", &site_key.site_key);
-    }
-    if let Some(arkose_endpoint) = g_ctx.arkose_endpoint() {
-        ctx.insert("arkose_endpoint", arkose_endpoint)
-    }
-}
+    g_ctx.auth_key().map(|_| {
+        ctx.insert(AUTH_KEY, EMPTY);
+    });
 
-#[allow(dead_code)]
-#[derive(serde::Deserialize)]
-struct ImageQuery {
-    url: String,
-    w: String,
-    q: String,
+    g_ctx.cf_turnstile().map(|site_key| {
+        ctx.insert(SITE_KEY, &site_key.site_key);
+    });
+
+    g_ctx.pop_preauth_cookie().map(|_| {
+        ctx.insert(SUPPORT_APPLE, EMPTY);
+    });
+
+    g_ctx
+        .arkose_endpoint()
+        .map(|arkose_endpoint| ctx.insert(ARKOSE_ENDPOINT, arkose_endpoint));
 }

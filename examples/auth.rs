@@ -16,7 +16,6 @@ async fn main() -> anyhow::Result<()> {
     let email = std::env::var("EMAIL")?;
     let password = std::env::var("PASSWORD")?;
     let auth = openai::auth::AuthClientBuilder::builder()
-        .user_agent(openai::HEADER_UA)
         .timeout(time::Duration::from_secs(30))
         .connect_timeout(time::Duration::from_secs(10))
         .build();

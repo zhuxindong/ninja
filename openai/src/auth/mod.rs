@@ -23,6 +23,7 @@ use reqwest::{Client, Proxy, StatusCode, Url};
 use sha2::{Digest, Sha256};
 use tokio::sync::OnceCell;
 
+use crate::constant::API_AUTH_SESSION_COOKIE_KEY;
 use crate::debug;
 use crate::URL_CHATGPT_API;
 use error::AuthError;
@@ -38,7 +39,6 @@ const OPENAI_API_URL: &str = "https://api.openai.com";
 const OPENAI_OAUTH_URL: &str = "https://auth0.openai.com";
 const OPENAI_OAUTH_TOKEN_URL: &str = "https://auth0.openai.com/oauth/token";
 const OPENAI_OAUTH_REVOKE_URL: &str = "https://auth0.openai.com/oauth/revoke";
-pub(crate) const API_AUTH_SESSION_COOKIE_KEY: &str = "__Secure-next-auth.session-token";
 
 static EMAIL_REGEX: OnceCell<Regex> = OnceCell::const_new();
 

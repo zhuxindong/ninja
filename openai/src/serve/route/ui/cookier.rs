@@ -1,5 +1,6 @@
+use crate::constant::EMPTY;
+
 use super::DEFAULT_INDEX;
-use crate::serve::EMPTY;
 use axum_extra::extract::cookie;
 
 pub fn build_cookie<'a>(

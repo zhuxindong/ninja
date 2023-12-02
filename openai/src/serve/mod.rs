@@ -10,7 +10,6 @@ mod signal;
 mod turnstile;
 mod whitelist;
 
-use anyhow::anyhow;
 use axum::body::Body;
 use axum::headers::authorization::Bearer;
 use axum::headers::Authorization;
@@ -18,6 +17,7 @@ use axum::http::Response;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{any, get, post};
+use axum::Router;
 use axum::{Json, TypedHeader};
 use axum_server::{AddrIncomingConfig, Handle};
 
@@ -26,7 +26,7 @@ use self::proxy::ext::SendRequestExt;
 use self::proxy::resp::response_convert;
 use crate::auth::model::{AccessToken, AuthAccount, RefreshToken, SessionAccessToken};
 use crate::auth::provide::AuthProvider;
-use crate::auth::API_AUTH_SESSION_COOKIE_KEY;
+use crate::constant::API_AUTH_SESSION_COOKIE_KEY;
 use crate::context::{self, Args};
 use crate::proxy::{InnerProxy, Proxy};
 use crate::serve::error::ProxyError;
@@ -46,7 +46,6 @@ use tower_http::trace;
 use tracing::Level;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-const EMPTY: &str = "";
 
 fn print_boot_message(inner: &Args) {
     info!("OS: {}", std::env::consts::OS);
@@ -108,6 +107,7 @@ impl Serve {
         // init context
         context::init(self.0.clone());
 
+        // init global layer provider
         let global_layer = tower::ServiceBuilder::new()
             .layer(
                 tower_http::trace::TraceLayer::new_for_http()
@@ -134,6 +134,7 @@ impl Serve {
             )))
             .layer(axum::extract::DefaultBodyLimit::max(200 * 1024 * 1024));
 
+        // init auth layer provider
         let app_layer = {
             let limit_context = TokenBucketLimitContext::from((
                 Strategy::from_str(self.0.tb_store_strategy.as_str())?,
@@ -157,34 +158,49 @@ impl Serve {
                 ))
         };
 
-        let router = axum::Router::new()
-            // official dashboard api endpoint
-            .route("/dashboard/*path", any(official_proxy))
-            // official v1 api endpoint
-            .route("/v1/*path", any(official_proxy))
-            // unofficial backend api endpoint
-            .route("/backend-api/*path", any(unofficial_proxy))
-            .route_layer(app_layer)
-            // unofficial public api endpoint
-            .route("/public-api/*path", any(unofficial_proxy))
-            .route("/auth/token", post(post_access_token))
-            .route("/auth/refresh_token", post(post_refresh_token))
-            .route("/auth/revoke_token", post(post_revoke_token))
-            .route("/api/auth/session", get(get_session));
+        let router = route::config(
+            Router::new()
+                // official dashboard api endpoint
+                .route("/dashboard/*path", any(official_proxy))
+                // official v1 api endpoint
+                .route("/v1/*path", any(official_proxy))
+                // unofficial backend api endpoint
+                .route("/backend-api/*path", any(unofficial_proxy))
+                .route_layer(app_layer)
+                // unofficial public api endpoint
+                .route("/public-api/*path", any(unofficial_proxy))
+                .route("/auth/token", post(post_access_token))
+                .route("/auth/refresh_token", post(post_refresh_token))
+                .route("/auth/revoke_token", post(post_revoke_token))
+                .route("/api/auth/session", get(get_session)),
+            &self.0,
+        )
+        .layer(global_layer);
 
-        let router = route::config(router, &self.0).layer(global_layer);
+        // Signal the server to shutdown using Handle.
+        let handle = Handle::new();
 
+        // Spawn a task to gracefully shutdown server.
+        tokio::spawn(signal::graceful_shutdown(handle.clone()));
+
+        // Spawn a task to check wan address.
+        tokio::spawn(check_wan_address());
+
+        // http server config
         let http_config = HttpConfig::new()
             .http1_title_case_headers(true)
             .http1_preserve_header_case(true)
             .build();
 
+        // http server incoming config
         let incoming_config = AddrIncomingConfig::new()
             .tcp_sleep_on_accept_errors(true)
             .tcp_keepalive(Some(Duration::from_secs(self.0.tcp_keepalive as u64)))
             .build();
 
+        // http server mitm signal
         let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
+
         // PreAuth mitm proxy
         #[cfg(feature = "preauth")]
         if let Some(pbind) = self.0.pbind.clone() {
@@ -203,15 +219,7 @@ impl Serve {
             }
         }
 
-        // Signal the server to shutdown using Handle.
-        let handle = Handle::new();
-
-        // Spawn a task to gracefully shutdown server.
-        tokio::spawn(signal::graceful_shutdown(handle.clone()));
-
-        // Spawn a task to check wan address.
-        tokio::spawn(check_wan_address());
-
+        // Run http server
         let result = match (self.0.tls_cert, self.0.tls_key) {
             (Some(cert), Some(key)) => {
                 let tls_config = RustlsConfig::from_pem_file(cert, key)
@@ -251,7 +259,7 @@ impl Serve {
 /// GET /api/auth/session
 async fn get_session(jar: CookieJar) -> Result<impl IntoResponse, ResponseError> {
     let session = jar.get(API_AUTH_SESSION_COOKIE_KEY).ok_or_else(|| {
-        ResponseError::Unauthorized(anyhow!("Session: {API_AUTH_SESSION_COOKIE_KEY} required!"))
+        ResponseError::Unauthorized(ProxyError::SessionRequired(API_AUTH_SESSION_COOKIE_KEY))
     })?;
 
     let session_token = with_context!(auth_client)
@@ -280,9 +288,9 @@ async fn post_access_token(
 
     if let Some(auth_key) = with_context!(auth_key) {
         // check bearer token exist
-        let bearer = bearer.ok_or(ResponseError::Unauthorized(anyhow!("Auth Key required!")))?;
+        let bearer = bearer.ok_or(ResponseError::Unauthorized(ProxyError::AuthKeyRequired))?;
         if auth_key.ne(bearer.token()) {
-            return Err(ResponseError::Unauthorized(ProxyError::AuthKeyError));
+            return Err(ResponseError::Forbidden(ProxyError::AuthKeyError));
         }
     }
 

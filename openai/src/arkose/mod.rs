@@ -20,10 +20,10 @@ use serde::Serializer;
 use tokio::sync::OnceCell;
 
 use crate::arkose::crypto::encrypt;
+use crate::constant::HEADER_UA;
 use crate::generate_random_string;
 use crate::warn;
 use crate::with_context;
-use crate::HEADER_UA;
 use error::ArkoseError;
 
 use self::funcaptcha::solver::SubmitSolver;

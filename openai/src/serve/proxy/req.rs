@@ -10,6 +10,7 @@ use http::{HeaderMap, Method};
 use serde_json::{json, Value};
 
 use crate::arkose::Type;
+use crate::constant::{ARKOSE_TOKEN, EMPTY, MODEL, NULL, PUID};
 use crate::{arkose, with_context};
 
 use super::ext::{RequestExt, ResponseExt, SendRequestExt};
@@ -17,7 +18,6 @@ use super::resp::header_convert;
 use super::toapi;
 use crate::serve::error::{ProxyError, ResponseError};
 use crate::serve::puid::{get_or_init, reduce_key};
-use crate::serve::EMPTY;
 
 #[async_trait]
 impl SendRequestExt for reqwest::Client {
@@ -64,7 +64,7 @@ impl SendRequestExt for reqwest::Client {
 pub(super) fn has_puid(headers: &HeaderMap) -> Result<bool, ResponseError> {
     if let Some(hv) = headers.get(header::COOKIE) {
         let cookie_str = hv.to_str().map_err(ResponseError::BadRequest)?;
-        Ok(cookie_str.contains("_puid"))
+        Ok(cookie_str.contains(PUID))
     } else {
         Ok(false)
     }
@@ -91,7 +91,7 @@ async fn handle_conv_request(req: &mut RequestExt) -> Result<(), ResponseError> 
 
     // If model is not exist, then return error
     let model = body
-        .get("model")
+        .get(MODEL)
         .and_then(|m| m.as_str())
         .ok_or(ResponseError::BadRequest(ProxyError::ModelRequired))?;
 
@@ -111,7 +111,7 @@ async fn handle_conv_request(req: &mut RequestExt) -> Result<(), ResponseError> 
         if let Some(puid) = puid {
             req.headers.insert(
                 header::COOKIE,
-                header::HeaderValue::from_str(&format!("_puid={puid};"))
+                header::HeaderValue::from_str(&format!("{PUID}={puid};"))
                     .map_err(ResponseError::BadRequest)?,
             );
         }
@@ -122,17 +122,17 @@ async fn handle_conv_request(req: &mut RequestExt) -> Result<(), ResponseError> 
 
     // If model is gpt3 or gpt4, then add arkose_token
     if (with_context!(arkose_gpt3_experiment) && model.is_gpt3()) || model.is_gpt4() {
-        let condition = match body.get("arkose_token") {
+        let condition = match body.get(ARKOSE_TOKEN) {
             Some(s) => {
                 let s = s.as_str().unwrap_or(EMPTY);
-                s.is_empty() || s.eq("null")
+                s.is_empty() || s.eq(NULL)
             }
             None => true,
         };
 
         if condition {
             let arkose_token = arkose::ArkoseToken::new_from_context(model.into()).await?;
-            body.insert("arkose_token".to_owned(), json!(arkose_token));
+            body.insert(ARKOSE_TOKEN.to_owned(), json!(arkose_token));
             // Updaye Modify bytes
             req.body = Some(Bytes::from(
                 serde_json::to_vec(&json).map_err(ResponseError::BadRequest)?,
@@ -165,9 +165,9 @@ async fn handle_dashboard_request(req: &mut RequestExt) -> Result<(), ResponseEr
         .ok_or(ResponseError::BadRequest(ProxyError::BodyMustBeJsonObject))?;
 
     // If arkose_token is not exist, then add it
-    if body.get("arkose_token").is_none() {
+    if body.get(ARKOSE_TOKEN).is_none() {
         let arkose_token = arkose::ArkoseToken::new_from_context(Type::Platform).await?;
-        body.insert("arkose_token".to_owned(), json!(arkose_token));
+        body.insert(ARKOSE_TOKEN.to_owned(), json!(arkose_token));
         // Updaye Modify bytes
         req.body = Some(Bytes::from(
             serde_json::to_vec(&json).map_err(ResponseError::BadRequest)?,

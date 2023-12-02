@@ -6,10 +6,10 @@ use axum_extra::extract::CookieJar;
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 
+use crate::constant::API_AUTH_SESSION_COOKIE_KEY;
 use crate::debug;
 use crate::token::TokenProfile;
 use crate::{
-    auth::API_AUTH_SESSION_COOKIE_KEY,
     serve::{error::ResponseError, route::ui::LOGIN_INDEX, route::ui::SESSION_ID},
     token::model::Token,
 };

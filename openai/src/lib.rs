@@ -3,11 +3,12 @@ pub mod arkose;
 pub mod auth;
 pub mod chatgpt;
 pub mod client;
+mod constant;
 pub mod context;
 mod dns;
 pub mod eventsource;
 pub mod homedir;
-pub mod log;
+mod log;
 pub mod platform;
 pub mod proxy;
 
@@ -21,7 +22,6 @@ pub mod uuid;
 use std::time::Duration;
 
 pub const LIB_VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const HEADER_UA: &str = "okhttp/4.9.1";
 pub const URL_CHATGPT_API: &str = "https://chat.openai.com";
 pub const URL_PLATFORM_API: &str = "https://api.openai.com";
 

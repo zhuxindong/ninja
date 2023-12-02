@@ -1,5 +1,5 @@
 use super::error::ResponseError;
-use crate::with_context;
+use crate::{serve::error::ProxyError, with_context};
 
 pub(super) async fn cf_turnstile_check(
     addr: &std::net::IpAddr,
@@ -16,9 +16,9 @@ pub(super) async fn cf_turnstile_check(
     let ctx = with_context!();
 
     if let Some(turnsile) = ctx.cf_turnstile() {
-        let response = cf_response.filter(|r| !r.is_empty()).ok_or_else(|| {
-            ResponseError::BadRequest(anyhow::anyhow!("Missing cf_captcha_response".to_owned()))
-        })?;
+        let response = cf_response
+            .filter(|r| !r.is_empty())
+            .ok_or_else(|| ResponseError::BadRequest(ProxyError::MissingCfCaptchaResponse))?;
 
         let form = CfCaptchaForm {
             secret: &turnsile.secret_key,
