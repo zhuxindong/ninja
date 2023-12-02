@@ -50,6 +50,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .enable_direct(args.enable_direct)
         .cookie_store(args.cookie_store)
         .tcp_keepalive(args.tcp_keepalive)
+        .no_keepalive(args.no_keepalive)
         .pool_idle_timeout(args.pool_idle_timeout)
         .timeout(args.timeout)
         .connect_timeout(args.connect_timeout)

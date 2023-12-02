@@ -53,35 +53,39 @@ pub struct Args {
     #[builder(setter(into), default = Some(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 7999)))]
     pub(crate) bind: Option<SocketAddr>,
 
-    /// Concurrent limit (Enforces a limit on the concurrent number of requests the underlying)
+    /// Server concurrent limit (Enforces a limit on the concurrent number of requests the underlying)
     #[builder(setter(into), default = 65535)]
     pub(crate) concurrent_limit: usize,
-
-    /// Disable direct connection
-    #[builder(default = false)]
-    pub(crate) enable_direct: bool,
 
     /// Enabled Cookie Store
     #[builder(default = false)]
     pub(crate) cookie_store: bool,
 
-    /// TCP keepalive (second)
+    /// Server/Client TCP keepalive (second)
     #[builder(setter(into), default = 75)]
     pub(crate) tcp_keepalive: usize,
 
-    /// Set an optional timeout for idle sockets being kept-alive
+    /// Disable Http Server/Client Keepalive
+    #[builder(default = false)]
+    pub(crate) no_keepalive: bool,
+
+    /// Keep the client alive on an idle socket with an optional timeout set
     #[builder(setter(into), default = 90)]
     pub(crate) pool_idle_timeout: usize,
 
-    /// Client timeout
+    /// Server/Client timeout
     #[builder(setter(into), default = 600)]
     pub(crate) timeout: usize,
 
-    /// Client connect timeout
+    /// Server/Client connect timeout
     #[builder(setter(into), default = 60)]
     pub(crate) connect_timeout: usize,
 
-    /// Server proxies
+    /// Disable direct connection
+    #[builder(default = false)]
+    pub(crate) enable_direct: bool,
+
+    /// Client proxies
     #[builder(setter(into), default)]
     pub(crate) proxies: Vec<proxy::Proxy>,
 

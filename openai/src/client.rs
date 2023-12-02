@@ -204,7 +204,7 @@ impl ClientRoundRobinBalancer {
 
         // Helper function to join client to the pool
         let mut join_client = |bind: Option<IpAddr>, proxy: Option<Url>| {
-            let client = build_fn(&config, bind, None, proxy, false);
+            let client = build_fn(&config, bind, None, proxy, args.no_keepalive);
             pool.push(client_type(client));
         };
 
@@ -230,7 +230,13 @@ impl ClientRoundRobinBalancer {
 
         // Join a default client to the pool if it's still empty
         if pool.is_empty() {
-            pool.push(client_type(build_fn(&config, None, None, None, true)));
+            pool.push(client_type(build_fn(
+                &config,
+                None,
+                None,
+                None,
+                args.no_keepalive,
+            )));
         }
 
         Ok(Self {
@@ -293,13 +299,13 @@ fn build_client(
     config: &Config,
     preferred_addrs: Option<IpAddr>,
     fallback_addrs: Option<IpAddr>,
-    proxy_url: Option<Url>,
+    proxy: Option<Url>,
     disable_keep_alive: bool,
 ) -> Client {
     let mut builder = Client::builder();
 
     // set proxy
-    if let Some(url) = proxy_url {
+    if let Some(url) = proxy {
         let proxy = reqwest::Proxy::all(url).expect("Failed to build proxy");
         builder = builder.proxy(proxy)
     }
@@ -354,7 +360,7 @@ fn build_auth_client(
     config: &Config,
     preferred_addrs: Option<IpAddr>,
     fallback_addrs: Option<IpAddr>,
-    proxy_url: Option<Url>,
+    proxy: Option<Url>,
     disable_keep_alive: bool,
 ) -> AuthClient {
     let mut builder = auth::AuthClientBuilder::builder();
@@ -394,7 +400,7 @@ fn build_auth_client(
         .timeout(Duration::from_secs(config.timeout))
         .connect_timeout(Duration::from_secs(config.connect_timeout))
         .dns_resolver(trust_dns_resolver)
-        .proxy(proxy_url)
+        .proxy(proxy)
         .build()
 }
 
@@ -417,7 +423,7 @@ fn get_or_init_dns_resolver(ip_strategy: LookupIpStrategy) -> Arc<dns::TrustDnsR
     // maybe DNS_RESOLVER is not initialized
     let cache = DNS_RESOLVER.get_or_init(|| {
         let cache: Cache<LookupIpStrategyExt, Arc<TrustDnsResolver>> =
-            Cache::builder().max_capacity(100).build();
+            Cache::builder().max_capacity(5).build();
         cache
     });
     // init dns resolver cache

@@ -39,6 +39,7 @@ use axum_extra::extract::{cookie, CookieJar};
 use axum_server::tls_rustls::RustlsConfig;
 use axum_server::HttpConfig;
 use std::net::SocketAddr;
+use std::ops::Not;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -55,6 +56,7 @@ fn print_boot_message(inner: &Args) {
     info!("Keepalive {} seconds", inner.tcp_keepalive);
     info!("Timeout {} seconds", inner.timeout);
     info!("Connect timeout {} seconds", inner.connect_timeout);
+    info!("Enable tcp keepalive: {}", inner.no_keepalive.not());
     info!("Enable cookie store: {}", inner.cookie_store);
     info!("Enable file proxy: {}", inner.enable_file_proxy);
     info!("Enable direct connection: {}", inner.enable_direct);
@@ -186,16 +188,24 @@ impl Serve {
         // Spawn a task to check wan address.
         tokio::spawn(check_wan_address());
 
+        // http server tcp keepalive
+        let tcp_keepalive = if self.0.no_keepalive {
+            None
+        } else {
+            Some(Duration::from_secs(self.0.tcp_keepalive as u64 + 1))
+        };
+
         // http server config
         let http_config = HttpConfig::new()
             .http1_title_case_headers(true)
             .http1_preserve_header_case(true)
+            .http2_keep_alive_interval(tcp_keepalive)
             .build();
 
         // http server incoming config
         let incoming_config = AddrIncomingConfig::new()
             .tcp_sleep_on_accept_errors(true)
-            .tcp_keepalive(Some(Duration::from_secs(self.0.tcp_keepalive as u64)))
+            .tcp_keepalive(tcp_keepalive)
             .build();
 
         // http server mitm signal
