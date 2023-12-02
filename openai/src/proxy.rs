@@ -92,6 +92,15 @@ impl TryFrom<(&str, Url)> for Proxy {
     }
 }
 
+impl TryFrom<(&str, &str)> for Proxy {
+    type Error = anyhow::Error;
+
+    fn try_from((proto, url): (&str, &str)) -> Result<Self, Error> {
+        let url = Url::parse(url)?;
+        Self::try_from((proto, url))
+    }
+}
+
 impl TryFrom<(&str, cidr::Ipv6Cidr)> for Proxy {
     type Error = anyhow::Error;
 
