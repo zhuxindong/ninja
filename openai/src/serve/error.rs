@@ -5,6 +5,8 @@ use axum::response::Response;
 use axum::Json;
 use serde_json::json;
 
+use crate::auth::error::AuthError;
+
 #[derive(thiserror::Error, Debug)]
 pub enum ProxyError {
     #[error("Session not found")]
@@ -89,10 +91,64 @@ where
     E: Into<anyhow::Error>,
 {
     fn from(err: E) -> Self {
-        Self {
-            msg: Some(err.into().to_string()),
-            code: StatusCode::INTERNAL_SERVER_ERROR,
+        let err = err.into();
+
+        // Make ResponseError
+        let make_error = |msg: String, code: StatusCode| ResponseError {
+            msg: Some(msg),
+            code,
             path: None,
+        };
+
+        if let Some(auth_error) = err.downcast_ref::<AuthError>() {
+            match auth_error {
+                // 500
+                AuthError::FailedRequest(_)
+                | AuthError::ServerError(_)
+                | AuthError::FailedLogin
+                | AuthError::FailedAccessToken(_)
+                | AuthError::FailedCallbackCode
+                | AuthError::FailedCallbackURL
+                | AuthError::FailedAuthorizedUrl
+                | AuthError::FailedState
+                | AuthError::FailedCsrfToken
+                | AuthError::FailedAuthSessionCookie
+                | AuthError::DeserializeError(_)
+                | AuthError::NotSupportedImplementation
+                | AuthError::PreauthCookieNotFound
+                | AuthError::InvalidRegex(_) => {
+                    make_error(auth_error.to_string(), StatusCode::INTERNAL_SERVER_ERROR)
+                }
+                // 400
+                AuthError::BadRequest(_)
+                | AuthError::InvalidLogin(_)
+                | AuthError::InvalidArkoseToken(_)
+                | AuthError::InvalidLoginUrl(_)
+                | AuthError::InvalidEmailOrPassword
+                | AuthError::InvalidRequest(_)
+                | AuthError::InvalidEmail
+                | AuthError::InvalidLocation
+                | AuthError::InvalidRefreshToken
+                | AuthError::InvalidLocationPath
+                | AuthError::MFAFailed
+                | AuthError::MFARequired => {
+                    make_error(auth_error.to_string(), StatusCode::BAD_REQUEST)
+                }
+                // 401
+                AuthError::Unauthorized(_) => {
+                    make_error(auth_error.to_string(), StatusCode::UNAUTHORIZED)
+                }
+                // 403
+                AuthError::Forbidden(_) => {
+                    make_error(auth_error.to_string(), StatusCode::FORBIDDEN)
+                }
+                // 429
+                AuthError::TooManyRequests(_) => {
+                    make_error(auth_error.to_string(), StatusCode::TOO_MANY_REQUESTS)
+                }
+            }
+        } else {
+            make_error(err.to_string(), StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }

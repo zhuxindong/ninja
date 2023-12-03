@@ -5,8 +5,7 @@ use crate::auth::{
     model::{self, AuthStrategy},
     OPENAI_OAUTH_REVOKE_URL, OPENAI_OAUTH_TOKEN_URL, OPENAI_OAUTH_URL,
 };
-use crate::{debug, warn};
-use anyhow::{bail, Context};
+use crate::warn;
 use async_recursion::async_recursion;
 use axum::http::HeaderValue;
 use reqwest::Client;
@@ -28,7 +27,9 @@ impl PlatformAuthProvider {
     }
 
     async fn authorize(&self, ctx: &mut RequestContext<'_>) -> AuthResult<()> {
+        // Build url
         let url = format!("{OPENAI_OAUTH_URL}/authorize?client_id={PLATFORM_CLIENT_ID}&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write&audience=https://api.openai.com/v1&redirect_uri=https://platform.openai.com/auth/callback&response_type=code");
+
         let resp = self
             .0
             .get(&url)
@@ -37,22 +38,25 @@ impl PlatformAuthProvider {
             .map_err(AuthError::FailedRequest)?
             .ext_context(ctx);
 
-        let identifier_location = AuthClient::get_location_path(resp.headers())?;
+        // Get location path from response headers
+        let location = AuthClient::get_location_path(resp.headers())?;
+
         let resp = self
             .0
-            .get(format!("{OPENAI_OAUTH_URL}{identifier_location}"))
+            .get(format!("{OPENAI_OAUTH_URL}{location}"))
             .ext_context(ctx)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
             .ext_context(ctx);
 
+        // Get state from response url
         let state = AuthClient::get_callback_state(&resp.url());
+
+        // Set state
         ctx.set_state(state.as_str());
 
-        Ok(AuthClient::response_handle_unit(resp)
-            .await
-            .map_err(|e| AuthError::InvalidLoginUrl(e.to_string()))?)
+        AuthClient::response_handle_unit(resp).await
     }
 
     async fn authenticate_username(&self, ctx: &mut RequestContext<'_>) -> AuthResult<()> {
@@ -78,7 +82,7 @@ impl PlatformAuthProvider {
 
         AuthClient::response_handle_unit(resp)
             .await
-            .context(AuthError::InvalidEmail)
+            .map_err(|_| (AuthError::InvalidEmail))
     }
 
     async fn authenticate_password(
@@ -106,16 +110,26 @@ impl PlatformAuthProvider {
             .map_err(AuthError::FailedRequest)?
             .ext_context(ctx);
 
-        let location = AuthClient::get_location_path(&resp.headers())?;
-        if location.contains("https://chat.openai.com/") {
-            warn!("PlatformAuthProvider::authenticate_password: invalid location path: {location}");
-            bail!(AuthError::InvalidLocationPath)
+        // If resp status is client error return InvalidEmailOrPassword
+        if resp.status().is_client_error() {
+            return Err(AuthError::InvalidEmailOrPassword);
         }
 
+        // Get location path
+        let location = AuthClient::get_location_path(&resp.headers())?;
+
+        // If location path starts with https://chat.openai.com/, return invalid location path
+        if location.contains("https://chat.openai.com/") {
+            warn!("PlatformAuthProvider::authenticate_password: invalid location path: {location}");
+            return Err(AuthError::InvalidLocationPath);
+        }
+
+        // If location path starts with /authorize/resume?
         if location.starts_with("/authorize/resume?") {
             return self.authenticate_resume(ctx, location).await;
         }
-        bail!(AuthError::FailedLogin)
+
+        Err(AuthError::FailedLogin)
     }
 
     async fn authenticate_resume(
@@ -132,16 +146,21 @@ impl PlatformAuthProvider {
             .map_err(AuthError::FailedRequest)?
             .ext_context(ctx);
 
+        // Get location path
         let location: &str = AuthClient::get_location_path(&resp.headers())
             .map_err(|_| AuthError::InvalidLocation)?;
 
+        // If location path starts with /u/mfa-otp-challenge?
         if location.starts_with("/u/mfa-otp-challenge?") {
-            self.authenticate_mfa(ctx, location).await
-        } else if !location.starts_with(OPENAI_OAUTH_PLATFORM_CALLBACK_URL) {
-            bail!(AuthError::FailedCallbackURL)
-        } else {
-            self.authorization_code(location).await
+            return self.authenticate_mfa(ctx, location).await;
         }
+
+        // If location path starts with https://platform.openai.com/auth/callback
+        if location.starts_with(OPENAI_OAUTH_PLATFORM_CALLBACK_URL) {
+            return self.authorization_code(location).await;
+        }
+
+        Err(AuthError::FailedCallbackURL)
     }
 
     #[async_recursion]
@@ -150,9 +169,16 @@ impl PlatformAuthProvider {
         ctx: &mut RequestContext<'_>,
         location: &str,
     ) -> AuthResult<model::AccessToken> {
+        // Get mfa code
         let mfa_code = &ctx.account.mfa.clone().ok_or(AuthError::MFARequired)?;
-        let url = format!("{OPENAI_OAUTH_URL}{}", location);
-        let state = AuthClient::get_callback_state(&Url::parse(&url)?);
+
+        // Parse url
+        let url = Url::parse(&format!("{OPENAI_OAUTH_URL}{}", location))
+            .map_err(AuthError::InvalidLoginUrl)?;
+
+        // Get state from url
+        let state = AuthClient::get_callback_state(&url);
+
         let data = AuthenticateMfaData::builder()
             .action("default")
             .state(&state)
@@ -161,10 +187,13 @@ impl PlatformAuthProvider {
 
         let resp = self
             .0
-            .post(&url)
+            .post(url)
             .ext_context(ctx)
             .json(&data)
-            .header(reqwest::header::REFERER, HeaderValue::from_str(&url)?)
+            .header(
+                reqwest::header::REFERER,
+                HeaderValue::from_static(OPENAI_OAUTH_URL),
+            )
             .header(
                 reqwest::header::ORIGIN,
                 HeaderValue::from_static(OPENAI_OAUTH_URL),
@@ -175,15 +204,21 @@ impl PlatformAuthProvider {
             .ext_context(ctx);
 
         let location: &str = AuthClient::get_location_path(&resp.headers())?;
+
+        // If location starts with /authorize/resume? and mfa is none, return mfa failed
         if location.starts_with("/authorize/resume?") && ctx.account.mfa.is_none() {
-            bail!(AuthError::MFAFailed)
+            return Err(AuthError::MFAFailed);
         }
         self.authenticate_resume(ctx, location).await
     }
 
     async fn authorization_code(&self, location: &str) -> AuthResult<model::AccessToken> {
-        debug!("authorization_code location path: {location}");
-        let code = AuthClient::get_callback_code(&Url::parse(location)?)?;
+        // Parse url
+        let url = Url::parse(location).map_err(AuthError::InvalidLoginUrl)?;
+
+        // Get code from url
+        let code = AuthClient::get_callback_code(&url)?;
+
         let data = AuthorizationCodeData::builder()
             .redirect_uri(OPENAI_OAUTH_PLATFORM_CALLBACK_URL)
             .grant_type(GrantType::AuthorizationCode)

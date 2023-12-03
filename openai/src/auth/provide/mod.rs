@@ -15,7 +15,7 @@ use reqwest::header;
 use serde::Serialize;
 use typed_builder::TypedBuilder;
 
-pub type AuthResult<T, E = anyhow::Error> = anyhow::Result<T, E>;
+pub type AuthResult<T, E = AuthError> = anyhow::Result<T, E>;
 
 #[async_trait::async_trait]
 pub trait AuthProvider: Send + Sync {
