@@ -176,6 +176,8 @@ Recently, `OpenAI` has canceled the `Arkose` verification for `GPT-3.5`. It can 
 - `--enable-file-proxy`, environment variable `ENABLE_FILE_PROXY`, turns on the file upload and download API proxy
 - `--enable-direct`, enable direct connection, add the IP bound to the `interface` export to the proxy pool
 - `--proxies`, proxy, supports proxy pool, multiple proxies are separated by `,`, format: protocol://user:pass@ip:port
+- `-no-keepalive` turns off Http Client Tcp keepalive
+- `--visitor-email-whitelist`, whitelist restriction, the restriction is for AccessToken, the parameter is the email address, multiple email addresses are separated by `,`
 
 ##### Advanced proxy usage
 
