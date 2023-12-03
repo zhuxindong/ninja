@@ -243,25 +243,27 @@ Options:
   -b, --bind <BIND>
           Server bind address [env: BIND=] [default: 0.0.0.0:7999]
       --concurrent-limit <CONCURRENT_LIMIT>
-          Enforces a limit on the concurrent number of requests the underlying [default: 1024]
-      --enable-direct
-          Enable direct connection [env: ENABLE_DIRECT=]
+          Server Enforces a limit on the concurrent number of requests the underlying [default: 1024]
+      --timeout <TIMEOUT>
+          Server/Client timeout (seconds) [default: 360]
+      --connect-timeout <CONNECT_TIMEOUT>
+          Server/Client connect timeout (seconds) [default: 5]
+      --tcp-keepalive <TCP_KEEPALIVE>
+          Server/Client TCP keepalive (seconds) [default: 60]
+  -H, --no-keepalive
+          Server/Client No TCP keepalive [env: NO_TCP_KEEPALIVE=]
+      --pool-idle-timeout <POOL_IDLE_TIMEOUT>
+          Keep the client alive on an idle socket with an optional timeout set [default: 90]
   -x, --proxies <PROXIES>
-          Request client proxy, support multiple proxy, use ',' to separate
+          Client proxy, support multiple proxy, use ',' to separate
           Format: proto|type
           Proto: all/api/auth/arkose, default: all
           Type: interface/proxy/ipv6 subnet，proxy type only support: socks5/http/https
           Example: all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081 [env: PROXIES=]
+      --enable-direct
+          Enable direct connection [env: ENABLE_DIRECT=]
       --cookie-store
           Enabled Cookie Store [env: COOKIE_STORE=]
-      --timeout <TIMEOUT>
-          Client timeout (seconds) [default: 360]
-      --connect-timeout <CONNECT_TIMEOUT>
-          Client connect timeout (seconds) [default: 20]
-      --tcp-keepalive <TCP_KEEPALIVE>
-          TCP keepalive (seconds) [default: 60]
-      --pool-idle-timeout <POOL_IDLE_TIMEOUT>
-          Set an optional timeout for idle sockets being kept-alive [default: 90]
       --tls-cert <TLS_CERT>
           TLS certificate file path [env: TLS_CERT=]
       --tls-key <TLS_KEY>
@@ -276,6 +278,8 @@ Options:
           Disable WebUI [env: DISABLE_WEBUI=]
   -F, --enable-file-proxy
           Enable file proxy [env: ENABLE_FILE_PROXY=]
+  -W, --visitor-email-whitelist <VISITOR_EMAIL_WHITELIST>
+          Visitor email whitelist [env: VISITOR_EMAIL_WHITELIST=]
       --arkose-endpoint <ARKOSE_ENDPOINT>
           Arkose endpoint, Example: https://client-api.arkoselabs.com
   -E, --arkose-gpt3-experiment

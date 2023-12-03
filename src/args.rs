@@ -84,15 +84,31 @@ pub struct ServeArgs {
     #[clap(short, long, env = "BIND", default_value = "0.0.0.0:7999", value_parser = parse::parse_socket_addr)]
     pub(super) bind: Option<std::net::SocketAddr>,
 
-    /// Enforces a limit on the concurrent number of requests the underlying
+    /// Server Enforces a limit on the concurrent number of requests the underlying
     #[clap(long, default_value = "1024")]
     pub(super) concurrent_limit: usize,
 
-    /// Enable direct connection
-    #[clap(long, env = "ENABLE_DIRECT")]
-    pub(super) enable_direct: bool,
+    /// Server/Client timeout (seconds)
+    #[clap(long, default_value = "360")]
+    pub(super) timeout: usize,
 
-    /// Request client proxy, support multiple proxy, use ',' to separate
+    /// Server/Client connect timeout (seconds)
+    #[clap(long, default_value = "5")]
+    pub(super) connect_timeout: usize,
+
+    /// Server/Client TCP keepalive (seconds)
+    #[clap(long, default_value = "60")]
+    pub(super) tcp_keepalive: usize,
+
+    /// Server/Client No TCP keepalive
+    #[clap(short = 'H', long, env = "NO_TCP_KEEPALIVE", default_value = "false")]
+    pub(super) no_keepalive: bool,
+
+    /// Keep the client alive on an idle socket with an optional timeout set
+    #[clap(long, default_value = "90")]
+    pub(super) pool_idle_timeout: usize,
+
+    /// Client proxy, support multiple proxy, use ',' to separate
     /// Format: proto|type
     /// Proto: all/api/auth/arkose, default: all
     /// Type: interface/proxy/ipv6 subnet，proxy type only support: socks5/http/https
@@ -100,25 +116,13 @@ pub struct ServeArgs {
     #[clap(short = 'x',long, env = "PROXIES", value_parser = parse::parse_proxies_url, verbatim_doc_comment)]
     pub(super) proxies: Option<std::vec::Vec<proxy::Proxy>>,
 
+    /// Enable direct connection
+    #[clap(long, env = "ENABLE_DIRECT")]
+    pub(super) enable_direct: bool,
+
     /// Enabled Cookie Store
     #[clap(long, env = "COOKIE_STORE")]
     pub(super) cookie_store: bool,
-
-    /// Client timeout (seconds)
-    #[clap(long, default_value = "360")]
-    pub(super) timeout: usize,
-
-    /// Client connect timeout (seconds)
-    #[clap(long, default_value = "5")]
-    pub(super) connect_timeout: usize,
-
-    /// TCP keepalive (seconds)
-    #[clap(long, default_value = "60")]
-    pub(super) tcp_keepalive: usize,
-
-    /// Set an optional timeout for idle sockets being kept-alive
-    #[clap(long, default_value = "90")]
-    pub(super) pool_idle_timeout: usize,
 
     /// TLS certificate file path
     #[clap(long, env = "TLS_CERT", requires = "tls_key")]
