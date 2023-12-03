@@ -6,7 +6,6 @@ use crate::auth::{
     OPENAI_OAUTH_REVOKE_URL, OPENAI_OAUTH_TOKEN_URL, OPENAI_OAUTH_URL,
 };
 use crate::{warn, with_context};
-use anyhow::{bail, Context};
 use async_recursion::async_recursion;
 use axum::http::HeaderValue;
 use reqwest::Client;
@@ -28,7 +27,7 @@ pub(crate) struct PreAuthProvider;
 
 impl PreAuthProvider {
     fn get_preauth_cookie(&self) -> AuthResult<String> {
-        with_context!(pop_preauth_cookie).context(AuthError::PreauthCookieNotFound)
+        with_context!(pop_preauth_cookie).ok_or(AuthError::PreauthCookieNotFound)
     }
 }
 
@@ -46,12 +45,16 @@ impl AppleAuthProvider {
     }
 
     async fn authorize(&self, ctx: &mut RequestContext<'_>) -> AuthResult<()> {
-        let code_challenge = ctx.code_challenge.as_str();
+        // Get the preauth cookie.
         let preauth_cookie = self.preauth_provider.get_preauth_cookie()?;
+
+        // Build the URL.
+        let code_challenge = ctx.code_challenge.as_str();
         let url = format!("{OPENAI_OAUTH_URL}/authorize?state={STATE}&ios_app_version={APP_VERSION}&client_id={APPLE_CLIENT_ID}&redirect_uri={OPENAI_OAUTH_APPLE_CALLBACK_URL}&code_challenge={code_challenge}&scope=openid%20email%20profile%20offline_access%20model.request%20model.read%20organization.read%20organization.write&prompt=login&preauth_cookie={preauth_cookie}&audience=https://api.openai.com/v1&code_challenge_method=S256&response_type=code&auth0Client={AUTH0_CLIENT}");
+
         let resp = self
             .inner
-            .get(&url)
+            .get(url)
             .header(
                 reqwest::header::REFERER,
                 HeaderValue::from_static(OPENAI_OAUTH_URL),
@@ -61,22 +64,25 @@ impl AppleAuthProvider {
             .map_err(AuthError::FailedRequest)?
             .ext_context(ctx);
 
-        let identifier_location = AuthClient::get_location_path(resp.headers())?;
+        // Get the location path from the response headers.
+        let location = AuthClient::get_location_path(resp.headers())?;
+
         let resp = self
             .inner
-            .get(format!("{OPENAI_OAUTH_URL}{identifier_location}"))
+            .get(format!("{OPENAI_OAUTH_URL}{location}"))
             .ext_context(ctx)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?
             .ext_context(ctx);
 
-        let state = AuthClient::get_callback_state(&resp.url());
+        // Get the callback state from the URL.
+        let state = AuthClient::get_callback_state(resp.url());
+
+        // Set the callback state.
         ctx.set_state(state.as_str());
 
-        Ok(AuthClient::response_handle_unit(resp)
-            .await
-            .map_err(|e| AuthError::InvalidLoginUrl(e.to_string()))?)
+        AuthClient::response_handle_unit(resp).await
     }
 
     async fn authenticate_username(&self, ctx: &mut RequestContext<'_>) -> AuthResult<()> {
@@ -97,12 +103,13 @@ impl AppleAuthProvider {
                     .build(),
             )
             .send()
-            .await?
+            .await
+            .map_err(AuthError::FailedRequest)?
             .ext_context(ctx);
 
         AuthClient::response_handle_unit(resp)
             .await
-            .context(AuthError::InvalidEmail)
+            .map_err(|_| AuthError::InvalidEmail)
     }
 
     async fn authenticate_password(
@@ -131,16 +138,26 @@ impl AppleAuthProvider {
             .map_err(AuthError::FailedRequest)?
             .ext_context(ctx);
 
-        let location = AuthClient::get_location_path(&resp.headers())?;
-        if location.contains("https://chat.openai.com/") {
-            warn!("AppleAuthProvider::authenticate_password: location contains {location}");
-            bail!(AuthError::InvalidLocationPath)
+        // If resp status is client error return InvalidEmailOrPassword
+        if resp.status().is_client_error() {
+            return Err(AuthError::InvalidEmailOrPassword);
         }
 
+        // Get the location path from the response headers.
+        let location = AuthClient::get_location_path(&resp.headers())?;
+
+        // If the location contains "https://chat.openai.com/", it means that the login failed.
+        if location.contains("https://chat.openai.com/") {
+            warn!("AppleAuthProvider::authenticate_password: location contains {location}");
+            return Err(AuthError::InvalidLocationPath);
+        }
+
+        // If the location contains "/authorize/resume?", it means that the login was successful.
         if location.starts_with("/authorize/resume?") {
             return self.authenticate_resume(ctx, location).await;
         }
-        bail!(AuthError::FailedLogin)
+
+        Err(AuthError::FailedLogin)
     }
 
     async fn authenticate_resume(
@@ -157,17 +174,25 @@ impl AppleAuthProvider {
             .map_err(AuthError::FailedRequest)?
             .ext_context(ctx);
 
+        // If resp status is client error return InvalidEmailOrPassword
+        if resp.status().is_client_error() {
+            return Err(AuthError::InvalidEmailOrPassword);
+        }
+
+        // If get_location_path returns an error, it means that the location is invalid.
         let location: &str = AuthClient::get_location_path(&resp.headers())
             .map_err(|_| AuthError::InvalidLocation)?;
 
         if location.starts_with("/u/mfa-otp-challenge?") {
+            // If the location contains "/u/mfa-otp-challenge?", it means that MFA is required.
             let mfa_code = ctx.account.mfa.clone().ok_or(AuthError::MFARequired)?;
-            self.authenticate_mfa(ctx, &mfa_code, location).await
-        } else if !location.starts_with(OPENAI_OAUTH_APPLE_CALLBACK_URL) {
-            bail!(AuthError::FailedCallbackURL)
-        } else {
-            self.authorization_code(ctx, location).await
+            return self.authenticate_mfa(ctx, &mfa_code, location).await;
+        } else if location.starts_with(OPENAI_OAUTH_APPLE_CALLBACK_URL) {
+            return self.authorization_code(ctx, location).await;
         }
+
+        // Return an error if the location is invalid.
+        Err(AuthError::FailedCallbackURL)
     }
 
     #[async_recursion]
@@ -177,12 +202,16 @@ impl AppleAuthProvider {
         mfa_code: &str,
         location: &str,
     ) -> AuthResult<model::AccessToken> {
-        let url = format!("{OPENAI_OAUTH_URL}{}", location);
-        let state = AuthClient::get_callback_state(&Url::parse(&url)?);
+        // Concat the location with the base URL.
+        let url = Url::parse(&format!("{OPENAI_OAUTH_URL}{}", location))
+            .map_err(AuthError::InvalidLoginUrl)?;
+
+        // Get the callback state from the URL.
+        let state = AuthClient::get_callback_state(&url);
 
         let resp = self
             .inner
-            .post(&url)
+            .post(url)
             .json(
                 &AuthenticateMfaData::builder()
                     .action("default")
@@ -197,9 +226,12 @@ impl AppleAuthProvider {
             .ext_context(ctx);
 
         let location: &str = AuthClient::get_location_path(&resp.headers())?;
+
+        // If the location contains "/authorize/resume?", it means that the login was successful.
         if location.starts_with("/authorize/resume?") && ctx.account.mfa.is_none() {
-            bail!(AuthError::MFAFailed)
+            return Err(AuthError::MFAFailed);
         }
+
         self.authenticate_resume(ctx, location).await
     }
 
@@ -208,7 +240,12 @@ impl AppleAuthProvider {
         ctx: &mut RequestContext<'_>,
         location: &str,
     ) -> AuthResult<model::AccessToken> {
-        let code = AuthClient::get_callback_code(&Url::parse(location)?)?;
+        // Parse the URL.
+        let url = Url::parse(location).map_err(AuthError::InvalidLoginUrl)?;
+
+        // Get the callback code from the URL.
+        let code = AuthClient::get_callback_code(&url)?;
+
         let resp = self
             .inner
             .post(OPENAI_OAUTH_TOKEN_URL)
@@ -225,7 +262,10 @@ impl AppleAuthProvider {
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
+
+        // If the response contains "error", it means that the login failed.
         let access_token = AuthClient::response_handle::<model::OAuthAccessToken>(resp).await?;
+
         Ok(model::AccessToken::OAuth(access_token))
     }
 }
@@ -274,7 +314,9 @@ impl AuthProvider for AppleAuthProvider {
             .await?;
 
         let mut token = AuthClient::response_handle::<model::RefreshToken>(resp).await?;
+        // Set the refresh token.
         token.refresh_token = refresh_token.to_owned();
+
         Ok(token)
     }
 

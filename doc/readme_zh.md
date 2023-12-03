@@ -176,6 +176,8 @@ services:
 - `--enable-file-proxy`，环境变量`ENABLE_FILE_PROXY`，开启文件上下传API代理
 - `--enable-direct`，开启直连，将绑定`interface`出口的IP的加入代理池
 - `--proxies`，代理，支持代理池，多个代理使用`,`隔开，格式: protocol://user:pass@ip:port
+- `-no-keepalive` 关闭Http Client Tcp保活
+- `--visitor-email-whitelist`，白名单限制，限制针对AccessToken，参数为邮箱，多个邮箱用`,`隔开
 
 ##### 代理高阶用法
 

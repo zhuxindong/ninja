@@ -1,4 +1,4 @@
-mod error;
+pub mod error;
 pub mod model;
 pub mod provide;
 
@@ -9,7 +9,6 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{bail, Context};
 use regex::Regex;
 use reqwest::dns::Resolve;
 use reqwest::header::{self, HeaderMap, HeaderValue};
@@ -68,14 +67,18 @@ impl AuthClient {
         let c = resp
             .cookies()
             .find(|c| c.name().eq(API_AUTH_SESSION_COOKIE_KEY))
-            .ok_or_else(|| AuthError::FailedAuthSessionCookie)?;
+            .ok_or(AuthError::FailedAuthSessionCookie)?;
 
         let session = model::Session {
             value: c.value().to_owned(),
             expires: c.expires(),
         };
 
-        let mut session_access_token = resp.json::<model::SessionAccessToken>().await?;
+        let mut session_access_token = resp
+            .json::<model::SessionAccessToken>()
+            .await
+            .map_err(AuthError::DeserializeError)?;
+
         session_access_token.session_token = Some(session);
         Ok(model::AccessToken::Session(session_access_token))
     }
@@ -120,10 +123,7 @@ impl AuthClient {
         Self::response_handle(resp).await
     }
 
-    pub async fn billing_credit_grants(
-        &self,
-        sensitive_id: &str,
-    ) -> anyhow::Result<model::Billing> {
+    pub async fn billing_credit_grants(&self, sensitive_id: &str) -> AuthResult<model::Billing> {
         let resp = self
             .inner
             .get(format!("{OPENAI_API_URL}/dashboard/billing/credit_grants"))
@@ -135,32 +135,27 @@ impl AuthClient {
     }
 
     async fn response_handle<U: DeserializeOwned>(resp: reqwest::Response) -> AuthResult<U> {
-        let url = resp.url().clone();
         match resp.error_for_status_ref() {
-            Ok(_) => Ok(resp
-                .json::<U>()
-                .await
-                .map_err(|op| AuthError::DeserializeError(op.to_string()))?),
-            Err(err) => {
-                let err_msg = format!("error: {}, url: {}", resp.text().await?, url);
-                bail!(Self::handle_error(err.status(), err_msg).await)
+            Ok(_) => {
+                let result = resp
+                    .json::<U>()
+                    .await
+                    .map_err(AuthError::DeserializeError)?;
+                Ok(result)
             }
+            Err(err) => Err(Self::handle_error(err)),
         }
     }
 
     async fn response_handle_unit(resp: reqwest::Response) -> AuthResult<()> {
-        let url = resp.url().clone();
         match resp.error_for_status_ref() {
             Ok(_) => Ok(()),
-            Err(err) => {
-                let err_msg = format!("error: {}, url: {}", resp.text().await?, url);
-                bail!(Self::handle_error(err.status(), err_msg).await)
-            }
+            Err(err) => Err(Self::handle_error(err)),
         }
     }
 
-    async fn handle_error(status: Option<StatusCode>, err_msg: String) -> AuthError {
-        match status {
+    fn handle_error(err: reqwest::Error) -> AuthError {
+        match err.status() {
             Some(
                 status_code @ (StatusCode::UNAUTHORIZED
                 | StatusCode::REQUEST_TIMEOUT
@@ -174,23 +169,22 @@ impl AuthClient {
                 | StatusCode::GATEWAY_TIMEOUT),
             ) => {
                 if status_code == StatusCode::UNAUTHORIZED {
-                    return AuthError::Unauthorized("Unauthorized".to_owned());
+                    return AuthError::Unauthorized(err);
                 }
                 if status_code == StatusCode::TOO_MANY_REQUESTS {
-                    return AuthError::TooManyRequests("Too Many Requests".to_owned());
+                    return AuthError::TooManyRequests(err);
                 }
                 if status_code == StatusCode::BAD_REQUEST {
-                    return AuthError::BadRequest("Bad Request".to_owned());
+                    return AuthError::BadRequest(err);
                 }
 
-                if status_code.is_client_error() {
-                    return AuthError::InvalidClientRequest(err_msg);
+                if status_code == StatusCode::FORBIDDEN {
+                    return AuthError::Forbidden(err);
                 }
-
-                AuthError::ServerError(err_msg)
             }
-            _ => AuthError::InvalidRequest("Invalid Request".to_owned()),
+            _ => {}
         }
+        AuthError::ServerError(err)
     }
 
     fn generate_code_verifier() -> String {
@@ -212,6 +206,7 @@ impl AuthClient {
         code_challenge
     }
 
+    /// Get the callback code from the url
     fn get_callback_code(url: &Url) -> AuthResult<String> {
         let mut url_params = HashMap::new();
         url.query_pairs().into_owned().for_each(|(key, value)| {
@@ -223,40 +218,49 @@ impl AuthClient {
 
         debug!("get_callback_code: {:?}", url_params);
 
+        // If the user denies the request, the URL will contain an error parameter
         if let Some(error) = url_params.get("error") {
-            if let Some(error_description) = url_params.get("error_description") {
-                let msg = format!("{}: {}", error[0], error_description[0]);
-                bail!("{}", msg)
+            return if let Some(error_description) = url_params.get("error_description") {
+                let msg = error_description.join(",");
+                Err(AuthError::InvalidLogin(msg))
             } else {
-                bail!("{}", error[0])
-            }
+                Err(AuthError::InvalidLogin(error.join(",")))
+            };
         }
 
-        let code = url_params
+        // Return the code if it exists
+        let callback_code = url_params
             .get("code")
-            .ok_or(AuthError::FailedCallbackCode)?[0]
+            .map(|c| c.first())
+            .flatten()
+            .ok_or(AuthError::FailedCallbackCode)?
             .to_string();
-        Ok(code)
+        Ok(callback_code)
     }
 
+    /// Get the callback state from the url
     fn get_callback_state(url: &Url) -> String {
         let url_params = url.query_pairs().into_owned().collect::<HashMap<_, _>>();
         debug!("get_callback_state: {:?}", url_params);
         url_params["state"].to_owned()
     }
 
+    /// Get the location path from the header
     fn get_location_path(header: &HeaderMap<HeaderValue>) -> AuthResult<&str> {
         debug!("get_location_path: {:?}", header);
-        Ok(header
+        let location = header
             .get("Location")
             .ok_or(AuthError::InvalidLocation)?
-            .to_str()?)
+            .to_str()
+            .map_err(|_| AuthError::InvalidLocation)?;
+        Ok(location)
     }
 
+    /// Trim the bearer token from the refresh token
     fn trim_bearer(t: &str) -> AuthResult<&str> {
         let refresh_token = t.trim_start_matches("Bearer ");
         if refresh_token.is_empty() {
-            bail!(AuthError::InvalidRefreshToken)
+            return Err(AuthError::InvalidRefreshToken);
         }
         Ok(refresh_token)
     }
@@ -276,18 +280,21 @@ impl AuthProvider for AuthClient {
             .get_or_try_init(|| async {
                 Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b")
             })
-            .await?;
+            .await
+            .map_err(AuthError::InvalidRegex)?;
 
         if !regex.is_match(&account.username) || account.password.is_empty() {
-            bail!(AuthError::InvalidEmailOrPassword)
+            return Err(AuthError::InvalidEmailOrPassword);
         }
 
+        // Try supported providers
         for provider in self.providers.iter() {
             if provider.supports(&account.option) {
                 return provider.do_access_token(account).await;
             }
         }
-        bail!("Login implementation is not supported")
+
+        Err(AuthError::NotSupportedImplementation)
     }
 
     async fn do_revoke_token(&self, refresh_token: &str) -> AuthResult<()> {
@@ -307,7 +314,7 @@ impl AuthProvider for AuthClient {
             }
         }
 
-        result.context(AuthError::NotSupportedImplementation)?
+        result.ok_or(AuthError::NotSupportedImplementation)?
     }
 
     async fn do_refresh_token(&self, refresh_token: &str) -> AuthResult<model::RefreshToken> {
@@ -328,7 +335,7 @@ impl AuthProvider for AuthClient {
             }
         }
 
-        result.context(AuthError::NotSupportedImplementation)?
+        result.ok_or(AuthError::NotSupportedImplementation)?
     }
 }
 

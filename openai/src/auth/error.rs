@@ -1,17 +1,22 @@
 #[derive(thiserror::Error, Debug)]
 pub enum AuthError {
-    #[error("Bad request (error {0:?})")]
-    BadRequest(String),
-    #[error("Too many requests (error {0:?})")]
-    TooManyRequests(String),
-    #[error("Unauthorized request (error {0:?})")]
-    Unauthorized(String),
-    #[error("Server error ({0:?})")]
-    ServerError(String),
-    #[error("Failed login")]
-    FailedLogin,
+    /// Request Error
     #[error(transparent)]
     FailedRequest(#[from] reqwest::Error),
+    #[error("Bad request (error {0:?})")]
+    BadRequest(reqwest::Error),
+    #[error("Too many requests (error {0:?})")]
+    TooManyRequests(reqwest::Error),
+    #[error("Unauthorized request (error {0:?})")]
+    Unauthorized(reqwest::Error),
+    #[error("Forbidden request (error {0:?})")]
+    Forbidden(reqwest::Error),
+    #[error("Server error ({0:?})")]
+    ServerError(reqwest::Error),
+
+    /// Failed Error
+    #[error("Failed login")]
+    FailedLogin,
     #[error("Failed to get access token (error {0:?})")]
     FailedAccessToken(String),
     #[error("Failed get code from callback url")]
@@ -26,12 +31,14 @@ pub enum AuthError {
     FailedCsrfToken,
     #[error("Failed to get auth session cookie")]
     FailedAuthSessionCookie,
-    #[error("Invalid client request (error {0:?})")]
-    InvalidClientRequest(String),
+
+    /// Invalid Error
+    #[error("Invalid login (error {0:?})")]
+    InvalidLogin(String),
     #[error("Invalid arkose token ({0:?})")]
     InvalidArkoseToken(anyhow::Error),
     #[error("Invalid request login url (error {0:?})")]
-    InvalidLoginUrl(String),
+    InvalidLoginUrl(url::ParseError),
     #[error("Invalid email or password")]
     InvalidEmailOrPassword,
     #[error("Invalid request (error {0:?})")]
@@ -49,9 +56,13 @@ pub enum AuthError {
     #[error("MFA required")]
     MFARequired,
     #[error("Json deserialize error (error {0:?})")]
-    DeserializeError(String),
+    DeserializeError(reqwest::Error),
     #[error("Implementation is not supported")]
     NotSupportedImplementation,
     #[error("Failed to get preauth cookie")]
     PreauthCookieNotFound,
+
+    /// Other Error
+    #[error("Regex error (error {0:?})")]
+    InvalidRegex(regex::Error),
 }

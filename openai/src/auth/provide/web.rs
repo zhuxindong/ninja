@@ -10,7 +10,6 @@ use crate::auth::{
 };
 use crate::constant::API_AUTH_SESSION_COOKIE_KEY;
 use crate::{debug, warn, URL_CHATGPT_API};
-use anyhow::{bail, Context};
 use reqwest::{Client, StatusCode};
 use serde_json::Value;
 use url::Url;
@@ -31,20 +30,20 @@ impl WebAuthProvider {
             .map_err(AuthError::FailedRequest)?
             .ext_context(ctx);
 
-        match resp.error_for_status_ref() {
-            Ok(_) => {
+        match resp.error_for_status() {
+            Ok(resp) => {
                 let res = resp.json::<Value>().await?;
                 let csrf_token = res
                     .as_object()
                     .and_then(|obj| obj.get("csrfToken"))
                     .and_then(|csrf| csrf.as_str())
-                    .context(AuthError::FailedCsrfToken)?;
+                    .ok_or(AuthError::FailedCsrfToken)?;
                 ctx.set_csrf_token(csrf_token);
                 return Ok(());
             }
             Err(err) => {
                 warn!("{err}");
-                bail!(AuthError::FailedCsrfToken)
+                Err(AuthError::FailedCsrfToken)
             }
         }
     }
@@ -75,12 +74,12 @@ impl WebAuthProvider {
                     .as_object()
                     .and_then(|v| v.get("url"))
                     .and_then(|v| v.as_str())
-                    .context(AuthError::FailedAuthorizedUrl)?;
+                    .ok_or(AuthError::FailedAuthorizedUrl)?;
                 return self.state(url, ctx).await;
             }
             Err(err) => {
                 debug!("WebAuthHandle authorized url error: {err}");
-                bail!(AuthError::FailedAuthorizedUrl)
+                Err(AuthError::FailedAuthorizedUrl)
             }
         }
     }
@@ -95,10 +94,10 @@ impl WebAuthProvider {
             .map_err(AuthError::FailedRequest)?
             .ext_context(ctx);
 
-        let identifier_location = AuthClient::get_location_path(resp.headers())?;
+        let locatio = AuthClient::get_location_path(resp.headers())?;
         let resp = self
             .0
-            .get(format!("{OPENAI_OAUTH_URL}{identifier_location}"))
+            .get(format!("{OPENAI_OAUTH_URL}{locatio}"))
             .ext_context(ctx)
             .send()
             .await
@@ -135,7 +134,7 @@ impl WebAuthProvider {
 
         AuthClient::response_handle_unit(resp)
             .await
-            .context(AuthError::InvalidEmail)
+            .map_err(|_| AuthError::InvalidEmail)
     }
 
     async fn authenticate_password(
@@ -164,11 +163,16 @@ impl WebAuthProvider {
             .map_err(AuthError::FailedRequest)?
             .ext_context(ctx);
 
+        // If resp status is client error return InvalidEmailOrPassword
+        if resp.status().is_client_error() {
+            return Err(AuthError::InvalidEmailOrPassword);
+        }
+
         if resp.status().is_redirection() {
             let location = AuthClient::get_location_path(&resp.headers())?;
             if location.contains("https://chat.openai.com/") {
                 warn!("WebAuthProvider::authenticate_password: invalid location path: {location}");
-                bail!(AuthError::InvalidLocationPath)
+                return Err(AuthError::InvalidLocationPath);
             }
 
             let resp = self
@@ -198,16 +202,11 @@ impl WebAuthProvider {
 
                 return match resp.status() {
                     StatusCode::FOUND => self.get_access_token(ctx).await,
-                    StatusCode::TEMPORARY_REDIRECT => {
-                        bail!(AuthError::InvalidEmailOrPassword)
-                    }
-                    _ => {
-                        bail!(AuthError::FailedLogin)
-                    }
+                    _ => Err(AuthError::InvalidEmailOrPassword),
                 };
             }
         }
-        bail!(AuthError::FailedLogin)
+        Err(AuthError::FailedLogin)
     }
 
     async fn authenticate_mfa(
@@ -216,8 +215,13 @@ impl WebAuthProvider {
         mfa_code: &str,
         location: &str,
     ) -> AuthResult<model::AccessToken> {
-        let url = format!("{OPENAI_OAUTH_URL}{}", location);
-        let state = AuthClient::get_callback_state(&Url::parse(&url)?);
+        // Parse location
+        let url = Url::parse(&format!("{OPENAI_OAUTH_URL}{}", location))
+            .map_err(AuthError::InvalidLoginUrl)?;
+
+        // Get state from url
+        let state = AuthClient::get_callback_state(&url);
+
         let data = AuthenticateMfaData::builder()
             .action("default")
             .state(&state)
@@ -226,7 +230,7 @@ impl WebAuthProvider {
 
         let resp = self
             .0
-            .post(&url)
+            .post(url)
             .ext_context(ctx)
             .json(&data)
             .send()
@@ -234,10 +238,13 @@ impl WebAuthProvider {
             .map_err(AuthError::FailedRequest)?
             .ext_context(ctx);
 
-        let location: &str = AuthClient::get_location_path(resp.headers())?;
+        let location = AuthClient::get_location_path(resp.headers())?;
+
+        // If location path starts with /authorize/resume? and mfa is none return MFAFailed
         if location.starts_with("/authorize/resume?") && ctx.account.mfa.is_none() {
-            bail!(AuthError::MFAFailed)
+            return Err(AuthError::MFAFailed);
         }
+
         self.get_access_token(ctx).await
     }
 
@@ -252,8 +259,9 @@ impl WebAuthProvider {
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
-        match resp.status() {
-            StatusCode::OK => {
+
+        match resp.error_for_status() {
+            Ok(resp) => {
                 let session = resp
                     .cookies()
                     .find(|c| c.name().eq(API_AUTH_SESSION_COOKIE_KEY))
@@ -264,24 +272,21 @@ impl WebAuthProvider {
 
                 match session {
                     Some(session) => {
-                        let mut session_access_token =
-                            resp.json::<model::SessionAccessToken>().await?;
+                        let mut session_access_token = resp
+                            .json::<model::SessionAccessToken>()
+                            .await
+                            .map_err(AuthError::DeserializeError)?;
                         session_access_token.session_token = Some(session);
                         Ok(model::AccessToken::Session(session_access_token))
                     }
                     None => {
                         let text = resp.text().await?;
                         warn!("Unable to obtain {API_AUTH_SESSION_COOKIE_KEY}, error: {text}");
-                        bail!(AuthError::FailedAccessToken(text))
+                        Err(AuthError::FailedAccessToken(text))
                     }
                 }
             }
-            StatusCode::TOO_MANY_REQUESTS => {
-                bail!(AuthError::TooManyRequests("Too Many Requests".to_owned()))
-            }
-            _ => {
-                bail!("Failed to get access token")
-            }
+            Err(err) => Err(AuthClient::handle_error(err)),
         }
     }
 }
@@ -311,10 +316,10 @@ impl AuthProvider for WebAuthProvider {
     }
 
     async fn do_refresh_token(&self, _refresh_token: &str) -> AuthResult<model::RefreshToken> {
-        bail!("Not yet implemented")
+        Err(AuthError::NotSupportedImplementation)
     }
 
     async fn do_revoke_token(&self, _refresh_token: &str) -> AuthResult<()> {
-        bail!("Not yet implemented")
+        Err(AuthError::NotSupportedImplementation)
     }
 }
