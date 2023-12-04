@@ -89,6 +89,10 @@ pub struct Args {
     #[builder(setter(into), default)]
     pub(crate) proxies: Vec<proxy::Proxy>,
 
+    /// Random Chrome User-Agent
+    #[builder(default = false)]
+    pub(crate) random_chrome_ua: bool,
+
     /// TLS cert
     #[builder(setter(into), default)]
     pub(crate) tls_cert: Option<PathBuf>,
