@@ -1,12 +1,14 @@
 level = "info"
 bind = "0.0.0.0:7999"
 concurrent_limit = 65535
-enable_direct = false
-cookie_store = true
 timeout = 600
 connect_timeout = 60
 tcp_keepalive = 60
+no_keepalive = false
 pool_idle_timeout = 90
+enable_direct = false
+random_chrome_ua = false
+cookie_store = true
 disable_webui = false
 enable_file_proxy = false
 arkose_gpt3_experiment = false

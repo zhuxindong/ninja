@@ -55,6 +55,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .timeout(args.timeout)
         .connect_timeout(args.connect_timeout)
         .concurrent_limit(args.concurrent_limit)
+        .random_chrome_ua(args.random_chrome_ua)
         .tls_cert(args.tls_cert)
         .tls_key(args.tls_key)
         .auth_key(args.auth_key)

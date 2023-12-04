@@ -120,6 +120,10 @@ pub struct ServeArgs {
     #[clap(long, env = "ENABLE_DIRECT")]
     pub(super) enable_direct: bool,
 
+    /// Random Chrome User-Agent
+    #[clap(short = 'R', long, env = "RANDOM_UA")]
+    pub(super) random_chrome_ua: bool,
+
     /// Enabled Cookie Store
     #[clap(long, env = "COOKIE_STORE")]
     pub(super) cookie_store: bool,
