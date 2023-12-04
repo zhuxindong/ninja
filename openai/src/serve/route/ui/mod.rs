@@ -50,7 +50,7 @@ use crate::info;
 use crate::now_duration;
 use crate::serve::error::ResponseError;
 use crate::serve::middleware::csrf;
-use crate::serve::proxy::resp::header_convert;
+use crate::serve::proxy::header_convert;
 use crate::serve::route::ui::extract::SessionExtractor;
 use crate::serve::turnstile;
 use crate::serve::whitelist;

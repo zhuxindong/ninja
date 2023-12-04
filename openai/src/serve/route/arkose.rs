@@ -82,7 +82,7 @@ async fn proxy(
                     });
                     return create_response(
                         StatusCode::OK,
-                        mime::TEXT_HTML_UTF_8.as_ref(),
+                        mime::APPLICATION_JSON.as_ref(),
                         target.to_string(),
                     );
                 }

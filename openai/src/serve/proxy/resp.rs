@@ -2,86 +2,19 @@ use std::time::UNIX_EPOCH;
 
 use crate::constant::{CF_CLEARANCE, NINJA_VERSION, PUID, SET_COOKIE};
 use crate::with_context;
-use crate::{debug, LIB_VERSION};
+use crate::LIB_VERSION;
 use axum::body::Body;
 use axum::body::StreamBody;
 use axum::http::header;
 use axum::response::{IntoResponse, Response};
+use axum_extra::extract::cookie;
 use axum_extra::extract::cookie::Cookie;
-use axum_extra::extract::{cookie, CookieJar};
-use reqwest::header::HeaderMap;
 use serde_json::Value;
 
 use crate::serve::error::ResponseError;
 
 use super::ext::ResponseExt;
 use super::toapi;
-
-/// Request headers convert
-pub(crate) fn header_convert(
-    h: &HeaderMap,
-    jar: &CookieJar,
-    origin: &'static str,
-) -> Result<HeaderMap, ResponseError> {
-    let mut headers = HeaderMap::new();
-
-    h.get("Access-Control-Request-Headers")
-        .map(|h| headers.insert("Access-Control-Request-Headers", h.clone()));
-
-    h.get("Access-Control-Request-Method").map(|h| {
-        headers.insert("Access-Control-Request-Method", h.clone());
-    });
-
-    h.get("X-Ms-Blob-Type")
-        .map(|v| headers.insert("X-Ms-Blob-Type", v.clone()));
-
-    h.get("X-Ms-Version")
-        .map(|v| headers.insert("X-Ms-Version", v.clone()));
-
-    h.get(header::ACCEPT)
-        .map(|h| headers.insert(header::ACCEPT, h.clone()));
-
-    h.get(header::ACCEPT_LANGUAGE)
-        .map(|h| headers.insert(header::ACCEPT_LANGUAGE, h.clone()));
-
-    h.get(header::ACCEPT_ENCODING)
-        .map(|h| headers.insert(header::ACCEPT_ENCODING, h.clone()));
-
-    h.get(header::DNT)
-        .map(|h| headers.insert(header::DNT, h.clone()));
-
-    h.get(header::AUTHORIZATION)
-        .map(|h| headers.insert(header::AUTHORIZATION, h.clone()));
-
-    h.get(header::CONTENT_TYPE)
-        .map(|h| headers.insert(header::CONTENT_TYPE, h.clone()));
-
-    headers.insert(header::ORIGIN, header::HeaderValue::from_static(origin));
-    headers.insert(header::REFERER, header::HeaderValue::from_static(origin));
-
-    let mut cookies = Vec::new();
-
-    jar.iter()
-        .filter(|c| {
-            let name = c.name().to_lowercase();
-            name.eq("_puid") || name.eq("cf_clearance")
-        })
-        .for_each(|c| {
-            let c = format!("{}={}", c.name(), cookie_encoded(c.value()));
-            debug!("cookie: {}", c);
-            cookies.push(c);
-        });
-
-    // setting cookie
-    if !cookies.is_empty() {
-        headers.insert(
-            header::COOKIE,
-            header::HeaderValue::from_str(&cookies.join(";"))
-                .map_err(ResponseError::InternalServerError)?,
-        );
-    }
-    Ok(headers)
-}
 
 /// Response convert
 pub(crate) async fn response_convert(
@@ -165,25 +98,5 @@ pub(crate) async fn response_convert(
             .body(StreamBody::new(resp.inner.bytes_stream()))
             .map_err(ResponseError::InternalServerError)?
             .into_response())
-    }
-}
-
-fn cookie_encoded(input: &str) -> String {
-    let separator = ':';
-    if let Some((name, value)) = input.split_once(separator) {
-        let encoded_value = value
-            .chars()
-            .map(|ch| match ch {
-                '!' | '#' | '$' | '%' | '&' | '\'' | '(' | ')' | '*' | '+' | ',' | '/' | ':'
-                | ';' | '=' | '?' | '@' | '[' | ']' | '~' => {
-                    format!("%{:02X}", ch as u8)
-                }
-                _ => ch.to_string(),
-            })
-            .collect::<String>();
-
-        format!("{name}:{encoded_value}")
-    } else {
-        input.to_string()
     }
 }

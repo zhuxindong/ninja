@@ -108,7 +108,7 @@ pub struct PostConvoRequest<'a> {
     #[builder(default = false)]
     force_rate_limit: bool,
     #[builder(default = vec![])]
-    suggestions: Vec<String>,
+    suggestions: Vec<&'a str>,
     #[builder(setter(into), default)]
     arkose_token: Option<&'a ArkoseToken>,
 }
