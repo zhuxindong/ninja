@@ -4,7 +4,7 @@ use crate::{
     args::{self, ServeArgs},
     utils::unix::fix_relative_path,
 };
-use openai::{arkose::funcaptcha::ArkoseSolver, context::Args, proxy, serve::Serve};
+use openai::{arkose::funcaptcha::ArkoseSolver, context::args::Args, proxy, serve::Serve};
 use std::{net::IpAddr, ops::Not, path::PathBuf, str::FromStr};
 use url::Url;
 
@@ -69,6 +69,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .arkose_auth_har_dir(args.arkose_auth_har_dir)
         .arkose_platform_har_dir(args.arkose_platform_har_dir)
         .arkose_gpt3_experiment(args.arkose_gpt3_experiment)
+        .arkose_gpt3_experiment_solver(args.arkose_gpt3_experiment_solver)
         .arkose_har_upload_key(args.arkose_har_upload_key)
         .arkose_solver(arkose_solver)
         .enable_file_proxy(args.enable_file_proxy)

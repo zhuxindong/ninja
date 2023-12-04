@@ -1,6 +1,6 @@
 use openai::{
     arkose::ArkoseToken,
-    context::{self, Args},
+    context::{self, args::Args},
     proxy,
 };
 
