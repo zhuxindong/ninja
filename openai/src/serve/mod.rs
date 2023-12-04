@@ -27,7 +27,8 @@ use self::proxy::resp::response_convert;
 use crate::auth::model::{AccessToken, AuthAccount, RefreshToken, SessionAccessToken};
 use crate::auth::provide::AuthProvider;
 use crate::constant::API_AUTH_SESSION_COOKIE_KEY;
-use crate::context::{self, Args};
+use crate::context;
+use crate::context::args::Args;
 use crate::proxy::{InnerProxy, Proxy};
 use crate::serve::error::ProxyError;
 use crate::serve::error::ResponseError;
@@ -56,13 +57,23 @@ fn print_boot_message(inner: &Args) {
     info!("Keepalive {} seconds", inner.tcp_keepalive);
     info!("Timeout {} seconds", inner.timeout);
     info!("Connect timeout {} seconds", inner.connect_timeout);
-    info!("Enable tcp keepalive: {}", inner.no_keepalive.not());
-    info!("Enable cookie store: {}", inner.cookie_store);
-    info!("Enable file proxy: {}", inner.enable_file_proxy);
-    info!("Enable direct connection: {}", inner.enable_direct);
+    info!("TCP keepalive: {}", inner.no_keepalive.not());
+    info!("Cookie store: {}", inner.cookie_store);
+    info!("File proxy: {}", inner.enable_file_proxy);
+    info!("Direct connection: {}", inner.enable_direct);
+    info!(
+        "ArkoseLabs GPT-3.5 experiment: {}",
+        inner.arkose_gpt3_experiment
+    );
+    info!(
+        "ArkoseLabs GPT-3.5 experiment solver: {}",
+        inner.arkose_gpt3_experiment_solver
+    );
     inner.arkose_solver.as_ref().map(|solver| {
         info!("ArkoseLabs solver: {:?}", solver.solver);
     });
+    info!("Random chrome user-agent: {}", inner.random_chrome_ua);
+
     inner.proxies.iter().for_each(|p| match p {
         Proxy::All(inner) | Proxy::Api(inner) | Proxy::Auth(inner) | Proxy::Arkose(inner) => {
             match inner {

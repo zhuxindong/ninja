@@ -29,7 +29,7 @@ use error::ArkoseError;
 use self::funcaptcha::solver::SubmitSolver;
 use self::funcaptcha::ArkoseSolver;
 use self::funcaptcha::Solver;
-#[derive(Hash, PartialEq, Eq, Debug)]
+#[derive(Hash, PartialEq, Eq, Debug, Clone)]
 pub enum Type {
     GPT3,
     GPT4,
@@ -351,22 +351,17 @@ async fn get_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<ArkoseToken> {
 /// Get ArkoseLabs token from context (Only support ChatGPT, Platform, Auth)
 #[inline]
 async fn get_from_context(t: Type) -> anyhow::Result<ArkoseToken> {
-    let valid_arkose_token =
-        |arkose_token: ArkoseToken, arkose_solver: Option<&'static ArkoseSolver>| async move {
-            let get = move || async { Ok(arkose_token) };
-            return submit_if_invalid(get, arkose_solver).await;
-        };
-
-    let ctx = with_context!();
-
     // Get arkose solver
-    let arkose_solver = ctx.arkose_solver();
+    let arkose_solver = with_context!(arkose_solver);
 
-    let hat_path = ctx.arkose_har_path(&t);
+    // Get HAR path
+    let hat_path = with_context!(arkose_har_path, &t);
+
+    // If har path is not empty, use har file
     if let Some(file_path) = hat_path.file_path {
         match ArkoseToken::new_from_har(&file_path).await {
             Ok(arkose_token) => {
-                return valid_arkose_token(arkose_token, arkose_solver).await;
+                return valid_arkose_token(arkose_token, arkose_solver, t).await;
             }
             Err(err) => {
                 warn!(
@@ -377,10 +372,11 @@ async fn get_from_context(t: Type) -> anyhow::Result<ArkoseToken> {
         }
     }
 
-    if let Some(arkose_solver) = arkose_solver {
-        match ArkoseToken::new(t).await {
+    // If arkose solver is not empty, use bx
+    if arkose_solver.is_some() {
+        match ArkoseToken::new(t.clone()).await {
             Ok(arkose_token) => {
-                return valid_arkose_token(arkose_token, Some(arkose_solver)).await;
+                return valid_arkose_token(arkose_token, arkose_solver, t).await;
             }
             Err(err) => {
                 warn!("get arkose token from local bx error: {err}")
@@ -392,16 +388,13 @@ async fn get_from_context(t: Type) -> anyhow::Result<ArkoseToken> {
 }
 
 #[inline]
-async fn submit_if_invalid<F, Fut>(
-    get_token: F,
+async fn valid_arkose_token(
+    arkose_token: ArkoseToken,
     arkose_solver: Option<&'static ArkoseSolver>,
+    t: Type,
 ) -> anyhow::Result<ArkoseToken>
 where
-    F: FnOnce() -> Fut,
-    Fut: futures_core::Future<Output = anyhow::Result<ArkoseToken>>,
 {
-    let arkose_token = get_token().await?;
-
     if arkose_token.success() {
         // Submit token to funcaptcha callback
         tokio::spawn(funcaptcha::callback(
@@ -409,6 +402,15 @@ where
             arkose_token.value().to_owned(),
         ));
     } else {
+        // If enable gpt3 arkoselabs experiment, use gpt4 token
+        if with_context!(arkose_gpt3_experiment)
+            && !with_context!(arkose_gpt3_experiment_solver)
+            && t == Type::GPT3
+        {
+            return Ok(arkose_token);
+        }
+
+        // If arkose solver is not empty, use solver
         if let Some(arkose_solver) = arkose_solver {
             return submit_captcha(
                 &arkose_solver.solver,

@@ -1,8 +1,8 @@
 use crate::auth::{self};
+use crate::context::args::Args;
 use crate::dns::{self, TrustDnsResolver};
 use crate::{
     auth::AuthClient,
-    context,
     proxy::{self, Ipv6CidrExt},
 };
 use moka::sync::Cache;
@@ -124,7 +124,7 @@ pub struct ClientRoundRobinBalancer {
 }
 
 impl ClientRoundRobinBalancer {
-    pub fn new_client(args: &context::Args) -> anyhow::Result<Self> {
+    pub fn new_client(args: &Args) -> anyhow::Result<Self> {
         let p: Vec<proxy::InnerProxy> = args
             .proxies
             .clone()
@@ -138,7 +138,7 @@ impl ClientRoundRobinBalancer {
         Self::new_client_generic(args, ClientAgent::Api, p, build_client)
     }
 
-    pub fn new_auth_client(args: &context::Args) -> anyhow::Result<Self> {
+    pub fn new_auth_client(args: &Args) -> anyhow::Result<Self> {
         let p: Vec<proxy::InnerProxy> = args
             .proxies
             .clone()
@@ -152,7 +152,7 @@ impl ClientRoundRobinBalancer {
         Self::new_client_generic(args, ClientAgent::Auth, p, build_auth_client)
     }
 
-    pub fn new_arkose_client(args: &context::Args) -> anyhow::Result<Self> {
+    pub fn new_arkose_client(args: &Args) -> anyhow::Result<Self> {
         let p: Vec<proxy::InnerProxy> = args
             .proxies
             .clone()
@@ -167,7 +167,7 @@ impl ClientRoundRobinBalancer {
     }
 
     fn new_client_generic<F, T>(
-        args: &context::Args,
+        args: &Args,
         client_type: fn(T) -> ClientAgent,
         proxy: Vec<proxy::InnerProxy>,
         build_fn: F,

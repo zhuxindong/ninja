@@ -168,6 +168,10 @@ pub struct ServeArgs {
     #[clap(short = 'E', long, default_value = "false")]
     pub(super) arkose_gpt3_experiment: bool,
 
+    /// Enable Arkose GPT-3.5 experiment solver
+    #[clap(short = 'S', long, default_value = "false")]
+    pub(super) arkose_gpt3_experiment_solver: bool,
+
     /// About the browser HAR directory path requested by ChatGPT GPT-3.5 ArkoseLabs
     #[clap(long, value_parser = parse::parse_dir_path)]
     pub(super) arkose_gpt3_har_dir: Option<PathBuf>,
