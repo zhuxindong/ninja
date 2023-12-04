@@ -22,8 +22,8 @@
   GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 deb包，二进制文件，以Ubuntu为例：
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.9.1/ninja-0.9.1-x86_64-unknown-linux-musl.tar.gz
-tar -xf ninja-0.9.1-x86_64-unknown-linux-musl.tar.gz
+wget https://github.com/gngpp/ninja/releases/download/v0.9.2/ninja-0.9.2-x86_64-unknown-linux-musl.tar.gz
+tar -xf ninja-0.9.2-x86_64-unknown-linux-musl.tar.gz
 ./ninja run
 ```
 
@@ -32,11 +32,11 @@ tar -xf ninja-0.9.1-x86_64-unknown-linux-musl.tar.gz
 GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 ipk 文件， 目前提供了 aarch64/x86_64 等架构的版本，下载后使用 opkg 安装，以 nanopi r4s 为例：
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.9.1/ninja_0.9.1_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.9.1/luci-app-ninja_1.1.6-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.9.1/luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.9.2/ninja_0.9.2_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.9.2/luci-app-ninja_1.1.6-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.9.2/luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
 
-opkg install ninja_0.9.1_aarch64_generic.ipk
+opkg install ninja_0.9.2_aarch64_generic.ipk
 opkg install luci-app-ninja_1.1.6-1_all.ipk
 opkg install luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
 ```
@@ -106,7 +106,7 @@ services:
 
 目前OpenAI已经更新`登录`需要验证`Arkose Token`，解决方式同`GPT-4`，填写启动参数指定HAR文件`--arkose-auth-har-dir`。创建API-Key需要上传Platform相关的HAR特征文件，获取方式同上。
 
-近日，`OpenAI`取消对`GPT-3.5`进行`Arkose`验证，可以不上传HAR特征文件使用（已上传的不影响），兼容后续可能会再次开启`Arkose`验证，需要加上启动参数`--arkose-gpt3-experiment`进行开启`GPT-3.5`模型`Arkose`验证处理，WebUI不受影响.
+近日，`OpenAI`取消对`GPT-3.5`进行`Arkose`验证，可以不上传HAR特征文件使用（已上传的不影响），兼容后续可能会再次开启`Arkose`验证，需要加上启动参数`--arkose-gpt3-experiment`进行开启`GPT-3.5`模型`Arkose`验证处理，WebUI不受影响。如果遇到`418 I'm a teapot`，可以开启`--arkose-gpt3-experiment`，同时需要上传`HAR`特征，如果没有`GPT-3.5`的特征，使用`GPT-4`也是可以使用的；或者开启参数`--random-chrome-ua`。
 
 ### Http 服务
 
