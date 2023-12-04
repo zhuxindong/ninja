@@ -14,7 +14,7 @@ use crate::constant::{ARKOSE_TOKEN, EMPTY, MODEL, NULL, PUID};
 use crate::{arkose, with_context};
 
 use super::ext::{RequestExt, ResponseExt, SendRequestExt};
-use super::resp::header_convert;
+use super::header_convert;
 use super::toapi;
 use crate::serve::error::{ProxyError, ResponseError};
 use crate::serve::puid::{get_or_init, reduce_key};

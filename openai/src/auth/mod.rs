@@ -453,7 +453,30 @@ impl AuthClientBuilder {
     }
 
     pub fn build(self) -> AuthClient {
-        let client = self.inner.build().expect("ClientBuilder::build()");
+        let client = self
+            .inner
+            .default_headers({
+                let mut headers = HeaderMap::new();
+                headers.insert(header::ACCEPT, HeaderValue::from_static("*/*"));
+                headers.insert(
+                    header::ACCEPT_ENCODING,
+                    HeaderValue::from_static("gzip, deflate, br"),
+                );
+                headers.insert(
+                    header::ACCEPT_LANGUAGE,
+                    HeaderValue::from_static("en-US,en;q=0.9"),
+                );
+                headers.insert(
+                    header::UPGRADE_INSECURE_REQUESTS,
+                    HeaderValue::from_static("1"),
+                );
+                headers.insert(header::DNT, HeaderValue::from_static("1"));
+                headers.insert(header::ORIGIN, HeaderValue::from_static(OPENAI_OAUTH_URL));
+                headers.insert(header::REFERER, HeaderValue::from_static(OPENAI_OAUTH_URL));
+                headers
+            })
+            .build()
+            .expect("ClientBuilder::build()");
 
         let mut providers: Vec<Box<dyn AuthProvider + Send + Sync>> = Vec::with_capacity(3);
         providers.push(Box::new(WebAuthProvider::new(client.clone())));
@@ -473,13 +496,6 @@ impl AuthClientBuilder {
                 .danger_accept_invalid_certs(true)
                 .connect_timeout(Duration::from_secs(10))
                 .timeout(Duration::from_secs(30))
-                .default_headers({
-                    let mut headers = HeaderMap::new();
-                    headers.insert(header::DNT, HeaderValue::from_static("1"));
-                    headers.insert(header::ORIGIN, HeaderValue::from_static(OPENAI_OAUTH_URL));
-                    headers.insert(header::REFERER, HeaderValue::from_static(OPENAI_OAUTH_URL));
-                    headers
-                })
                 .redirect(Policy::none()),
         }
     }

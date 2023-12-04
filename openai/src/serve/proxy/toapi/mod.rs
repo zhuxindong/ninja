@@ -2,6 +2,7 @@ mod model;
 mod stream;
 
 use axum::http::header;
+use axum::http::HeaderValue;
 use axum::http::Method;
 use axum::{
     response::{IntoResponse, Sse},
@@ -35,6 +36,13 @@ use crate::{
 
 use super::ext::{ContextExt, RequestExt, ResponseExt};
 use crate::URL_CHATGPT_API;
+
+const SUGGESTIONS: [&'static str; 4] = [
+  "Write a script to automate sending daily email reports in Python, and walk me through how I would set it up.",
+  "Design a database schema for an online merch store.",
+  "I'm planning a 4-day trip to Seoul. Can you suggest an itinerary that doesn't involve popular tourist attractions?",
+  "I'm going to cook for my date who claims to be a picky eater. Can you recommend me a dish that's easy to cook?"
+];
 
 /// Check if the request is supported
 pub(super) fn support(req: &RequestExt) -> bool {
@@ -92,20 +100,36 @@ pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, Respons
     let parent_message_id = uuid();
     let req_body = PostConvoRequest::builder()
         .action(Action::Next)
-        .parent_message_id(&parent_message_id)
-        .messages(messages)
-        .model(raw_model)
-        .history_and_training_disabled(true)
-        .force_paragen(false)
-        .force_rate_limit(false)
+        .arkose_token(&arkose_token)
         .conversation_mode(ConversationMode {
             kind: "primary_assistant",
         })
-        .arkose_token(&arkose_token)
+        .force_paragen(false)
+        .force_rate_limit(false)
+        .history_and_training_disabled(true)
+        .messages(messages)
+        .model(raw_model)
+        .parent_message_id(&parent_message_id)
+        .suggestions(SUGGESTIONS.to_vec())
+        .timezone_offset_min(-480)
         .build();
 
     let mut builder = with_context!(api_client)
         .post(format!("{URL_CHATGPT_API}/backend-api/conversation"))
+        .header(header::ACCEPT, HeaderValue::from_static("*/*"))
+        .header(
+            header::ACCEPT_ENCODING,
+            HeaderValue::from_static("gzip, deflate, br"),
+        )
+        .header(
+            header::ACCEPT_LANGUAGE,
+            HeaderValue::from_static("en-US,en;q=0.9"),
+        )
+        .header(
+            header::UPGRADE_INSECURE_REQUESTS,
+            HeaderValue::from_static("1"),
+        )
+        .header(header::DNT, HeaderValue::from_static("1"))
         .header(header::ORIGIN, URL_CHATGPT_API)
         .header(header::REFERER, URL_CHATGPT_API)
         .bearer_auth(baerer);
