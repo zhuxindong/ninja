@@ -176,8 +176,18 @@ services:
 - `--enable-file-proxy`，环境变量`ENABLE_FILE_PROXY`，开启文件上下传API代理
 - `--enable-direct`，开启直连，将绑定`interface`出口的IP的加入代理池
 - `--proxies`，代理，支持代理池，多个代理使用`,`隔开，格式: protocol://user:pass@ip:port
-- `-no-keepalive` 关闭Http Client Tcp保活
+- `--no-keepalive` 关闭Http Client Tcp保活
 - `--visitor-email-whitelist`，白名单限制，限制针对AccessToken，参数为邮箱，多个邮箱用`,`隔开
+- `--random-chrome-ua`，随机Chrome User-Agent
+- `--cookie-store`，开启Cookie Store
+- `--cf-site-key`，环境变量 `CF_SITE_KEY`，Cloudflare turnstile captcha site key
+- `--cf-secret-key`，环境变量 `CF_SECRET_KEY`，Cloudflare turnstile captcha secret key
+- `--auth-key`，环境变量 `AUTH_KEY`，登录认证Key，随Authorization Bearer Token格式发送
+- `--arkose-endpoint`，环境变量 `ARKOSE_ENDPOINT`，ArkoseLabs endpoint，例如: https://client-api.arkoselabs.com
+- `--arkose-solver`，环境变量 `ARKOSE_SOLVER`，ArkoseLabs solver platform，例如: yescaptcha
+- `--arkose-solver-key`，环境变量 `ARKOSE_SOLVER_KEY`，ArkoseLabs solver client key
+- `--arkose-gpt3-experiment`，环境变量 `ARKOSE_GPT3_EXPERIMENT`，开启GPT-3.5 ArkoseLabs实验，需要上传HAR特征文件
+- `--arkose-gpt3-experiment-solver`，环境变量 `ARKOSE_GPT3_EXPERIMENT_SOLVER`，开启GPT-3.5 ArkoseLabs实验，需要上传HAR特征文件，并且会校验ArkoseToken正确性
 
 ##### 代理高阶用法
 
@@ -264,6 +274,8 @@ Options:
           Example: all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081 [env: PROXIES=]
       --enable-direct
           Enable direct connection [env: ENABLE_DIRECT=]
+  -R, --random-chrome-ua
+          Random Chrome User-Agent [env: RANDOM_UA=]
       --cookie-store
           Enabled Cookie Store [env: COOKIE_STORE=]
       --tls-cert <TLS_CERT>
@@ -286,6 +298,8 @@ Options:
           Arkose endpoint, Example: https://client-api.arkoselabs.com
   -E, --arkose-gpt3-experiment
           Enable Arkose GPT-3.5 experiment
+  -S, --arkose-gpt3-experiment-solver
+          Enable Arkose GPT-3.5 experiment solver
       --arkose-gpt3-har-dir <ARKOSE_GPT3_HAR_DIR>
           About the browser HAR directory path requested by ChatGPT GPT-3.5 ArkoseLabs
       --arkose-gpt4-har-dir <ARKOSE_GPT4_HAR_DIR>

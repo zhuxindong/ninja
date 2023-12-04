@@ -176,8 +176,18 @@ Recently, `OpenAI` has canceled the `Arkose` verification for `GPT-3.5`. It can 
 - `--enable-file-proxy`, environment variable `ENABLE_FILE_PROXY`, turns on the file upload and download API proxy
 - `--enable-direct`, enable direct connection, add the IP bound to the `interface` export to the proxy pool
 - `--proxies`, proxy, supports proxy pool, multiple proxies are separated by `,`, format: protocol://user:pass@ip:port
-- `-no-keepalive` turns off Http Client Tcp keepalive
+- `--no-keepalive` turns off Http Client Tcp keepalive
 - `--visitor-email-whitelist`, whitelist restriction, the restriction is for AccessToken, the parameter is the email address, multiple email addresses are separated by `,`
+- `--random-chrome-ua`, random Chrome User-Agent
+- `--cookie-store`, enable Cookie Store
+- `--cf-site-key`, environment variable `CF_SITE_KEY`, Cloudflare turnstile captcha site key
+- `--cf-secret-key`, environment variable `CF_SECRET_KEY`, Cloudflare turnstile captcha secret key
+- `--auth-key`, environment variable `AUTH_KEY`, login authentication Key, sent with Authorization Bearer Token format
+- `--arkose-endpoint`, environment variable `ARKOSE_ENDPOINT`, ArkoseLabs endpoint, for example: https://client-api.arkoselabs.com
+- `--arkose-solver`, environment variable `ARKOSE_SOLVER`, ArkoseLabs solver platform, for example: yescaptcha
+- `--arkose-solver-key`, environment variable `ARKOSE_SOLVER_KEY`, ArkoseLabs solver client key
+- `--arkose-gpt3-experiment`, environment variable `ARKOSE_GPT3_EXPERIMENT`, to enable GPT-3.5 ArkoseLabs experiment, you need to upload the HAR feature file
+- `--arkose-gpt3-experiment-solver`, environment variable `ARKOSE_GPT3_EXPERIMENT_SOLVER`, to open the GPT-3.5 ArkoseLabs experiment, you need to upload the HAR feature file, and the correctness of the ArkoseToken will be verified
 
 ##### Advanced proxy usage
 
@@ -264,6 +274,8 @@ Options:
           Example: all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081 [env: PROXIES=]
       --enable-direct
           Enable direct connection [env: ENABLE_DIRECT=]
+  -R, --random-chrome-ua
+          Random Chrome User-Agent [env: RANDOM_UA=]
       --cookie-store
           Enabled Cookie Store [env: COOKIE_STORE=]
       --tls-cert <TLS_CERT>
@@ -286,6 +298,8 @@ Options:
           Arkose endpoint, Example: https://client-api.arkoselabs.com
   -E, --arkose-gpt3-experiment
           Enable Arkose GPT-3.5 experiment
+  -S, --arkose-gpt3-experiment-solver
+          Enable Arkose GPT-3.5 experiment solver
       --arkose-gpt3-har-dir <ARKOSE_GPT3_HAR_DIR>
           About the browser HAR directory path requested by ChatGPT GPT-3.5 ArkoseLabs
       --arkose-gpt4-har-dir <ARKOSE_GPT4_HAR_DIR>
