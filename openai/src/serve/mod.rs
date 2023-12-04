@@ -149,14 +149,11 @@ impl Serve {
 
             tower::ServiceBuilder::new()
                 .layer(axum::middleware::from_fn(
-                    middleware::token_authorization_middleware,
+                    middleware::auth::token_middleware,
                 ))
                 .layer(axum::middleware::from_fn_with_state(
                     Arc::new(limit_context),
-                    middleware::token_bucket_limit_middleware,
-                ))
-                .layer(axum::middleware::from_fn(
-                    middleware::whitelist::whitelist_middleware,
+                    middleware::limit::limit_middleware,
                 ))
         };
 
