@@ -9,7 +9,7 @@ edition = "2021"
 log = "0.4.20"
 anyhow = "1.0.75"
 thiserror = "1.0.48"
-reqwest = { package = "reqwest-impersonate", version ="0.11.30", default-features = false, features = [
+reqwest = { package = "reqwest-impersonate", version ="0.11.31", default-features = false, features = [
     "boring-tls", "impersonate","json", "cookies", "stream", "multipart", "socks"
 ] }
 hyper = { package = "hyper_imp", version = "0.14.28", default-features = false, features = [
