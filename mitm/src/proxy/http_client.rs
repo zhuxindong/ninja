@@ -16,7 +16,7 @@ impl HttpClient {
             builder = builder.proxy(reqwest::Proxy::all(p).expect("faild build proxy"));
         }
         let inner = builder
-            .impersonate(Impersonate::Chrome99Android)
+            .impersonate(Impersonate::Chrome99)
             .http1_title_case_headers()
             .danger_accept_invalid_certs(true)
             .build()
