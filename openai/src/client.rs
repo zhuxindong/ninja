@@ -351,6 +351,8 @@ fn build_client(
     builder
         .impersonate(random_impersonate(config.random_chrome_ua))
         .danger_accept_invalid_certs(true)
+        .permute_extensions(true)
+        .enable_ech_grease(true)
         .connect_timeout(Duration::from_secs(config.connect_timeout))
         .timeout(Duration::from_secs(config.timeout))
         .dns_resolver(trust_dns_resolver)
@@ -400,6 +402,9 @@ fn build_auth_client(
 
     builder
         .impersonate(random_impersonate(config.random_chrome_ua))
+        .danger_accept_invalid_certs(true)
+        .permute_extensions(true)
+        .enable_ech_grease(true)
         .timeout(Duration::from_secs(config.timeout))
         .connect_timeout(Duration::from_secs(config.connect_timeout))
         .dns_resolver(trust_dns_resolver)
