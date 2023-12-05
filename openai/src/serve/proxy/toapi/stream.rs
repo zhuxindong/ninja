@@ -7,9 +7,10 @@ use std::convert::Infallible;
 use tokio_stream::StreamExt;
 
 use crate::chatgpt::model::resp::{ConvoResponse, PostConvoResponse};
+use crate::chatgpt::model::Role;
 use crate::serve::error::{ProxyError, ResponseError};
 use crate::serve::ProxyResult;
-use crate::{chatgpt::model::Role, debug};
+use crate::warn;
 
 use super::model;
 
@@ -90,7 +91,7 @@ pub(super) fn stream_handler(
                     }
                 },
                 Err(err) => {
-                    debug!("event-source stream error: {}", err);
+                    warn!("event-source stream error: {}", err);
                     break;
                 }
             }
@@ -200,7 +201,7 @@ pub(super) async fn not_stream_handler(
                 }
             }
             Err(err) => {
-                debug!("event-source stream error: {}", err);
+                warn!("event-source stream error: {}", err);
                 drop(event_soure);
                 return Err(ProxyError::EventSourceStreamError(err));
             }
