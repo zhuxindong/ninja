@@ -83,7 +83,7 @@ struct Config {
     /// TCP keepalive interval.
     tcp_keepalive: u64,
     /// Random Chrome User-Agent
-    random_chrome_ua: bool,
+    impersonate_uas: Option<Vec<Impersonate>>,
 
     index_for_interfaces: AtomicUsize,
     /// Interfaces to bind to.
@@ -199,7 +199,7 @@ impl ClientRoundRobinBalancer {
             ipv6_subnets,
             index_for_interfaces: AtomicUsize::new(0),
             index_for_ipv6_subnets: AtomicUsize::new(0),
-            random_chrome_ua: args.random_chrome_ua,
+            impersonate_uas: args.impersonate_uas.clone(),
         };
 
         // init client pool
@@ -349,7 +349,7 @@ fn build_client(
     let trust_dns_resolver = get_or_init_dns_resolver(ip_s);
 
     builder
-        .impersonate(random_impersonate(config.random_chrome_ua))
+        .impersonate(random_impersonate(config.impersonate_uas.as_ref()))
         .danger_accept_invalid_certs(true)
         .permute_extensions(true)
         .enable_ech_grease(true)
@@ -401,7 +401,7 @@ fn build_auth_client(
     let trust_dns_resolver = get_or_init_dns_resolver(ip_s);
 
     builder
-        .impersonate(random_impersonate(config.random_chrome_ua))
+        .impersonate(random_impersonate(config.impersonate_uas.as_ref()))
         .danger_accept_invalid_certs(true)
         .permute_extensions(true)
         .enable_ech_grease(true)
@@ -440,7 +440,7 @@ fn get_or_init_dns_resolver(ip_strategy: LookupIpStrategy) -> Arc<dns::TrustDnsR
     })
 }
 
-const RANDOM_OKHTTP_IMPERSONATE: [Impersonate; 7] = [
+const IMPERSONATE_UAS: [Impersonate; 21] = [
     Impersonate::OkHttp3_9,
     Impersonate::OkHttp3_11,
     Impersonate::OkHttp3_13,
@@ -448,9 +448,6 @@ const RANDOM_OKHTTP_IMPERSONATE: [Impersonate; 7] = [
     Impersonate::OkHttp4_9,
     Impersonate::OkHttp4_10,
     Impersonate::OkHttp5,
-];
-
-const RANDOM_CHROME_IMPERSONATE: [Impersonate; 10] = [
     Impersonate::Chrome99,
     Impersonate::Chrome104,
     Impersonate::Chrome105,
@@ -459,23 +456,33 @@ const RANDOM_CHROME_IMPERSONATE: [Impersonate; 10] = [
     Impersonate::Chrome108,
     Impersonate::Chrome109,
     Impersonate::Chrome114,
+    Impersonate::Chrome116,
     Impersonate::Chrome118,
     Impersonate::Chrome119,
+    Impersonate::Safari12,
+    Impersonate::Safari15_3,
+    Impersonate::Safari15_5,
 ];
 
 /// Randomly select a user agent from a list of known user agents.
-fn random_impersonate(random_chrome: bool) -> Impersonate {
+fn random_impersonate(impersonate_uas: Option<&Vec<Impersonate>>) -> Impersonate {
     use rand::seq::IteratorRandom;
 
-    if random_chrome {
-        RANDOM_CHROME_IMPERSONATE
-            .into_iter()
-            .choose(&mut rand::thread_rng())
-            .unwrap_or(Impersonate::Chrome99)
-    } else {
-        RANDOM_OKHTTP_IMPERSONATE
-            .into_iter()
-            .choose(&mut rand::thread_rng())
-            .unwrap_or(Impersonate::OkHttp4_9)
+    // if user has specified a list of user agents, randomly select one from the list
+    if let Some(impersonate_uas) = impersonate_uas {
+        if !impersonate_uas.is_empty() {
+            return impersonate_uas
+                .iter()
+                .choose(&mut rand::thread_rng())
+                .unwrap()
+                .clone();
+        }
     }
+
+    // otherwise, randomly select one from the default list
+    IMPERSONATE_UAS
+        .iter()
+        .choose(&mut rand::thread_rng())
+        .unwrap_or(&Impersonate::Chrome119)
+        .clone()
 }

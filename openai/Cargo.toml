@@ -9,10 +9,10 @@ edition = "2021"
 log = "0.4.20"
 anyhow = "1.0.75"
 thiserror = "1.0.48"
-reqwest = { package = "reqwest-impersonate", version ="0.11.34", default-features = false, features = [
+reqwest = { package = "reqwest-impersonate", version ="0.11.36", default-features = false, features = [
     "boring-tls", "impersonate","json", "cookies", "stream", "multipart", "socks"
 ] }
-hyper = { package = "hyper_imp", version = "0.14.28", default-features = false, features = [
+hyper = { package = "hyper_imp", version = "0.14.29", default-features = false, features = [
     "client",
 ] }
 trust-dns-resolver = { version = "0.23.2", default-features = false, features = ["system-config", "tokio-runtime"] }

@@ -4,7 +4,9 @@ use crate::{
     args::{self, ServeArgs},
     utils::unix::fix_relative_path,
 };
+use clap::CommandFactory;
 use openai::{arkose::funcaptcha::ArkoseSolver, context::args::Args, proxy, serve::Serve};
+use reqwest::impersonate::Impersonate;
 use std::{net::IpAddr, ops::Not, path::PathBuf, str::FromStr};
 use url::Url;
 
@@ -55,7 +57,6 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .timeout(args.timeout)
         .connect_timeout(args.connect_timeout)
         .concurrent_limit(args.concurrent_limit)
-        .random_chrome_ua(args.random_chrome_ua)
         .tls_cert(args.tls_cert)
         .tls_key(args.tls_key)
         .auth_key(args.auth_key)
@@ -87,7 +88,30 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .tb_fill_rate(args.tb_fill_rate)
         .tb_expired(args.tb_expired);
 
-    Serve::new(builder.build()).run()
+    // Parse the impersonate user agents
+    if let Some(impersonate_list) = args.impersonate_uas {
+        let mut impersonate_uas: Vec<Impersonate> = Vec::new();
+        for ua in impersonate_list {
+            match Impersonate::from_str(ua.as_str()) {
+                Ok(impersonate) => {
+                    impersonate_uas.push(impersonate);
+                }
+                Err(_) => {
+                    let mut cmd = args::cmd::Opt::command();
+                    cmd.error(
+                        clap::error::ErrorKind::ArgumentConflict,
+                        &format!("Unsupport impersonate user agent: {}", ua),
+                    )
+                    .exit();
+                }
+            }
+        }
+
+        let args = builder.impersonate_uas(impersonate_uas).build();
+        Serve::new(args).run()
+    } else {
+        Serve::new(builder.build()).run()
+    }
 }
 
 #[cfg(target_family = "unix")]

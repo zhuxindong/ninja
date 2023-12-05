@@ -74,7 +74,6 @@ fn print_boot_message(inner: &Args) {
     inner.arkose_solver.as_ref().map(|solver| {
         info!("ArkoseLabs solver: {:?}", solver.solver);
     });
-    info!("Random chrome user-agent: {}", inner.random_chrome_ua);
 
     inner.proxies.iter().for_each(|p| match p {
         Proxy::All(inner) | Proxy::Api(inner) | Proxy::Auth(inner) | Proxy::Arkose(inner) => {
