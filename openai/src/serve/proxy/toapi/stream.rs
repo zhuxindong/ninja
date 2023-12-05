@@ -1,14 +1,16 @@
 use axum::response::sse::Event;
 use axum::Json;
 use eventsource_stream::EventStream;
-use futures::StreamExt;
 use futures_core::Stream;
 use serde_json::Value;
 use std::convert::Infallible;
+use tokio_stream::StreamExt;
 
 use crate::chatgpt::model::resp::{ConvoResponse, PostConvoResponse};
+use crate::chatgpt::model::Role;
 use crate::serve::error::{ProxyError, ResponseError};
-use crate::{chatgpt::model::Role, debug};
+use crate::serve::ProxyResult;
+use crate::warn;
 
 use super::model;
 
@@ -89,10 +91,14 @@ pub(super) fn stream_handler(
                     }
                 },
                 Err(err) => {
-                    debug!("event-source stream error: {}", err);
+                    warn!("event-source stream error: {}", err);
+                    break;
                 }
             }
+
         }
+
+        drop(event_soure)
     };
     Ok(stream)
 }
@@ -100,7 +106,7 @@ pub(super) fn stream_handler(
 async fn event_convert_handler(
     context: &mut HandlerContext<'_>,
     convo: ConvoResponse,
-) -> anyhow::Result<Event> {
+) -> ProxyResult<Event> {
     // Set pin message id
     if context.pin_message_id.is_empty() {
         context.pin_message_id.push_str(convo.message_id())
@@ -150,7 +156,10 @@ async fn event_convert_handler(
             .build()])
         .build();
 
-    let data = format!(" {}", serde_json::to_string(&resp)?);
+    let data = format!(
+        " {}",
+        serde_json::to_string(&resp).map_err(ProxyError::DeserializeError)?
+    );
     Ok(Event::default().data(data))
 }
 
@@ -159,18 +168,22 @@ pub(super) async fn not_stream_handler(
         impl Stream<Item = Result<bytes::Bytes, reqwest::Error>> + std::marker::Unpin,
     >,
     model: String,
-) -> anyhow::Result<Json<Value>> {
+) -> ProxyResult<Json<Value>> {
     let id = super::generate_id(29);
     let timestamp = super::current_timestamp()?;
     let mut previous_message = String::new();
     let mut finish_reason = None;
+
     while let Some(event_result) = event_soure.next().await {
         match event_result {
-            Ok(message) => {
-                if message.data.eq("[DONE]") {
+            Ok(event) => {
+                // Break if event data is "[DONE]"
+                if event.data.eq("[DONE]") {
                     break;
                 }
-                if let Ok(res) = serde_json::from_str::<PostConvoResponse>(&message.data) {
+
+                // Parse event data
+                if let Ok(res) = serde_json::from_str::<PostConvoResponse>(&event.data) {
                     if let PostConvoResponse::Conversation(convo) = res {
                         let finish = convo.metadata_finish_details_type();
                         if !finish.is_empty() {
@@ -188,10 +201,13 @@ pub(super) async fn not_stream_handler(
                 }
             }
             Err(err) => {
-                debug!("event-source stream error: {}", err);
+                warn!("event-source stream error: {}", err);
+                drop(event_soure);
+                return Err(ProxyError::EventSourceStreamError(err));
             }
         }
     }
+
     drop(event_soure);
 
     let message = model::Message::builder()
@@ -217,6 +233,6 @@ pub(super) async fn not_stream_handler(
                 .build(),
         ))
         .build();
-    let value = serde_json::to_value(&resp)?;
+    let value = serde_json::to_value(&resp).map_err(ProxyError::DeserializeError)?;
     Ok(Json(value))
 }

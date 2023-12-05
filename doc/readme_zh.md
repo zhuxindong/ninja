@@ -134,9 +134,9 @@ services:
   - 登录: `/auth/token`，表单`option`可选参数，默认为`web`登录，返回`AccessToken`与`Session`；参数为`apple`/`platform`，返回`AccessToken`与`RefreshToken`
   - 刷新 `RefreshToken`: `/auth/refresh_token`
   - 撤销 `RefreshToken`: `/auth/revoke_token`
-  - 刷新 `Session`: `/api/auth/session`，发送名为`__Secure-next-auth.session-token`的Cookie调用刷新`Session`，同时返回新的`AccessToken`
+  - 刷新 `Session`: `/auth/refresh_session`，发送名为`__Secure-next-auth.session-token`的Cookie调用刷新`Session`，同时返回新的`AccessToken`
   
-  `Web登录`默认返回一个名为: `__Secure-next-auth.session-token`的cookie，客户端只需要保存这个cookie，调用`/api/auth/session`也可以刷新`AccessToken`
+  `Web登录`默认返回一个名为: `__Secure-next-auth.session-token`的cookie，客户端只需要保存这个cookie，调用`/auth/refresh_session`也可以刷新`AccessToken`
 
   `RefreshToken`获取的方式，采用`Apple`平台`ChatGPT App`登录方式，原理是使用内置MITM代理。`Apple设备`连上代理即可开启`Apple平台`登录获取`RefreshToken`，仅适用于量小或者个人使用`（量大会封设备，慎用）`，详细使用请看启动参数说明。
 

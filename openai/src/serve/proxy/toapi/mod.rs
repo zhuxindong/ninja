@@ -16,6 +16,7 @@ use crate::chatgpt::model::req::Metadata;
 use crate::chatgpt::model::Role;
 use crate::now_duration;
 use crate::serve::error::ProxyError;
+use crate::serve::ProxyResult;
 use crate::token;
 use crate::{
     arkose::{ArkoseToken, GPTModel},
@@ -146,6 +147,7 @@ pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, Respons
         .send()
         .await
         .map_err(ResponseError::InternalServerError)?;
+
     Ok(ResponseExt::builder()
         .inner(resp)
         .context(
@@ -235,7 +237,7 @@ fn generate_id(length: usize) -> String {
     format!("chatcmpl-{rand_str}")
 }
 
-fn current_timestamp() -> anyhow::Result<i64> {
+fn current_timestamp() -> ProxyResult<i64> {
     let time = now_duration()
         .map_err(ProxyError::SystemTimeBeforeEpoch)?
         .as_secs();

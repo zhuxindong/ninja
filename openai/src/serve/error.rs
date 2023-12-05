@@ -3,6 +3,7 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::response::Response;
 use axum::Json;
+use eventsource_stream::EventStreamError;
 use serde_json::json;
 
 use crate::auth::error::AuthError;
@@ -26,7 +27,7 @@ pub enum ProxyError {
     #[error("Request Content is empty")]
     RequestContentIsEmpty,
     #[error("System time before UNIX EPOCH!: {0}")]
-    SystemTimeBeforeEpoch(#[from] anyhow::Error),
+    SystemTimeBeforeEpoch(anyhow::Error),
     #[error("new filename is empty")]
     NewFilenameIsEmpty,
     #[error("filename is invalid")]
@@ -43,6 +44,10 @@ pub enum ProxyError {
     SessionRequired(&'static str),
     #[error("Missing cf_captcha_response")]
     MissingCfCaptchaResponse,
+    #[error("event-source stream error: {0}")]
+    EventSourceStreamError(EventStreamError<reqwest::Error>),
+    #[error("Deserialize error: {0}")]
+    DeserializeError(serde_json::Error),
 }
 
 // Make our own error that wraps `anyhow::Error`.

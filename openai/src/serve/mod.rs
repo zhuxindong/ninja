@@ -49,6 +49,8 @@ use tracing::Level;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
+type ProxyResult<T> = std::result::Result<T, ProxyError>;
+
 fn print_boot_message(inner: &Args) {
     info!("OS: {}", std::env::consts::OS);
     info!("Arch: {}", std::env::consts::ARCH);
@@ -182,7 +184,7 @@ impl Serve {
                 .route("/auth/token", post(post_access_token))
                 .route("/auth/refresh_token", post(post_refresh_token))
                 .route("/auth/revoke_token", post(post_revoke_token))
-                .route("/api/auth/session", get(get_session)),
+                .route("/auth/refresh_session", get(get_session)),
             &self.0,
         )
         .layer(global_layer);
@@ -274,7 +276,7 @@ impl Serve {
     }
 }
 
-/// GET /api/auth/session
+/// GET /auth/refresh_session
 async fn get_session(jar: CookieJar) -> Result<impl IntoResponse, ResponseError> {
     let session = jar.get(API_AUTH_SESSION_COOKIE_KEY).ok_or_else(|| {
         ResponseError::Unauthorized(ProxyError::SessionRequired(API_AUTH_SESSION_COOKIE_KEY))

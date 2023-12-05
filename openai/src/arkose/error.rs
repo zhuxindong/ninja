@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 #[derive(thiserror::Error, Debug)]
 pub enum ArkoseError {
     #[error("submit funcaptcha answer error {0:?}")]
@@ -16,4 +18,12 @@ pub enum ArkoseError {
     HexDecodeError,
     #[error("unsupported hash algorithm")]
     UnsupportedHashAlgorithm,
+    #[error("Unable to find har related request entry")]
+    HarEntryNotFound,
+    #[error("Invalid HAR file")]
+    InvalidHarFile,
+    #[error("{0:?} not a file")]
+    NotAFile(String),
+    #[error("Failed to get HAR entry error {0:?}")]
+    FailedToGetHarEntry(Arc<anyhow::Error>),
 }

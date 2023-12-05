@@ -1,4 +1,5 @@
 use crate::arkose::crypto;
+use crate::arkose::error::ArkoseError;
 use crate::urldecoding;
 use base64::Engine;
 use moka::sync::Cache;
@@ -37,7 +38,7 @@ pub fn parse_from_slice(s: &[u8]) -> anyhow::Result<RequestEntry> {
 static CACHE_REQUEST_ENTRY: OnceLock<Cache<String, RequestEntry>> = OnceLock::new();
 
 fn get_or_init_cache() -> &'static Cache<String, RequestEntry> {
-    CACHE_REQUEST_ENTRY.get_or_init(|| Cache::new(10000))
+    CACHE_REQUEST_ENTRY.get_or_init(|| Cache::new(u64::MAX))
 }
 
 pub(crate) fn clear_cache(key: &str) {
@@ -50,20 +51,25 @@ pub fn parse_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<RequestEntry> 
     path.as_ref()
         .is_file()
         .then(|| ())
-        .ok_or_else(|| anyhow::anyhow!("{} not a file", path.as_ref().display()))?;
+        .ok_or_else(|| ArkoseError::NotAFile(path.as_ref().display().to_string()))?;
 
+    // Get the cache
     let cache = get_or_init_cache();
 
+    // Get the key from the path
     let key = format!("{}", path.as_ref().display());
-    match cache.get(&key) {
-        Some(entry) => Ok(entry.clone()),
-        None => {
-            let bytes = std::fs::read(path)?;
-            let har = serde_json::from_slice::<Har>(&bytes)?;
-            drop(bytes);
-            let entry = parse(har)?;
-            Ok(cache.get_with(key, || entry))
-        }
+
+    // Try to get the value from the cache
+    let result = cache.try_get_with(key, || {
+        let bytes = std::fs::read(path)?;
+        let har = serde_json::from_slice::<Har>(&bytes)?;
+        drop(bytes);
+        parse(har)
+    });
+
+    match result {
+        Ok(value) => Ok(value),
+        Err(err) => anyhow::bail!(ArkoseError::FailedToGetHarEntry(err)),
     }
 }
 
@@ -76,7 +82,7 @@ fn parse(har: Har) -> anyhow::Result<RequestEntry> {
         .find(|e| e.request.url.contains("fc/gt2/public_key"))
     {
         if entry.started_date_time.is_empty() {
-            anyhow::bail!("Invalid HAR file");
+            anyhow::bail!(ArkoseError::InvalidHarFile);
         }
 
         let started_date_time = time::OffsetDateTime::parse(&entry.started_date_time, &Rfc3339)?;
@@ -130,7 +136,7 @@ fn parse(har: Har) -> anyhow::Result<RequestEntry> {
         }
     }
 
-    anyhow::bail!("Unable to find har related request entry")
+    anyhow::bail!(ArkoseError::HarEntryNotFound)
 }
 
 #[derive(Debug, Deserialize)]

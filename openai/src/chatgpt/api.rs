@@ -53,15 +53,13 @@ pub enum ApiError {
     RequiredParameter(String),
 }
 
-use std::time::Duration;
-
 use reqwest::{impersonate::Impersonate, Proxy, StatusCode};
 use serde::{de::DeserializeOwned, Serialize};
+use std::time::Duration;
 use tokio::sync::RwLock;
 
 use super::model::{req, resp};
-
-use crate::{HEADER_UA, URL_CHATGPT_API};
+use crate::URL_CHATGPT_API;
 
 pub struct ChatGPT {
     api_prefix: String,
@@ -451,8 +449,9 @@ impl ChatGPTBuilder {
 
     pub fn builder() -> ChatGPTBuilder {
         let builder = reqwest::ClientBuilder::new()
-            .user_agent(HEADER_UA)
-            .impersonate(Impersonate::OkHttpAndroid13)
+            .impersonate(Impersonate::OkHttp4_9)
+            .permute_extensions(true)
+            .enable_ech_grease(true)
             .danger_accept_invalid_certs(true)
             .cookie_store(true);
 
