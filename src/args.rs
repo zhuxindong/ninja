@@ -108,8 +108,7 @@ pub struct ServeArgs {
     #[clap(long, default_value = "90")]
     pub(super) pool_idle_timeout: usize,
 
-    /// Client proxy, support multiple proxy, use ',' to separate
-    /// Format: proto|type
+    /// Client proxy, support multiple proxy, use ',' to separate, Format: proto|type
     /// Proto: all/api/auth/arkose, default: all
     /// Type: interface/proxy/ipv6 subnet，proxy type only support: socks5/http/https
     /// Example: all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081
@@ -120,8 +119,11 @@ pub struct ServeArgs {
     #[clap(long, env = "ENABLE_DIRECT")]
     pub(super) enable_direct: bool,
 
-    /// Impersonate User-Agent
-    #[clap(short = 'I',long, env = "IMPERSONATE_UA", value_parser = parse::parse_impersonate_uas)]
+    /// Impersonate User-Agent, separate multiple ones with ","
+    /// Safari: safari12,safari15_3
+    /// OkHttp: safari15_5,okhttp3_9,okhttp3_11,okhttp3_13,okhttp3_14,okhttp4_9,okhttp4_10,okhttp5
+    /// Chrome: chrome99,chrome104,chrome105,chrome106,chrome107,chrome108,chrome109,chrome114,chrome116,chrome118,chrome119
+    #[clap(short = 'I',long, env = "IMPERSONATE_UA", value_parser = parse::parse_impersonate_uas, verbatim_doc_comment)]
     pub(super) impersonate_uas: Option<std::vec::Vec<String>>,
 
     /// Enabled Cookie Store
@@ -244,13 +246,15 @@ pub struct ServeArgs {
     )]
     pub(super) pbind: Option<std::net::SocketAddr>,
 
-    /// Preauth MITM server upstream proxy, Only support http/https/socks5/socks5h protocol
+    /// Preauth MITM server upstream proxy
+    /// Supports: http/https/socks5/socks5h
     #[clap(
         short = 'X',
         long,
         env = "PREAUTH_UPSTREAM",
         value_parser = parse::parse_url,
-        requires = "pbind"
+        requires = "pbind",
+        verbatim_doc_comment
     )]
     pub(super) pupstream: Option<String>,
 
