@@ -103,3 +103,20 @@ pub fn parse_email_whitelist(s: &str) -> anyhow::Result<Vec<String>> {
 
     Ok(emails)
 }
+
+// parse impersonate user-agent
+pub fn parse_impersonate_uas(s: &str) -> anyhow::Result<Vec<String>> {
+    let split = s.split(',');
+    let mut uas: Vec<_> = vec![];
+
+    for ele in split {
+        let ua = ele.trim();
+        if ua.is_empty() {
+            continue;
+        }
+
+        uas.push(ua.to_string());
+    }
+
+    Ok(uas)
+}

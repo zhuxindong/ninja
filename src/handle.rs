@@ -4,7 +4,9 @@ use crate::{
     args::{self, ServeArgs},
     utils::unix::fix_relative_path,
 };
+use clap::CommandFactory;
 use openai::{arkose::funcaptcha::ArkoseSolver, context::args::Args, proxy, serve::Serve};
+use reqwest::impersonate::Impersonate;
 use std::{net::IpAddr, ops::Not, path::PathBuf, str::FromStr};
 use url::Url;
 
@@ -55,7 +57,6 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .timeout(args.timeout)
         .connect_timeout(args.connect_timeout)
         .concurrent_limit(args.concurrent_limit)
-        .random_chrome_ua(args.random_chrome_ua)
         .tls_cert(args.tls_cert)
         .tls_key(args.tls_key)
         .auth_key(args.auth_key)
@@ -86,6 +87,22 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .tb_capacity(args.tb_capacity)
         .tb_fill_rate(args.tb_fill_rate)
         .tb_expired(args.tb_expired);
+
+    if let Some(impersonate_list) = args.impersonate_uas {
+        let mut impersonates: Vec<Impersonate> = Vec::new();
+        for ua in impersonate_list {
+            match Impersonate::from_str(ua.as_str()) {
+                Ok(impersonate) => {
+                    impersonates.push(impersonate);
+                }
+                Err(err) => {
+                    let mut cmd = args::cmd::Opt::command();
+                    cmd.error(clap::error::ErrorKind::ArgumentConflict, err)
+                        .exit();
+                }
+            }
+        }
+    }
 
     Serve::new(builder.build()).run()
 }

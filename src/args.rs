@@ -120,9 +120,9 @@ pub struct ServeArgs {
     #[clap(long, env = "ENABLE_DIRECT")]
     pub(super) enable_direct: bool,
 
-    /// Random Chrome User-Agent
-    #[clap(short = 'R', long, env = "RANDOM_UA")]
-    pub(super) random_chrome_ua: bool,
+    /// Impersonate User-Agent
+    #[clap(short = 'I',long, env = "IMPERSONATE_UA", value_parser = parse::parse_impersonate_uas)]
+    pub(super) impersonate_uas: Option<std::vec::Vec<String>>,
 
     /// Enabled Cookie Store
     #[clap(long, env = "COOKIE_STORE")]
