@@ -445,8 +445,8 @@ const RANDOM_OKHTTP_IMPERSONATE: [Impersonate; 7] = [
     Impersonate::OkHttp5,
 ];
 
-const RANDOM_CHROME_IMPERSONATE: [Impersonate; 9] = [
-    Impersonate::Chrome99Android,
+const RANDOM_CHROME_IMPERSONATE: [Impersonate; 10] = [
+    Impersonate::Chrome99,
     Impersonate::Chrome104,
     Impersonate::Chrome105,
     Impersonate::Chrome106,
@@ -455,6 +455,7 @@ const RANDOM_CHROME_IMPERSONATE: [Impersonate; 9] = [
     Impersonate::Chrome109,
     Impersonate::Chrome114,
     Impersonate::Chrome118,
+    Impersonate::Chrome119,
 ];
 
 /// Randomly select a user agent from a list of known user agents.
@@ -465,11 +466,11 @@ fn random_impersonate(random_chrome: bool) -> Impersonate {
         RANDOM_CHROME_IMPERSONATE
             .into_iter()
             .choose(&mut rand::thread_rng())
-            .unwrap_or(Impersonate::Chrome118)
+            .unwrap_or(Impersonate::Chrome99)
     } else {
         RANDOM_OKHTTP_IMPERSONATE
             .into_iter()
             .choose(&mut rand::thread_rng())
-            .unwrap_or(Impersonate::OkHttp5)
+            .unwrap_or(Impersonate::OkHttp4_9)
     }
 }
