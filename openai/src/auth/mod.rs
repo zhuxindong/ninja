@@ -452,6 +452,24 @@ impl AuthClientBuilder {
         self
     }
 
+    /// Controls the use of certificate validation.
+    pub fn danger_accept_invalid_certs(mut self, enable: bool) -> Self {
+        self.inner = self.inner.danger_accept_invalid_certs(enable);
+        self
+    }
+
+    /// Enable Encrypted Client Hello (Secure SNI)
+    pub fn enable_ech_grease(mut self, enable: bool) -> Self {
+        self.inner = self.inner.enable_ech_grease(enable);
+        self
+    }
+
+    /// Enable TLS permute_extensions
+    pub fn permute_extensions(mut self, enable: bool) -> Self {
+        self.inner = self.inner.permute_extensions(enable);
+        self
+    }
+
     pub fn build(self) -> AuthClient {
         let client = self
             .inner
@@ -493,7 +511,6 @@ impl AuthClientBuilder {
     pub fn builder() -> AuthClientBuilder {
         AuthClientBuilder {
             inner: Client::builder()
-                .danger_accept_invalid_certs(true)
                 .connect_timeout(Duration::from_secs(10))
                 .timeout(Duration::from_secs(30))
                 .redirect(Policy::none()),
