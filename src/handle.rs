@@ -88,23 +88,30 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .tb_fill_rate(args.tb_fill_rate)
         .tb_expired(args.tb_expired);
 
+    // Parse the impersonate user agents
     if let Some(impersonate_list) = args.impersonate_uas {
-        let mut impersonates: Vec<Impersonate> = Vec::new();
+        let mut impersonate_uas: Vec<Impersonate> = Vec::new();
         for ua in impersonate_list {
             match Impersonate::from_str(ua.as_str()) {
                 Ok(impersonate) => {
-                    impersonates.push(impersonate);
+                    impersonate_uas.push(impersonate);
                 }
-                Err(err) => {
+                Err(_) => {
                     let mut cmd = args::cmd::Opt::command();
-                    cmd.error(clap::error::ErrorKind::ArgumentConflict, err)
-                        .exit();
+                    cmd.error(
+                        clap::error::ErrorKind::ArgumentConflict,
+                        &format!("Unsupport impersonate user agent: {}", ua),
+                    )
+                    .exit();
                 }
             }
         }
-    }
 
-    Serve::new(builder.build()).run()
+        let args = builder.impersonate_uas(impersonate_uas).build();
+        Serve::new(args).run()
+    } else {
+        Serve::new(builder.build()).run()
+    }
 }
 
 #[cfg(target_family = "unix")]
