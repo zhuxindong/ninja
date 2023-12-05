@@ -49,6 +49,8 @@ use tracing::Level;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
+type ProxyResult<T> = std::result::Result<T, ProxyError>;
+
 fn print_boot_message(inner: &Args) {
     info!("OS: {}", std::env::consts::OS);
     info!("Arch: {}", std::env::consts::ARCH);

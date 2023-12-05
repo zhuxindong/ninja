@@ -74,23 +74,24 @@ impl std::str::FromStr for Type {
 
 #[derive(PartialEq, Eq, Clone)]
 pub enum GPTModel {
-    Gpt35Model,
+    Gpt35,
     Gpt35Other,
-    Gpt4Model,
+    Gpt4,
+    Gpt4Mobile,
     Gpt4Other,
 }
 
 impl GPTModel {
     pub fn is_gpt3(&self) -> bool {
         match self {
-            GPTModel::Gpt35Model | GPTModel::Gpt35Other => true,
+            GPTModel::Gpt35 | GPTModel::Gpt35Other => true,
             _ => false,
         }
     }
 
     pub fn is_gpt4(&self) -> bool {
         match self {
-            GPTModel::Gpt4Model | GPTModel::Gpt4Other => true,
+            GPTModel::Gpt4 | GPTModel::Gpt4Mobile | GPTModel::Gpt4Other => true,
             _ => false,
         }
     }
@@ -99,8 +100,8 @@ impl GPTModel {
 impl Into<Type> for GPTModel {
     fn into(self) -> Type {
         match self {
-            GPTModel::Gpt35Other | GPTModel::Gpt35Model => Type::GPT3,
-            GPTModel::Gpt4Other | GPTModel::Gpt4Model => Type::GPT4,
+            GPTModel::Gpt35Other | GPTModel::Gpt35 => Type::GPT3,
+            GPTModel::Gpt4Other | GPTModel::Gpt4 | GPTModel::Gpt4Mobile => Type::GPT4,
         }
     }
 }
@@ -110,8 +111,8 @@ impl std::str::FromStr for GPTModel {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
-            "gpt-4" => Ok(GPTModel::Gpt4Model),
-            "gpt-3.5" => Ok(GPTModel::Gpt35Model),
+            "gpt-4" => Ok(GPTModel::Gpt4),
+            "gpt-3.5" => Ok(GPTModel::Gpt35),
             s if s.starts_with("gpt-4") || s.starts_with("gpt4") => Ok(GPTModel::Gpt4Other),
             s if s.starts_with("gpt-3.5") || s.starts_with("text-davinci") => {
                 Ok(GPTModel::Gpt35Other)
