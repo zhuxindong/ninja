@@ -61,8 +61,9 @@ fn print_boot_message(inner: &Args) {
     info!("Connect timeout {} seconds", inner.connect_timeout);
     info!("TCP keepalive: {}", inner.no_keepalive.not());
     info!("Cookie store: {}", inner.cookie_store);
-    info!("File proxy: {}", inner.enable_file_proxy);
     info!("Direct connection: {}", inner.enable_direct);
+    info!("File endpoint: {}", inner.enable_file_proxy);
+    info!("Arkose token endpoint: {}", inner.enable_arkose_proxy);
     info!(
         "ArkoseLabs GPT-3.5 experiment: {}",
         inner.arkose_gpt3_experiment
@@ -160,9 +161,7 @@ impl Serve {
             ));
 
             tower::ServiceBuilder::new()
-                .layer(axum::middleware::from_fn(
-                    middleware::auth::token_middleware,
-                ))
+                .layer(axum::middleware::from_fn(middleware::auth::auth_middleware))
                 .layer(axum::middleware::from_fn_with_state(
                     Arc::new(limit_context),
                     middleware::limit::limit_middleware,

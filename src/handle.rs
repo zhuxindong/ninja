@@ -74,6 +74,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
         .arkose_har_upload_key(args.arkose_har_upload_key)
         .arkose_solver(arkose_solver)
         .enable_file_proxy(args.enable_file_proxy)
+        .enable_arkose_proxy(args.enable_arkose_proxy)
         .pbind(args.pbind)
         .pupstream(args.pupstream)
         .pcert(args.pcert)
