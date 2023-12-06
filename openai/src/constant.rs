@@ -19,6 +19,5 @@ pub(crate) const API_AUTH_SESSION_COOKIE_KEY: &str = "__Secure-next-auth.session
 pub(crate) const PUID: &str = "_puid";
 pub(crate) const CF_CLEARANCE: &str = "cf_clearance";
 pub(crate) const MODEL: &str = "model";
-pub(crate) const SET_COOKIE: &str = "set-cookie";
 pub(crate) const ARKOSE_TOKEN: &str = "arkose_token";
 pub(crate) const NINJA_VERSION: &str = "ninja-version";

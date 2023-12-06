@@ -1,6 +1,6 @@
 use std::time::UNIX_EPOCH;
 
-use crate::constant::{CF_CLEARANCE, NINJA_VERSION, PUID, SET_COOKIE};
+use crate::constant::{CF_CLEARANCE, NINJA_VERSION, PUID};
 use crate::with_context;
 use crate::LIB_VERSION;
 use axum::body::Body;
@@ -35,7 +35,7 @@ pub(crate) async fn response_convert(
         .inner
         .headers()
         .into_iter()
-        .filter(|(k, _)| k.as_str().to_lowercase().ne(SET_COOKIE))
+        .filter(|(k, _)| k.ne(&header::SET_COOKIE) && k.ne(&header::CONTENT_LENGTH))
     {
         builder = builder.header(kv.0, kv.1);
     }
@@ -89,7 +89,7 @@ pub(crate) async fn response_convert(
 
         let json_bytes = serde_json::to_vec(&json)?;
         Ok(builder
-            .body(Body::from(json_bytes))
+            .body(StreamBody::new(Body::from(json_bytes)))
             .map_err(ResponseError::InternalServerError)?
             .into_response())
     } else {
