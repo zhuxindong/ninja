@@ -22,8 +22,8 @@
   GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 deb包，二进制文件，以Ubuntu为例：
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.9.2/ninja-0.9.2-x86_64-unknown-linux-musl.tar.gz
-tar -xf ninja-0.9.2-x86_64-unknown-linux-musl.tar.gz
+wget https://github.com/gngpp/ninja/releases/download/v0.9.3/ninja-0.9.3-x86_64-unknown-linux-musl.tar.gz
+tar -xf ninja-0.9.3-x86_64-unknown-linux-musl.tar.gz
 ./ninja run
 ```
 
@@ -32,11 +32,11 @@ tar -xf ninja-0.9.2-x86_64-unknown-linux-musl.tar.gz
 GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 ipk 文件， 目前提供了 aarch64/x86_64 等架构的版本，下载后使用 opkg 安装，以 nanopi r4s 为例：
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.9.2/ninja_0.9.2_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.9.2/luci-app-ninja_1.1.6-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.9.2/luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.9.3/ninja_0.9.3_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.9.3/luci-app-ninja_1.1.6-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.9.3/luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
 
-opkg install ninja_0.9.2_aarch64_generic.ipk
+opkg install ninja_0.9.3_aarch64_generic.ipk
 opkg install luci-app-ninja_1.1.6-1_all.ipk
 opkg install luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
 ```
