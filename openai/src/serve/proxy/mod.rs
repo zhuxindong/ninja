@@ -33,11 +33,6 @@ pub(crate) fn header_convert(
     h.get("X-Ms-Version")
         .map(|v| headers.insert("X-Ms-Version", v.clone()));
 
-    h.get(header::ACCEPT)
-        .map(|h| headers.insert(header::ACCEPT, h.clone()))
-        .flatten()
-        .or_else(|| headers.insert(header::ACCEPT, header::HeaderValue::from_static("*/*")));
-
     h.get(header::ACCEPT_LANGUAGE)
         .map(|h| headers.insert(header::ACCEPT_LANGUAGE, h.clone()))
         .flatten()

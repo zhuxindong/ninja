@@ -3,6 +3,7 @@ use std::{
     path::PathBuf,
 };
 
+use reqwest::impersonate::Impersonate;
 use typed_builder::TypedBuilder;
 
 use crate::{arkose::funcaptcha::ArkoseSolver, proxy};
@@ -50,8 +51,8 @@ pub struct Args {
     pub(crate) proxies: Vec<proxy::Proxy>,
 
     /// Random Chrome User-Agent
-    #[builder(default = false)]
-    pub(crate) random_chrome_ua: bool,
+    #[builder(setter(into), default)]
+    pub(crate) impersonate_uas: Option<Vec<Impersonate>>,
 
     /// TLS cert
     #[builder(setter(into), default)]
@@ -76,6 +77,10 @@ pub struct Args {
     /// Enable file proxy
     #[builder(setter(into), default = false)]
     pub(crate) enable_file_proxy: bool,
+
+    /// Get arkose token proxy
+    #[builder(default = false)]
+    pub(crate) enable_arkose_proxy: bool,
 
     /// Cloudflare captcha site key
     #[builder(setter(into), default)]

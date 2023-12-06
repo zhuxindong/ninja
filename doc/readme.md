@@ -106,7 +106,7 @@ The platform performs verification code parsing, start the parameter `--arkose-s
 
 Currently OpenAI has updated `Login` which requires verification of `Arkose Token`. The solution is the same as `GPT-4`. Fill in the startup parameters and specify the HAR file `--arkose-auth-har-dir`. To create an API-Key, you need to upload the HAR feature file related to the Platform. The acquisition method is the same as above.
 
-Recently, `OpenAI` has canceled the `Arkose` verification for `GPT-3.5`. It can be used without uploading the HAR feature file (uploaded ones will not be affected). After compatibility, `Arkose` verification may be turned on again, and startup parameters need to be added. `--arkose-gpt3-experiment` enables the `GPT-3.5` model `Arkose` verification processing, and the WebUI is not affected. If you encounter `418 I'm a teapot`, you can enable `--arkose-gpt3-experiment` and upload the `HAR` feature. If there is no `GPT-3.5` feature, you can also use `GPT-4` Used; or enable the parameter `--random-chrome-ua`.
+Recently, `OpenAI` has canceled the `Arkose` verification for `GPT-3.5`. It can be used without uploading the HAR feature file (uploaded ones will not be affected). After compatibility, `Arkose` verification may be turned on again, and startup parameters need to be added. `--arkose-gpt3-experiment` enables the `GPT-3.5` model `Arkose` verification processing, and the WebUI is not affected. If you encounter `418 I'm a teapot`, you can enable `--arkose-gpt3-experiment` and upload the `HAR` feature. If there is no `GPT-3.5` feature, you can also use `GPT-4` Used.
 
 ### Http Server
 
@@ -129,6 +129,10 @@ Recently, `OpenAI` has canceled the `Arkose` verification for `GPT-3.5`. It can 
 - Files-API
   - `/files/*`
   > Image and file upload and download API proxy, the API returned by the `/backend-api/files` interface has been converted to `/files/*`
+
+- Arkose-API
+  - `/arkose_token/:pk`
+  > where pk is the arkose type ID, such as requesting Arkose for GPT4, `/arkose_token/35536E1E-65B4-4D96-9D97-6ADB7EFF8147`
 
 - Authorization
   - Login: `/auth/token`, form `option` optional parameter, default is `web` login, returns `AccessToken` and `Session`; parameter is `apple`/`platform`, returns `AccessToken` and `RefreshToken`
@@ -180,14 +184,15 @@ Recently, `OpenAI` has canceled the `Arkose` verification for `GPT-3.5`. It can 
 - `--visitor-email-whitelist`, whitelist restriction, the restriction is for AccessToken, the parameter is the email address, multiple email addresses are separated by `,`
 - `--random-chrome-ua`, random Chrome User-Agent
 - `--cookie-store`, enable Cookie Store
-- `--cf-site-key`, environment variable `CF_SITE_KEY`, Cloudflare turnstile captcha site key
-- `--cf-secret-key`, environment variable `CF_SECRET_KEY`, Cloudflare turnstile captcha secret key
-- `--auth-key`, environment variable `AUTH_KEY`, login authentication Key, sent with Authorization Bearer Token format
-- `--arkose-endpoint`, environment variable `ARKOSE_ENDPOINT`, ArkoseLabs endpoint, for example: https://client-api.arkoselabs.com
-- `--arkose-solver`, environment variable `ARKOSE_SOLVER`, ArkoseLabs solver platform, for example: yescaptcha
-- `--arkose-solver-key`, environment variable `ARKOSE_SOLVER_KEY`, ArkoseLabs solver client key
-- `--arkose-gpt3-experiment`, environment variable `ARKOSE_GPT3_EXPERIMENT`, to enable GPT-3.5 ArkoseLabs experiment, you need to upload the HAR feature file
-- `--arkose-gpt3-experiment-solver`, environment variable `ARKOSE_GPT3_EXPERIMENT_SOLVER`, to open the GPT-3.5 ArkoseLabs experiment, you need to upload the HAR feature file, and the correctness of the ArkoseToken will be verified
+- `--cf-site-key`, Cloudflare turnstile captcha site key
+- `--cf-secret-key`, Cloudflare turnstile captcha secret key
+- `--auth-key`, login authentication Key, sent with Authorization Bearer Token format
+- `--arkose-endpoint`, ArkoseLabs endpoint, for example: <https://client-api.arkoselabs.com>
+- `--arkose-solver`, ArkoseLabs solver platform, for example: yescaptcha
+- `--arkose-solver-key`, ArkoseLabs solver client key
+- `--arkose-gpt3-experiment`, to enable GPT-3.5 ArkoseLabs experiment, you need to upload the HAR feature file
+- `--arkose-gpt3-experiment-solver`, to open the GPT-3.5 ArkoseLabs experiment, you need to upload the HAR feature file, and the correctness of the ArkoseToken will be verified
+- `--impersonate-uas`, pretending to be a user agent, separate multiple ones with `,`, if not selected, use all random ones, support **Safari**: `safari12,safari15_3`，**OkHttp**: `safari15_5,okhttp3_9,okhttp3_11,okhttp3_13,okhttp3_14,okhttp4_9,okhttp4_10,okhttp5`, **Chrome**: `chrome99,chrome104,chrome105,chrome106,chrome107,chrome108,chrome109,chrome114,chrome116,chrome118,chrome119`
 
 ##### Advanced proxy usage
 
@@ -267,15 +272,17 @@ Options:
       --pool-idle-timeout <POOL_IDLE_TIMEOUT>
           Keep the client alive on an idle socket with an optional timeout set [default: 90]
   -x, --proxies <PROXIES>
-          Client proxy, support multiple proxy, use ',' to separate
-          Format: proto|type
+          Client proxy, support multiple proxy, use ',' to separate, Format: proto|type
           Proto: all/api/auth/arkose, default: all
           Type: interface/proxy/ipv6 subnet，proxy type only support: socks5/http/https
           Example: all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081 [env: PROXIES=]
       --enable-direct
           Enable direct connection [env: ENABLE_DIRECT=]
-  -R, --random-chrome-ua
-          Random Chrome User-Agent [env: RANDOM_UA=]
+  -I, --impersonate-uas <IMPERSONATE_UAS>
+          Impersonate User-Agent, separate multiple ones with ","
+          Safari: safari12,safari15_3
+          OkHttp: safari15_5,okhttp3_9,okhttp3_11,okhttp3_13,okhttp3_14,okhttp4_9,okhttp4_10,okhttp5
+          Chrome: chrome99,chrome104,chrome105,chrome106,chrome107,chrome108,chrome109,chrome114,chrome116,chrome118,chrome119 [env: IMPERSONATE_UA=]
       --cookie-store
           Enabled Cookie Store [env: COOKIE_STORE=]
       --tls-cert <TLS_CERT>
@@ -329,7 +336,8 @@ Options:
   -B, --pbind <PBIND>
           Preauth MITM server bind address [env: PREAUTH_BIND=]
   -X, --pupstream <PUPSTREAM>
-          Preauth MITM server upstream proxy, Only support http/https/socks5/socks5h protocol [env: PREAUTH_UPSTREAM=]
+          Preauth MITM server upstream proxy
+          Supports: http/https/socks5/socks5h [env: PREAUTH_UPSTREAM=]
       --pcert <PCERT>
           Preauth MITM server CA certificate file path [default: ca/cert.crt]
       --pkey <PKEY>

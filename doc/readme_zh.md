@@ -106,7 +106,7 @@ services:
 
 目前OpenAI已经更新`登录`需要验证`Arkose Token`，解决方式同`GPT-4`，填写启动参数指定HAR文件`--arkose-auth-har-dir`。创建API-Key需要上传Platform相关的HAR特征文件，获取方式同上。
 
-近日，`OpenAI`取消对`GPT-3.5`进行`Arkose`验证，可以不上传HAR特征文件使用（已上传的不影响），兼容后续可能会再次开启`Arkose`验证，需要加上启动参数`--arkose-gpt3-experiment`进行开启`GPT-3.5`模型`Arkose`验证处理，WebUI不受影响。如果遇到`418 I'm a teapot`，可以开启`--arkose-gpt3-experiment`，同时需要上传`HAR`特征，如果没有`GPT-3.5`的特征，使用`GPT-4`也是可以使用的；或者开启参数`--random-chrome-ua`。
+近日，`OpenAI`取消对`GPT-3.5`进行`Arkose`验证，可以不上传HAR特征文件使用（已上传的不影响），兼容后续可能会再次开启`Arkose`验证，需要加上启动参数`--arkose-gpt3-experiment`进行开启`GPT-3.5`模型`Arkose`验证处理，WebUI不受影响。如果遇到`418 I'm a teapot`，可以开启`--arkose-gpt3-experiment`，同时需要上传`HAR`特征，如果没有`GPT-3.5`的特征，使用`GPT-4`也是可以使用的。
 
 ### Http 服务
 
@@ -129,6 +129,10 @@ services:
 - Files-API
   - `/files/*`
   > 图片和文件上下传API代理，`/backend-api/files`接口返回的API已经转为`/files/*`
+
+- Arkose-API
+  - `/arkose_token/:pk`
+  > 其中pk为arkose类型的ID，比如请求GPT4的Arkose，`/arkose_token/35536E1E-65B4-4D96-9D97-6ADB7EFF8147`
 
 - Authorization
   - 登录: `/auth/token`，表单`option`可选参数，默认为`web`登录，返回`AccessToken`与`Session`；参数为`apple`/`platform`，返回`AccessToken`与`RefreshToken`
@@ -180,14 +184,15 @@ services:
 - `--visitor-email-whitelist`，白名单限制，限制针对AccessToken，参数为邮箱，多个邮箱用`,`隔开
 - `--random-chrome-ua`，随机Chrome User-Agent
 - `--cookie-store`，开启Cookie Store
-- `--cf-site-key`，环境变量 `CF_SITE_KEY`，Cloudflare turnstile captcha site key
-- `--cf-secret-key`，环境变量 `CF_SECRET_KEY`，Cloudflare turnstile captcha secret key
-- `--auth-key`，环境变量 `AUTH_KEY`，登录认证Key，随Authorization Bearer Token格式发送
-- `--arkose-endpoint`，环境变量 `ARKOSE_ENDPOINT`，ArkoseLabs endpoint，例如: https://client-api.arkoselabs.com
-- `--arkose-solver`，环境变量 `ARKOSE_SOLVER`，ArkoseLabs solver platform，例如: yescaptcha
-- `--arkose-solver-key`，环境变量 `ARKOSE_SOLVER_KEY`，ArkoseLabs solver client key
-- `--arkose-gpt3-experiment`，环境变量 `ARKOSE_GPT3_EXPERIMENT`，开启GPT-3.5 ArkoseLabs实验，需要上传HAR特征文件
-- `--arkose-gpt3-experiment-solver`，环境变量 `ARKOSE_GPT3_EXPERIMENT_SOLVER`，开启GPT-3.5 ArkoseLabs实验，需要上传HAR特征文件，并且会校验ArkoseToken正确性
+- `--cf-site-key`，Cloudflare turnstile captcha site key
+- `--cf-secret-key`，Cloudflare turnstile captcha secret key
+- `--auth-key`，登录认证Key，随Authorization Bearer Token格式发送
+- `--arkose-endpoint`，ArkoseLabs endpoint，例如: <https://client-api.arkoselabs.com>
+- `--arkose-solver`，ArkoseLabs solver platform，例如: yescaptcha
+- `--arkose-solver-key`，ArkoseLabs solver client key
+- `--arkose-gpt3-experiment`，开启GPT-3.5 ArkoseLabs实验，需要上传HAR特征文件
+- `--arkose-gpt3-experiment-solver`，开启GPT-3.5 ArkoseLabs实验，需要上传HAR特征文件，并且会校验ArkoseToken正确性
+- `--impersonate-uas`，冒充用户代理，多个用`,`隔开，不选择则使用全部随机，支持 **Safari**: `safari12,safari15_3`，**OkHttp**: `safari15_5,okhttp3_9,okhttp3_11,okhttp3_13,okhttp3_14,okhttp4_9,okhttp4_10,okhttp5`, **Chrome**: `chrome99,chrome104,chrome105,chrome106,chrome107,chrome108,chrome109,chrome114,chrome116,chrome118,chrome119`，
 
 ##### 代理高阶用法
 
@@ -267,15 +272,17 @@ Options:
       --pool-idle-timeout <POOL_IDLE_TIMEOUT>
           Keep the client alive on an idle socket with an optional timeout set [default: 90]
   -x, --proxies <PROXIES>
-          Client proxy, support multiple proxy, use ',' to separate
-          Format: proto|type
+          Client proxy, support multiple proxy, use ',' to separate, Format: proto|type
           Proto: all/api/auth/arkose, default: all
           Type: interface/proxy/ipv6 subnet，proxy type only support: socks5/http/https
           Example: all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081 [env: PROXIES=]
       --enable-direct
           Enable direct connection [env: ENABLE_DIRECT=]
-  -R, --random-chrome-ua
-          Random Chrome User-Agent [env: RANDOM_UA=]
+  -I, --impersonate-uas <IMPERSONATE_UAS>
+          Impersonate User-Agent, separate multiple ones with ","
+          Safari: safari12,safari15_3
+          OkHttp: safari15_5,okhttp3_9,okhttp3_11,okhttp3_13,okhttp3_14,okhttp4_9,okhttp4_10,okhttp5
+          Chrome: chrome99,chrome104,chrome105,chrome106,chrome107,chrome108,chrome109,chrome114,chrome116,chrome118,chrome119 [env: IMPERSONATE_UA=]
       --cookie-store
           Enabled Cookie Store [env: COOKIE_STORE=]
       --tls-cert <TLS_CERT>
@@ -329,7 +336,8 @@ Options:
   -B, --pbind <PBIND>
           Preauth MITM server bind address [env: PREAUTH_BIND=]
   -X, --pupstream <PUPSTREAM>
-          Preauth MITM server upstream proxy, Only support http/https/socks5/socks5h protocol [env: PREAUTH_UPSTREAM=]
+          Preauth MITM server upstream proxy
+          Supports: http/https/socks5/socks5h [env: PREAUTH_UPSTREAM=]
       --pcert <PCERT>
           Preauth MITM server CA certificate file path [default: ca/cert.crt]
       --pkey <PKEY>

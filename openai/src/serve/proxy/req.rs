@@ -132,7 +132,7 @@ async fn handle_conv_request(req: &mut RequestExt) -> Result<(), ResponseError> 
 
         if condition {
             let arkose_token = arkose::ArkoseToken::new_from_context(model.into()).await?;
-            body.insert(ARKOSE_TOKEN.to_owned(), json!(arkose_token));
+            body.insert(ARKOSE_TOKEN.to_owned(), json!(arkose_token.value()));
             // Updaye Modify bytes
             req.body = Some(Bytes::from(
                 serde_json::to_vec(&json).map_err(ResponseError::BadRequest)?,
@@ -167,7 +167,7 @@ async fn handle_dashboard_request(req: &mut RequestExt) -> Result<(), ResponseEr
     // If arkose_token is not exist, then add it
     if body.get(ARKOSE_TOKEN).is_none() {
         let arkose_token = arkose::ArkoseToken::new_from_context(Type::Platform).await?;
-        body.insert(ARKOSE_TOKEN.to_owned(), json!(arkose_token));
+        body.insert(ARKOSE_TOKEN.to_owned(), json!(arkose_token.value()));
         // Updaye Modify bytes
         req.body = Some(Bytes::from(
             serde_json::to_vec(&json).map_err(ResponseError::BadRequest)?,

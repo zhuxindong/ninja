@@ -4,7 +4,7 @@ use crate::token;
 use axum::http::header;
 use axum::{http::Request, middleware::Next, response::Response};
 
-pub(crate) async fn token_middleware<B>(
+pub(crate) async fn auth_middleware<B>(
     request: Request<B>,
     next: Next<B>,
 ) -> Result<Response, ResponseError> {
