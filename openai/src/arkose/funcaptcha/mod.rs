@@ -3,7 +3,6 @@ pub mod model;
 pub mod solver;
 
 use self::model::{Challenge, ConciseChallenge, FunCaptcha, RequestChallenge};
-
 use super::crypto;
 use crate::arkose::funcaptcha::model::SubmitChallenge;
 use crate::{debug, now_duration, warn, with_context};

@@ -1,9 +1,8 @@
-use std::pin::Pin;
-
 #[cfg(feature = "stream")]
 use crate::eventsource::{Event, EventSource, RequestBuilderExt};
 #[cfg(feature = "stream")]
 use futures::{stream::StreamExt, Stream};
+use std::pin::Pin;
 
 pub type ApiResult<T, E = ApiError> = anyhow::Result<T, E>;
 

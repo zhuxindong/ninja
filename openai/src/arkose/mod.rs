@@ -5,6 +5,7 @@ pub mod har;
 pub mod murmur;
 
 use base64::engine::general_purpose;
+use rand::thread_rng;
 use serde::Serialize;
 use std::path::Path;
 use std::time::SystemTime;
@@ -342,6 +343,31 @@ async fn get_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<ArkoseToken> {
 /// Get ArkoseLabs token from context (Only support ChatGPT, Platform, Auth)
 #[inline]
 async fn get_from_context(typed: Type) -> anyhow::Result<ArkoseToken> {
+    // If enable gpt3 arkoselabs experiment
+    if typed.eq(&Type::GPT3)
+        && with_context!(arkose_gpt3_experiment)
+        && !with_context!(arkose_gpt3_experiment_solver)
+    {
+        use rand::distributions::Alphanumeric;
+
+        let mut rng = thread_rng();
+
+        let before_dot: String = (0..18)
+            .map(|_| rng.sample(Alphanumeric))
+            .map(char::from)
+            .collect();
+
+        let after_dot: String = (0..10)
+            .map(|_| rng.sample(Alphanumeric))
+            .map(char::from)
+            .collect();
+
+        let rid = rng.gen_range(1..=99);
+        // experiment token
+        let fake_token = format!("{before_dot}.{after_dot}|r=us-west-2|meta=3|metabgclr=transparent|metaiconclr=%23757575|guitextcolor=%23000000|pk=35536E1E-65B4-4D96-9D97-6ADB7EFF8147|at=40|sup=1|rid={rid}|ag=101|cdn_url=https%3A%2F%2Ftcr9i.chat.openai.com%2Fcdn%2Ffc|lurl=https%3A%2F%2Faudio-us-west-2.arkoselabs.com|surl=https%3A%2F%2Ftcr9i.chat.openai.com|smurl=https%3A%2F%2Ftcr9i.chat.openai.com%2Fcdn%2Ffc%2Fassets%2Fstyle-manager");
+        return Ok(ArkoseToken::from(fake_token));
+    }
+
     // Get arkose solver
     let arkose_solver = with_context!(arkose_solver);
 
@@ -352,7 +378,7 @@ async fn get_from_context(typed: Type) -> anyhow::Result<ArkoseToken> {
     if let Some(file_path) = hat_path.file_path {
         match ArkoseToken::new_from_har(&file_path).await {
             Ok(arkose_token) => {
-                return valid_arkose_token(arkose_token, arkose_solver, typed).await;
+                return valid_arkose_token(arkose_token, arkose_solver).await;
             }
             Err(err) => {
                 warn!(
@@ -367,7 +393,7 @@ async fn get_from_context(typed: Type) -> anyhow::Result<ArkoseToken> {
     if arkose_solver.is_some() {
         match ArkoseToken::new(typed.clone()).await {
             Ok(arkose_token) => {
-                return valid_arkose_token(arkose_token, arkose_solver, typed).await;
+                return valid_arkose_token(arkose_token, arkose_solver).await;
             }
             Err(err) => {
                 warn!("get arkose token from local bx error: {err}")
@@ -382,7 +408,6 @@ async fn get_from_context(typed: Type) -> anyhow::Result<ArkoseToken> {
 async fn valid_arkose_token(
     arkose_token: ArkoseToken,
     arkose_solver: Option<&'static ArkoseSolver>,
-    typed: Type,
 ) -> anyhow::Result<ArkoseToken>
 where
 {
@@ -393,14 +418,6 @@ where
             arkose_token.value().to_owned(),
         ));
     } else {
-        // If enable gpt3 arkoselabs experiment, use gpt4 token
-        if with_context!(arkose_gpt3_experiment)
-            && !with_context!(arkose_gpt3_experiment_solver)
-            && typed == Type::GPT3
-        {
-            return Ok(arkose_token);
-        }
-
         // If arkose solver is not empty, use solver
         if let Some(arkose_solver) = arkose_solver {
             return submit_captcha(

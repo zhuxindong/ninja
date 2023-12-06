@@ -1,12 +1,10 @@
+use crate::{arkose::funcaptcha::ArkoseSolver, proxy};
+use reqwest::impersonate::Impersonate;
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::PathBuf,
 };
-
-use reqwest::impersonate::Impersonate;
 use typed_builder::TypedBuilder;
-
-use crate::{arkose::funcaptcha::ArkoseSolver, proxy};
 
 #[derive(TypedBuilder, Clone, Default)]
 pub struct Args {

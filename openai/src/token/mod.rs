@@ -40,7 +40,7 @@ struct KeyResult {
     keys: Vec<Keys>,
 }
 
-#[cfg(feature = "remote--token")]
+#[cfg(feature = "remote-token")]
 async fn keys() -> TokenResult<KeyResult> {
     use crate::context::Context;
     use crate::error::AuthError;

@@ -1,11 +1,10 @@
+use crate::{info, with_context};
 use mitm::proxy::hyper::{
     body::Body,
     http::{header, HeaderMap, HeaderValue, Request, Response},
 };
 use mitm::proxy::{handler::HttpHandler, mitm::RequestOrResponse};
 use std::fmt::Write;
-
-use crate::{info, with_context};
 
 #[derive(Clone)]
 pub struct PreAuthHanlder;
