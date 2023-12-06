@@ -5,6 +5,7 @@ pub mod har;
 pub mod murmur;
 
 use base64::engine::general_purpose;
+use serde::Serialize;
 use std::path::Path;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
@@ -15,8 +16,6 @@ use regex::Regex;
 use reqwest::header;
 use reqwest::Method;
 use serde::Deserialize;
-use serde::Serialize;
-use serde::Serializer;
 use tokio::sync::OnceCell;
 
 use crate::arkose::crypto::encrypt;
@@ -123,7 +122,7 @@ impl std::str::FromStr for GPTModel {
 }
 
 /// curl 'https://tcr9i.chat.openai.com/fc/gt2/public_key/35536E1E-65B4-4D96-9D97-6ADB7EFF8147' --data-raw 'public_key=35536E1E-65B4-4D96-9D97-6ADB7EFF8147'
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ArkoseToken {
     token: String,
 }
@@ -139,15 +138,6 @@ impl From<&str> for ArkoseToken {
 impl From<String> for ArkoseToken {
     fn from(value: String) -> Self {
         ArkoseToken { token: value }
-    }
-}
-
-impl Serialize for ArkoseToken {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&self.token)
     }
 }
 
@@ -168,8 +158,8 @@ impl ArkoseToken {
     }
 
     #[inline]
-    pub async fn new(t: Type) -> anyhow::Result<Self> {
-        match t {
+    pub async fn new(typed: Type) -> anyhow::Result<Self> {
+        match typed {
             Type::GPT3 => get_gpt3_from_bx(GPT3_BX).await,
             Type::GPT4 => get_gpt4_from_bx(GPT4_BX).await,
             Type::Auth => get_auth_from_bx(AUTH_BX).await,
@@ -179,8 +169,8 @@ impl ArkoseToken {
 
     /// Get ArkoseLabs token from context (Support ChatGPT, Platform, Auth)
     #[inline]
-    pub async fn new_from_context(t: Type) -> anyhow::Result<Self> {
-        get_from_context(t).await
+    pub async fn new_from_context(typed: Type) -> anyhow::Result<Self> {
+        get_from_context(typed).await
     }
 
     /// Get ArkoseLabs token from HAR file (Support ChatGPT, Platform, Auth)
@@ -351,18 +341,18 @@ async fn get_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<ArkoseToken> {
 
 /// Get ArkoseLabs token from context (Only support ChatGPT, Platform, Auth)
 #[inline]
-async fn get_from_context(t: Type) -> anyhow::Result<ArkoseToken> {
+async fn get_from_context(typed: Type) -> anyhow::Result<ArkoseToken> {
     // Get arkose solver
     let arkose_solver = with_context!(arkose_solver);
 
     // Get HAR path
-    let hat_path = with_context!(arkose_har_path, &t);
+    let hat_path = with_context!(arkose_har_path, &typed);
 
     // If har path is not empty, use har file
     if let Some(file_path) = hat_path.file_path {
         match ArkoseToken::new_from_har(&file_path).await {
             Ok(arkose_token) => {
-                return valid_arkose_token(arkose_token, arkose_solver, t).await;
+                return valid_arkose_token(arkose_token, arkose_solver, typed).await;
             }
             Err(err) => {
                 warn!(
@@ -375,9 +365,9 @@ async fn get_from_context(t: Type) -> anyhow::Result<ArkoseToken> {
 
     // If arkose solver is not empty, use bx
     if arkose_solver.is_some() {
-        match ArkoseToken::new(t.clone()).await {
+        match ArkoseToken::new(typed.clone()).await {
             Ok(arkose_token) => {
-                return valid_arkose_token(arkose_token, arkose_solver, t).await;
+                return valid_arkose_token(arkose_token, arkose_solver, typed).await;
             }
             Err(err) => {
                 warn!("get arkose token from local bx error: {err}")
@@ -392,7 +382,7 @@ async fn get_from_context(t: Type) -> anyhow::Result<ArkoseToken> {
 async fn valid_arkose_token(
     arkose_token: ArkoseToken,
     arkose_solver: Option<&'static ArkoseSolver>,
-    t: Type,
+    typed: Type,
 ) -> anyhow::Result<ArkoseToken>
 where
 {
@@ -406,7 +396,7 @@ where
         // If enable gpt3 arkoselabs experiment, use gpt4 token
         if with_context!(arkose_gpt3_experiment)
             && !with_context!(arkose_gpt3_experiment_solver)
-            && t == Type::GPT3
+            && typed == Type::GPT3
         {
             return Ok(arkose_token);
         }

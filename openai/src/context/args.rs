@@ -78,6 +78,10 @@ pub struct Args {
     #[builder(setter(into), default = false)]
     pub(crate) enable_file_proxy: bool,
 
+    /// Get arkose token proxy
+    #[builder(default = false)]
+    pub(crate) enable_arkose_proxy: bool,
+
     /// Cloudflare captcha site key
     #[builder(setter(into), default)]
     pub(crate) cf_site_key: Option<String>,

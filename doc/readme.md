@@ -130,6 +130,10 @@ Recently, `OpenAI` has canceled the `Arkose` verification for `GPT-3.5`. It can 
   - `/files/*`
   > Image and file upload and download API proxy, the API returned by the `/backend-api/files` interface has been converted to `/files/*`
 
+- Arkose-API
+  - `/arkose_token/:pk`
+  > where pk is the arkose type ID, such as requesting Arkose for GPT4, `/arkose_token/35536E1E-65B4-4D96-9D97-6ADB7EFF8147`
+
 - Authorization
   - Login: `/auth/token`, form `option` optional parameter, default is `web` login, returns `AccessToken` and `Session`; parameter is `apple`/`platform`, returns `AccessToken` and `RefreshToken`
   - Refresh `RefreshToken`: `/auth/refresh_token`

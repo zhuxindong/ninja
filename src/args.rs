@@ -154,9 +154,13 @@ pub struct ServeArgs {
     #[clap(short = 'D', long, env = "DISABLE_WEBUI")]
     pub(super) disable_webui: bool,
 
-    /// Enable file proxy
+    /// Enable file endpoint proxy
     #[clap(short = 'F', long, env = "ENABLE_FILE_PROXY")]
     pub(super) enable_file_proxy: bool,
+
+    /// Enable arkose token endpoint proxy
+    #[clap(short = 'G', long, env = "ENABLE_ARKOSE_PROXY")]
+    pub(super) enable_arkose_proxy: bool,
 
     /// Visitor email whitelist
     #[clap(short = 'W', long, env = "VISITOR_EMAIL_WHITELIST", value_parser = parse::parse_email_whitelist)]

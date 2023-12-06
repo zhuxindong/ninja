@@ -130,6 +130,10 @@ services:
   - `/files/*`
   > 图片和文件上下传API代理，`/backend-api/files`接口返回的API已经转为`/files/*`
 
+- Arkose-API
+  - `/arkose_token/:pk`
+  > 其中pk为arkose类型的ID，比如请求GPT4的Arkose，`/arkose_token/35536E1E-65B4-4D96-9D97-6ADB7EFF8147`
+
 - Authorization
   - 登录: `/auth/token`，表单`option`可选参数，默认为`web`登录，返回`AccessToken`与`Session`；参数为`apple`/`platform`，返回`AccessToken`与`RefreshToken`
   - 刷新 `RefreshToken`: `/auth/refresh_token`
