@@ -3,14 +3,9 @@ use redis::RedisResult;
 use redis_macros::{FromRedisValue, ToRedisArgs};
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
-fn now_timestamp() -> u64 {
-    let now_duration = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards");
-    now_duration.as_secs()
-}
+use crate::now_duration;
 
 #[async_trait::async_trait]
 pub trait TokenBucket: Send + Sync {
@@ -80,7 +75,7 @@ impl TokenBucket for MemTokenBucket {
             return Ok(true);
         }
 
-        let now_timestamp = now_timestamp();
+        let now_timestamp = now_duration()?.as_secs();
 
         let mut bucket = self
             .buckets
@@ -147,7 +142,7 @@ impl TokenBucket for RedisTokenBucket {
             return Ok(true);
         }
         let mut con = self.client.get_async_connection().await?;
-        let now_timestamp = now_timestamp();
+        let now_timestamp = now_duration()?.as_secs();
         let mut bucket: BucketState = con
             .get_ex(ip.to_string(), redis::Expiry::EX(self.expired as usize))
             .await

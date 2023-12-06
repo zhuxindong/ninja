@@ -1,10 +1,9 @@
+use crate::info;
 use axum_server::Handle;
 use std::time::Duration;
 #[cfg(target_family = "unix")]
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::time::sleep;
-
-use crate::info;
 
 pub(super) async fn graceful_shutdown(handle: Handle) {
     #[cfg(target_family = "windows")]

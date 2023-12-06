@@ -1,10 +1,9 @@
+use crate::arkose::error::ArkoseError;
 use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit};
 use anyhow::anyhow;
 use base64::{engine::general_purpose, Engine};
 use rand::random;
 use serde::{Deserialize, Serialize};
-
-use crate::arkose::error::ArkoseError;
 
 /// AES-256-CBC with PKCS#7 padding Decryptor
 type Aes256CbcDec = cbc::Decryptor<aes::Aes256>;
