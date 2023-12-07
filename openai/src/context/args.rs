@@ -48,8 +48,8 @@ pub struct Args {
     #[builder(setter(into), default)]
     pub(crate) proxies: Vec<proxy::Proxy>,
 
-    /// Random Chrome User-Agent
-    #[builder(setter(into), default)]
+    /// Random User-Agent
+    #[builder(setter(into), default = Some(vec![Impersonate::OkHttp4_9]))]
     pub(crate) impersonate_uas: Option<Vec<Impersonate>>,
 
     /// TLS cert

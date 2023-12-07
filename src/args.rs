@@ -120,8 +120,8 @@ pub struct ServeArgs {
     pub(super) enable_direct: bool,
 
     /// Impersonate User-Agent, separate multiple ones with ","
-    /// Safari: safari12,safari15_3
-    /// OkHttp: safari15_5,okhttp3_9,okhttp3_11,okhttp3_13,okhttp3_14,okhttp4_9,okhttp4_10,okhttp5
+    /// Safari: safari12,safari15_3,safari15_5
+    /// OkHttp: okhttp3_9,okhttp3_11,okhttp3_13,okhttp3_14,okhttp4_9,okhttp4_10,okhttp5
     /// Chrome: chrome99,chrome104,chrome105,chrome106,chrome107,chrome108,chrome109,chrome114,chrome116,chrome118,chrome119
     #[clap(short = 'I',long, env = "IMPERSONATE_UA", value_parser = parse::parse_impersonate_uas, verbatim_doc_comment)]
     pub(super) impersonate_uas: Option<std::vec::Vec<String>>,
