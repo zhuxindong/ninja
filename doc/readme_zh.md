@@ -106,7 +106,7 @@ services:
 
 目前OpenAI已经更新`登录`需要验证`Arkose Token`，解决方式同`GPT-4`，填写启动参数指定HAR文件`--arkose-auth-har-dir`。创建API-Key需要上传Platform相关的HAR特征文件，获取方式同上。
 
-近日，`OpenAI`取消对`GPT-3.5`进行`Arkose`验证，可以不上传HAR特征文件使用（已上传的不影响），兼容后续可能会再次开启`Arkose`验证，需要加上启动参数`--arkose-gpt3-experiment`进行开启`GPT-3.5`模型`Arkose`验证处理，WebUI不受影响。如果遇到`418 I'm a teapot`，可以开启`--arkose-gpt3-experiment`，同时需要上传`HAR`特征，如果没有`GPT-3.5`的特征，使用`GPT-4`也是可以使用的。
+`OpenAI`取消对`GPT-3.5`进行`Arkose`验证，可以不上传HAR特征文件使用（已上传的不影响），兼容后续可能会再次开启`Arkose`验证，需要加上启动参数`--arkose-gpt3-experiment`进行开启`GPT-3.5`模型`Arkose`验证处理，WebUI不受影响。如果遇到`418 I'm a teapot`，可以开启`--arkose-gpt3-experiment`，同时需要上传`HAR`特征，如果没有`GPT-3.5`的特征，`GPT-4`的特征也可以使用，如果还不行，则尝试开启`--arkose-gpt3-experiment-solver`，可能会使用第三方平台解决验证码。
 
 ### Http 服务
 
@@ -182,7 +182,6 @@ services:
 - `--proxies`，代理，支持代理池，多个代理使用`,`隔开，格式: protocol://user:pass@ip:port
 - `--no-keepalive` 关闭Http Client Tcp保活
 - `--visitor-email-whitelist`，白名单限制，限制针对AccessToken，参数为邮箱，多个邮箱用`,`隔开
-- `--random-chrome-ua`，随机Chrome User-Agent
 - `--cookie-store`，开启Cookie Store
 - `--cf-site-key`，Cloudflare turnstile captcha site key
 - `--cf-secret-key`，Cloudflare turnstile captcha secret key
@@ -190,7 +189,7 @@ services:
 - `--arkose-endpoint`，ArkoseLabs endpoint，例如: <https://client-api.arkoselabs.com>
 - `--arkose-solver`，ArkoseLabs solver platform，例如: yescaptcha
 - `--arkose-solver-key`，ArkoseLabs solver client key
-- `--arkose-gpt3-experiment`，开启GPT-3.5 ArkoseLabs实验，需要上传HAR特征文件
+- `--arkose-gpt3-experiment`，开启GPT-3.5 ArkoseLabs实验
 - `--arkose-gpt3-experiment-solver`，开启GPT-3.5 ArkoseLabs实验，需要上传HAR特征文件，并且会校验ArkoseToken正确性
 
 ##### 代理高阶用法

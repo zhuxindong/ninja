@@ -106,7 +106,7 @@ The platform performs verification code parsing, start the parameter `--arkose-s
 
 Currently OpenAI has updated `Login` which requires verification of `Arkose Token`. The solution is the same as `GPT-4`. Fill in the startup parameters and specify the HAR file `--arkose-auth-har-dir`. To create an API-Key, you need to upload the HAR feature file related to the Platform. The acquisition method is the same as above.
 
-Recently, `OpenAI` has canceled the `Arkose` verification for `GPT-3.5`. It can be used without uploading the HAR feature file (uploaded ones will not be affected). After compatibility, `Arkose` verification may be turned on again, and startup parameters need to be added. `--arkose-gpt3-experiment` enables the `GPT-3.5` model `Arkose` verification processing, and the WebUI is not affected. If you encounter `418 I'm a teapot`, you can enable `--arkose-gpt3-experiment` and upload the `HAR` feature. If there is no `GPT-3.5` feature, you can also use `GPT-4` Used.
+`OpenAI` cancels `Arkose` verification for `GPT-3.5` and can be used without uploading HAR feature files (uploaded ones will not be affected). After compatibility, `Arkose` verification may be turned on again, and startup parameters need to be added`-- arkose-gpt3-experiment` enables the `GPT-3.5` model `Arkose` verification process, and the WebUI is not affected. If you encounter `418 I'm a teapot`, you can enable `--arkose-gpt3-experiment`, and you need to upload `HAR` features. If there are no `GPT-3.5` features, `GPT-4` features are also required. It can be used. If it still doesn't work, try to enable `--arkose-gpt3-experiment-solver`, which may use a third-party platform to solve the verification code.
 
 ### Http Server
 
@@ -182,7 +182,6 @@ Recently, `OpenAI` has canceled the `Arkose` verification for `GPT-3.5`. It can 
 - `--proxies`, proxy, supports proxy pool, multiple proxies are separated by `,`, format: protocol://user:pass@ip:port
 - `--no-keepalive` turns off Http Client Tcp keepalive
 - `--visitor-email-whitelist`, whitelist restriction, the restriction is for AccessToken, the parameter is the email address, multiple email addresses are separated by `,`
-- `--random-chrome-ua`, random Chrome User-Agent
 - `--cookie-store`, enable Cookie Store
 - `--cf-site-key`, Cloudflare turnstile captcha site key
 - `--cf-secret-key`, Cloudflare turnstile captcha secret key
@@ -190,7 +189,7 @@ Recently, `OpenAI` has canceled the `Arkose` verification for `GPT-3.5`. It can 
 - `--arkose-endpoint`, ArkoseLabs endpoint, for example: <https://client-api.arkoselabs.com>
 - `--arkose-solver`, ArkoseLabs solver platform, for example: yescaptcha
 - `--arkose-solver-key`, ArkoseLabs solver client key
-- `--arkose-gpt3-experiment`, to enable GPT-3.5 ArkoseLabs experiment, you need to upload the HAR feature file
+- `--arkose-gpt3-experiment`, to enable GPT-3.5 ArkoseLabs experiment
 - `--arkose-gpt3-experiment-solver`, to open the GPT-3.5 ArkoseLabs experiment, you need to upload the HAR feature file, and the correctness of the ArkoseToken will be verified
 
 ##### Advanced proxy usage
