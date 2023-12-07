@@ -22,8 +22,8 @@
   GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 deb包，二进制文件，以Ubuntu为例：
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.9.3/ninja-0.9.3-x86_64-unknown-linux-musl.tar.gz
-tar -xf ninja-0.9.3-x86_64-unknown-linux-musl.tar.gz
+wget https://github.com/gngpp/ninja/releases/download/v0.9.4/ninja-0.9.4-x86_64-unknown-linux-musl.tar.gz
+tar -xf ninja-0.9.4-x86_64-unknown-linux-musl.tar.gz
 ./ninja run
 ```
 
@@ -32,11 +32,11 @@ tar -xf ninja-0.9.3-x86_64-unknown-linux-musl.tar.gz
 GitHub [Releases](https://github.com/gngpp/ninja/releases/latest) 中有预编译的 ipk 文件， 目前提供了 aarch64/x86_64 等架构的版本，下载后使用 opkg 安装，以 nanopi r4s 为例：
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.9.3/ninja_0.9.3_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.9.3/luci-app-ninja_1.1.6-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.9.3/luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.9.4/ninja_0.9.4_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.9.4/luci-app-ninja_1.1.6-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.9.4/luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
 
-opkg install ninja_0.9.3_aarch64_generic.ipk
+opkg install ninja_0.9.4_aarch64_generic.ipk
 opkg install luci-app-ninja_1.1.6-1_all.ipk
 opkg install luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
 ```
@@ -192,7 +192,6 @@ services:
 - `--arkose-solver-key`，ArkoseLabs solver client key
 - `--arkose-gpt3-experiment`，开启GPT-3.5 ArkoseLabs实验，需要上传HAR特征文件
 - `--arkose-gpt3-experiment-solver`，开启GPT-3.5 ArkoseLabs实验，需要上传HAR特征文件，并且会校验ArkoseToken正确性
-- `--impersonate-uas`，冒充用户代理，多个用`,`隔开，不选择则使用全部随机，支持 **Safari**: `safari12,safari15_3`，**OkHttp**: `safari15_5,okhttp3_9,okhttp3_11,okhttp3_13,okhttp3_14,okhttp4_9,okhttp4_10,okhttp5`, **Chrome**: `chrome99,chrome104,chrome105,chrome106,chrome107,chrome108,chrome109,chrome114,chrome116,chrome118,chrome119`，
 
 ##### 代理高阶用法
 

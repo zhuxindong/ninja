@@ -10,6 +10,7 @@ enable_direct = false
 cookie_store = true
 disable_webui = false
 enable_file_proxy = false
+enable_arkose_proxy = false
 arkose_gpt3_experiment = false
 arkose_gpt3_experiment_solver = false
 arkose_solver = "yescaptcha"

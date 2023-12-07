@@ -22,8 +22,8 @@ If the project is helpful to you, please consider [donating support](https://git
 Making [Releases](https://github.com/gngpp/ninja/releases/latest) has a precompiled deb package, binaries, in Ubuntu, for example:
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.9.3/ninja-0.9.3-x86_64-unknown-linux-musl.tar.gz
-tar -xf ninja-0.9.3-x86_64-unknown-linux-musl.tar.gz
+wget https://github.com/gngpp/ninja/releases/download/v0.9.4/ninja-0.9.4-x86_64-unknown-linux-musl.tar.gz
+tar -xf ninja-0.9.4-x86_64-unknown-linux-musl.tar.gz
 ./ninja run
 ```
 
@@ -32,11 +32,11 @@ tar -xf ninja-0.9.3-x86_64-unknown-linux-musl.tar.gz
 There are pre-compiled ipk files in GitHub [Releases](https://github.com/gngpp/ninja/releases/latest), which currently provide versions of aarch64/x86_64 and other architectures. After downloading, use opkg to install, and use nanopi r4s as example:
 
 ```shell
-wget https://github.com/gngpp/ninja/releases/download/v0.9.3/ninja_0.9.3_aarch64_generic.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.9.3/luci-app-ninja_1.1.6-1_all.ipk
-wget https://github.com/gngpp/ninja/releases/download/v0.9.3/luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.9.4/ninja_0.9.4_aarch64_generic.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.9.4/luci-app-ninja_1.1.6-1_all.ipk
+wget https://github.com/gngpp/ninja/releases/download/v0.9.4/luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
 
-opkg install ninja_0.9.3_aarch64_generic.ipk
+opkg install ninja_0.9.4_aarch64_generic.ipk
 opkg install luci-app-ninja_1.1.6-1_all.ipk
 opkg install luci-i18n-ninja-zh-cn_1.1.6-1_all.ipk
 ```
@@ -192,7 +192,6 @@ Recently, `OpenAI` has canceled the `Arkose` verification for `GPT-3.5`. It can 
 - `--arkose-solver-key`, ArkoseLabs solver client key
 - `--arkose-gpt3-experiment`, to enable GPT-3.5 ArkoseLabs experiment, you need to upload the HAR feature file
 - `--arkose-gpt3-experiment-solver`, to open the GPT-3.5 ArkoseLabs experiment, you need to upload the HAR feature file, and the correctness of the ArkoseToken will be verified
-- `--impersonate-uas`, pretending to be a user agent, separate multiple ones with `,`, if not selected, use all random ones, support **Safari**: `safari12,safari15_3`，**OkHttp**: `safari15_5,okhttp3_9,okhttp3_11,okhttp3_13,okhttp3_14,okhttp4_9,okhttp4_10,okhttp5`, **Chrome**: `chrome99,chrome104,chrome105,chrome106,chrome107,chrome108,chrome109,chrome114,chrome116,chrome118,chrome119`
 
 ##### Advanced proxy usage
 
