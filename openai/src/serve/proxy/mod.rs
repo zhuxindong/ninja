@@ -3,14 +3,13 @@ pub mod req;
 pub mod resp;
 mod toapi;
 
+use super::error::ResponseError;
 use crate::constant::CF_CLEARANCE;
 use crate::constant::PUID;
 use crate::debug;
 use axum::http::header;
 use axum::http::HeaderMap;
 use axum_extra::extract::CookieJar;
-
-use super::error::ResponseError;
 
 /// Request headers convert
 pub(crate) fn header_convert(

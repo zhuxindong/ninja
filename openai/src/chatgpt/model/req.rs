@@ -1,8 +1,6 @@
+use super::{Author, Role};
 use serde::Serialize;
 use typed_builder::TypedBuilder;
-
-use super::{Author, Role};
-use crate::arkose::ArkoseToken;
 
 #[derive(Serialize, TypedBuilder)]
 pub struct Content<'a> {
@@ -110,7 +108,7 @@ pub struct PostConvoRequest<'a> {
     #[builder(default = vec![])]
     suggestions: Vec<&'a str>,
     #[builder(setter(into), default)]
-    arkose_token: Option<&'a ArkoseToken>,
+    arkose_token: Option<&'a str>,
 }
 
 impl<'a> From<PostNextConvoRequest<'a>> for PostConvoRequest<'a> {
@@ -187,7 +185,7 @@ pub struct PostNextConvoRequest<'a> {
     conversation_id: Option<&'a str>,
 
     #[builder(setter(into), default)]
-    arkose_token: Option<&'a ArkoseToken>,
+    arkose_token: Option<&'a str>,
 }
 
 #[derive(Serialize, TypedBuilder)]
@@ -200,7 +198,7 @@ pub struct PostContinueConvoRequest<'a> {
     conversation_id: &'a str,
 
     #[builder(setter(into), default)]
-    arkose_token: Option<&'a ArkoseToken>,
+    arkose_token: Option<&'a str>,
 }
 
 #[derive(Serialize, TypedBuilder)]
@@ -217,5 +215,5 @@ pub struct PostVaraintConvoRequest<'a> {
     conversation_id: &'a str,
 
     #[builder(setter(into), default)]
-    arkose_token: Option<&'a ArkoseToken>,
+    arkose_token: Option<&'a str>,
 }

@@ -468,13 +468,14 @@ const IMPERSONATE_UAS: [Impersonate; 21] = [
 fn random_impersonate(impersonate_uas: Option<&Vec<Impersonate>>) -> Impersonate {
     use rand::seq::IteratorRandom;
 
+    let mut rng = rand::thread_rng();
     // if user has specified a list of user agents, randomly select one from the list
     if let Some(impersonate_uas) = impersonate_uas {
         if !impersonate_uas.is_empty() {
             return impersonate_uas
                 .iter()
-                .choose(&mut rand::thread_rng())
-                .unwrap()
+                .choose(&mut rng)
+                .unwrap_or(&Impersonate::OkHttp4_9)
                 .clone();
         }
     }
@@ -482,7 +483,7 @@ fn random_impersonate(impersonate_uas: Option<&Vec<Impersonate>>) -> Impersonate
     // otherwise, randomly select one from the default list
     IMPERSONATE_UAS
         .iter()
-        .choose(&mut rand::thread_rng())
+        .choose(&mut rng)
         .unwrap_or(&Impersonate::Chrome119)
         .clone()
 }
