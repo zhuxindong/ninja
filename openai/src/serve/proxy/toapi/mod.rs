@@ -2,7 +2,6 @@ mod model;
 mod stream;
 
 use axum::http::header;
-use axum::http::HeaderValue;
 use axum::http::Method;
 use axum::{
     response::{IntoResponse, Sse},
@@ -36,6 +35,7 @@ use crate::{
 };
 
 use super::ext::{ContextExt, RequestExt, ResponseExt};
+use super::header_convert;
 use crate::URL_CHATGPT_API;
 
 const SUGGESTIONS: [&'static str; 4] = [
@@ -101,7 +101,7 @@ pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, Respons
     let parent_message_id = uuid();
     let req_body = PostConvoRequest::builder()
         .action(Action::Next)
-        .arkose_token(&arkose_token)
+        .arkose_token(arkose_token.as_deref())
         .conversation_mode(ConversationMode {
             kind: "primary_assistant",
         })
@@ -117,23 +117,7 @@ pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, Respons
 
     let mut builder = with_context!(api_client)
         .post(format!("{URL_CHATGPT_API}/backend-api/conversation"))
-        .header(header::ACCEPT, HeaderValue::from_static("*/*"))
-        .header(
-            header::ACCEPT_ENCODING,
-            HeaderValue::from_static("gzip, deflate, br"),
-        )
-        .header(
-            header::ACCEPT_LANGUAGE,
-            HeaderValue::from_static("en-US,en;q=0.9"),
-        )
-        .header(
-            header::UPGRADE_INSECURE_REQUESTS,
-            HeaderValue::from_static("1"),
-        )
-        .header(header::DNT, HeaderValue::from_static("1"))
-        .header(header::ORIGIN, URL_CHATGPT_API)
-        .header(header::REFERER, URL_CHATGPT_API)
-        .bearer_auth(baerer);
+        .headers(header_convert(&req.headers, &req.jar, URL_CHATGPT_API)?);
 
     // Try to get puid from cache
     let puid = get_or_init(baerer, &body.model, cache_id).await?;
@@ -210,7 +194,7 @@ fn handle_error_response(err: reqwest::Error) -> Result<impl IntoResponse, Respo
 }
 
 /// OpenAI API to ChatGPT API model mapper
-async fn model_mapper(model: &str) -> Result<(&str, &str, Option<ArkoseToken>), ResponseError> {
+async fn model_mapper(model: &str) -> Result<(&str, &str, Option<String>), ResponseError> {
     // check model is supported
     let gpt_model = GPTModel::from_str(model)?;
 
@@ -218,7 +202,7 @@ async fn model_mapper(model: &str) -> Result<(&str, &str, Option<ArkoseToken>), 
     let arkose_token =
         if (with_context!(arkose_gpt3_experiment) && gpt_model.is_gpt3()) || gpt_model.is_gpt4() {
             let arkose_token = ArkoseToken::new_from_context(gpt_model.clone().into()).await?;
-            Some(arkose_token)
+            Some(std::convert::Into::<String>::into(arkose_token))
         } else {
             None
         };
