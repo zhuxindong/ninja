@@ -191,6 +191,7 @@ Currently OpenAI has updated `Login` which requires verification of `Arkose Toke
 - `--arkose-solver-key`, ArkoseLabs solver client key
 - `--arkose-gpt3-experiment`, to enable GPT-3.5 ArkoseLabs experiment
 - `--arkose-gpt3-experiment-solver`, to open the GPT-3.5 ArkoseLabs experiment, you need to upload the HAR feature file, and the correctness of the ArkoseToken will be verified
+- `--impersonate-uas`, you can optionally simulate UA randomly. Use `,` to separate multiple ones. Please see the command manual for details.
 
 ##### Advanced proxy usage
 
@@ -278,8 +279,8 @@ Options:
           Enable direct connection [env: ENABLE_DIRECT=]
   -I, --impersonate-uas <IMPERSONATE_UAS>
           Impersonate User-Agent, separate multiple ones with ","
-          Safari: safari12,safari15_3
-          OkHttp: safari15_5,okhttp3_9,okhttp3_11,okhttp3_13,okhttp3_14,okhttp4_9,okhttp4_10,okhttp5
+          Safari: safari12,safari15_3,safari15_5
+          OkHttp: okhttp3_9,okhttp3_11,okhttp3_13,okhttp3_14,okhttp4_9,okhttp4_10,okhttp5
           Chrome: chrome99,chrome104,chrome105,chrome106,chrome107,chrome108,chrome109,chrome114,chrome116,chrome118,chrome119 [env: IMPERSONATE_UA=]
       --cookie-store
           Enabled Cookie Store [env: COOKIE_STORE=]
