@@ -82,7 +82,7 @@ struct Config {
     pool_idle_timeout: u64,
     /// TCP keepalive interval.
     tcp_keepalive: u64,
-    /// Random Chrome User-Agent
+    /// Random User-Agent
     impersonate_uas: Option<Vec<Impersonate>>,
 
     index_for_interfaces: AtomicUsize,
