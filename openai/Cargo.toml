@@ -68,7 +68,7 @@ static-files = { version = "0.2.3", optional = true }
 tracing = { version = "0.1.40", optional = true }
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"], optional = true }
 async-stream = { version = "0.3.5", optional = true }
-axum_csrf = { version = "0.7.2", features = ["layer"], optional = true }
+axum_csrf = { version = "0.8.0", features = ["layer"], optional = true }
 serde_urlencoded = { version = "0.7.1", optional = true }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
