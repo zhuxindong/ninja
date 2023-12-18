@@ -440,7 +440,7 @@ fn get_or_init_dns_resolver(ip_strategy: LookupIpStrategy) -> Arc<dns::TrustDnsR
     })
 }
 
-const IMPERSONATE_UAS: [Impersonate; 21] = [
+const IMPERSONATE_UAS: [Impersonate; 28] = [
     Impersonate::OkHttp3_9,
     Impersonate::OkHttp3_11,
     Impersonate::OkHttp3_13,
@@ -449,6 +449,8 @@ const IMPERSONATE_UAS: [Impersonate; 21] = [
     Impersonate::OkHttp4_10,
     Impersonate::OkHttp5,
     Impersonate::Chrome99,
+    Impersonate::Chrome100,
+    Impersonate::Chrome101,
     Impersonate::Chrome104,
     Impersonate::Chrome105,
     Impersonate::Chrome106,
@@ -457,11 +459,16 @@ const IMPERSONATE_UAS: [Impersonate; 21] = [
     Impersonate::Chrome109,
     Impersonate::Chrome114,
     Impersonate::Chrome116,
+    Impersonate::Chrome117,
     Impersonate::Chrome118,
     Impersonate::Chrome119,
+    Impersonate::Chrome120,
     Impersonate::Safari12,
     Impersonate::Safari15_3,
     Impersonate::Safari15_5,
+    Impersonate::Safari15_6_1,
+    Impersonate::Safari16,
+    Impersonate::Safari16_5,
 ];
 
 /// Randomly select a user agent from a list of known user agents.
