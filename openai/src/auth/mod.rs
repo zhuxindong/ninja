@@ -177,7 +177,6 @@ impl AuthClient {
                 if status_code == StatusCode::BAD_REQUEST {
                     return AuthError::BadRequest(err);
                 }
-
                 if status_code == StatusCode::FORBIDDEN {
                     return AuthError::Forbidden(err);
                 }

@@ -89,7 +89,7 @@ impl Serialize for Session {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct DashSession {
     pub object: String,
     pub user: DashUser,
@@ -118,7 +118,7 @@ impl DashSession {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct DashUser {
     pub object: String,
     pub id: String,
