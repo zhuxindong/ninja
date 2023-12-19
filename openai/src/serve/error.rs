@@ -40,8 +40,6 @@ pub enum ProxyError {
     AccessNotInWhitelist,
     #[error("Auth Key required!")]
     AuthKeyRequired,
-    #[error("Session: {0} required")]
-    SessionRequired(&'static str),
     #[error("Missing cf_captcha_response")]
     MissingCfCaptchaResponse,
     #[error("event-source stream error: {0}")]
