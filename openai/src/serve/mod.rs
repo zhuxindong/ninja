@@ -16,7 +16,7 @@ use axum::headers::Authorization;
 use axum::http::Response;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::routing::{any, get, post};
+use axum::routing::{any, post};
 use axum::Router;
 use axum::{Json, TypedHeader};
 use axum_server::{AddrIncomingConfig, Handle};
@@ -36,7 +36,7 @@ use crate::serve::middleware::tokenbucket::{Strategy, TokenBucketLimitContext};
 use crate::{info, warn, with_context};
 use crate::{URL_CHATGPT_API, URL_PLATFORM_API};
 use axum::http::header;
-use axum_extra::extract::{cookie, CookieJar};
+use axum_extra::extract::cookie;
 use axum_server::tls_rustls::RustlsConfig;
 use axum_server::HttpConfig;
 use std::net::SocketAddr;
@@ -182,7 +182,8 @@ impl Serve {
                 .route("/auth/token", post(post_access_token))
                 .route("/auth/refresh_token", post(post_refresh_token))
                 .route("/auth/revoke_token", post(post_revoke_token))
-                .route("/auth/refresh_session", get(get_session)),
+                .route("/auth/refresh_session", post(post_session))
+                .route("/auth/sess_token", post(post_sess_token)),
             &self.0,
         )
         .layer(global_layer);
@@ -274,25 +275,34 @@ impl Serve {
     }
 }
 
-/// GET /auth/refresh_session
-async fn get_session(jar: CookieJar) -> Result<impl IntoResponse, ResponseError> {
-    let session = jar.get(API_AUTH_SESSION_COOKIE_KEY).ok_or_else(|| {
-        ResponseError::Unauthorized(ProxyError::SessionRequired(API_AUTH_SESSION_COOKIE_KEY))
-    })?;
-
+/// POST /auth/refresh_session
+async fn post_session(
+    TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
+) -> Result<impl IntoResponse, ResponseError> {
     let session_token = with_context!(auth_client)
-        .do_session(session.value())
+        .do_session(bearer.token())
         .await
         .map_err(ResponseError::BadRequest)?;
 
     match session_token {
         AccessToken::Session(session_token) => {
             let resp: Response<Body> = session_token.try_into()?;
-            Ok(resp.into_response())
+            Ok(resp)
         }
-        _ => Err(ResponseError::InternalServerError(
-            ProxyError::SessionNotFound,
-        )),
+        _ => Err(ResponseError::BadRequest(ProxyError::SessionNotFound)),
+    }
+}
+
+/// GET /auth/sess_token
+async fn post_sess_token(
+    TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
+) -> Result<impl IntoResponse, ResponseError> {
+    match with_context!(auth_client)
+        .do_dashboard_login(bearer.token())
+        .await
+    {
+        Ok(dash_session) => Ok(Json(dash_session)),
+        Err(err) => Err(ResponseError::BadRequest(err)),
     }
 }
 
@@ -348,7 +358,7 @@ async fn post_revoke_token(
 }
 
 /// match path /dashboard/{tail.*}
-/// POST https://api.openai.com/dashboard/onboarding/login"
+/// POST https://api.openai.com/dashboard/onboarding/login
 /// POST https://api.openai.com/dashboard/user/api_keys
 /// GET https://api.openai.com/dashboard/user/api_keys
 /// POST https://api.openai.com/dashboard/billing/usage

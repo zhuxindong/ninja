@@ -135,10 +135,12 @@ Currently OpenAI has updated `Login` which requires verification of `Arkose Toke
   > where pk is the arkose type ID, such as requesting Arkose for GPT4, `/arkose_token/35536E1E-65B4-4D96-9D97-6ADB7EFF8147`
 
 - Authorization
-  - Login: `/auth/token`, form `option` optional parameter, default is `web` login, returns `AccessToken` and `Session`; parameter is `apple`/`platform`, returns `AccessToken` and `RefreshToken`
-  - Refresh `RefreshToken`: `/auth/refresh_token`
-  - Revoke `RefreshToken`: `/auth/revoke_token`
-  - Refresh `Session`: `/auth/refresh_session`, send a cookie named `__Secure-next-auth.session-token` to call refresh `Session`, and return a new `AccessToken`
+  > Except for login, use `Authorization: Bearer xxxx`
+  - Login: `POST /auth/token`, form `option` optional parameter, default is `web` login, returns `AccessToken` and `Session`; parameter is `apple`/`platform`, returns `AccessToken` and `RefreshToken`
+  - Refresh `RefreshToken`: `POST /auth/refresh_token`
+  - Revoke `RefreshToken`: `POST /auth/revoke_token`
+  - Refresh `Session`: `POST /auth/refresh_session`
+  - Get `Sess token`: `POST /auth/sess_token`
   
   `Web login`, a cookie named: `__Secure-next-auth.session-token` is returned by default. The client only needs to save this cookie. Calling `/auth/refresh_session` can also refresh `AccessToken`
 
