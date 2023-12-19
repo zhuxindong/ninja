@@ -4,6 +4,7 @@ pub mod solver;
 
 use self::model::{Challenge, ConciseChallenge, FunCaptcha, RequestChallenge};
 use super::crypto;
+use crate::arkose::error::ArkoseError;
 use crate::arkose::funcaptcha::model::SubmitChallenge;
 use crate::{debug, now_duration, warn, with_context};
 use anyhow::{bail, Context};
@@ -102,7 +103,7 @@ pub async fn callback(client: reqwest::Client, arkose_token: String) -> anyhow::
 
     let resp = client
         .get(format!(
-            "https://client-api.arkoselabs.com/fc/a/?{callback_query}"
+            "https://tcr9i.chat.openai.com/fc/a?{callback_query}"
         ))
         .timeout(std::time::Duration::from_secs(5))
         .send()
@@ -135,7 +136,7 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
         .unwrap_or_default();
 
     let mut headers = header::HeaderMap::new();
-    headers.insert(header::REFERER, format!("https://client-api.arkoselabs.com/fc/assets/ec-game-core/game-core/2.2.2/standard/index.html?session={}", arkose_token.replace("|", "&")).parse()?);
+    headers.insert(header::REFERER, format!("https://tcr9i.chat.openai.com/fc/assets/ec-game-core/game-core/1.15.0/standard/index.html?session={}", arkose_token.replace("|", "&")).parse()?);
     headers.insert(header::DNT, header::HeaderValue::from_static("1"));
 
     let mut session = Session {
@@ -208,7 +209,7 @@ impl Session {
 
         let resp = self
             .client
-            .post("https://client-api.arkoselabs.com/fc/gfct/")
+            .post("https://openai-api.arkoselabs.com/fc/gfct/")
             .form(&challenge_request)
             .headers(headers)
             .send()
@@ -216,7 +217,7 @@ impl Session {
 
         if !resp.status().is_success() {
             anyhow::bail!(
-                "[https://client-api.arkoselabs.com/fc/gfct/] status code: {}",
+                "[https://openai-api.arkoselabs.com/fc/gfct/] status code: {}",
                 resp.status().as_u16()
             )
         }
@@ -311,7 +312,7 @@ impl Session {
 
         let resp = self
             .client
-            .post("https://client-api.arkoselabs.com/fc/ca/")
+            .post("https://tcr9i.chat.openai.com/fc/ca/")
             .headers(self.headers)
             .form(&submit)
             .send()
@@ -329,18 +330,20 @@ impl Session {
 
         match resp.error_for_status() {
             Ok(resp) => {
-                let resp = resp.json::<Response>().await?;
+                let resp = resp
+                    .json::<Response>()
+                    .await
+                    .map_err(ArkoseError::DeserializeError)?;
 
                 if let Some(error) = resp.error {
-                    anyhow::bail!("funcaptcha submit error {error}")
+                    anyhow::bail!(ArkoseError::FuncaptchaSubmitError(error))
                 }
 
                 if !resp.solved {
                     warn!("funcaptcha not solved: {:#?}", self.challenge);
-                    anyhow::bail!(
-                        "incorrect guess {}",
+                    anyhow::bail!(ArkoseError::FuncaptchaNotSolvedError(
                         resp.incorrect_guess.unwrap_or_default()
-                    )
+                    ))
                 }
 
                 tokio::spawn(async move {

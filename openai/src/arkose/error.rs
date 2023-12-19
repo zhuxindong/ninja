@@ -26,4 +26,10 @@ pub enum ArkoseError {
     NotAFile(String),
     #[error("Failed to get HAR entry error {0:?}")]
     FailedToGetHarEntry(Arc<anyhow::Error>),
+    #[error("Deserialize error {0:?}")]
+    DeserializeError(#[from] reqwest::Error),
+    #[error("Funcaptcha submit error: {0:?}")]
+    FuncaptchaSubmitError(String),
+    #[error("Funcaptcha not solved error: {0:?}")]
+    FuncaptchaNotSolvedError(String),
 }
