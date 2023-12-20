@@ -1,22 +1,15 @@
 use openai::{
     arkose::ArkoseToken,
     context::{self, args::Args},
-    proxy,
 };
 
 #[tokio::main]
 async fn main() {
-    let args = Args::builder()
-        .proxies(vec![proxy::Proxy::try_from((
-            "all",
-            "http://127.0.0.1:8100",
-        ))
-        .unwrap()])
-        .build();
+    let args = Args::builder().build();
     context::init(args);
     for _ in 0..100 {
         match ArkoseToken::new_from_har(
-            "/Users/gngpp/VSCode/ninja/har/auth0.openai.com_Archive.har",
+            "/Users/gngpp/PycharmProjects/arkose-generator/har_pool/0A1D34FC-659D-4E23-B17B-694DCFCF6A6C/ua_9ccf5392af6a2715a08456f19ebf3de9.har",
         )
         .await
         {

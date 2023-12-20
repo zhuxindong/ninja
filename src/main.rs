@@ -8,7 +8,7 @@ pub mod inter;
 pub mod store;
 
 mod args;
-mod handle;
+mod daemon;
 mod parse;
 mod update;
 mod utils;
@@ -19,21 +19,21 @@ fn main() -> anyhow::Result<()> {
     #[cfg(all(feature = "serve", not(feature = "terminal")))]
     if let Some(command) = opt.command {
         match command {
-            args::ServeSubcommand::Run(args) => handle::serve(args, false)?,
+            args::ServeSubcommand::Run(args) => daemon::serve(args, false)?,
             #[cfg(target_family = "unix")]
-            args::ServeSubcommand::Stop => handle::serve_stop()?,
+            args::ServeSubcommand::Stop => daemon::serve_stop()?,
             #[cfg(target_family = "unix")]
-            args::ServeSubcommand::Start(args) => handle::serve_start(args)?,
+            args::ServeSubcommand::Start(args) => daemon::serve_start(args)?,
             #[cfg(target_family = "unix")]
-            args::ServeSubcommand::Restart(args) => handle::serve_restart(args)?,
+            args::ServeSubcommand::Restart(args) => daemon::serve_restart(args)?,
             #[cfg(target_family = "unix")]
-            args::ServeSubcommand::Status => handle::serve_status()?,
+            args::ServeSubcommand::Status => daemon::serve_status()?,
             #[cfg(target_family = "unix")]
-            args::ServeSubcommand::Log => handle::serve_log()?,
+            args::ServeSubcommand::Log => daemon::serve_log()?,
             args::ServeSubcommand::Genca => {
                 let _ = mitm::cagen::gen_ca();
             }
-            args::ServeSubcommand::GT { out } => handle::generate_template(out)?,
+            args::ServeSubcommand::GT { out } => daemon::generate_template(out)?,
             args::ServeSubcommand::Update => update::update()?,
         }
     }
@@ -43,21 +43,21 @@ fn main() -> anyhow::Result<()> {
         use args::cmd::SubCommands;
         match command {
             SubCommands::Serve(commands) => match commands {
-                args::ServeSubcommand::Run(args) => handle::serve(args, true)?,
+                args::ServeSubcommand::Run(args) => daemon::serve(args, true)?,
                 #[cfg(target_family = "unix")]
-                args::ServeSubcommand::Stop => handle::serve_stop()?,
+                args::ServeSubcommand::Stop => daemon::serve_stop()?,
                 #[cfg(target_family = "unix")]
-                args::ServeSubcommand::Start(args) => handle::serve_start(args)?,
+                args::ServeSubcommand::Start(args) => daemon::serve_start(args)?,
                 #[cfg(target_family = "unix")]
-                args::ServeSubcommand::Restart(args) => handle::serve_restart(args)?,
+                args::ServeSubcommand::Restart(args) => daemon::serve_restart(args)?,
                 #[cfg(target_family = "unix")]
-                args::ServeSubcommand::Status => handle::serve_status()?,
+                args::ServeSubcommand::Status => daemon::serve_status()?,
                 #[cfg(target_family = "unix")]
-                args::ServeSubcommand::Log => handle::serve_log()?,
+                args::ServeSubcommand::Log => daemon::serve_log()?,
                 args::ServeSubcommand::Genca => {
                     let _ = openai::serve::preauth::cagen::gen_ca();
                 }
-                args::ServeSubcommand::GT { out } => handle::generate_template(out)?,
+                args::ServeSubcommand::GT { out } => daemon::generate_template(out)?,
                 args::ServeSubcommand::Update => update::update()?,
             },
             SubCommands::Terminal => {

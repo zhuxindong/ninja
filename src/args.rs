@@ -130,6 +130,10 @@ pub struct ServeArgs {
     #[clap(long, env = "COOKIE_STORE")]
     pub(super) cookie_store: bool,
 
+    /// Use fastest DNS resolver
+    #[clap(long, env = "FASTEST_DNS")]
+    pub(super) fastest_dns: bool,
+
     /// TLS certificate file path
     #[clap(long, env = "TLS_CERT", requires = "tls_key")]
     pub(super) tls_cert: Option<PathBuf>,
