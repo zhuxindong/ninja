@@ -93,14 +93,19 @@ pub async fn load_fastest_dns(enabled: bool) -> anyhow::Result<()> {
         .ok_or_else(|| anyhow::anyhow!("No fastest dns"))?;
 
     // '\n*' split fastest_dns_group
-    let fastest_dns_group = conf
+    let mut fastest_dns_group = conf
         .name_servers()
         .iter()
         .map(|ns| ns.socket_addr.to_string())
-        .collect::<Vec<_>>()
-        .join("\n* ");
+        .collect::<Vec<_>>();
 
-    tracing::info!("Fastest DNS group ({elapsed:?}):\n* {fastest_dns_group}");
+    // this removes all duplicates
+    fastest_dns_group.dedup();
+
+    tracing::info!(
+        "Fastest DNS group ({elapsed:?}):\n* {}",
+        fastest_dns_group.join("\n* ")
+    );
 
     // Set fastest dns group
     FASTEST_DNS_CONFIG
