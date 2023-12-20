@@ -347,37 +347,37 @@ async fn get_session(extract: SessionExtractor) -> Result<Response<Body>, Respon
     }
 
     // Refresh session
-    if extract.session.expires - current_timestamp <= 21600 {
-        let ctx = with_context!();
-        let new_session = if let Some(c) = extract.session_token {
-            match ctx.auth_client().do_session(&c).await {
-                Ok(access_token) => {
-                    let authentication_token = Token::try_from(access_token)?;
-                    Some(Session::from(authentication_token))
-                }
-                Err(err) => {
-                    debug!("Get session token error: {}", err);
-                    None
-                }
+    let new_session = if let Some(c) = extract.session_token {
+        match with_context!(auth_client).do_session(&c).await {
+            Ok(access_token) => {
+                let authentication_token = Token::try_from(access_token)?;
+                Some(Session::from(authentication_token))
             }
-        } else if let Some(refresh_token) = extract.session.refresh_token.as_ref() {
-            match ctx.auth_client().do_refresh_token(&refresh_token).await {
-                Ok(new_refresh_token) => {
-                    let authentication_token = Token::try_from(new_refresh_token)?;
-                    Some(Session::from(authentication_token))
-                }
-                Err(err) => {
-                    debug!("Refresh token error: {}", err);
-                    None
-                }
+            Err(err) => {
+                debug!("Get session token error: {}", err);
+                None
             }
-        } else {
-            None
-        };
-
-        if let Some(new_session) = new_session {
-            return create_response_from_session(&new_session);
         }
+    } else if let Some(refresh_token) = extract.session.refresh_token.as_ref() {
+        match with_context!(auth_client)
+            .do_refresh_token(&refresh_token)
+            .await
+        {
+            Ok(new_refresh_token) => {
+                let authentication_token = Token::try_from(new_refresh_token)?;
+                Some(Session::from(authentication_token))
+            }
+            Err(err) => {
+                debug!("Refresh token error: {}", err);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    if let Some(new_session) = new_session {
+        return create_response_from_session(&new_session);
     }
 
     create_response_from_session(&extract.session)
