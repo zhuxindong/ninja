@@ -183,6 +183,7 @@ Currently OpenAI has updated `Login` which requires verification of `Arkose Toke
 - `--enable-direct`, enable direct connection, add the IP bound to the `interface` export to the proxy pool
 - `--proxies`, proxy, supports proxy pool, multiple proxies are separated by `,`, format: protocol://user:pass@ip:port
 - `--no-keepalive` turns off Http Client Tcp keepalive
+- `--fastest-dns` Use the built-in fastest DNS group
 - `--visitor-email-whitelist`, whitelist restriction, the restriction is for AccessToken, the parameter is the email address, multiple email addresses are separated by `,`
 - `--cookie-store`, enable Cookie Store
 - `--cf-site-key`, Cloudflare turnstile captcha site key
@@ -286,6 +287,8 @@ Options:
           Chrome: chrome99,chrome100,chrome101,chrome104,chrome105,chrome106,chrome107,chrome108,chrome109,chrome114,chrome116,chrome117,chrome118,chrome119,chrome120 [env: IMPERSONATE_UA=]
       --cookie-store
           Enabled Cookie Store [env: COOKIE_STORE=]
+      --fastest-dns
+          Use fastest DNS resolver [env: FASTEST_DNS=]
       --tls-cert <TLS_CERT>
           TLS certificate file path [env: TLS_CERT=]
       --tls-key <TLS_KEY>
@@ -299,7 +302,9 @@ Options:
   -D, --disable-webui
           Disable WebUI [env: DISABLE_WEBUI=]
   -F, --enable-file-proxy
-          Enable file proxy [env: ENABLE_FILE_PROXY=]
+          Enable file endpoint proxy [env: ENABLE_FILE_PROXY=]
+  -G, --enable-arkose-proxy
+          Enable arkose token endpoint proxy [env: ENABLE_ARKOSE_PROXY=]
   -W, --visitor-email-whitelist <VISITOR_EMAIL_WHITELIST>
           Visitor email whitelist [env: VISITOR_EMAIL_WHITELIST=]
       --arkose-endpoint <ARKOSE_ENDPOINT>
