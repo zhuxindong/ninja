@@ -73,8 +73,9 @@ pub async fn load_fastest_dns(enabled: bool) -> anyhow::Result<()> {
         let task = async move {
             let start = Instant::now();
             let ips = resolver.lookup_ip("chat.openai.com").await?;
-            let _ = ips.iter().collect::<Vec<_>>();
             let elapsed = start.elapsed();
+            let ips = ips.iter().collect::<Vec<_>>();
+            tracing::debug!("Fastest DNS resovler: {ips:?} ({elapsed:?})");
             Ok((elapsed, config))
         };
         tasks.push(task);
