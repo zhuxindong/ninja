@@ -29,6 +29,7 @@ use crate::auth::provide::AuthProvider;
 use crate::constant::API_AUTH_SESSION_COOKIE_KEY;
 use crate::context;
 use crate::context::args::Args;
+use crate::dns;
 use crate::proxy::{InnerProxy, Proxy};
 use crate::serve::error::ProxyError;
 use crate::serve::error::ResponseError;
@@ -121,6 +122,9 @@ impl Serve {
 
         // init context
         context::init(self.0.clone());
+
+        // fast dns test
+        dns::fast::load_fastest_dns(self.0.fastest_dns).await?;
 
         // init global layer provider
         let global_layer = tower::ServiceBuilder::new()

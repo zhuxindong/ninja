@@ -72,6 +72,8 @@ impl LookupIpStrategyExt {
 static DNS_RESOLVER: OnceLock<Cache<LookupIpStrategyExt, Arc<TrustDnsResolver>>> = OnceLock::new();
 
 struct Config {
+    /// Use fastest DNS resolver
+    fastest_dns: bool,
     /// Enable cookie store.
     cookie_store: bool,
     /// Timeout for each request.
@@ -190,6 +192,7 @@ impl ClientRoundRobinBalancer {
 
         // init config
         let config = Config {
+            fastest_dns: args.fastest_dns,
             cookie_store: args.cookie_store,
             timeout: args.timeout as u64,
             connect_timeout: args.connect_timeout as u64,
@@ -346,7 +349,7 @@ fn build_client(
     };
 
     // init dns resolver
-    let trust_dns_resolver = get_or_init_dns_resolver(ip_s);
+    let trust_dns_resolver = get_or_init_dns_resolver(ip_s, config.fastest_dns);
 
     builder
         .impersonate(random_impersonate(config.impersonate_uas.as_ref()))
@@ -398,7 +401,7 @@ fn build_auth_client(
     };
 
     // init dns resolver
-    let trust_dns_resolver = get_or_init_dns_resolver(ip_s);
+    let trust_dns_resolver = get_or_init_dns_resolver(ip_s, config.fastest_dns);
 
     builder
         .impersonate(random_impersonate(config.impersonate_uas.as_ref()))
@@ -427,7 +430,10 @@ fn get_next_index(len: usize, counter: &AtomicUsize) -> usize {
 }
 
 /// Create a DNS resolver
-fn get_or_init_dns_resolver(ip_strategy: LookupIpStrategy) -> Arc<dns::TrustDnsResolver> {
+fn get_or_init_dns_resolver(
+    ip_strategy: LookupIpStrategy,
+    fatest_dns: bool,
+) -> Arc<dns::TrustDnsResolver> {
     // maybe DNS_RESOLVER is not initialized
     let cache = DNS_RESOLVER.get_or_init(|| {
         let cache: Cache<LookupIpStrategyExt, Arc<TrustDnsResolver>> =
@@ -436,7 +442,7 @@ fn get_or_init_dns_resolver(ip_strategy: LookupIpStrategy) -> Arc<dns::TrustDnsR
     });
     // init dns resolver cache
     cache.get_with(LookupIpStrategyExt::from_strategy(ip_strategy), || {
-        Arc::new(dns::TrustDnsResolver::new(ip_strategy))
+        Arc::new(dns::TrustDnsResolver::new(ip_strategy, fatest_dns))
     })
 }
 

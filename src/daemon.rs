@@ -48,6 +48,7 @@ pub(super) fn serve(mut args: ServeArgs, relative_path: bool) -> anyhow::Result<
 
     let builder = Args::builder()
         .bind(args.bind)
+        .fastest_dns(args.fastest_dns)
         .proxies(args.proxies.unwrap_or_default())
         .enable_direct(args.enable_direct)
         .cookie_store(args.cookie_store)

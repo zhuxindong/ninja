@@ -20,6 +20,10 @@ pub struct Args {
     #[builder(default = false)]
     pub(crate) cookie_store: bool,
 
+    /// Use fastest DNS resolver
+    #[builder(default = false)]
+    pub(crate) fastest_dns: bool,
+
     /// Server/Client TCP keepalive (second)
     #[builder(setter(into), default = 75)]
     pub(crate) tcp_keepalive: usize,
