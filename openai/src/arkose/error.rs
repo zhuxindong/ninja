@@ -32,4 +32,8 @@ pub enum ArkoseError {
     FuncaptchaSubmitError(String),
     #[error("Funcaptcha not solved error ({0})")]
     FuncaptchaNotSolvedError(String),
+    #[error("Unknown game type ({0})")]
+    UnknownGameType(u32),
+    #[error("Invalid arkose token ({0})")]
+    InvalidArkoseToken(String),
 }

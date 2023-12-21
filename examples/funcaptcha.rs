@@ -1,6 +1,6 @@
 use openai::arkose;
+use openai::arkose::funcaptcha::solver::Solver;
 use openai::arkose::funcaptcha::solver::SubmitSolver;
-use openai::arkose::funcaptcha::Solver;
 use openai::arkose::{
     funcaptcha::{self, start_challenge},
     ArkoseToken,
@@ -58,7 +58,7 @@ async fn parse(
     let token = arkose_token.value();
     println!("arkose_token: {:?}", token);
     if !arkose_token.success() {
-        match start_challenge(token).await {
+        match start_challenge(&arkose_token).await {
             Ok(session) => {
                 if let Some(funs) = session.funcaptcha() {
                     let mut rx = match solver {
@@ -159,7 +159,5 @@ async fn parse(
             }
         }
     }
-
-    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     Ok(())
 }

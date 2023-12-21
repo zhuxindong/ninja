@@ -186,7 +186,7 @@ impl Serve {
                 .route("/auth/token", post(post_access_token))
                 .route("/auth/refresh_token", post(post_refresh_token))
                 .route("/auth/revoke_token", post(post_revoke_token))
-                .route("/auth/refresh_session", post(post_session))
+                .route("/auth/refresh_session", post(post_refresh_session))
                 .route("/auth/sess_token", post(post_sess_token)),
             &self.0,
         )
@@ -280,7 +280,7 @@ impl Serve {
 }
 
 /// POST /auth/refresh_session
-async fn post_session(
+async fn post_refresh_session(
     TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
 ) -> Result<impl IntoResponse, ResponseError> {
     let session_token = with_context!(auth_client)

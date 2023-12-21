@@ -1,6 +1,6 @@
 use crate::parse;
 use clap::{Args, Subcommand};
-use openai::{arkose::funcaptcha::Solver, proxy};
+use openai::{arkose::funcaptcha::solver::Solver, proxy};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 

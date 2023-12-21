@@ -1,4 +1,4 @@
-use crate::{arkose::funcaptcha::ArkoseSolver, proxy};
+use crate::{arkose::funcaptcha::solver::ArkoseSolver, proxy};
 use reqwest::impersonate::Impersonate;
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
