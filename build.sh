@@ -70,7 +70,8 @@ build_linux_target() {
         -v $HOME/.cargo/registry:/root/.cargo/registry \
         -v $HOME/.cargo/git:/root/.cargo/git \
         -e "FEATURES=$features" \
-        $docker_image /bin/bash -c "cargo build --release \$FEATURES"
+        -e "TARGET=$1" \
+        $docker_image /bin/bash -c "cargo build --release --target \$TARGET  \$FEATURES"
 
     sudo chmod -R 777 target
     upx --best --lzma target/$1/release/ninja
