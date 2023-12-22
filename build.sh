@@ -28,7 +28,7 @@ docker_images=("ghcr.io/gngpp/rust-musl-cross:x86_64-musl" "ghcr.io/gngpp/rust-m
 get_docker_image() {
     local target_arch="$1"
     local index
-    for ((index=0; index<${#target_architectures[@]}; ++index)); do
+    for ((index = 0; index < ${#target_architectures[@]}; ++index)); do
         if [ "${target_architectures[index]}" == "$target_arch" ]; then
             echo "${docker_images[index]}"
             return 0
@@ -60,7 +60,11 @@ build_linux_target() {
     if [ "$1" = "armv5te-unknown-linux-musleabi" ] || [ "$1" = "arm-unknown-linux-musleabi" ] || [ "$1" = "arm-unknown-linux-musleabihf" ]; then
         features="--features rpmalloc"
     else
-        features="--features mimalloc"
+        if [ "$1" = "i686-unknown-linux-gnu" ] || [ "$1" = "i586-unknown-linux-gnu" ]; then
+            features=""
+        else
+            features="--features mimalloc"
+        fi
     fi
 
     docker_image=$(get_docker_image "$1")
