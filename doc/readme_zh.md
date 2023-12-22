@@ -13,6 +13,8 @@
   - `arm-unknown-linux-musleabi`
   - `arm-unknown-linux-musleabihf`
   - `armv5te-unknown-linux-musleabi`
+  - `i686-unknown-linux-gnu`
+  - `i586-unknown-linux-gnu`
   - `x86_64-pc-windows-msvc`
   - `x86_64-apple-darwin`
   - `aarch64-apple-darwin`

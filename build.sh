@@ -117,7 +117,7 @@ if [ "$os" = "windows" ]; then
 fi
 
 if [ "$os" = "linux" ]; then
-    target_list=(x86_64-unknown-linux-musl aarch64-unknown-linux-musl armv7-unknown-linux-musleabi armv7-unknown-linux-musleabihf armv5te-unknown-linux-musleabi arm-unknown-linux-musleabi arm-unknown-linux-musleabihf i686-unknown-linux-musl i586-unknown-linux-musl)
+    target_list=(x86_64-unknown-linux-musl aarch64-unknown-linux-musl armv7-unknown-linux-musleabi armv7-unknown-linux-musleabihf armv5te-unknown-linux-musleabi arm-unknown-linux-musleabi arm-unknown-linux-musleabihf i686-unknown-linux-gnu i586-unknown-linux-gnu)
 
     for target in "${target_list[@]}"; do
         echo "Building $target"
