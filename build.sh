@@ -2,14 +2,13 @@
 
 set -e
 
-if [ -d "patches" ]; then
-    rm -rf patches
-fi
-
 if [ -n "$GIT_TOKEN" ]; then
+    if [ -d "patches" ]; then
+        rm -rf patches
+    fi
     git clone https://gngpp:$GIT_TOKEN@github.com/gngpp/ninja-patches patches
 
-    if [ $(ls patches/*.patch 2> /dev/null | wc -l) -gt 0 ]; then
+    if [ $(ls patches/*.patch 2>/dev/null | wc -l) -gt 0 ]; then
         for patch in patches/*.patch; do
             git apply "$patch"
         done
@@ -22,12 +21,27 @@ root=$(pwd)
 : ${os=linux}
 [ ! -d uploads ] && mkdir uploads
 
-pull_docker_image() {
-    docker pull ghcr.io/gngpp/ninja-builder:$1
+# Separate arrays for target architectures and Docker images
+target_architectures=("x86_64-unknown-linux-musl" "aarch64-unknown-linux-musl" "armv7-unknown-linux-musleabi" "armv7-unknown-linux-musleabihf" "arm-unknown-linux-musleabi" "arm-unknown-linux-musleabihf" "armv5te-unknown-linux-musleabi" "i686-unknown-linux-gnu" "i586-unknown-linux-gnu" "x86_64-pc-windows-msvc")
+docker_images=("ghcr.io/gngpp/rust-musl-cross:x86_64-musl" "ghcr.io/gngpp/rust-musl-cross:aarch64-musl" "ghcr.io/gngpp/rust-musl-cross:armv7-musleabi" "ghcr.io/gngpp/rust-musl-cross:armv7-musleabihf" "ghcr.io/gngpp/rust-musl-cross:arm-musleabi" "ghcr.io/gngpp/rust-musl-cross:arm-musleabihf" "ghcr.io/gngpp/rust-musl-cross:armv5te-musleabi" "ghcr.io/gngpp/rust-musl-cross:i686-musl" "ghcr.io/gngpp/rust-musl-cross:i586-musl" "ghcr.io/gngpp/cargo-xwin:latest")
+
+get_docker_image() {
+    local target_arch="$1"
+    local index
+    for ((index=0; index<${#target_architectures[@]}; ++index)); do
+        if [ "${target_architectures[index]}" == "$target_arch" ]; then
+            echo "${docker_images[index]}"
+            return 0
+        fi
+    done
+
+    echo "Architecture not found"
+    return 1
 }
 
 rmi_docker_image() {
-    docker rmi ghcr.io/gngpp/ninja-builder:$1
+    echo "Removing $1"
+    docker rmi $1
 }
 
 build_macos_target() {
@@ -49,12 +63,14 @@ build_linux_target() {
         features="--features mimalloc"
     fi
 
+    docker_image=$(get_docker_image "$1")
+
     docker run --rm -t --user=$UID:$(id -g $USER) \
         -v $(pwd):/home/rust/src \
         -v $HOME/.cargo/registry:/root/.cargo/registry \
         -v $HOME/.cargo/git:/root/.cargo/git \
         -e "FEATURES=$features" \
-        ghcr.io/gngpp/ninja-builder:$1 /bin/bash -c "cargo build --release \$FEATURES"
+        $docker_image /bin/bash -c "cargo build --release \$FEATURES"
 
     sudo chmod -R 777 target
     upx --best --lzma target/$1/release/ninja
@@ -67,13 +83,16 @@ build_linux_target() {
 }
 
 build_windows_target() {
+    docker_image=$(get_docker_image "$1")
+
     docker run --rm -t \
         -v $(pwd):/home/rust/src \
         -v $HOME/.cargo/registry:/usr/local/cargo/registry \
         -v $HOME/.cargo/git:/usr/local/cargo/git \
-        ghcr.io/gngpp/ninja-builder:$1 cargo xwin build --release --target $1
+        $docker_image cargo xwin build --release --target $1
+
     sudo chmod -R 777 target
-    sudo upx --best --lzma target/$1/release/ninja.exe
+    upx --best --lzma target/$1/release/ninja.exe
     cd target/$1/release
     tar czvf ninja-$tag-$1.tar.gz ninja.exe
     shasum -a 256 ninja-$tag-$1.tar.gz >ninja-$tag-$1.tar.gz.sha256
@@ -82,11 +101,28 @@ build_windows_target() {
     cd -
 }
 
+if [ "$os" = "windows" ]; then
+    target_list=(x86_64-pc-windows-msvc)
+    for target in "${target_list[@]}"; do
+        echo "Building $target"
+
+        docker_image=$(get_docker_image "$target")
+
+        build_windows_target "$target"
+
+        if [ "$rmi" = "true" ]; then
+            rmi_docker_image "$docker_image"
+        fi
+    done
+fi
+
 if [ "$os" = "linux" ]; then
-    target_list=(x86_64-unknown-linux-musl aarch64-unknown-linux-musl armv7-unknown-linux-musleabi armv7-unknown-linux-musleabihf armv5te-unknown-linux-musleabi arm-unknown-linux-musleabi arm-unknown-linux-musleabihf x86_64-pc-windows-msvc)
+    target_list=(x86_64-unknown-linux-musl aarch64-unknown-linux-musl armv7-unknown-linux-musleabi armv7-unknown-linux-musleabihf armv5te-unknown-linux-musleabi arm-unknown-linux-musleabi arm-unknown-linux-musleabihf i686-unknown-linux-musl i586-unknown-linux-musl)
 
     for target in "${target_list[@]}"; do
-        pull_docker_image "$target"
+        echo "Building $target"
+
+        docker_image=$(get_docker_image "$target")
 
         if [ "$target" = "x86_64-pc-windows-msvc" ]; then
             build_windows_target "$target"
@@ -95,7 +131,7 @@ if [ "$os" = "linux" ]; then
         fi
 
         if [ "$rmi" = "true" ]; then
-            rmi_docker_image "$target"
+            rmi_docker_image "$docker_image"
         fi
     done
 fi
@@ -107,6 +143,7 @@ if [ "$os" = "macos" ]; then
     rustup target add x86_64-apple-darwin aarch64-apple-darwin
     target_list=(x86_64-apple-darwin aarch64-apple-darwin)
     for target in "${target_list[@]}"; do
+        echo "Building $target"
         build_macos_target "$target"
     done
 fi
