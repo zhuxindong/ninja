@@ -80,13 +80,13 @@ build_linux_target() {
     sudo chmod -R 777 target
     if [ "$1" != "i686-unknown-linux-gnu" ] && [ "$1" != "i586-unknown-linux-gnu" ]; then
         upx --best --lzma target/$1/release/ninja
-        cd target/$1/release
-        tar czvf ninja-$tag-$1.tar.gz ninja
-        shasum -a 256 ninja-$tag-$1.tar.gz >ninja-$tag-$1.tar.gz.sha256
-        mv ninja-$tag-$1.tar.gz $root/uploads/
-        mv ninja-$tag-$1.tar.gz.sha256 $root/uploads/
-        cd -
     fi
+    cd target/$1/release
+    tar czvf ninja-$tag-$1.tar.gz ninja
+    shasum -a 256 ninja-$tag-$1.tar.gz >ninja-$tag-$1.tar.gz.sha256
+    mv ninja-$tag-$1.tar.gz $root/uploads/
+    mv ninja-$tag-$1.tar.gz.sha256 $root/uploads/
+    cd -
 }
 
 build_windows_target() {
