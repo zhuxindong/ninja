@@ -6,8 +6,8 @@ pub enum ArkoseError {
     SubmitAnswerError(anyhow::Error),
     #[error("Invalid arkose platform type: {0:?}")]
     InvalidPlatformType(String),
-    #[error("Invalid GPT model: {0:?}")]
-    InvalidGptModel(String),
+    #[error("Invalid public key: {0:?}")]
+    InvalidPublicKey(String),
     #[error("No solver available or solver is invalid")]
     NoSolverAvailable,
     #[error("Error creating arkose session error {0:?}")]

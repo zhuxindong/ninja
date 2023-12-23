@@ -7,6 +7,7 @@ mod constant;
 pub mod context;
 mod dns;
 pub mod eventsource;
+pub mod gpt_model;
 pub mod homedir;
 mod log;
 pub mod platform;

@@ -1,6 +1,5 @@
 use super::error::ResponseError;
-use crate::arkose::GPTModel;
-use crate::{with_context, URL_CHATGPT_API};
+use crate::{gpt_model::GPTModel, with_context, URL_CHATGPT_API};
 use moka::sync::Cache;
 use std::str::FromStr;
 use tokio::sync::OnceCell;
