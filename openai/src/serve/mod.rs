@@ -297,7 +297,7 @@ async fn post_session(
     }
 }
 
-/// GET /auth/sess_token
+/// POST /auth/sess_token
 async fn post_sess_token(
     TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
 ) -> Result<impl IntoResponse, ResponseError> {

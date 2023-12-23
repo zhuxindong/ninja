@@ -9,8 +9,9 @@ use http::header;
 use http::{HeaderMap, Method};
 use serde_json::{json, Value};
 
-use crate::arkose::Type;
+use crate::arkose::{ArkoseToken, Type};
 use crate::constant::{ARKOSE_TOKEN, EMPTY, MODEL, NULL, PUID};
+use crate::gpt_model::GPTModel;
 use crate::{arkose, with_context};
 
 use super::ext::{RequestExt, ResponseExt, SendRequestExt};
@@ -118,7 +119,7 @@ async fn handle_conv_request(req: &mut RequestExt) -> Result<(), ResponseError> 
     }
 
     // Parse model
-    let model = arkose::GPTModel::from_str(model).map_err(ResponseError::BadRequest)?;
+    let model = GPTModel::from_str(model).map_err(ResponseError::BadRequest)?;
 
     // If model is gpt3 or gpt4, then add arkose_token
     if (with_context!(arkose_gpt3_experiment) && model.is_gpt3()) || model.is_gpt4() {
@@ -131,7 +132,7 @@ async fn handle_conv_request(req: &mut RequestExt) -> Result<(), ResponseError> 
         };
 
         if condition {
-            let arkose_token = arkose::ArkoseToken::new_from_context(model.into()).await?;
+            let arkose_token = ArkoseToken::new_from_context(model.into()).await?;
             body.insert(ARKOSE_TOKEN.to_owned(), json!(arkose_token.value()));
             // Updaye Modify bytes
             req.body = Some(Bytes::from(

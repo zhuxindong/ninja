@@ -1,3 +1,5 @@
+use crate::gpt_model::GPTModel;
+
 use super::{Author, Role};
 use serde::Serialize;
 use typed_builder::TypedBuilder;
@@ -92,7 +94,7 @@ pub struct PostConvoRequest<'a> {
     action: Action,
     messages: Vec<Messages<'a>>,
     parent_message_id: &'a str,
-    model: &'a str,
+    model: GPTModel,
     #[builder(default = -480)]
     timezone_offset_min: i64,
     #[builder(setter(into), default)]
@@ -173,7 +175,7 @@ impl<'a> From<PostVaraintConvoRequest<'a>> for PostConvoRequest<'a> {
 #[derive(Serialize, TypedBuilder)]
 pub struct PostNextConvoRequest<'a> {
     /// The conversation uses a model that usually remains the same throughout the conversation
-    model: &'a str,
+    model: GPTModel,
     /// What to ask.
     prompt: &'a str,
     /// The message ID, usually generated using str(uuid.uuid4())
@@ -191,7 +193,7 @@ pub struct PostNextConvoRequest<'a> {
 #[derive(Serialize, TypedBuilder)]
 pub struct PostContinueConvoRequest<'a> {
     /// The conversation uses a model that usually remains the same throughout the conversation
-    model: &'a str,
+    model: GPTModel,
     /// Parent message ID, the message ID of the last ChatGPT reply.
     parent_message_id: &'a str,
     /// ID of a session. conversation_id Session ID.
@@ -204,7 +206,7 @@ pub struct PostContinueConvoRequest<'a> {
 #[derive(Serialize, TypedBuilder)]
 pub struct PostVaraintConvoRequest<'a> {
     /// The conversation uses a model that usually remains the same throughout the conversation
-    model: &'a str,
+    model: GPTModel,
     /// What to ask.
     prompt: &'a str,
     /// ID of the message sent by the previous user.

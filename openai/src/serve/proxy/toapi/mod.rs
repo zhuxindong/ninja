@@ -13,12 +13,13 @@ use std::str::FromStr;
 
 use crate::chatgpt::model::req::Metadata;
 use crate::chatgpt::model::Role;
+use crate::gpt_model::GPTModel;
 use crate::now_duration;
 use crate::serve::error::ProxyError;
 use crate::serve::ProxyResult;
 use crate::token;
 use crate::{
-    arkose::{ArkoseToken, GPTModel},
+    arkose::ArkoseToken,
     chatgpt::model::req::{Content, ConversationMode, Messages, PostConvoRequest},
     serve::{
         error::ResponseError,
@@ -194,7 +195,7 @@ fn handle_error_response(err: reqwest::Error) -> Result<impl IntoResponse, Respo
 }
 
 /// OpenAI API to ChatGPT API model mapper
-async fn model_mapper(model: &str) -> Result<(&str, &str, Option<String>), ResponseError> {
+async fn model_mapper(model: &str) -> Result<(GPTModel, &str, Option<String>), ResponseError> {
     // check model is supported
     let gpt_model = GPTModel::from_str(model)?;
 
@@ -202,18 +203,13 @@ async fn model_mapper(model: &str) -> Result<(&str, &str, Option<String>), Respo
     let arkose_token =
         if (with_context!(arkose_gpt3_experiment) && gpt_model.is_gpt3()) || gpt_model.is_gpt4() {
             let arkose_token = ArkoseToken::new_from_context(gpt_model.clone().into()).await?;
-            Some(std::convert::Into::<String>::into(arkose_token))
+            Some(arkose_token.into())
         } else {
             None
         };
 
-    // if model is gpt-4
-    if gpt_model.is_gpt4() {
-        return Ok(("gpt-4", "gpt-4", arkose_token));
-    }
-
-    // fallback to gpt-3.5
-    Ok(("text-davinci-002-render-sha", "gpt-3.5-turbo", arkose_token))
+    // fallback
+    Ok((gpt_model, model, arkose_token))
 }
 
 fn generate_id(length: usize) -> String {

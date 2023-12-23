@@ -8,6 +8,7 @@ use base64::engine::general_purpose;
 use rand::thread_rng;
 use serde::Serialize;
 use std::path::Path;
+use std::str::FromStr;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
@@ -22,6 +23,7 @@ use tokio::sync::OnceCell;
 use crate::arkose::crypto::encrypt;
 use crate::constant::HEADER_UA;
 use crate::generate_random_string;
+use crate::gpt_model::GPTModel;
 use crate::warn;
 use crate::with_context;
 use error::ArkoseError;
@@ -44,7 +46,7 @@ impl Type {
             "35536E1E-65B4-4D96-9D97-6ADB7EFF8147" => Type::GPT4,
             "0A1D34FC-659D-4E23-B17B-694DCFCF6A6C" => Type::Auth,
             "23AAD243-4799-4A9E-B01D-1166C5DE02DF" => Type::Platform,
-            _ => anyhow::bail!("Invalid public key"),
+            _ => anyhow::bail!(ArkoseError::InvalidPublicKey(pk.to_owned())),
         };
         Ok(t)
     }
@@ -58,7 +60,16 @@ impl Type {
     }
 }
 
-impl std::str::FromStr for Type {
+impl From<GPTModel> for Type {
+    fn from(value: GPTModel) -> Self {
+        match value {
+            GPTModel::Gpt35 => Type::GPT3,
+            GPTModel::Gpt4 | GPTModel::Gpt4Mobile => Type::GPT4,
+        }
+    }
+}
+
+impl FromStr for Type {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -68,56 +79,6 @@ impl std::str::FromStr for Type {
             "auth" => Ok(Type::Auth),
             "platform" => Ok(Type::Platform),
             _ => anyhow::bail!(ArkoseError::InvalidPlatformType(s.to_owned())),
-        }
-    }
-}
-
-#[derive(PartialEq, Eq, Clone)]
-pub enum GPTModel {
-    Gpt35,
-    Gpt35Other,
-    Gpt4,
-    Gpt4Mobile,
-    Gpt4Other,
-}
-
-impl GPTModel {
-    pub fn is_gpt3(&self) -> bool {
-        match self {
-            GPTModel::Gpt35 | GPTModel::Gpt35Other => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_gpt4(&self) -> bool {
-        match self {
-            GPTModel::Gpt4 | GPTModel::Gpt4Mobile | GPTModel::Gpt4Other => true,
-            _ => false,
-        }
-    }
-}
-
-impl Into<Type> for GPTModel {
-    fn into(self) -> Type {
-        match self {
-            GPTModel::Gpt35Other | GPTModel::Gpt35 => Type::GPT3,
-            GPTModel::Gpt4Other | GPTModel::Gpt4 | GPTModel::Gpt4Mobile => Type::GPT4,
-        }
-    }
-}
-
-impl std::str::FromStr for GPTModel {
-    type Err = anyhow::Error;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value {
-            "gpt-4" => Ok(GPTModel::Gpt4),
-            "gpt-3.5" => Ok(GPTModel::Gpt35),
-            s if s.starts_with("gpt-4") || s.starts_with("gpt4") => Ok(GPTModel::Gpt4Other),
-            s if s.starts_with("gpt-3.5") || s.starts_with("text-davinci") => {
-                Ok(GPTModel::Gpt35Other)
-            }
-            _ => anyhow::bail!(ArkoseError::InvalidGptModel(value.to_owned())),
         }
     }
 }
