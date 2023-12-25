@@ -2,8 +2,6 @@ name: CloseIssue
 
 on:
   workflow_dispatch:
-  issues:
-    types: [opened]
 
 jobs:
   run-python-script:
