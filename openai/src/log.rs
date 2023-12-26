@@ -5,7 +5,7 @@ macro_rules! info {
     (target: $target:expr, $($arg:tt)+) => (log::info!($($arg)+));
 
     // info!("a {} event", "log")
-    ($($arg:tt)+) => (log::info!($($arg)+))
+    ($($arg:tt)+) => (tracing::info!($($arg)+))
 }
 
 #[macro_export]
@@ -15,7 +15,7 @@ macro_rules! debug {
     (target: $target:expr, $($arg:tt)+) => (log::debug!("[{}] {}",std::panic::Location::caller(), $($arg)+));
 
     // debug!("a {} event", "log")
-    ($($arg:tt)+) => (log::debug!("[{}] {}", std::panic::Location::caller(),  format!($($arg)+)))
+    ($($arg:tt)+) => (tracing::debug!("[{}] {}", std::panic::Location::caller(),  format!($($arg)+)))
 }
 
 #[macro_export]
@@ -25,7 +25,7 @@ macro_rules! warn {
     (target: $target:expr, $($arg:tt)+) => (log::warn!("[{}] {}",std::panic::Location::caller(), $($arg)+));
 
     // warn!("a {} event", "log")
-    ($($arg:tt)+) => (log::warn!("[{}] {}", std::panic::Location::caller(),  format!($($arg)+)))
+    ($($arg:tt)+) => (tracing::warn!("[{}] {}", std::panic::Location::caller(),  format!($($arg)+)))
 }
 
 #[macro_export]
@@ -35,7 +35,7 @@ macro_rules! trace {
     (target: $target:expr, $($arg:tt)+) => (log::trace!("[{}] {}",std::panic::Location::caller(), $($arg)+));
 
     // trace!("a {} event", "log")
-    ($($arg:tt)+) => (log::trace!("[{}] {}", std::panic::Location::caller(),  format!($($arg)+)))
+    ($($arg:tt)+) => (tracing::trace!("[{}] {}", std::panic::Location::caller(),  format!($($arg)+)))
 }
 
 #[macro_export]
@@ -45,5 +45,5 @@ macro_rules! error {
     (target: $target:expr, $($arg:tt)+) => (log::error!("[{}] {}",std::panic::Location::caller(), $($arg)+));
 
     // error!("a {} event", "log")
-    ($($arg:tt)+) => (log::error!("[{}] {}", std::panic::Location::caller(),  format!($($arg)+)))
+    ($($arg:tt)+) => (tracing::error!("[{}] {}", std::panic::Location::caller(),  format!($($arg)+)))
 }
