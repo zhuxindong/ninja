@@ -205,8 +205,10 @@ impl AuthClient {
         code_challenge
     }
 
-    /// Get the callback code from the url
-    fn get_callback_code(url: &Url) -> AuthResult<String> {
+    /// Check the state of the auth callback
+    /// You do not have an account because it has been deleted or deactivated.
+    /// If you believe this was an error, please contact us through our help center at help.openai.com. (error=account_deactivated)
+    fn check_auth_callback_state(url: &Url) -> AuthResult<HashMap<String, Vec<String>>> {
         let mut url_params = HashMap::new();
         url.query_pairs().into_owned().for_each(|(key, value)| {
             url_params
@@ -214,8 +216,6 @@ impl AuthClient {
                 .and_modify(|v: &mut Vec<String>| v.push(value.clone()))
                 .or_insert(vec![value]);
         });
-
-        debug!("get_callback_code: {:?}", url_params);
 
         // If the user denies the request, the URL will contain an error parameter
         if let Some(error) = url_params.get("error") {
@@ -227,8 +227,13 @@ impl AuthClient {
             };
         }
 
+        Ok(url_params)
+    }
+
+    /// Get the callback code from the url
+    fn get_callback_code(url: &Url) -> AuthResult<String> {
         // Return the code if it exists
-        let callback_code = url_params
+        let callback_code = Self::check_auth_callback_state(&url)?
             .get("code")
             .map(|c| c.first())
             .flatten()
@@ -238,10 +243,11 @@ impl AuthClient {
     }
 
     /// Get the callback state from the url
-    fn get_callback_state(url: &Url) -> String {
+    fn get_callback_state(url: &Url) -> AuthResult<String> {
         let url_params = url.query_pairs().into_owned().collect::<HashMap<_, _>>();
         debug!("get_callback_state: {:?}", url_params);
-        url_params["state"].to_owned()
+        let state = url_params.get("state").ok_or(AuthError::FailedState)?;
+        Ok(state.to_owned())
     }
 
     /// Get the location path from the header
@@ -474,20 +480,6 @@ impl AuthClientBuilder {
             .inner
             .default_headers({
                 let mut headers = HeaderMap::new();
-                headers.insert(header::ACCEPT, HeaderValue::from_static("*/*"));
-                headers.insert(
-                    header::ACCEPT_ENCODING,
-                    HeaderValue::from_static("gzip, deflate, br"),
-                );
-                headers.insert(
-                    header::ACCEPT_LANGUAGE,
-                    HeaderValue::from_static("en-US,en;q=0.9"),
-                );
-                headers.insert(
-                    header::UPGRADE_INSECURE_REQUESTS,
-                    HeaderValue::from_static("1"),
-                );
-                headers.insert(header::DNT, HeaderValue::from_static("1"));
                 headers.insert(header::ORIGIN, HeaderValue::from_static(OPENAI_OAUTH_URL));
                 headers.insert(header::REFERER, HeaderValue::from_static(OPENAI_OAUTH_URL));
                 headers
@@ -509,10 +501,7 @@ impl AuthClientBuilder {
 
     pub fn builder() -> AuthClientBuilder {
         AuthClientBuilder {
-            inner: Client::builder()
-                .connect_timeout(Duration::from_secs(10))
-                .timeout(Duration::from_secs(30))
-                .redirect(Policy::none()),
+            inner: Client::builder().redirect(Policy::none()),
         }
     }
 }

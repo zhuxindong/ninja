@@ -51,7 +51,7 @@ impl PlatformAuthProvider {
             .ext_context(ctx);
 
         // Get state from response url
-        let state = AuthClient::get_callback_state(&resp.url());
+        let state = AuthClient::get_callback_state(&resp.url())?;
 
         // Set state
         ctx.set_state(state.as_str());
@@ -146,9 +146,11 @@ impl PlatformAuthProvider {
             .map_err(AuthError::FailedRequest)?
             .ext_context(ctx);
 
+        // maybe auth failed
+        let _ = AuthClient::check_auth_callback_state(resp.url())?;
+
         // Get location path
-        let location: &str = AuthClient::get_location_path(&resp.headers())
-            .map_err(|_| AuthError::InvalidLocation)?;
+        let location: &str = AuthClient::get_location_path(&resp.headers())?;
 
         // If location path starts with /u/mfa-otp-challenge?
         if location.starts_with("/u/mfa-otp-challenge?") {
@@ -177,7 +179,7 @@ impl PlatformAuthProvider {
             .map_err(AuthError::InvalidLoginUrl)?;
 
         // Get state from url
-        let state = AuthClient::get_callback_state(&url);
+        let state = AuthClient::get_callback_state(&url)?;
 
         let data = AuthenticateMfaData::builder()
             .action("default")

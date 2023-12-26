@@ -94,16 +94,16 @@ impl WebAuthProvider {
             .map_err(AuthError::FailedRequest)?
             .ext_context(ctx);
 
-        let locatio = AuthClient::get_location_path(resp.headers())?;
+        let location = AuthClient::get_location_path(resp.headers())?;
         let resp = self
             .0
-            .get(format!("{OPENAI_OAUTH_URL}{locatio}"))
+            .get(format!("{OPENAI_OAUTH_URL}{location}"))
             .ext_context(ctx)
             .send()
             .await
             .map_err(AuthError::FailedRequest)?;
 
-        let state = AuthClient::get_callback_state(&resp.url());
+        let state = AuthClient::get_callback_state(&resp.url())?;
         ctx.set_state(state.as_str());
 
         Ok(AuthClient::response_handle_unit(resp)
@@ -163,11 +163,15 @@ impl WebAuthProvider {
             .map_err(AuthError::FailedRequest)?
             .ext_context(ctx);
 
+        debug!("authenticate_password status: {}", resp.status());
+
         // If resp status is client error return InvalidEmailOrPassword
         if resp.status().is_client_error() {
             return Err(AuthError::InvalidEmailOrPassword);
         }
 
+        // 1. /authorize/resume?state=xxx
+        // 2. https://chat.openai.com/auth/login
         if resp.status().is_redirection() {
             let location = AuthClient::get_location_path(&resp.headers())?;
             if location.contains("https://chat.openai.com/") {
@@ -183,6 +187,8 @@ impl WebAuthProvider {
                 .await
                 .map_err(AuthError::FailedRequest)?
                 .ext_context(ctx);
+
+            debug!("authenticate_password redirect url: {}", resp.url());
 
             if resp.status().is_redirection() {
                 let location = AuthClient::get_location_path(resp.headers())?;
@@ -200,10 +206,13 @@ impl WebAuthProvider {
                     .map_err(AuthError::FailedRequest)?
                     .ext_context(ctx);
 
-                return match resp.status() {
-                    StatusCode::FOUND => self.get_access_token(ctx).await,
-                    _ => Err(AuthError::InvalidEmailOrPassword),
-                };
+                // maybe auth failed
+                let _ = AuthClient::check_auth_callback_state(resp.url())?;
+
+                // If resp status is found return get_access_token
+                if resp.status() == StatusCode::FOUND {
+                    return self.get_access_token(ctx).await;
+                }
             }
         }
         Err(AuthError::FailedLogin)
@@ -220,7 +229,7 @@ impl WebAuthProvider {
             .map_err(AuthError::InvalidLoginUrl)?;
 
         // Get state from url
-        let state = AuthClient::get_callback_state(&url);
+        let state = AuthClient::get_callback_state(&url)?;
 
         let data = AuthenticateMfaData::builder()
             .action("default")

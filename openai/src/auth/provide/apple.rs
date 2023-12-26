@@ -77,7 +77,7 @@ impl AppleAuthProvider {
             .ext_context(ctx);
 
         // Get the callback state from the URL.
-        let state = AuthClient::get_callback_state(resp.url());
+        let state = AuthClient::get_callback_state(resp.url())?;
 
         // Set the callback state.
         ctx.set_state(state.as_str());
@@ -179,15 +179,20 @@ impl AppleAuthProvider {
             return Err(AuthError::InvalidEmailOrPassword);
         }
 
+        // maybe auth failed
+        let _ = AuthClient::check_auth_callback_state(resp.url())?;
+
         // If get_location_path returns an error, it means that the location is invalid.
-        let location: &str = AuthClient::get_location_path(&resp.headers())
-            .map_err(|_| AuthError::InvalidLocation)?;
+        let location: &str = AuthClient::get_location_path(&resp.headers())?;
 
         if location.starts_with("/u/mfa-otp-challenge?") {
             // If the location contains "/u/mfa-otp-challenge?", it means that MFA is required.
             let mfa_code = ctx.account.mfa.clone().ok_or(AuthError::MFARequired)?;
             return self.authenticate_mfa(ctx, &mfa_code, location).await;
-        } else if location.starts_with(OPENAI_OAUTH_APPLE_CALLBACK_URL) {
+        }
+
+        // Indicates successful login.
+        if location.starts_with(OPENAI_OAUTH_APPLE_CALLBACK_URL) {
             return self.authorization_code(ctx, location).await;
         }
 
@@ -207,7 +212,7 @@ impl AppleAuthProvider {
             .map_err(AuthError::InvalidLoginUrl)?;
 
         // Get the callback state from the URL.
-        let state = AuthClient::get_callback_state(&url);
+        let state = AuthClient::get_callback_state(&url)?;
 
         let resp = self
             .inner

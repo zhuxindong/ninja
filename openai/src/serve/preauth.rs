@@ -1,4 +1,4 @@
-use crate::{info, with_context};
+use crate::with_context;
 use mitm::proxy::hyper::{
     body::Body,
     http::{header, HeaderMap, HeaderValue, Request, Response},
@@ -12,18 +12,14 @@ pub struct PreAuthHanlder;
 #[async_trait::async_trait]
 impl HttpHandler for PreAuthHanlder {
     async fn handle_request(&self, req: Request<Body>) -> RequestOrResponse {
-        if log::log_enabled!(log::Level::Debug) {
-            log_req(&req).await;
-        }
+        log_req(&req).await;
         // extract preauth cookie
         collect_preauth_cookie(req.headers());
         RequestOrResponse::Request(req)
     }
 
     async fn handle_response(&self, res: Response<Body>) -> Response<Body> {
-        if log::log_enabled!(log::Level::Debug) {
-            log_res(&res).await;
-        }
+        log_res(&res).await;
         collect_preauth_cookie(res.headers());
         res
     }
@@ -59,7 +55,7 @@ pub async fn log_req(req: &Request<Body>) {
         .unwrap();
     }
 
-    info!(
+    tracing::debug!(
         "{} {}
 Headers:
 {}",
@@ -88,7 +84,7 @@ pub async fn log_res(res: &Response<Body>) {
         .unwrap();
     }
 
-    info!(
+    tracing::debug!(
         "{} {:?}
 Headers:
 {}",
