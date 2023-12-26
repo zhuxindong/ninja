@@ -33,15 +33,15 @@ pub enum AuthError {
     FailedAuthSessionCookie,
 
     /// Invalid Error
-    #[error("Invalid login (error {0:?})")]
+    #[error("Invalid login ({0})")]
     InvalidLogin(String),
     #[error("Invalid arkose token ({0:?})")]
     InvalidArkoseToken(anyhow::Error),
-    #[error("Invalid request login url (error {0:?})")]
+    #[error("Invalid request login url ({0:?})")]
     InvalidLoginUrl(url::ParseError),
     #[error("Invalid email or password")]
     InvalidEmailOrPassword,
-    #[error("Invalid request (error {0:?})")]
+    #[error("Invalid request ({0})")]
     InvalidRequest(String),
     #[error("Invalid email")]
     InvalidEmail,
@@ -55,7 +55,7 @@ pub enum AuthError {
     MFAFailed,
     #[error("MFA required")]
     MFARequired,
-    #[error("Json deserialize error (error {0:?})")]
+    #[error("Json deserialize error ({0:?})")]
     DeserializeError(reqwest::Error),
     #[error("Implementation is not supported")]
     NotSupportedImplementation,
@@ -63,6 +63,6 @@ pub enum AuthError {
     PreauthCookieNotFound,
 
     /// Other Error
-    #[error("Regex error (error {0:?})")]
+    #[error("Regex error ({0:?})")]
     InvalidRegex(regex::Error),
 }

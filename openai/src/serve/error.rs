@@ -26,7 +26,7 @@ pub enum ProxyError {
     BodyMessageIsEmpty,
     #[error("Request Content is empty")]
     RequestContentIsEmpty,
-    #[error("System time before UNIX EPOCH!: {0}")]
+    #[error("System time before UNIX EPOCH! ({0})")]
     SystemTimeBeforeEpoch(anyhow::Error),
     #[error("new filename is empty")]
     NewFilenameIsEmpty,
@@ -42,9 +42,9 @@ pub enum ProxyError {
     AuthKeyRequired,
     #[error("Missing cf_captcha_response")]
     MissingCfCaptchaResponse,
-    #[error("event-source stream error: {0}")]
+    #[error("event-source stream error ({0})")]
     EventSourceStreamError(EventStreamError<reqwest::Error>),
-    #[error("Deserialize error: {0}")]
+    #[error("Deserialize error ({0})")]
     DeserializeError(serde_json::Error),
 }
 
@@ -124,7 +124,6 @@ where
                 }
                 // 400
                 AuthError::BadRequest(_)
-                | AuthError::InvalidLogin(_)
                 | AuthError::InvalidArkoseToken(_)
                 | AuthError::InvalidLoginUrl(_)
                 | AuthError::InvalidEmailOrPassword
@@ -142,7 +141,7 @@ where
                     make_error(auth_error.to_string(), StatusCode::UNAUTHORIZED)
                 }
                 // 403
-                AuthError::Forbidden(_) => {
+                AuthError::Forbidden(_) | AuthError::InvalidLogin(_) => {
                     make_error(auth_error.to_string(), StatusCode::FORBIDDEN)
                 }
                 // 429

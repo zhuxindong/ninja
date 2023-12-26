@@ -111,10 +111,9 @@ pub async fn callback(client: reqwest::Client, arkose_token: String) -> anyhow::
 
     match resp.error_for_status() {
         Ok(resp) => {
-            if log::log_enabled!(log::Level::Debug) {
-                if let Ok(ok) = resp.text().await {
-                    debug!("funcaptcha callback: {ok}")
-                }
+            if tracing::event_enabled!(tracing::Level::DEBUG) {
+                let text = resp.text().await?;
+                debug!("funcaptcha callback: {text}")
             }
         }
         Err(err) => {

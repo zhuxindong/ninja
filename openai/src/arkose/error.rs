@@ -2,15 +2,15 @@ use std::sync::Arc;
 
 #[derive(thiserror::Error, Debug)]
 pub enum ArkoseError {
-    #[error("submit funcaptcha answer error {0:?}")]
+    #[error("submit funcaptcha answer error ({0:?})")]
     SubmitAnswerError(anyhow::Error),
-    #[error("Invalid arkose platform type: {0:?}")]
+    #[error("Invalid arkose platform type ({0})")]
     InvalidPlatformType(String),
-    #[error("Invalid public key: {0:?}")]
+    #[error("Invalid public key ({0})")]
     InvalidPublicKey(String),
     #[error("No solver available or solver is invalid")]
     NoSolverAvailable,
-    #[error("Error creating arkose session error {0:?}")]
+    #[error("Error creating arkose session error ({0:?})")]
     CreateSessionError(anyhow::Error),
     #[error("invalid funcaptcha error")]
     InvalidFunCaptcha,
@@ -22,14 +22,14 @@ pub enum ArkoseError {
     HarEntryNotFound,
     #[error("Invalid HAR file")]
     InvalidHarFile,
-    #[error("{0:?} not a file")]
+    #[error("{0} not a file")]
     NotAFile(String),
-    #[error("Failed to get HAR entry error {0:?}")]
+    #[error("Failed to get HAR entry error ({0:?})")]
     FailedToGetHarEntry(Arc<anyhow::Error>),
     #[error("Deserialize error {0:?}")]
     DeserializeError(#[from] reqwest::Error),
-    #[error("Funcaptcha submit error: {0:?}")]
+    #[error("Funcaptcha submit error ({0})")]
     FuncaptchaSubmitError(String),
-    #[error("Funcaptcha not solved error: {0:?}")]
+    #[error("Funcaptcha not solved error ({0})")]
     FuncaptchaNotSolvedError(String),
 }
