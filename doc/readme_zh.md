@@ -26,7 +26,13 @@
 ```shell
 wget https://github.com/gngpp/ninja/releases/download/v0.9.7/ninja-0.9.7-x86_64-unknown-linux-musl.tar.gz
 tar -xf ninja-0.9.7-x86_64-unknown-linux-musl.tar.gz
-./ninja run
+mv ./ninja /bin/ninja
+
+# 在线更新
+ninja update
+
+# 前台运行
+ninja run
 ```
 
 - #### OpenWrt

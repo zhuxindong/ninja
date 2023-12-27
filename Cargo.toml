@@ -14,21 +14,26 @@ readme = "README.md"
 anyhow = "1.0.75"
 clap = { version = "4.4.3", features = ["derive", "env"] }
 serde = {version = "1.0.188", features = ["derive"] }
-openai = { path = "openai" }
-mitm ={ path = "mitm", optional = true }
+openai = { path = "./crates/openai" }
+mitm = { path = "./crates/mitm", optional = true }
 cidr = "0.2.2"
 toml = "0.8.0"
 url = "2.4.1"
 
-tokio = { version = "1.32.0", default-features = false, features = ["rt"], optional = true }
-serde_json = { version = "1.0.107", optional = true }
+tokio = { version = "1.35.1", default-features = false, features = ["rt"], optional = true }
+serde_json = { version = "1.0.108", optional = true }
 inquire = { version = "0.6.2", optional =  true }
 colored_json = { version = "4.0.0", optional = true }
-indicatif = { version = "0.17.6", optional = true }
+indicatif = { version = "0.17.7", optional = true }
 json_to_table = { version = "0.7.0", optional = true }
 tabled = { version = "0.12.2", optional = true }
-self_update = { version = "0.39.0", default-features = false, features = ["rustls", "archive-tar", "compression-flate2"] }
+self_update = { path = "./crates/self_update", default-features = false, features = ["archive-tar", "compression-flate2"] }
 reqwest = { package = "reqwest-impersonate", version ="0.11.46", default-features = false, features = ["impersonate"] }
+
+# self update
+zip = { version = "0.6", default-features = false, features = ["time"], optional = true }
+tempfile = "3"
+semver = "1.0"
 
 # allocator
 tcmalloc = { version = "0.3.0", optional = true }
@@ -56,10 +61,11 @@ viuer = "0.6.2"
 hex = "0.4.3"
 sha2 = "0.10.8"
 env_logger = "0.10.0"
-openai = { path = "openai" }
+openai = { path = "./crates/openai" }
 
 [features]
-default = ["serve", "mitm"]
+default = ["serve", "mitm", "self_update"]
+self_update = ["dep:serde_json"]
 mitm = ["openai/preauth", "dep:mitm"]
 terminal = [
     "openai/api",
