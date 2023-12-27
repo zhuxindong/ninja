@@ -31,6 +31,3 @@ archive-tar = ["tar", "zipsign-api?/verify-tar"]
 compression-flate2 = ["archive-tar", "flate2", "either"]
 signatures = ["dep:zipsign-api"]
 
-[package.metadata.docs.rs]
-# Whether to pass `--all-features` to Cargo (default: false)
-all-features = true
