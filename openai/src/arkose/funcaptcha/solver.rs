@@ -1,9 +1,55 @@
+use std::str::FromStr;
+
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
 use crate::{warn, with_context};
 
-use super::Solver;
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Solver {
+    Yescaptcha,
+    Capsolver,
+}
+
+impl Default for Solver {
+    fn default() -> Self {
+        Self::Yescaptcha
+    }
+}
+
+impl FromStr for Solver {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "yescaptcha" => Ok(Self::Yescaptcha),
+            "capsolver" => Ok(Self::Capsolver),
+            _ => anyhow::bail!("Only support `yescaptcha` and `capsolver`"),
+        }
+    }
+}
+
+impl ToString for Solver {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Yescaptcha => "yescaptcha".to_string(),
+            Self::Capsolver => "capsolver".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ArkoseSolver {
+    pub solver: Solver,
+    pub client_key: String,
+}
+
+impl ArkoseSolver {
+    pub fn new(solver: Solver, client_key: String) -> Self {
+        Self { solver, client_key }
+    }
+}
 
 #[derive(Deserialize, Default, Debug)]
 #[serde(default)]

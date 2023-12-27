@@ -5,7 +5,7 @@ use crate::{
     utils::unix::fix_relative_path,
 };
 use clap::CommandFactory;
-use openai::{arkose::funcaptcha::ArkoseSolver, context::args::Args, proxy, serve::Serve};
+use openai::{arkose::funcaptcha::solver::ArkoseSolver, context::args::Args, proxy, serve::Serve};
 use reqwest::impersonate::Impersonate;
 use std::{net::IpAddr, ops::Not, path::PathBuf, str::FromStr};
 use url::Url;

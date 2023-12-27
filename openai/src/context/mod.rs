@@ -8,7 +8,7 @@ use self::{
     preauth::PreauthCookieProvider,
 };
 use crate::{
-    arkose::{self, funcaptcha::ArkoseSolver},
+    arkose::{self, funcaptcha::solver::ArkoseSolver},
     auth::AuthClient,
     client::ClientRoundRobinBalancer,
     error,

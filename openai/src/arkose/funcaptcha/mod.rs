@@ -3,129 +3,18 @@ pub mod model;
 pub mod solver;
 
 use self::model::{Challenge, ConciseChallenge, FunCaptcha, RequestChallenge};
-use super::crypto;
+use super::{crypto, ArkoseToken};
 use crate::arkose::error::ArkoseError;
 use crate::arkose::funcaptcha::model::SubmitChallenge;
 use crate::{debug, now_duration, warn, with_context};
 use anyhow::{bail, Context};
 use reqwest::header;
-use serde::{Deserialize, Serialize};
-use std::str::FromStr;
+use serde::Deserialize;
 use std::sync::Arc;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Solver {
-    Yescaptcha,
-    Capsolver,
-}
-
-impl Default for Solver {
-    fn default() -> Self {
-        Self::Yescaptcha
-    }
-}
-
-impl FromStr for Solver {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "yescaptcha" => Ok(Self::Yescaptcha),
-            "capsolver" => Ok(Self::Capsolver),
-            _ => anyhow::bail!("Only support `yescaptcha` and `capsolver`"),
-        }
-    }
-}
-
-impl ToString for Solver {
-    fn to_string(&self) -> String {
-        match self {
-            Self::Yescaptcha => "yescaptcha".to_string(),
-            Self::Capsolver => "capsolver".to_string(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ArkoseSolver {
-    pub solver: Solver,
-    pub client_key: String,
-}
-
-impl ArkoseSolver {
-    pub fn new(solver: Solver, client_key: String) -> Self {
-        Self { solver, client_key }
-    }
-}
-
-/// Callback to arkose
-pub async fn callback(client: reqwest::Client, arkose_token: String) -> anyhow::Result<()> {
-    // Split the data string by the "|" delimiter
-    let elements: Vec<&str> = arkose_token.split('|').collect();
-
-    // Session token
-    let session_token = elements
-        .first()
-        .context("invalid arkose token")?
-        .to_string();
-
-    // Create a mutable HashMap to store the key-value pairs
-    let mut parsed_data = std::collections::HashMap::new();
-
-    for element in elements {
-        let key_value: Vec<&str> = element.splitn(2, '=').collect();
-
-        if key_value.len() == 2 {
-            let key = key_value[0];
-            let value = key_value[1];
-
-            // Insert the key-value pair into the HashMap
-            parsed_data.insert(key, value);
-        }
-    }
-
-    let mut callback_data = Vec::with_capacity(6);
-    callback_data.push(format!("callback=__jsonp_{}", now_duration()?.as_millis()));
-    callback_data.push(format!("category=loaded"));
-    callback_data.push(format!("action=game loaded"));
-    callback_data.push(format!("session_token={session_token}"));
-    // Print the parsed data
-    for (key, value) in parsed_data {
-        if key.eq("pk") {
-            callback_data.push(format!("data[public_key]={value}"));
-            let t = super::Type::from_pk(value)?;
-            callback_data.push(format!("data[site]={}", t.get_site()));
-        }
-    }
-
-    let callback_query = callback_data.join("&");
-
-    let resp = client
-        .get(format!(
-            "https://tcr9i.chat.openai.com/fc/a?{callback_query}"
-        ))
-        .timeout(std::time::Duration::from_secs(5))
-        .send()
-        .await?;
-
-    match resp.error_for_status() {
-        Ok(resp) => {
-            if tracing::event_enabled!(tracing::Level::DEBUG) {
-                let text = resp.text().await?;
-                debug!("funcaptcha callback: {text}")
-            }
-        }
-        Err(err) => {
-            warn!("funcaptcha callback error: {err}")
-        }
-    }
-
-    Ok(())
-}
-
-pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
-    let fields: Vec<&str> = arkose_token.split('|').collect();
+pub async fn start_challenge<'a>(arkose_token: &'a ArkoseToken) -> anyhow::Result<Session> {
+    let value = arkose_token.value();
+    let fields: Vec<&str> = value.split('|').collect();
     let session_token = fields.get(0).context("invalid arkose token")?.to_string();
     let sid = fields
         .get(1)
@@ -135,10 +24,11 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
         .unwrap_or_default();
 
     let mut headers = header::HeaderMap::new();
-    headers.insert(header::REFERER, format!("https://tcr9i.chat.openai.com/fc/assets/ec-game-core/game-core/1.15.0/standard/index.html?session={}", arkose_token.replace("|", "&")).parse()?);
+    headers.insert(header::REFERER, format!("https://tcr9i.chat.openai.com/fc/assets/ec-game-core/game-core/1.15.0/standard/index.html?session={}", value.replace("|", "&")).parse()?);
     headers.insert(header::DNT, header::HeaderValue::from_static("1"));
 
     let mut session = Session {
+        arkose_token,
         sid: sid.to_owned(),
         session_token,
         funcaptcha: None,
@@ -175,8 +65,9 @@ pub async fn start_challenge(arkose_token: &str) -> anyhow::Result<Session> {
 }
 
 #[derive(Debug)]
-pub struct Session {
+pub struct Session<'a> {
     client: reqwest::Client,
+    arkose_token: &'a ArkoseToken,
     sid: String,
     session_token: String,
     headers: header::HeaderMap,
@@ -186,11 +77,7 @@ pub struct Session {
     game_type: u32,
 }
 
-impl Session {
-    pub fn funcaptcha(&self) -> Option<&Arc<Vec<FunCaptcha>>> {
-        self.funcaptcha.as_ref()
-    }
-
+impl<'a> Session<'_> {
     #[inline]
     async fn request_challenge(&mut self) -> anyhow::Result<ConciseChallenge> {
         let challenge_request = RequestChallenge {
@@ -204,7 +91,7 @@ impl Session {
         };
 
         let mut headers = self.headers.clone();
-        headers.insert("X-NewRelic-Timestamp", get_time_stamp().parse()?);
+        headers.insert("X-NewRelic-Timestamp", get_time_stamp()?.parse()?);
 
         let resp = self
             .client
@@ -307,7 +194,7 @@ impl Session {
             .insert(header::DNT, header::HeaderValue::from_static("1"));
         self.headers.insert("X-Requested-ID", request_id.parse()?);
         self.headers
-            .insert("X-NewRelic-Timestamp", get_time_stamp().parse()?);
+            .insert("X-NewRelic-Timestamp", get_time_stamp()?.parse()?);
 
         let resp = self
             .client
@@ -345,11 +232,8 @@ impl Session {
                     ))
                 }
 
-                tokio::spawn(async move {
-                    if let Err(err) = callback(self.client, self.session_token).await {
-                        warn!("funcaptcha callback error: {err}")
-                    }
-                });
+                // Callback
+                let _ = self.arkose_token.callback().await;
 
                 Ok(())
             }
@@ -375,9 +259,13 @@ impl Session {
 
         Ok(b64_imgs)
     }
+
+    pub fn funcaptcha(&self) -> Option<&Arc<Vec<FunCaptcha>>> {
+        self.funcaptcha.as_ref()
+    }
 }
 
-fn get_time_stamp() -> String {
-    let since_the_epoch = now_duration().expect("Time went backwards");
-    since_the_epoch.as_millis().to_string()
+fn get_time_stamp() -> anyhow::Result<String> {
+    let since_the_epoch = now_duration()?;
+    Ok(since_the_epoch.as_millis().to_string())
 }

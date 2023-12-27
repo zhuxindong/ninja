@@ -20,17 +20,19 @@ use reqwest::Method;
 use serde::Deserialize;
 use tokio::sync::OnceCell;
 
+use self::funcaptcha::solver::ArkoseSolver;
+use self::funcaptcha::solver::Solver;
+use self::funcaptcha::solver::SubmitSolver;
 use crate::arkose::crypto::encrypt;
 use crate::constant::HEADER_UA;
+use crate::debug;
 use crate::generate_random_string;
 use crate::gpt_model::GPTModel;
+use crate::now_duration;
 use crate::warn;
 use crate::with_context;
 use error::ArkoseError;
 
-use self::funcaptcha::solver::SubmitSolver;
-use self::funcaptcha::ArkoseSolver;
-use self::funcaptcha::Solver;
 #[derive(Hash, PartialEq, Eq, Debug, Clone)]
 pub enum Type {
     GPT3,
@@ -145,6 +147,70 @@ impl ArkoseToken {
     #[inline]
     pub async fn new_from_har<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         get_from_har(path).await
+    }
+
+    /// Callback to arkose
+    pub async fn callback(&self) -> anyhow::Result<()> {
+        // Split the data string by the "|" delimiter
+        let elements: Vec<&str> = self.token.split('|').collect();
+
+        // Session token
+        let session_token = elements
+            .first()
+            .ok_or_else(|| ArkoseError::InvalidArkoseToken(self.token.to_owned()))?
+            .to_string();
+
+        // Create a mutable HashMap to store the key-value pairs
+        let mut parsed_data = std::collections::HashMap::new();
+
+        for element in elements {
+            let key_value: Vec<&str> = element.splitn(2, '=').collect();
+
+            if key_value.len() == 2 {
+                let key = key_value[0];
+                let value = key_value[1];
+                // Insert the key-value pair into the HashMap
+                parsed_data.insert(key, value);
+            }
+        }
+
+        let mut callback_data = Vec::with_capacity(6);
+        callback_data.push(format!("callback=__jsonp_{}", now_duration()?.as_millis()));
+        callback_data.push(format!("category=loaded"));
+        callback_data.push(format!("action=game loaded"));
+        callback_data.push(format!("session_token={session_token}"));
+        // Print the parsed data
+        for (key, value) in parsed_data {
+            if key.eq("pk") {
+                callback_data.push(format!("data[public_key]={value}"));
+                let typed = Type::from_pk(value)?;
+                callback_data.push(format!("data[site]={}", typed.get_site()));
+            }
+        }
+
+        let callback_query = callback_data.join("&");
+
+        let resp = with_context!(arkose_client)
+            .get(format!(
+                "https://client-api.arkoselabs.com/fc/a/?{callback_query}"
+            ))
+            .timeout(std::time::Duration::from_secs(5))
+            .send()
+            .await?;
+
+        match resp.error_for_status() {
+            Ok(resp) => {
+                if tracing::event_enabled!(tracing::Level::DEBUG) {
+                    let text = resp.text().await?;
+                    debug!("funcaptcha callback: {text}")
+                }
+            }
+            Err(err) => {
+                warn!("funcaptcha callback error: {err}")
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -338,34 +404,16 @@ async fn get_from_context(typed: Type) -> anyhow::Result<ArkoseToken> {
     // Get arkose solver
     let arkose_solver = with_context!(arkose_solver);
 
-    // Get HAR path
-    let hat_path = with_context!(arkose_har_path, &typed);
-
     // If har path is not empty, use har file
-    if let Some(file_path) = hat_path.file_path {
-        match ArkoseToken::new_from_har(&file_path).await {
-            Ok(arkose_token) => {
-                return valid_arkose_token(arkose_token, arkose_solver).await;
-            }
-            Err(err) => {
-                warn!(
-                    "get arkose token from har file: {} error: {err}",
-                    file_path.display()
-                )
-            }
-        }
+    if let Some(file_path) = with_context!(arkose_har_path, &typed).file_path {
+        let arkose_token = ArkoseToken::new_from_har(&file_path).await?;
+        return valid_arkose_token(arkose_token, arkose_solver).await;
     }
 
     // If arkose solver is not empty, use bx
     if arkose_solver.is_some() {
-        match ArkoseToken::new(typed.clone()).await {
-            Ok(arkose_token) => {
-                return valid_arkose_token(arkose_token, arkose_solver).await;
-            }
-            Err(err) => {
-                warn!("get arkose token from local bx error: {err}")
-            }
-        }
+        let arkose_token = ArkoseToken::new(typed.clone()).await?;
+        return valid_arkose_token(arkose_token, arkose_solver).await;
     }
 
     anyhow::bail!(ArkoseError::NoSolverAvailable)
@@ -380,10 +428,7 @@ where
 {
     if arkose_token.success() {
         // Submit token to funcaptcha callback
-        tokio::spawn(funcaptcha::callback(
-            with_context!(arkose_client),
-            arkose_token.value().to_owned(),
-        ));
+        let _ = arkose_token.callback().await;
     } else {
         // If arkose solver is not empty, use solver
         if let Some(arkose_solver) = arkose_solver {
@@ -406,7 +451,7 @@ async fn submit_captcha(
     key: &'static str,
     arkose_token: ArkoseToken,
 ) -> anyhow::Result<ArkoseToken> {
-    let session = funcaptcha::start_challenge(arkose_token.value())
+    let session = funcaptcha::start_challenge(&arkose_token)
         .await
         .map_err(ArkoseError::CreateSessionError)?;
 
