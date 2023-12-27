@@ -8,6 +8,7 @@ no_keepalive = false
 pool_idle_timeout = 90
 enable_direct = false
 cookie_store = true
+fastest_dns = false
 disable_webui = false
 enable_file_proxy = false
 enable_arkose_proxy = false
