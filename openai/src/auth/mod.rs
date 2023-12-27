@@ -62,25 +62,11 @@ impl AuthClient {
             )
             .send()
             .await
-            .map_err(AuthError::FailedRequest)?;
+            .map_err(AuthError::FailedRequest)?
+            .error_for_status()
+            .map_err(AuthClient::handle_error)?;
 
-        let c = resp
-            .cookies()
-            .find(|c| c.name().eq(API_AUTH_SESSION_COOKIE_KEY))
-            .ok_or(AuthError::FailedAuthSessionCookie)?;
-
-        let session = model::Session {
-            value: c.value().to_owned(),
-            expires: c.expires(),
-        };
-
-        let mut session_access_token = resp
-            .json::<model::SessionAccessToken>()
-            .await
-            .map_err(AuthError::DeserializeError)?;
-
-        session_access_token.session_token = Some(session);
-        Ok(model::AccessToken::Session(session_access_token))
+        Self::exstract_session_hanlder(resp).await
     }
 
     pub async fn do_dashboard_login(&self, access_token: &str) -> AuthResult<model::DashSession> {
@@ -132,6 +118,28 @@ impl AuthClient {
             .await
             .map_err(AuthError::FailedRequest)?;
         Self::response_handle(resp).await
+    }
+
+    async fn exstract_session_hanlder(resp: reqwest::Response) -> AuthResult<model::AccessToken> {
+        let session = resp
+            .cookies()
+            .find(|c| c.name().eq(API_AUTH_SESSION_COOKIE_KEY))
+            .map(|c| model::Session {
+                value: c.value().to_owned(),
+                expires: c.expires(),
+            });
+
+        match session {
+            Some(session) => {
+                let mut session_access_token = resp
+                    .json::<model::SessionAccessToken>()
+                    .await
+                    .map_err(AuthError::DeserializeError)?;
+                session_access_token.session_token = Some(session);
+                Ok(model::AccessToken::Session(session_access_token))
+            }
+            None => Err(AuthError::FailedAccessToken(resp.text().await?)),
+        }
     }
 
     async fn response_handle<U: DeserializeOwned>(resp: reqwest::Response) -> AuthResult<U> {

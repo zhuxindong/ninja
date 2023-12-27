@@ -8,7 +8,6 @@ use crate::auth::{
     provide::AuthenticateData,
     AuthClient, OPENAI_OAUTH_URL,
 };
-use crate::constant::API_AUTH_SESSION_COOKIE_KEY;
 use crate::{debug, warn, URL_CHATGPT_API};
 use reqwest::{Client, StatusCode};
 use serde_json::Value;
@@ -267,36 +266,11 @@ impl WebAuthProvider {
             .ext_context(ctx)
             .send()
             .await
-            .map_err(AuthError::FailedRequest)?;
+            .map_err(AuthError::FailedRequest)?
+            .error_for_status()
+            .map_err(AuthClient::handle_error)?;
 
-        match resp.error_for_status() {
-            Ok(resp) => {
-                let session = resp
-                    .cookies()
-                    .find(|c| c.name().eq(API_AUTH_SESSION_COOKIE_KEY))
-                    .map(|c| model::Session {
-                        value: c.value().to_owned(),
-                        expires: c.expires(),
-                    });
-
-                match session {
-                    Some(session) => {
-                        let mut session_access_token = resp
-                            .json::<model::SessionAccessToken>()
-                            .await
-                            .map_err(AuthError::DeserializeError)?;
-                        session_access_token.session_token = Some(session);
-                        Ok(model::AccessToken::Session(session_access_token))
-                    }
-                    None => {
-                        let text = resp.text().await?;
-                        warn!("Unable to obtain {API_AUTH_SESSION_COOKIE_KEY}, error: {text}");
-                        Err(AuthError::FailedAccessToken(text))
-                    }
-                }
-            }
-            Err(err) => Err(AuthClient::handle_error(err)),
-        }
+        AuthClient::exstract_session_hanlder(resp).await
     }
 }
 
