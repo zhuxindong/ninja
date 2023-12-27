@@ -28,11 +28,33 @@ wget https://github.com/gngpp/ninja/releases/download/v0.9.7/ninja-0.9.7-x86_64-
 tar -xf ninja-0.9.7-x86_64-unknown-linux-musl.tar.gz
 mv ./ninja /bin/ninja
 
-# 在线更新
+# 在线更新版本
 ninja update
 
-# 前台运行
+# 前台运行进程
 ninja run
+
+# 后台运行进程
+ninja start
+
+# 停止后台进程
+ninja stop
+
+# 重启后台进程
+ninja restart
+
+# 查看后台进程状态
+ninja status
+
+# 查看后台进程日志
+ninja log
+
+# 生成配置文件模版，serve.toml
+ninja gt -o serve.toml
+
+# 指定配置文件模版运行，绕开繁琐的cli命令
+ninja [COMMAND](run/start/restart) -C serve.toml
+
 ```
 
 - #### OpenWrt

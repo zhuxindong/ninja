@@ -27,6 +27,33 @@ Making [Releases](https://github.com/gngpp/ninja/releases/latest) has a precompi
 wget https://github.com/gngpp/ninja/releases/download/v0.9.7/ninja-0.9.7-x86_64-unknown-linux-musl.tar.gz
 tar -xf ninja-0.9.7-x86_64-unknown-linux-musl.tar.gz
 ./ninja run
+
+# Online update version
+ninja update
+
+# Run the process in the foreground
+ninja run
+
+# Run the process in the background
+ninja start
+
+# Stop background process
+ninja stop
+
+# Restart background process
+ninja restart
+
+# Check background process status
+ninja status
+
+# View background process logs
+ninja log
+
+# Generate configuration file template, serve.toml
+ninja gt -o serve.toml
+
+# Specify the configuration file template to run, bypassing the cumbersome cli commands
+ninja [COMMAND](run/start/restart) -C serve.toml
 ```
 
 - #### OpenWrt
