@@ -24,7 +24,7 @@
 - ChatGPT WebUI
 - API密钥获取
 - 电子邮件/密码帐户认证 (不支持Google/Microsoft第三方登录)
-- `Http API`代理支持`ChatGPT-API`/`OpenAI-API`/`ChatGPT-to-API` 
+- 代理 `ChatGPT-API`/`OpenAI-API`/`ChatGPT-to-API` 
 - 支持IP代理池
 - 极少的内存占用
 
@@ -46,3 +46,7 @@
 
 1. 开源项目可以魔改，但请保留原作者信息，以免失去技术支持。
 2. 报错、BUG之类的提出Issue，我会修复。
+
+### License
+
+**ninja** © [gngpp](https://github.com/gngpp)，根据 [GPL-3.](./LICENSE) 许可证发布。

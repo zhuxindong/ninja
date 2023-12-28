@@ -53,7 +53,7 @@ ninja log
 ninja gt -o serve.toml
 
 # Specify the configuration file template to run, bypassing the cumbersome cli commands
-ninja [COMMAND](run/start/restart) -C serve.toml
+ninja (run/start/restart) -C serve.toml
 ```
 
 - #### OpenWrt
@@ -189,6 +189,7 @@ Currently OpenAI has updated `Login` which requires verification of `Arkose Toke
 
 - Platfrom API [doc](https://platform.openai.com/docs/api-reference)
 - Backend API [doc](https://github.com/gngpp/ninja/blob/main/doc/rest.http)
+  > The example is only part of it, the official `API` is proxied according to `/backend-api/*`
 
 #### Basic services
 
@@ -209,6 +210,7 @@ Currently OpenAI has updated `Login` which requires verification of `Arkose Toke
 - `--tls-key`, environment variable `TLS_KEY`, TLS certificate private key
 - `--disable-webui`, if you don’t want to use the default built-in WebUI, use this parameter to turn it off
 - `--enable-file-proxy`, environment variable `ENABLE_FILE_PROXY`, turns on the file upload and download API proxy
+- `--enable-arkose-proxy`, enable obtaining `Arkose Token` endpoint
 - `--enable-direct`, enable direct connection, add the IP bound to the `interface` export to the proxy pool
 - `--proxies`, proxy, supports proxy pool, multiple proxies are separated by `,`, format: protocol://user:pass@ip:port
 - `--no-keepalive` turns off Http Client Tcp keepalive

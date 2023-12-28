@@ -53,7 +53,7 @@ ninja log
 ninja gt -o serve.toml
 
 # 指定配置文件模版运行，绕开繁琐的cli命令
-ninja [COMMAND](run/start/restart) -C serve.toml
+ninja (run/start/restart) -C serve.toml
 
 ```
 
@@ -190,6 +190,7 @@ services:
 
 - Platfrom API [doc](https://platform.openai.com/docs/api-reference)
 - Backend API [doc](https://github.com/gngpp/ninja/blob/main/doc/rest.http)
+  > 例子只是部分，根据`/backend-api/*`代理了官方`API`
 
 #### 基本服务
 
@@ -210,6 +211,7 @@ services:
 - `--tls-key`，环境变量 `TLS_KEY`，TLS证书私钥
 - `--disable-webui`, 如果不想使用默认自带的WebUI，使用此参数关闭
 - `--enable-file-proxy`，环境变量`ENABLE_FILE_PROXY`，开启文件上下传API代理
+- `--enable-arkose-proxy`，开启获取`Arkose Token`端点
 - `--enable-direct`，开启直连，将绑定`interface`出口的IP的加入代理池
 - `--proxies`，代理，支持代理池，多个代理使用`,`隔开，格式: protocol://user:pass@ip:port
 - `--no-keepalive` 关闭Http Client Tcp保活

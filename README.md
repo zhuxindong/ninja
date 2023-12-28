@@ -25,10 +25,12 @@ Reverse engineered `ChatGPT` proxy (bypass Cloudflare 403 Access Denied)
 - ChatGPT WebUI
 - API key acquisition
 - Email/password account authentication (Google/Microsoft third-party login not supported)
-- `Http API` proxy supports `ChatGPT-API`/`OpenAI-API`/`ChatGPT-to-API`
+- Proxy `ChatGPT-API`/`OpenAI-API`/`ChatGPT-to-API`
 - Support IP proxy pool
 - Very small memory footprint
 
+> [!INFO]
+> 
 > Limitations: This cannot bypass OpenAI's outright IP ban
 
 ### Installation
@@ -62,3 +64,7 @@ Your question might already be answered on the [issues](https://github.com/gngpp
 
 1. Open source projects can be modified, but please keep the original author information to avoid losing technical support.
 2. Submit an issue if there are errors, bugs, etc., and I will fix them.
+
+### License
+
+**ninja** © [gngpp](https://github.com/gngpp), Released under the [GPL-3.](./LICENSE) License.
