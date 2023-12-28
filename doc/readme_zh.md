@@ -219,13 +219,13 @@ services:
 - `--cookie-store`，开启Cookie Store
 - `--cf-site-key`，Cloudflare turnstile captcha site key
 - `--cf-secret-key`，Cloudflare turnstile captcha secret key
-- `--auth-key`，登录认证Key，随Authorization Bearer Token格式发送
 - `--arkose-endpoint`，ArkoseLabs endpoint，例如: <https://client-api.arkoselabs.com>
 - `--arkose-solver`，ArkoseLabs solver platform，例如: yescaptcha
 - `--arkose-solver-key`，ArkoseLabs solver client key
 - `--arkose-gpt3-experiment`，开启GPT-3.5 ArkoseLabs实验
 - `--arkose-gpt3-experiment-solver`，开启GPT-3.5 ArkoseLabs实验，需要上传HAR特征文件，并且会校验ArkoseToken正确性
 - `--impersonate-uas`，可选随机模拟UA，多个使用`,`隔开，详细请看命令手册
+- `--auth-key`，登录`API`认证`Key`，随`Authorization Bearer`格式发送
 
 ##### 代理高阶用法
 

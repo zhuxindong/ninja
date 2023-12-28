@@ -220,13 +220,13 @@ Currently OpenAI has updated `Login` which requires verification of `Arkose Toke
 - `--cookie-store`, enable Cookie Store
 - `--cf-site-key`, Cloudflare turnstile captcha site key
 - `--cf-secret-key`, Cloudflare turnstile captcha secret key
-- `--auth-key`, login authentication Key, sent with Authorization Bearer Token format
 - `--arkose-endpoint`, ArkoseLabs endpoint, for example: <https://client-api.arkoselabs.com>
 - `--arkose-solver`, ArkoseLabs solver platform, for example: yescaptcha
 - `--arkose-solver-key`, ArkoseLabs solver client key
 - `--arkose-gpt3-experiment`, to enable GPT-3.5 ArkoseLabs experiment
 - `--arkose-gpt3-experiment-solver`, to open the GPT-3.5 ArkoseLabs experiment, you need to upload the HAR feature file, and the correctness of the ArkoseToken will be verified
 - `--impersonate-uas`, you can optionally simulate UA randomly. Use `,` to separate multiple ones. Please see the command manual for details.
+- `--auth-key`, login `API` authentication `Key`, sent with `Authorization Bearer` format
 
 ##### Advanced proxy usage
 
