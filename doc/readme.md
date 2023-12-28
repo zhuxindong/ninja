@@ -26,6 +26,7 @@ Making [Releases](https://github.com/gngpp/ninja/releases/latest) has a precompi
 ```shell
 wget https://github.com/gngpp/ninja/releases/download/v0.9.7/ninja-0.9.7-x86_64-unknown-linux-musl.tar.gz
 tar -xf ninja-0.9.7-x86_64-unknown-linux-musl.tar.gz
+mv ./ninja /bin/ninja
 ./ninja run
 
 # Online update version
@@ -230,6 +231,8 @@ Currently OpenAI has updated `Login` which requires verification of `Arkose Toke
 ##### Advanced proxy usage
 
 The built-in protocols and proxy types of agents are divided into built-in protocols: `all/api/auth/arkose`, where `all` is for all clients, `api` is for all `OpenAI API`, `auth` is for authorization/login, `arkose` For ArkoseLabs; proxy type: `interface/proxy/ipv6_subnet`, where `interface` represents the bound export `IP` address, `proxy` represents the upstream proxy protocol: `http/https/socks5/socks5h`, `ipv6_subnet` represents the A random IP address within the IPv6 subnet acts as a proxy. The format is `proto|proxy`, example: **`all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081`**, without built-in protocol, the protocol defaults to `all`.
+
+> Regarding the proxy `http/https/socks5/socks5h`, only when the `socks5h` protocol is used, the DNS resolution will go through the proxy resolution, otherwise the `local`/`built-in` DNS resolution will be used
 
 ##### Agent usage rules
 

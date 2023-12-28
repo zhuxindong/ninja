@@ -54,7 +54,6 @@ ninja gt -o serve.toml
 
 # 指定配置文件模版运行，绕开繁琐的cli命令
 ninja (run/start/restart) -C serve.toml
-
 ```
 
 - #### OpenWrt
@@ -231,14 +230,16 @@ services:
 ##### 代理高阶用法
 
 分代理内置协议和代理类型，内置协议: `all/api/auth/arkose`，其中`all`针对所有客户端，`api`针对所有`OpenAI API`，`auth`针对授权/登录，`arkose`针对ArkoseLabs；代理类型: `interface/proxy/ipv6_subnet`，其中`interface`表示绑定的出口`IP`地址，`proxy`表示上游代理协议: `http/https/socks5/socks5h`，`ipv6_subnet`表示用Ipv6子网段内随机IP地址作为代理。格式为`proto|proxy`，例子: **`all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081`**，不带内置协议，协议默认为`all`。
-  
+
+> 关于代理`http/https/socks5/socks5h`，只有使用`socks5h`协议时，DNS解析才会走代理解析，否则将使用`本地`/`内置`DNS解析
+
 ##### 代理使用规则
 
 1) 存在`interface` \ `proxy` \ `ipv6_subnet`
 
 当开启`--enable-direct`，那么将使用`proxy` + `interface`作为代理池；未开启`--enable-direct`，只有`proxy`数量大于等于2才使用`proxy`，否则将使用 `ipv6_subnet`作为代理池，`interface`作为fallback地址。
 
-2) 存在`interface`、`proxy`
+2) 存在`interface` \ `proxy`
 
 当开启`--enable-direct`，那么将使用`proxy` + `interface`作为代理池；未开启`--enable-direct`，只使用`proxy`作为代理池。
   
