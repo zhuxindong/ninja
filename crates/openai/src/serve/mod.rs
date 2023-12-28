@@ -55,12 +55,11 @@ type ProxyResult<T> = std::result::Result<T, ProxyError>;
 fn print_boot_message(inner: &Args) {
     info!("OS: {}", std::env::consts::OS);
     info!("Arch: {}", std::env::consts::ARCH);
-    info!("Version: {}", env!("CARGO_PKG_VERSION"));
     info!("Concurrent limit: {}", inner.concurrent_limit);
-    info!("Keepalive {} seconds", inner.tcp_keepalive);
     info!("Timeout {} seconds", inner.timeout);
     info!("Connect timeout {} seconds", inner.connect_timeout);
     info!("TCP keepalive: {}", inner.no_keepalive.not());
+    info!("Keepalive {} seconds", inner.tcp_keepalive);
     info!("Cookie store: {}", inner.cookie_store);
     info!("Direct connection: {}", inner.enable_direct);
     info!("File endpoint: {}", inner.enable_file_proxy);
