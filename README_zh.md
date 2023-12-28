@@ -49,4 +49,4 @@
 
 ### License
 
-**ninja** © [gngpp](https://github.com/gngpp)，根据 [GPL-3.](./LICENSE) 许可证发布。
+**ninja** © [gngpp](https://github.com/gngpp)，根据 [GPL-3.0](./LICENSE) 许可证发布。

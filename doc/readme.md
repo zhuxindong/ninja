@@ -188,7 +188,7 @@ Currently OpenAI has updated `Login` which requires verification of `Arkose Toke
 #### API documentation
 
 - Platfrom API [doc](https://platform.openai.com/docs/api-reference)
-- Backend API [doc](https://github.com/gngpp/ninja/blob/main/doc/rest.http)
+- Backend API [doc1](https://github.com/gngpp/ninja/blob/main/doc/rest.http) or [doc2](https://github.com/gngpp/ninja/blob/main/doc/python-requests.ipynb)
   > The example is only part of it, the official `API` is proxied according to `/backend-api/*`
 
 #### Basic services

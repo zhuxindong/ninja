@@ -189,7 +189,7 @@ services:
 #### API文档
 
 - Platfrom API [doc](https://platform.openai.com/docs/api-reference)
-- Backend API [doc](https://github.com/gngpp/ninja/blob/main/doc/rest.http)
+- Backend API [doc1](https://github.com/gngpp/ninja/blob/main/doc/rest.http) or [doc2](https://github.com/gngpp/ninja/blob/main/doc/python-requests.ipynb)
   > 例子只是部分，根据`/backend-api/*`代理了官方`API`
 
 #### 基本服务

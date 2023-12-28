@@ -29,8 +29,6 @@ Reverse engineered `ChatGPT` proxy (bypass Cloudflare 403 Access Denied)
 - Support IP proxy pool
 - Very small memory footprint
 
-> [!INFO]
-> 
 > Limitations: This cannot bypass OpenAI's outright IP ban
 
 ### Installation
@@ -67,4 +65,4 @@ Your question might already be answered on the [issues](https://github.com/gngpp
 
 ### License
 
-**ninja** © [gngpp](https://github.com/gngpp), Released under the [GPL-3.](./LICENSE) License.
+**ninja** © [gngpp](https://github.com/gngpp), Released under the [GPL-3.0](./LICENSE) License.
