@@ -1,5 +1,3 @@
-use std::env;
-
 use self_update::cargo_crate_version;
 
 pub(super) fn update() -> anyhow::Result<()> {
