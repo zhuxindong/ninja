@@ -17,22 +17,20 @@
 
 逆向工程的 `ChatGPT` 代理（绕过 Cloudflare 403 Access Denied）
 
-> 如果项目对你有帮助，请考虑[捐赠支持](https://github.com/gngpp/gngpp/blob/main/SPONSOR.md#sponsor-my-open-source-works)项目持续维护，也可以付费获取咨询和技术支持服务。
+> 局限性: 无法绕过 OpenAI 的彻底 IP 禁令
 
 ### 特性
 
 - ChatGPT WebUI
 - API密钥获取
-- 电子邮件/密码帐户认证 (不支持Google/Microsoft第三方登录)
-- 代理 `ChatGPT-API`/`OpenAI-API`/`ChatGPT-to-API` 
+- `电子邮件`/`密码`帐户认证
+- 代理 `ChatGPT-API`/`OpenAI-API`/`ChatGPT-to-API`
 - 支持IP代理池
 - 极少的内存占用
 
-> 局限性: 无法绕过 OpenAI 的彻底 IP 禁令
-
 ### 安装
 
-如果您需要更详细的安装与使用信息，请查看[安装文档](https://github.com/gngpp/ninja/blob/main/doc/readme_zh.md)
+如果您需要更详细的安装与使用信息，请查看[文档](https://github.com/gngpp/ninja/blob/main/doc/readme_zh.md)
 
 ### 贡献
 
