@@ -118,6 +118,7 @@ impl Context {
                 .expect("Failed to initialize the requesting oauth client"),
             arkose_client: ClientRoundRobinBalancer::new_arkose_client(&args)
                 .expect("Failed to initialize the requesting arkose client"),
+            preauth_provider: args.pbind.is_some().then_some(PreauthCookieProvider::new()),
             arkose_endpoint: args.arkose_endpoint,
             arkose_solver: args.arkose_solver,
             arkose_har_upload_key: args.arkose_har_upload_key,
@@ -132,7 +133,6 @@ impl Context {
                     secret_key,
                 })
             }),
-            preauth_provider: args.pbind.is_some().then(|| PreauthCookieProvider::new()),
         }
     }
 
@@ -191,8 +191,10 @@ impl Context {
 
     /// Push a preauth cookie
     #[cfg(feature = "preauth")]
-    pub fn push_preauth_cookie(&self, value: &str) {
-        self.preauth_provider.as_ref().map(|p| p.push(value));
+    pub fn push_preauth_cookie(&self, value: &str, max_age: Option<u32>) {
+        self.preauth_provider
+            .as_ref()
+            .map(|p| p.push(value, max_age));
     }
 
     /// Pop a preauth cookie
