@@ -29,8 +29,12 @@ impl PreauthCookieProvider {
             .time_to_live(Duration::from_secs(3600 * 24))
             .build();
 
+        if let Some(err) = std::fs::write(&path, data.join("\n").as_bytes()).err() {
+            warn!("Failed to write preauth cookie to file: {err}")
+        };
+
         // Load from file
-        data.iter().for_each(|value| {
+        data.into_iter().for_each(|value| {
             info!(
                 "Load preauth cookie from file: {}, value: {value}",
                 path.display()
@@ -40,10 +44,6 @@ impl PreauthCookieProvider {
                 cache.insert(device_id.to_owned(), value.to_owned())
             });
         });
-
-        if let Some(err) = std::fs::write(&path, data.join("\n").as_bytes()).err() {
-            warn!("Failed to write preauth cookie to file: {err}")
-        };
 
         PreauthCookieProvider { cache, path }
     }

@@ -19,10 +19,10 @@ const FIELD_FILE: &'static str = "files";
 const LOGIN_PATH: &'static str = "/har/login";
 const UPLOAD_PATH: &'static str = "/har/upload";
 
-const LOGIN_PAGE: &'static str = include_str!("../../../../ui/har/login.html");
-const UPLOAD_PAGE: &'static str = include_str!("../../../../ui/har/upload.html");
-const SUCCESS_PAGE: &'static str = include_str!("../../../../ui/har/success.html");
-const ERROR_PAGE: &'static str = include_str!("../../../../ui/har/error.html");
+const LOGIN_PAGE: &'static str = include_str!("../../../../../frontend/har/login.html");
+const UPLOAD_PAGE: &'static str = include_str!("../../../../../frontend/har/upload.html");
+const SUCCESS_PAGE: &'static str = include_str!("../../../../../frontend/har/success.html");
+const ERROR_PAGE: &'static str = include_str!("../../../../../frontend/har/error.html");
 
 const FAILED_UPLOAD_TITLE: &'static str = "Failed to upload file";
 const FAILED_AUTH_TITLE: &'static str = "Failed Authenticate";

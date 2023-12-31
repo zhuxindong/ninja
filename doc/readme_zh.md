@@ -118,7 +118,7 @@ services:
 
 ### ArkoseLabs
 
-发送`GPT-4/GPT-3.5/创建API-Key`对话需要`Arkose Token`作为参数发送，支持的解决方案暂时只有两种
+发送`GPT-4/GPT-3.5/创建API-Key`对话需要`Arkose Token`作为参数发送
 
 1) 使用HAR
 
@@ -130,8 +130,7 @@ services:
 
 平台进行验证码解析，启动参数`--arkose-solver`选择平台（默认使用`YesCaptcha`），`--arkose-solver-key` 填写`Client Key`
 
-- 两种方案都使用，优先级是：`HAR` > `YesCaptcha` / `CapSolver`
-- `YesCaptcha` / `CapSolver`推荐搭配HAR使用，出验证码则调用解析器处理，验证后HAR使用更持久
+- `YesCaptcha` / `CapSolver`推荐搭配HAR使用，出验证码则调用解析器处理
 
 目前OpenAI已经更新`登录`需要验证`Arkose Token`，解决方式同`GPT-4`，填写启动参数指定HAR文件`--arkose-auth-har-dir`。创建API-Key需要上传Platform相关的HAR特征文件，获取方式同上。
 
@@ -160,8 +159,8 @@ services:
   > 图片和文件上下传API代理，`/backend-api/files`接口返回的API已经转为`/files/*`
 
 - Arkose-API
-  - `/arkose_token/:pk`
-  > 其中pk为arkose类型的ID，比如请求GPT4的Arkose，`/arkose_token/35536E1E-65B4-4D96-9D97-6ADB7EFF8147`
+  - `/auth/arkose_token/:pk`
+  > 其中pk为arkose类型的ID，比如请求GPT4的Arkose，`/auth/arkose_token/35536E1E-65B4-4D96-9D97-6ADB7EFF8147`
 
 - Authorization
   > 除了登录，都使用`Authorization: Bearer xxxx`

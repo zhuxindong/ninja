@@ -1,5 +1,6 @@
+mod arkose;
 mod cookier;
-mod extract;
+mod ext;
 
 use anyhow::anyhow;
 use axum::body;
@@ -46,12 +47,10 @@ use crate::constant::SUPPORT_APPLE;
 use crate::constant::USERNAME;
 use crate::context::args::Args;
 use crate::debug;
-use crate::info;
 use crate::now_duration;
 use crate::serve::error::ResponseError;
 use crate::serve::middleware::csrf;
 use crate::serve::proxy::header_convert;
-use crate::serve::route::ui::extract::SessionExtractor;
 use crate::serve::turnstile;
 use crate::serve::whitelist;
 use crate::with_context;
@@ -61,7 +60,8 @@ use crate::{
     URL_CHATGPT_API,
 };
 
-use self::extract::Session;
+use ext::Session;
+use ext::SessionExtractor;
 
 use super::get_static_resource;
 
@@ -86,31 +86,21 @@ pub(super) fn config(router: Router, args: &Args) -> Router {
         return router;
     }
 
-    if let Some(endpoint) = with_context!(arkose_endpoint) {
-        info!("WebUI site use Arkose endpoint: {endpoint}")
-    }
-
-    let mut tera = tera::Tera::default();
-    tera.add_raw_templates(vec![
-        (TEMP_404, include_str!("../../../../ui/404.htm")),
-        (TEMP_AUTH, include_str!("../../../../ui/auth.htm")),
-        (TEMP_LOGIN, include_str!("../../../../ui/login.htm")),
-        (TEMP_CHAT, include_str!("../../../../ui/chat.htm")),
-        (TEMP_DETAIL, include_str!("../../../../ui/detail.htm")),
-        (TEMP_SHARE, include_str!("../../../../ui/share.htm")),
-    ])
-    .expect("The static template failed to load");
-
-    let _ = TEMPLATE.set(tera);
-
+    // Configure csrf
     let config = CsrfConfig::default().with_key(Some(Key::generate()));
 
-    let router = if with_context!(auth_key).is_some() {
-        router
-    } else {
-        router.route("/auth", get(get_auth))
-    };
+    // Configure arkose routing
+    let router = arkose::config(
+        // If the auth key is empty, then the auth page is not required
+        if with_context!(auth_key).is_some() {
+            router
+        } else {
+            router.route("/auth", get(get_auth))
+        },
+        args,
+    );
 
+    // Configure the UI routing
     router
         .route(
             "/auth/login",
@@ -216,7 +206,7 @@ async fn post_login(
                 Token::try_from(access_token).map_err(ResponseError::InternalServerError)?;
             let session = Session::from(authentication_token);
 
-            let cookie = cookier::build_cookie(SESSION_ID, session.to_string(), session.expires)?;
+            let cookie = cookier::build_cookie(SESSION_ID, session.to_string()?, session.expires)?;
 
             let mut builder = Response::builder()
                 .status(StatusCode::SEE_OTHER)
@@ -292,7 +282,7 @@ async fn post_login_token(
     };
 
     // Consider using secure(true) based on your security requirements
-    let cookie = cookier::build_cookie(SESSION_ID, session.to_string(), session.expires)?;
+    let cookie = cookier::build_cookie(SESSION_ID, session.to_string()?, session.expires)?;
 
     // Set session cookie
     builder = builder.header(header::SET_COOKIE, cookie.to_string());
@@ -388,7 +378,7 @@ fn create_response_from_session(session: &Session) -> Result<Response<Body>, Res
     Ok(Response::builder()
         .status(StatusCode::OK)
         .header(header::LOCATION, LOGIN_INDEX)
-        .header(header::SET_COOKIE, session.to_string()) // Note: This might not be what you want
+        .header(header::SET_COOKIE, session.to_string()?) // Note: This might not be what you want
         .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
         .body(Body::from(body))
         .map_err(ResponseError::InternalServerError)?)
@@ -806,8 +796,28 @@ async fn error_404() -> Result<Response<Body>, ResponseError> {
 /// Render html template
 fn render_template(name: &str, context: &tera::Context) -> Result<Response<Body>, ResponseError> {
     let tm = TEMPLATE
-        .get()
-        .expect("template not init")
+        .get_or_init(|| {
+            let mut tera = tera::Tera::default();
+            tera.add_raw_templates(vec![
+                (TEMP_404, include_str!("../../../../../frontend/404.htm")),
+                (TEMP_AUTH, include_str!("../../../../../frontend/auth.htm")),
+                (
+                    TEMP_LOGIN,
+                    include_str!("../../../../../frontend/login.htm"),
+                ),
+                (TEMP_CHAT, include_str!("../../../../../frontend/chat.htm")),
+                (
+                    TEMP_DETAIL,
+                    include_str!("../../../../../frontend/detail.htm"),
+                ),
+                (
+                    TEMP_SHARE,
+                    include_str!("../../../../../frontend/share.htm"),
+                ),
+            ])
+            .expect("The static template failed to load");
+            tera
+        })
         .render(name, context)
         .map_err(ResponseError::InternalServerError)?;
 

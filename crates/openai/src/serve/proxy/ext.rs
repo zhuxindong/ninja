@@ -16,28 +16,28 @@ use crate::serve::error::ResponseError;
 
 /// Context extension.
 #[derive(TypedBuilder)]
-pub(crate) struct ContextExt {
+pub struct ContextExt {
     // Enable stream
-    pub(crate) stream: bool,
+    pub stream: bool,
     // Mapper model
-    pub(crate) model: String,
+    pub model: String,
 }
 
 /// Response extension.
 #[derive(TypedBuilder)]
-pub(crate) struct ResponseExt {
+pub struct ResponseExt {
     #[builder(setter(into), default)]
-    pub(crate) context: Option<ContextExt>,
-    pub(crate) inner: reqwest::Response,
+    pub context: Option<ContextExt>,
+    pub inner: reqwest::Response,
 }
 
 /// Extractor for request parts.
-pub(crate) struct RequestExt {
-    pub(crate) uri: Uri,
-    pub(crate) method: http::Method,
-    pub(crate) headers: http::HeaderMap,
-    pub(crate) jar: CookieJar,
-    pub(crate) body: Option<Bytes>,
+pub struct RequestExt {
+    pub uri: Uri,
+    pub method: http::Method,
+    pub headers: http::HeaderMap,
+    pub jar: CookieJar,
+    pub body: Option<Bytes>,
 }
 
 impl RequestExt {
