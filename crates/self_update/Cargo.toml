@@ -13,7 +13,7 @@ tar = { version = "0.4.40", optional = true }
 semver = "1.0.20"
 zip = { version = "0.6.6", default-features = false, features = ["time"], optional = true }
 either = { version = "1.9.0", optional = true }
-reqwest = { package = "reqwest-impersonate", version = "0.11.46", default-features = false, features = ["impersonate", "blocking", "json"] }
+reqwest = { package = "reqwest-impersonate", version = "0.11.47", default-features = false, features = ["impersonate", "blocking", "json"] }
 indicatif = "0.17.7"
 quick-xml = "0.31.0"
 regex = "1.10.2"
