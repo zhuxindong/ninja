@@ -119,7 +119,7 @@ services:
 
 ### ArkoseLabs
 
-Sending `GPT-4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` as a parameter. There are only two supported solutions for the time being.
+Sending `GPT-4/GPT-3.5/Creating API-Key` dialog requires sending `Arkose Token` as a parameter.
 
 1) Use HAR
 
@@ -131,8 +131,7 @@ The `ChatGPT` official website sends a `GPT-4` session message, and the browser 
 
 The platform performs verification code parsing, start the parameter `--arkose-solver` to select the platform (use `YesCaptcha` by default), `--arkose-solver-key` fill in `Client Key`
 
-- Both solutions are used, the priority is: `HAR` > `YesCaptcha` / `CapSolver`
-- `YesCaptcha` / `CapSolver` is recommended to be used with HAR. When the verification code is generated, the parser is called for processing. After verification, HAR is more durable.
+- `YesCaptcha` / `CapSolver` is recommended to be used with HAR. When the verification code is generated, the parser is called for processing.
 
 Currently OpenAI has updated `Login` which requires verification of `Arkose Token`. The solution is the same as `GPT-4`. Fill in the startup parameters and specify the HAR file `--arkose-auth-har-dir`. To create an API-Key, you need to upload the HAR feature file related to the Platform. The acquisition method is the same as above.
 
@@ -161,8 +160,8 @@ Currently OpenAI has updated `Login` which requires verification of `Arkose Toke
   > Image and file upload and download API proxy, the API returned by the `/backend-api/files` interface has been converted to `/files/*`
 
 - Arkose-API
-  - `/arkose_token/:pk`
-  > where pk is the arkose type ID, such as requesting Arkose for GPT4, `/arkose_token/35536E1E-65B4-4D96-9D97-6ADB7EFF8147`
+  - `/auth/arkose_token/:pk`
+  > where pk is the arkose type ID, such as requesting Arkose for GPT4, `/auth/arkose_token/35536E1E-65B4-4D96-9D97-6ADB7EFF8147`
 
 - Authorization
   > Except for login, use `Authorization: Bearer xxxx`

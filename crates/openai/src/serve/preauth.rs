@@ -1,7 +1,8 @@
 use crate::with_context;
+use axum_extra::extract::CookieJar;
 use mitm::proxy::hyper::{
     body::Body,
-    http::{header, HeaderMap, HeaderValue, Request, Response},
+    http::{HeaderMap, HeaderValue, Request, Response},
 };
 use mitm::proxy::{handler::HttpHandler, mitm::RequestOrResponse};
 use std::fmt::Write;
@@ -13,7 +14,6 @@ pub struct PreAuthHanlder;
 impl HttpHandler for PreAuthHanlder {
     async fn handle_request(&self, req: Request<Body>) -> RequestOrResponse {
         log_req(&req).await;
-        // extract preauth cookie
         collect_preauth_cookie(req.headers());
         RequestOrResponse::Request(req)
     }
@@ -26,14 +26,14 @@ impl HttpHandler for PreAuthHanlder {
 }
 
 fn collect_preauth_cookie(headers: &HeaderMap<HeaderValue>) {
-    headers
-        .iter()
-        .filter(|(k, _)| k.eq(&header::COOKIE) || k.eq(&header::SET_COOKIE))
-        .for_each(|(_, v)| {
-            let _ = v
-                .to_str()
-                .map(|value| with_context!(push_preauth_cookie, value));
-        });
+    let jar = CookieJar::from_headers(headers);
+    for c in jar.iter() {
+        // Preauth cookie max age
+        if c.name().eq("_preauth_devicecheck") {
+            let max_age = c.max_age().map(|a| a.as_seconds_f32() as u32);
+            with_context!(push_preauth_cookie, c.value(), max_age);
+        }
+    }
 }
 
 pub async fn log_req(req: &Request<Body>) {

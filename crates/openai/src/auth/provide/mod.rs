@@ -104,7 +104,11 @@ impl<'a> RequestContext<'a> {
 
     async fn load_arkose_token(&mut self) -> AuthResult<()> {
         let arkose_token = match self.account.arkose_token.as_deref() {
-            Some(arkose_token) => ArkoseToken::from(arkose_token),
+            Some(arkose_token) => {
+                let arkose_token = ArkoseToken::from(arkose_token);
+                let _ = arkose_token.callback().await;
+                arkose_token
+            }
             None => arkose::ArkoseToken::new_from_context(Type::Auth)
                 .await
                 .map_err(AuthError::InvalidArkoseToken)?,
@@ -112,6 +116,7 @@ impl<'a> RequestContext<'a> {
 
         self.cookie
             .insert(format!("arkoseToken={}", arkose_token.value()));
+
         Ok(())
     }
 }

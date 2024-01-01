@@ -11,11 +11,13 @@ mod turnstile;
 mod whitelist;
 
 use axum::body::Body;
+use axum::extract::Path;
 use axum::headers::authorization::Bearer;
 use axum::headers::Authorization;
 use axum::http::Response;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
+use axum::routing::get;
 use axum::routing::{any, post};
 use axum::Router;
 use axum::{Json, TypedHeader};
@@ -24,6 +26,8 @@ use axum_server::{AddrIncomingConfig, Handle};
 use self::proxy::ext::RequestExt;
 use self::proxy::ext::SendRequestExt;
 use self::proxy::resp::response_convert;
+use crate::arkose;
+use crate::arkose::ArkoseToken;
 use crate::auth::model::{AccessToken, AuthAccount, RefreshToken, SessionAccessToken};
 use crate::auth::provide::AuthProvider;
 use crate::constant::API_AUTH_SESSION_COOKIE_KEY;
@@ -75,6 +79,9 @@ fn print_boot_message(inner: &Args) {
     inner.arkose_solver.as_ref().map(|solver| {
         info!("ArkoseLabs solver: {:?}", solver.solver);
     });
+    inner.arkose_endpoint.as_ref().map(|endpoint| {
+        info!("ArkoseLabs endpoint: {:?}", endpoint);
+    });
 
     inner.proxies.iter().for_each(|p| match p {
         Proxy::All(inner) | Proxy::Api(inner) | Proxy::Auth(inner) | Proxy::Arkose(inner) => {
@@ -122,9 +129,6 @@ impl Serve {
         // init context
         context::init(self.0.clone());
 
-        // fast dns test
-        dns::fast::load_fastest_dns(self.0.fastest_dns).await?;
-
         // init global layer provider
         let global_layer = tower::ServiceBuilder::new()
             .layer(
@@ -171,31 +175,35 @@ impl Serve {
                 ))
         };
 
-        let router = route::config(
-            Router::new()
-                // official dashboard api endpoint
-                .route("/dashboard/*path", any(official_proxy))
-                // official v1 api endpoint
-                .route("/v1/*path", any(official_proxy))
-                // unofficial backend api endpoint
-                .route("/backend-api/*path", any(unofficial_proxy))
-                .route_layer(app_layer)
-                // unofficial public api endpoint
-                .route("/public-api/*path", any(unofficial_proxy))
-                .route("/auth/token", post(post_access_token))
-                .route("/auth/refresh_token", post(post_refresh_token))
-                .route("/auth/revoke_token", post(post_revoke_token))
-                .route("/auth/refresh_session", post(post_refresh_session))
-                .route("/auth/sess_token", post(post_sess_token)),
-            &self.0,
-        )
-        .layer(global_layer);
+        let router = Router::new()
+            .route("/dashboard/*path", any(official_proxy))
+            .route("/v1/*path", any(official_proxy))
+            .route("/backend-api/*path", any(unofficial_proxy))
+            .route_layer(app_layer)
+            .route("/public-api/*path", any(unofficial_proxy))
+            .route("/auth/token", post(post_access_token))
+            .route("/auth/refresh_token", post(post_refresh_token))
+            .route("/auth/revoke_token", post(post_revoke_token))
+            .route("/auth/refresh_session", post(post_refresh_session))
+            .route("/auth/sess_token", post(post_sess_token));
+
+        // Enable arkose token endpoint proxy
+        let router = if self.0.enable_arkose_proxy {
+            router.route("/auth/arkose_token/:path", get(get_arkose_token))
+        } else {
+            router
+        };
+
+        let router = route::config(router, &self.0).layer(global_layer);
 
         // Signal the server to shutdown using Handle.
         let handle = Handle::new();
 
         // Spawn a task to gracefully shutdown server.
         tokio::spawn(signal::graceful_shutdown(handle.clone()));
+
+        // Fast dns test
+        dns::fast::load_fastest_dns(self.0.fastest_dns).await?;
 
         // Spawn a task to check wan address.
         tokio::spawn(check_wan_address());
@@ -358,6 +366,16 @@ async fn post_revoke_token(
         Ok(_) => Ok(StatusCode::OK),
         Err(err) => Err(ResponseError::BadRequest(err)),
     }
+}
+
+/// GET /auth/arkose_token/:path
+/// Example: /auth//arkose_token/35536E1E-65B4-4D96-9D97-6ADB7EFF8147
+async fn get_arkose_token(pk: Path<String>) -> Result<Json<ArkoseToken>, ResponseError> {
+    let typed = arkose::Type::from_pk(pk.as_str()).map_err(ResponseError::BadRequest)?;
+    ArkoseToken::new_from_context(typed)
+        .await
+        .map(Json)
+        .map_err(ResponseError::ExpectationFailed)
 }
 
 /// match path /dashboard/{tail.*}

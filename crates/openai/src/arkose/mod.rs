@@ -24,7 +24,6 @@ use self::funcaptcha::solver::ArkoseSolver;
 use self::funcaptcha::solver::Solver;
 use self::funcaptcha::solver::SubmitSolver;
 use crate::arkose::crypto::encrypt;
-use crate::constant::HEADER_UA;
 use crate::debug;
 use crate::generate_random_string;
 use crate::gpt_model::GPTModel;
@@ -275,7 +274,7 @@ async fn get_from_bx_common(
             Regex::new(r#"\{"key":"n","value":"[^"]+"\}"#).expect("Invalid regex")
         })
         .await;
-    let bv = HEADER_UA;
+    let bv = "okhttp/4.9.1";
     let bt = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let bw = (bt - (bt % 21600)).to_string();
     let bx = regex.replace_all(
@@ -303,7 +302,7 @@ async fn get_from_bx_common(
 
     let resp = with_context!(arkose_client)
         .post(format!("https://{host}/fc/gt2/public_key/{public_key}"))
-        .header(header::USER_AGENT, HEADER_UA)
+        .header(header::USER_AGENT, "okhttp/4.9.1")
         .header(header::ACCEPT, "*/*")
         .header(header::ACCEPT_ENCODING, "gzip, deflate, br")
         .header(header::ACCEPT_LANGUAGE, "zh-CN,zh-Hans;q=0.9")

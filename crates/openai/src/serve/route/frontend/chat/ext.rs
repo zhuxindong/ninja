@@ -9,13 +9,12 @@ use serde::{Deserialize, Serialize};
 use crate::constant::API_AUTH_SESSION_COOKIE_KEY;
 use crate::debug;
 use crate::token::TokenProfile;
-use crate::{
-    serve::{error::ResponseError, route::ui::LOGIN_INDEX, route::ui::SESSION_ID},
-    token::model::Token,
-};
+use crate::{serve::error::ResponseError, token::model::Token};
+
+use super::{LOGIN_INDEX, SESSION_ID};
 
 #[derive(Serialize, Deserialize)]
-pub(super) struct Session {
+pub struct Session {
     pub access_token: String,
     pub refresh_token: Option<String>,
     #[serde(skip_serializing)]
@@ -25,11 +24,10 @@ pub(super) struct Session {
     pub expires: i64,
 }
 
-impl ToString for Session {
-    fn to_string(&self) -> String {
-        let json = serde_json::to_string(self)
-            .expect("An error occurred during the internal serialization session");
-        base64::engine::general_purpose::STANDARD.encode(json.as_bytes())
+impl Session {
+    pub fn to_string(&self) -> Result<String, ResponseError> {
+        let json = serde_json::to_string(&self).map_err(ResponseError::Unauthorized)?;
+        Ok(base64::engine::general_purpose::STANDARD.encode(json.as_bytes()))
     }
 }
 
@@ -70,7 +68,7 @@ impl From<(&str, TokenProfile)> for Session {
     }
 }
 
-pub(super) struct SessionExtractor {
+pub struct SessionExtractor {
     pub session: Session,
     pub session_token: Option<String>,
     pub headers: HeaderMap,

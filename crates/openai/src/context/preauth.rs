@@ -1,14 +1,69 @@
-use crate::{error, homedir::home_dir, info, now_duration, warn};
+use crate::{error, homedir::home_dir, info, now_duration};
 use moka::sync::Cache;
-use std::{path::PathBuf, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    sync::Mutex,
+    time::Duration,
+};
+
+const SEPARATOR: &str = "---";
+const DEFAULT_MAX_AGE: u32 = 3600;
+const DEFAULT_MAX_CAPACITY: u64 = 1000;
+
+static LOCK: Mutex<()> = Mutex::new(());
+static mut CACHE: Option<Cache<String, String>> = None;
+
+fn get_or_init_cache(max_age: Option<u32>) -> &'static Cache<String, String> {
+    unsafe {
+        CACHE.is_none().then(|| {
+            let cache = Cache::builder()
+                .max_capacity(DEFAULT_MAX_CAPACITY)
+                .time_to_live(Duration::from_secs(
+                    max_age.unwrap_or(DEFAULT_MAX_AGE).into(),
+                ))
+                .build();
+            CACHE = Some(cache);
+        });
+        CACHE.as_ref().unwrap()
+    }
+}
+
+fn reload_cache(max_age: Option<u32>) {
+    let cache = get_or_init_cache(max_age);
+
+    cache.run_pending_tasks();
+    // If cache is empty, return
+    if cache.entry_count() == 0 {
+        return;
+    }
+
+    let new_cache = Cache::builder()
+        .max_capacity(DEFAULT_MAX_CAPACITY)
+        .time_to_live(Duration::from_secs(
+            max_age.unwrap_or(DEFAULT_MAX_AGE).into(),
+        ))
+        .build();
+
+    cache.iter().for_each(|(k, v)| {
+        new_cache.insert(k.to_string(), v);
+    });
+
+    // Unsafe: Replace cache
+    if let Ok(lock) = LOCK.try_lock() {
+        unsafe {
+            CACHE = Some(new_cache);
+        }
+        drop(lock);
+    }
+}
 
 pub(super) struct PreauthCookieProvider {
     path: PathBuf,
-    cache: Cache<String, String>,
+    max_age: Option<u32>,
 }
 
 impl PreauthCookieProvider {
-    pub(super) fn new() -> Self {
+    pub fn new() -> Self {
         let path = home_dir()
             .unwrap_or(PathBuf::from("."))
             .join(".preauth_cookies");
@@ -19,59 +74,67 @@ impl PreauthCookieProvider {
                 data.split(|&c| c == b'\n')
                     .filter(|s| !s.is_empty())
                     .map(|s| String::from_utf8_lossy(s).to_string())
-                    .filter(|input| Self::is_invalid(input))
                     .collect::<Vec<String>>()
             })
             .unwrap_or_default();
 
-        let cache: Cache<String, String> = Cache::builder()
-            .max_capacity(1000)
-            .time_to_live(Duration::from_secs(3600 * 24))
-            .build();
+        let mut provider = PreauthCookieProvider {
+            path,
+            max_age: None,
+        };
 
         // Load from file
-        data.iter().for_each(|value| {
-            info!(
-                "Load preauth cookie from file: {}, value: {value}",
-                path.display()
-            );
+        data.into_iter().for_each(|value| {
+            // split by `---`, example: `max_age---device_id:timestamp-xxxx`
+            let group = value
+                .split(SEPARATOR)
+                .into_iter()
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<&str>>();
+
+            // If group length is not 2, skip
+            if group.len() != 2 {
+                return;
+            }
+
+            // Parse max_age
+            let max_age = group[0].parse::<u32>().unwrap_or(0);
+            // Parse value
+            let value = group[1];
+
+            provider.max_age = Some(max_age);
+
             value.find(":").map(|colon_index| {
                 let device_id = &value[..colon_index];
-                cache.insert(device_id.to_owned(), value.to_owned())
+                // If is invalid, skip
+                if !Self::is_invalid(value, Some(max_age)) {
+                    info!("Loading preauth cookie value: {value}",);
+                    get_or_init_cache(Some(max_age)).insert(device_id.to_owned(), value.to_owned())
+                }
             });
         });
 
-        if let Some(err) = std::fs::write(&path, data.join("\n").as_bytes()).err() {
-            warn!("Failed to write preauth cookie to file: {err}")
-        };
-
-        PreauthCookieProvider { cache, path }
+        provider
     }
 
-    pub(super) fn push(&self, value: &str) {
-        value
-            .split(";")
-            .find(|s| s.contains("_preauth_devicecheck"))
-            .map(|value| {
-                let preauth_devicecheck = value
-                    .trim()
-                    .trim_start_matches("_preauth_devicecheck=")
-                    .to_owned();
-                preauth_devicecheck.find(":").map(|colon_index| {
-                    let device_id = &preauth_devicecheck[..colon_index];
-                    info!("Push PreAuth Cookie: {preauth_devicecheck}");
-                    self.cache.insert(device_id.to_owned(), preauth_devicecheck);
-                    self.sync_to_file();
-                });
-            });
+    /// Push a preauth cookie
+    /// Example: `id1:1704031809-xxx`
+    pub fn push(&self, value: &str, max_age: Option<u32>) {
+        value.find(":").map(|colon_index| {
+            let device_id = &value[..colon_index];
+            info!("Push PreAuth Cookie: {value}");
+            get_or_init_cache(max_age).insert(device_id.to_owned(), value.to_owned());
+            self.sync_to_file(&self.path, max_age);
+        });
     }
 
-    pub(super) fn get(&self) -> Option<String> {
+    /// Pop a preauth cookie
+    /// Example: `id1:1704031809-xxx`
+    pub fn get(&self) -> Option<String> {
         use rand::seq::IteratorRandom;
-        if let Some((_, v)) = self
-            .cache
+        if let Some((_, v)) = get_or_init_cache(self.max_age)
             .iter()
-            .filter(|(_, input)| Self::is_invalid(input))
+            .filter(|(_, input)| Self::is_invalid(input, self.max_age))
             .choose(&mut rand::thread_rng())
         {
             return Some(v);
@@ -79,19 +142,8 @@ impl PreauthCookieProvider {
         None
     }
 
-    fn sync_to_file(&self) {
-        let data = self
-            .cache
-            .iter()
-            .map(|(_, v)| v)
-            .collect::<Vec<String>>()
-            .join("\n");
-        let _ = std::fs::write(&self.path, data).map_err(|err| {
-            error!("Failed to write preauth cookie to file: {}", err);
-        });
-    }
-
-    fn is_invalid(input: &str) -> bool {
+    /// Check if is invalid
+    fn is_invalid(input: &str, max_age: Option<u32>) -> bool {
         let parts: Vec<&str> = input.split(':').collect();
         if parts.len() == 2 {
             let timestamp_part = parts[1];
@@ -100,11 +152,32 @@ impl PreauthCookieProvider {
                 let timestamp = timestamp_parts[0];
                 let timestamp = timestamp.parse::<u64>().unwrap_or(0);
                 match now_duration() {
-                    Ok(duration) => return duration.as_secs() - timestamp < (3600 * 24 - 60),
+                    Ok(duration) => {
+                        return duration.as_secs() - timestamp
+                            < (max_age.unwrap_or(DEFAULT_MAX_AGE) - 60).into()
+                    }
                     Err(err) => error!("Failed to get now duration: {}", err),
                 }
             }
         }
         false
+    }
+
+    /// Sync to file
+    /// Only sync valid preauth cookie
+    fn sync_to_file(&self, path: impl AsRef<Path>, max_age: Option<u32>) {
+        // If upstream max_age is different, reload cache
+        if self.max_age.ne(&max_age) {
+            reload_cache(max_age)
+        }
+
+        let data = get_or_init_cache(max_age)
+            .iter()
+            .map(|(_, v)| format!("{}{SEPARATOR}{v}", max_age.unwrap_or(DEFAULT_MAX_AGE)))
+            .collect::<Vec<String>>()
+            .join("\n");
+        let _ = std::fs::write(path.as_ref(), data).map_err(|err| {
+            error!("Failed to write preauth cookie to file: {}", err);
+        });
     }
 }
