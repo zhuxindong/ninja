@@ -154,7 +154,7 @@ impl PreauthCookieProvider {
                 match now_duration() {
                     Ok(duration) => {
                         return duration.as_secs() - timestamp
-                            < (max_age.unwrap_or(DEFAULT_MAX_AGE) - 60).into()
+                            > (max_age.unwrap_or(DEFAULT_MAX_AGE) - 60).into()
                     }
                     Err(err) => error!("Failed to get now duration: {}", err),
                 }

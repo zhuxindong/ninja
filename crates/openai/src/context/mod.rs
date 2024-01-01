@@ -118,7 +118,7 @@ impl Context {
                 .expect("Failed to initialize the requesting oauth client"),
             arkose_client: ClientRoundRobinBalancer::new_arkose_client(&args)
                 .expect("Failed to initialize the requesting arkose client"),
-            preauth_provider: args.pbind.is_some().then_some(PreauthCookieProvider::new()),
+            preauth_provider: args.pbind.is_some().then(|| PreauthCookieProvider::new()),
             arkose_endpoint: args.arkose_endpoint,
             arkose_solver: args.arkose_solver,
             arkose_har_upload_key: args.arkose_har_upload_key,
