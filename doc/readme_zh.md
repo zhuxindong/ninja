@@ -160,7 +160,7 @@ services:
 
 - Arkose-API
   - `/auth/arkose_token/:pk`
-  > 其中pk为arkose类型的ID，比如请求GPT4的Arkose，`/auth/arkose_token/35536E1E-65B4-4D96-9D97-6ADB7EFF8147`
+  > 其中pk为arkose类型的ID，比如请求GPT4的Arkose，`/auth/arkose_token/35536E1E-65B4-4D96-9D97-6ADB7EFF8147`，若`GPT-4`开始强制blob参数，需要带上`AccessToken` -> `Authorization: Bearer xxxx`
 
 - Authorization
   > 除了登录，都使用`Authorization: Bearer xxxx`
@@ -273,6 +273,7 @@ Commands:
   status   Status of the Http server daemon process
   log      Show the Http server daemon log
   genca    Generate MITM CA certificate
+  ua      Show the impersonate user-agent list
   gt       Generate config template file (toml format file)
   update   Update the application
   help     Print this message or the help of the given subcommand(s)
@@ -314,9 +315,6 @@ Options:
           Enable direct connection [env: ENABLE_DIRECT=]
   -I, --impersonate-uas <IMPERSONATE_UAS>
           Impersonate User-Agent, separate multiple ones with ","
-          Safari: safari12,safari15_3,safari15_5,safari15_6_1,safari16,safari16_5
-          OkHttp: okhttp3_9,okhttp3_11,okhttp3_13,okhttp3_14,okhttp4_9,okhttp4_10,okhttp5
-          Chrome: chrome99,chrome100,chrome101,chrome104,chrome105,chrome106,chrome107,chrome108,chrome109,chrome114,chrome116,chrome117,chrome118,chrome119,chrome120 [env: IMPERSONATE_UA=]
       --cookie-store
           Enabled Cookie Store [env: COOKIE_STORE=]
       --fastest-dns

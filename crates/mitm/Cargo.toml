@@ -10,7 +10,7 @@ log = "0.4.20"
 anyhow = "1.0.75"
 thiserror = "1.0.48"
 async-trait = "0.1.73"
-reqwest = { package = "reqwest-impersonate", version ="0.11.46", default-features = false, features = [
+reqwest = { package = "reqwest-impersonate", version ="0.11.47", default-features = false, features = [
     "boring-tls", "impersonate", "stream", "socks"
 ] }
 typed-builder = "0.18.0"

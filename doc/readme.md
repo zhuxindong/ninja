@@ -161,7 +161,7 @@ Currently OpenAI has updated `Login` which requires verification of `Arkose Toke
 
 - Arkose-API
   - `/auth/arkose_token/:pk`
-  > where pk is the arkose type ID, such as requesting Arkose for GPT4, `/auth/arkose_token/35536E1E-65B4-4D96-9D97-6ADB7EFF8147`
+  > where pk is the arkose type ID, such as requesting Arkose for GPT4, `/auth/arkose_token/35536E1E-65B4-4D96-9D97-6ADB7EFF8147`. If `GPT-4` starts to force blob parameters, you need to bring `AccessToken` - > `Authorization: Bearer xxxx`
 
 - Authorization
   > Except for login, use `Authorization: Bearer xxxx`
@@ -274,6 +274,7 @@ Commands:
   status   Status of the Http server daemon process
   log      Show the Http server daemon log
   genca    Generate MITM CA certificate
+  ua      Show the impersonate user-agent list
   gt       Generate config template file (toml format file)
   update   Update the application
   help     Print this message or the help of the given subcommand(s)
@@ -315,9 +316,6 @@ Options:
           Enable direct connection [env: ENABLE_DIRECT=]
   -I, --impersonate-uas <IMPERSONATE_UAS>
           Impersonate User-Agent, separate multiple ones with ","
-          Safari: safari12,safari15_3,safari15_5,safari15_6_1,safari16,safari16_5
-          OkHttp: okhttp3_9,okhttp3_11,okhttp3_13,okhttp3_14,okhttp4_9,okhttp4_10,okhttp5
-          Chrome: chrome99,chrome100,chrome101,chrome104,chrome105,chrome106,chrome107,chrome108,chrome109,chrome114,chrome116,chrome117,chrome118,chrome119,chrome120 [env: IMPERSONATE_UA=]
       --cookie-store
           Enabled Cookie Store [env: COOKIE_STORE=]
       --fastest-dns
