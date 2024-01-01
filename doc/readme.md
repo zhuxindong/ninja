@@ -161,7 +161,7 @@ Currently OpenAI has updated `Login` which requires verification of `Arkose Toke
 
 - Arkose-API
   - `/auth/arkose_token/:pk`
-  > where pk is the arkose type ID, such as requesting Arkose for GPT4, `/auth/arkose_token/35536E1E-65B4-4D96-9D97-6ADB7EFF8147`
+  > where pk is the arkose type ID, such as requesting Arkose for GPT4, `/auth/arkose_token/35536E1E-65B4-4D96-9D97-6ADB7EFF8147`. If `GPT-4` starts to force blob parameters, you need to bring `AccessToken` - > `Authorization: Bearer xxxx`
 
 - Authorization
   > Except for login, use `Authorization: Bearer xxxx`
@@ -274,6 +274,7 @@ Commands:
   status   Status of the Http server daemon process
   log      Show the Http server daemon log
   genca    Generate MITM CA certificate
+  ua      Show the impersonate user-agent list
   gt       Generate config template file (toml format file)
   update   Update the application
   help     Print this message or the help of the given subcommand(s)

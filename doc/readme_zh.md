@@ -160,7 +160,7 @@ services:
 
 - Arkose-API
   - `/auth/arkose_token/:pk`
-  > 其中pk为arkose类型的ID，比如请求GPT4的Arkose，`/auth/arkose_token/35536E1E-65B4-4D96-9D97-6ADB7EFF8147`
+  > 其中pk为arkose类型的ID，比如请求GPT4的Arkose，`/auth/arkose_token/35536E1E-65B4-4D96-9D97-6ADB7EFF8147`，若`GPT-4`开始强制blob参数，需要带上`AccessToken` -> `Authorization: Bearer xxxx`
 
 - Authorization
   > 除了登录，都使用`Authorization: Bearer xxxx`
@@ -273,6 +273,7 @@ Commands:
   status   Status of the Http server daemon process
   log      Show the Http server daemon log
   genca    Generate MITM CA certificate
+  ua      Show the impersonate user-agent list
   gt       Generate config template file (toml format file)
   update   Update the application
   help     Print this message or the help of the given subcommand(s)
