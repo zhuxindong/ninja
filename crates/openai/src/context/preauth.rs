@@ -2,7 +2,7 @@ use crate::{error, homedir::home_dir, info, now_duration};
 use moka::sync::Cache;
 use std::{
     path::{Path, PathBuf},
-    sync::OnceLock,
+    sync::Mutex,
     time::Duration,
 };
 
@@ -10,17 +10,22 @@ const SEPARATOR: &str = "---";
 const DEFAULT_MAX_AGE: u32 = 3600;
 const DEFAULT_MAX_CAPACITY: u64 = 1000;
 
-static CACHE: OnceLock<Cache<String, String>> = OnceLock::new();
+static LOCK: Mutex<()> = Mutex::new(());
+static mut CACHE: Option<Cache<String, String>> = None;
 
 fn get_or_init_cache(max_age: Option<u32>) -> &'static Cache<String, String> {
-    CACHE.get_or_init(|| {
-        Cache::builder()
-            .max_capacity(DEFAULT_MAX_CAPACITY)
-            .time_to_live(Duration::from_secs(
-                max_age.unwrap_or(DEFAULT_MAX_AGE).into(),
-            ))
-            .build()
-    })
+    unsafe {
+        CACHE.is_none().then(|| {
+            let cache = Cache::builder()
+                .max_capacity(DEFAULT_MAX_CAPACITY)
+                .time_to_live(Duration::from_secs(
+                    max_age.unwrap_or(DEFAULT_MAX_AGE).into(),
+                ))
+                .build();
+            CACHE = Some(cache);
+        });
+        CACHE.as_ref().unwrap()
+    }
 }
 
 fn reload_cache(max_age: Option<u32>) {
@@ -43,7 +48,13 @@ fn reload_cache(max_age: Option<u32>) {
         new_cache.insert(k.to_string(), v);
     });
 
-    let _ = CACHE.set(new_cache);
+    // Unsafe: Replace cache
+    if let Ok(lock) = LOCK.try_lock() {
+        unsafe {
+            CACHE = Some(new_cache);
+        }
+        drop(lock);
+    }
 }
 
 pub(super) struct PreauthCookieProvider {
