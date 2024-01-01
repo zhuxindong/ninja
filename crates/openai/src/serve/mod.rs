@@ -187,14 +187,16 @@ impl Serve {
             .route("/auth/refresh_session", post(post_refresh_session))
             .route("/auth/sess_token", post(post_sess_token));
 
-        // Enable arkose token endpoint proxy
-        let router = if self.0.enable_arkose_proxy {
-            router.route("/auth/arkose_token/:path", get(get_arkose_token))
-        } else {
-            router
-        };
-
-        let router = route::config(router, &self.0).layer(global_layer);
+        let router = route::config(
+            // Enable arkose token endpoint proxy
+            if self.0.enable_arkose_proxy {
+                router.route("/auth/arkose_token/:path", get(get_arkose_token))
+            } else {
+                router
+            },
+            &self.0,
+        )
+        .layer(global_layer);
 
         // Signal the server to shutdown using Handle.
         let handle = Handle::new();
@@ -370,9 +372,14 @@ async fn post_revoke_token(
 
 /// GET /auth/arkose_token/:path
 /// Example: /auth//arkose_token/35536E1E-65B4-4D96-9D97-6ADB7EFF8147
-async fn get_arkose_token(pk: Path<String>) -> Result<Json<ArkoseToken>, ResponseError> {
+async fn get_arkose_token(
+    bearer: Option<TypedHeader<Authorization<Bearer>>>,
+    pk: Path<String>,
+) -> Result<Json<ArkoseToken>, ResponseError> {
     let typed = arkose::Type::from_pk(pk.as_str()).map_err(ResponseError::BadRequest)?;
-    ArkoseToken::new_from_context(typed)
+    // 35536E1E-65B4-4D96-9D97-6ADB7EFF8147 need access token
+    let identifier = bearer.map(|v| v.token().to_owned());
+    ArkoseToken::new_from_context(typed, identifier)
         .await
         .map(Json)
         .map_err(ResponseError::ExpectationFailed)

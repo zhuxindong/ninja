@@ -42,7 +42,7 @@ async fn main() -> anyhow::Result<()> {
     // start time
     let now = Instant::now();
 
-    let arkose_token = ArkoseToken::new(t).await?;
+    let arkose_token = ArkoseToken::new(t, None).await?;
 
     parse(arkose_token, solver, key).await?;
 

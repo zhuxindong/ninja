@@ -60,8 +60,8 @@ use crate::{
     URL_CHATGPT_API,
 };
 
-use ext::Session;
-use ext::SessionExtractor;
+use ext::session::Session;
+use ext::SessionExt;
 
 use super::get_static_resource;
 
@@ -301,7 +301,7 @@ async fn post_login_token(
     Ok(response)
 }
 
-async fn get_logout(extract: SessionExtractor) -> Result<Response<Body>, ResponseError> {
+async fn get_logout(extract: SessionExt) -> Result<Response<Body>, ResponseError> {
     // If the session is empty, then redirect to the login page
     if let Some(refresh_token) = extract.session.refresh_token {
         if let Some(err) = with_context!(auth_client)
@@ -329,7 +329,7 @@ async fn get_logout(extract: SessionExtractor) -> Result<Response<Body>, Respons
         .map_err(ResponseError::InternalServerError)?)
 }
 
-async fn get_session(extract: SessionExtractor) -> Result<Response<Body>, ResponseError> {
+async fn get_session(extract: SessionExt) -> Result<Response<Body>, ResponseError> {
     // Compare the current timestamp with the expiration time of the session
     let current_timestamp = now_duration()?.as_secs() as i64;
     if extract.session.expires < current_timestamp {
@@ -442,7 +442,7 @@ async fn get_auth_me(
 async fn get_chat(
     conversation_id: Option<Path<String>>,
     mut query: Query<HashMap<String, String>>,
-    extract: SessionExtractor,
+    extract: SessionExt,
 ) -> Result<Response<Body>, ResponseError> {
     let template_name = match conversation_id {
         Some(conversation_id) => {
@@ -490,7 +490,7 @@ async fn get_chat(
     return render_template(template_name, &ctx);
 }
 
-async fn get_chat_info(extract: SessionExtractor) -> Result<Response<Body>, ResponseError> {
+async fn get_chat_info(extract: SessionExt) -> Result<Response<Body>, ResponseError> {
     let body = serde_json::json!({
         "pageProps": {
             "user": {
@@ -522,7 +522,7 @@ async fn get_chat_info(extract: SessionExtractor) -> Result<Response<Body>, Resp
 
 async fn get_share_chat(
     share_id: Path<String>,
-    extract: SessionExtractor,
+    extract: SessionExt,
 ) -> Result<Response<Body>, ResponseError> {
     let share_id = share_id.0;
     let resp = with_context!(api_client)
@@ -609,7 +609,7 @@ async fn get_share_chat(
 
 async fn get_share_chat_info(
     share_id: Path<String>,
-    extract: SessionExtractor,
+    extract: SessionExt,
 ) -> Result<Response<Body>, ResponseError> {
     let share_id = share_id.0.replace(".json", EMPTY);
     let resp = with_context!(api_client)
@@ -678,7 +678,7 @@ async fn get_share_chat_continue(share_id: Path<String>) -> Result<Response<Body
 
 async fn get_share_chat_continue_info(
     share_id: Path<String>,
-    extract: SessionExtractor,
+    extract: SessionExt,
 ) -> Result<Response<Body>, ResponseError> {
     let resp = with_context!(api_client)
         .get(format!(

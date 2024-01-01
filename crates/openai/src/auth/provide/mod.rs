@@ -109,7 +109,7 @@ impl<'a> RequestContext<'a> {
                 let _ = arkose_token.callback().await;
                 arkose_token
             }
-            None => arkose::ArkoseToken::new_from_context(Type::Auth)
+            None => arkose::ArkoseToken::new_from_context(Type::Auth, None)
                 .await
                 .map_err(AuthError::InvalidArkoseToken)?,
         };

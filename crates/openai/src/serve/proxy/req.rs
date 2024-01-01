@@ -96,18 +96,19 @@ async fn handle_conv_request(req: &mut RequestExt) -> Result<(), ResponseError> 
         .and_then(|m| m.as_str())
         .ok_or(ResponseError::BadRequest(ProxyError::ModelRequired))?;
 
+    // extract token from Authorization header
+    let token = req
+        .bearer_auth()
+        .ok_or(ResponseError::Unauthorized(ProxyError::AccessTokenRequired))?
+        .to_owned();
+
     // If puid is exist, then return
     if !has_puid(&req.headers)? {
-        // extract token from Authorization header
-        let token = req
-            .bearer_auth()
-            .ok_or(ResponseError::Unauthorized(ProxyError::AccessTokenRequired))?;
-
         // Exstract the token from the Authorization header
-        let cache_id = reduce_key(token)?;
+        let cache_id = reduce_key(&token)?;
 
         // Get or init puid
-        let puid = get_or_init(token, model, cache_id).await?;
+        let puid = get_or_init(&token, model, cache_id).await?;
 
         if let Some(puid) = puid {
             req.headers.insert(
@@ -132,7 +133,7 @@ async fn handle_conv_request(req: &mut RequestExt) -> Result<(), ResponseError> 
         };
 
         if condition {
-            let arkose_token = ArkoseToken::new_from_context(model.into()).await?;
+            let arkose_token = ArkoseToken::new_from_context(model.into(), Some(token)).await?;
             body.insert(ARKOSE_TOKEN.to_owned(), json!(arkose_token.value()));
             // Updaye Modify bytes
             req.body = Some(Bytes::from(
@@ -167,7 +168,7 @@ async fn handle_dashboard_request(req: &mut RequestExt) -> Result<(), ResponseEr
 
     // If arkose_token is not exist, then add it
     if body.get(ARKOSE_TOKEN).is_none() {
-        let arkose_token = arkose::ArkoseToken::new_from_context(Type::Platform).await?;
+        let arkose_token = arkose::ArkoseToken::new_from_context(Type::Platform, None).await?;
         body.insert(ARKOSE_TOKEN.to_owned(), json!(arkose_token.value()));
         // Updaye Modify bytes
         req.body = Some(Bytes::from(

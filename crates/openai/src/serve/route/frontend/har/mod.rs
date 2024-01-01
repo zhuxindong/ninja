@@ -154,7 +154,7 @@ async fn post_upload(
             .await
             .map_err(ResponseError::InternalServerError)?;
 
-        if let Some(err) = arkose::har::check_from_slice(&data).err() {
+        if let Some(err) = arkose::har::parse_from_slice(&data).err() {
             warn!("upload har file check error: {}", err);
             return Ok(error_html(
                 FAILED_UPLOAD_TITLE,

@@ -35,7 +35,7 @@ use crate::{
     uuid::uuid,
 };
 
-use super::ext::{ContextExt, RequestExt, ResponseExt};
+use super::ext::{Context, RequestExt, ResponseExt};
 use super::header_convert;
 use crate::URL_CHATGPT_API;
 
@@ -96,7 +96,19 @@ pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, Respons
     }
 
     // OpenAI API to ChatGPT API model mapper
-    let (raw_model, mapper_model, arkose_token) = model_mapper(&body.model).await?;
+    // check model is supported
+    let gpt_model = GPTModel::from_str(&body.model)?;
+
+    // check if arkose token is required
+    let arkose_token: Option<String> =
+        if (with_context!(arkose_gpt3_experiment) && gpt_model.is_gpt3()) || gpt_model.is_gpt4() {
+            let arkose_token =
+                ArkoseToken::new_from_context(gpt_model.clone().into(), Some(baerer.to_owned()))
+                    .await?;
+            Some(arkose_token.into())
+        } else {
+            None
+        };
 
     // Create request
     let parent_message_id = uuid();
@@ -110,7 +122,7 @@ pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, Respons
         .force_rate_limit(false)
         .history_and_training_disabled(true)
         .messages(messages)
-        .model(raw_model)
+        .model(gpt_model)
         .parent_message_id(&parent_message_id)
         .suggestions(SUGGESTIONS.to_vec())
         .timezone_offset_min(-480)
@@ -136,8 +148,8 @@ pub(super) async fn send_request(req: RequestExt) -> Result<ResponseExt, Respons
     Ok(ResponseExt::builder()
         .inner(resp)
         .context(
-            ContextExt::builder()
-                .model(mapper_model.to_owned())
+            Context::builder()
+                .model(body.model)
                 .stream(body.stream)
                 .build(),
         )
@@ -192,24 +204,6 @@ fn handle_error_response(err: reqwest::Error) -> Result<impl IntoResponse, Respo
     } else {
         Err(ResponseError::InternalServerError(err))
     }
-}
-
-/// OpenAI API to ChatGPT API model mapper
-async fn model_mapper(model: &str) -> Result<(GPTModel, &str, Option<String>), ResponseError> {
-    // check model is supported
-    let gpt_model = GPTModel::from_str(model)?;
-
-    // check if arkose token is required
-    let arkose_token =
-        if (with_context!(arkose_gpt3_experiment) && gpt_model.is_gpt3()) || gpt_model.is_gpt4() {
-            let arkose_token = ArkoseToken::new_from_context(gpt_model.clone().into()).await?;
-            Some(arkose_token.into())
-        } else {
-            None
-        };
-
-    // fallback
-    Ok((gpt_model, model, arkose_token))
 }
 
 fn generate_id(length: usize) -> String {
