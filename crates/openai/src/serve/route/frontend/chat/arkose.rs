@@ -11,14 +11,12 @@ use axum::body::Body;
 use axum::body::StreamBody;
 use axum::extract::Path;
 use axum::http::header;
-use axum::http::response::Builder;
 use axum::http::Response;
 use axum::http::StatusCode;
-use axum::http::Uri;
 use axum::response::IntoResponse;
-use axum::Form;
 use axum::{routing::any, Router};
-use hyper::Method;
+
+use super::ext::ArkoseSessionExt;
 
 pub(super) fn config(router: Router, args: &Args) -> Router {
     // Enable arkose endpoint proxy
@@ -32,15 +30,13 @@ pub(super) fn config(router: Router, args: &Args) -> Router {
 }
 
 async fn proxy(
-    uri: Uri,
-    method: Method,
-    mut headers: header::HeaderMap,
-    body: Option<Form<HashMap<String, String>>>,
+    mut ext: ArkoseSessionExt<HashMap<String, String>>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let req_path = uri
+    let req_path = ext
+        .uri
         .path_and_query()
         .map(|p| p.as_str())
-        .unwrap_or(uri.path());
+        .unwrap_or(ext.uri.path());
 
     // try to get static resource
     if let Ok(resp) = get_static_resource(Path(req_path.to_owned())).await {
@@ -51,7 +47,9 @@ async fn proxy(
 
     if req_path.contains("/fc/gt2/public_key/") {
         let pk = req_path.trim_start_matches("/fc/gt2/public_key/");
-        match ArkoseToken::new_from_context(Type::from_pk(pk)?).await {
+        match ArkoseToken::new_from_context(Type::from_pk(pk)?, ext.session.map(|s| s.access_token))
+            .await
+        {
             Ok(arkose_token) => {
                 if arkose_token.success() {
                     let target = serde_json::json!({
@@ -98,32 +96,32 @@ async fn proxy(
         header::ACCEPT_ENCODING,
         header::HOST,
     ] {
-        headers.remove(header);
+        ext.headers.remove(header);
     }
 
     let client = with_context!(arkose_client);
     let url = format!("https://client-api.arkoselabs.com{}", req_path);
 
-    let resp = match body {
+    let resp = match ext.body {
         Some(form) => {
             client
-                .request(method, url)
-                .headers(headers)
+                .request(ext.method, url)
+                .headers(ext.headers)
                 .form(&form.0)
                 .send()
                 .await
         }
-        None => client.request(method, url).headers(headers).send().await,
+        None => {
+            client
+                .request(ext.method, url)
+                .headers(ext.headers)
+                .send()
+                .await
+        }
     }
     .map_err(ResponseError::InternalServerError)?;
 
-    let mut builder = Response::builder().status(resp.status());
-
-    for ele in resp.headers() {
-        builder = builder.header(ele.0, ele.1);
-    }
-
-    Ok(create_response(builder, resp)?.into_response())
+    Ok(create_response(resp)?.into_response())
 }
 
 fn create_response_with_data(
@@ -138,12 +136,15 @@ fn create_response_with_data(
         .map_err(ResponseError::InternalServerError)
 }
 
-fn create_response(
-    builder: Builder,
-    resp: reqwest::Response,
-) -> Result<impl IntoResponse, ResponseError> {
-    let resp = builder
+fn create_response(resp: reqwest::Response) -> Result<impl IntoResponse, ResponseError> {
+    let mut builder = Response::builder().status(resp.status());
+
+    // Copy headers
+    for ele in resp.headers() {
+        builder = builder.header(ele.0, ele.1);
+    }
+
+    Ok(builder
         .body(StreamBody::new(resp.bytes_stream()))
-        .map_err(ResponseError::InternalServerError)?;
-    Ok(resp)
+        .map_err(ResponseError::InternalServerError)?)
 }

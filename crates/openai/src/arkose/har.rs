@@ -1,3 +1,4 @@
+use super::Type;
 use crate::arkose::crypto;
 use crate::arkose::error::ArkoseError;
 use crate::urldecoding;
@@ -8,8 +9,23 @@ use std::path::Path;
 use std::sync::OnceLock;
 use time::format_description::well_known::Rfc3339;
 
+// Entry cache
+static CACHE: OnceLock<Cache<String, RequestEntry>> = OnceLock::new();
+
+// Get or init cache
+fn get_or_init_cache() -> &'static Cache<String, RequestEntry> {
+    CACHE.get_or_init(|| Cache::new(u64::MAX))
+}
+
+// Clear cache
+pub(crate) fn clear_cache(key: &str) {
+    get_or_init_cache().remove(key);
+}
+
+// Arkose request entry
 #[derive(Clone)]
 pub struct RequestEntry {
+    pub typed: Type,
     pub url: String,
     pub method: String,
     pub headers: Vec<Header>,
@@ -18,33 +34,14 @@ pub struct RequestEntry {
     pub bv: String,
 }
 
-pub fn check_from_slice(s: &[u8]) -> anyhow::Result<()> {
-    let _ = serde_json::from_slice::<Har>(&s)?;
-    Ok(())
-}
-
-#[inline]
-pub fn check_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<()> {
-    let bytes = std::fs::read(path)?;
-    check_from_slice(&bytes)
-}
-
+// Parse slice data
 #[inline]
 pub fn parse_from_slice(s: &[u8]) -> anyhow::Result<RequestEntry> {
     let har = serde_json::from_slice::<Har>(&s)?;
     parse(har)
 }
 
-static CACHE_REQUEST_ENTRY: OnceLock<Cache<String, RequestEntry>> = OnceLock::new();
-
-fn get_or_init_cache() -> &'static Cache<String, RequestEntry> {
-    CACHE_REQUEST_ENTRY.get_or_init(|| Cache::new(u64::MAX))
-}
-
-pub(crate) fn clear_cache(key: &str) {
-    get_or_init_cache().remove(key);
-}
-
+// Parse file
 #[inline]
 pub fn parse_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<RequestEntry> {
     // Check if the path is a file
@@ -81,11 +78,22 @@ fn parse(har: Har) -> anyhow::Result<RequestEntry> {
         .into_iter()
         .find(|e| e.request.url.contains("fc/gt2/public_key"))
     {
+        // Check if the entry has a started date time
         if entry.started_date_time.is_empty() {
             anyhow::bail!(ArkoseError::InvalidHarFile);
         }
 
+        // Get the public key
+        let pk = entry
+            .request
+            .url
+            .rsplit('/')
+            .next()
+            .ok_or_else(|| ArkoseError::InvalidHarFile)?;
+
+        // Request started date time
         let started_date_time = time::OffsetDateTime::parse(&entry.started_date_time, &Rfc3339)?;
+
         let bt = started_date_time.unix_timestamp();
         let bw = bt - (bt % 21600);
         let mut bv = String::new();
@@ -109,6 +117,7 @@ fn parse(har: Har) -> anyhow::Result<RequestEntry> {
                 let cow = urldecoding::decode(&bda_param.value)?;
                 let bda = base64::engine::general_purpose::STANDARD.decode(cow.into_owned())?;
                 let entry = RequestEntry {
+                    typed: Type::from_pk(pk)?,
                     url: entry.request.url,
                     method: entry.request.method,
                     headers: headers
@@ -172,11 +181,8 @@ pub struct Header {
     pub value: String,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct PostData {
-    #[serde(rename = "mimeType")]
-    mime_type: Option<String>,
     text: Option<String>,
     params: Option<Vec<Param>>,
 }

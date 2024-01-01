@@ -16,7 +16,7 @@ use crate::serve::error::ResponseError;
 
 /// Context extension.
 #[derive(TypedBuilder)]
-pub struct ContextExt {
+pub struct Context {
     // Enable stream
     pub stream: bool,
     // Mapper model
@@ -27,7 +27,7 @@ pub struct ContextExt {
 #[derive(TypedBuilder)]
 pub struct ResponseExt {
     #[builder(setter(into), default)]
-    pub context: Option<ContextExt>,
+    pub context: Option<Context>,
     pub inner: reqwest::Response,
 }
 
