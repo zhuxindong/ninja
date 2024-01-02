@@ -23,8 +23,7 @@ pub(super) struct HarProvider {
     /// File Hotwatch
     hotwatch: Hotwatch,
     /// HAR file pool
-    pool: Vec<String>,
-    index: AtomicUsize,
+    pool: (AtomicUsize, Vec<String>),
 }
 
 impl HarProvider {
@@ -45,10 +44,9 @@ impl HarProvider {
         Self::init_pool(&dir_path, &mut pool);
 
         HarProvider {
-            pool,
+            pool: (AtomicUsize::new(0), pool),
             hotwatch: watch_har_dir(_type, &dir_path),
             dir_path,
-            index: AtomicUsize::new(0),
         }
     }
 
@@ -70,8 +68,8 @@ impl HarProvider {
     }
 
     fn reset_pool(&mut self) {
-        self.pool.clear();
-        Self::init_pool(&self.dir_path, &mut self.pool)
+        self.pool.1.clear();
+        Self::init_pool(&self.dir_path, &mut self.pool.1)
     }
 
     pub(super) fn pool(&self) -> HarPath {
@@ -80,17 +78,18 @@ impl HarProvider {
             file_path: None,
         };
 
-        if self.pool.is_empty() {
+        if self.pool.1.is_empty() {
             return har_path;
         }
 
-        let len = self.pool.len();
-        let mut old = self.index.load(Ordering::Relaxed);
+        let len = self.pool.1.len();
+        let mut old = self.pool.0.load(Ordering::Relaxed);
         let mut new;
         loop {
             new = (old + 1) % len;
             match self
-                .index
+                .pool
+                .0
                 .compare_exchange_weak(old, new, Ordering::SeqCst, Ordering::Relaxed)
             {
                 Ok(_) => break,
@@ -98,7 +97,7 @@ impl HarProvider {
             }
         }
 
-        har_path.file_path = Some(self.dir_path.join(&self.pool[new]));
+        har_path.file_path = Some(self.dir_path.join(&self.pool.1[new]));
         har_path
     }
 }

@@ -86,43 +86,38 @@ struct Config {
     tcp_keepalive: u64,
     /// Random User-Agent
     impersonate_uas: Option<Vec<Impersonate>>,
-
-    index_for_interfaces: AtomicUsize,
     /// Interfaces to bind to.
-    interfaces: Vec<IpAddr>,
-
-    index_for_ipv6_subnets: AtomicUsize,
+    interfaces: (AtomicUsize, Vec<IpAddr>),
     /// IPv6 subnets to bind to.
-    ipv6_subnets: Vec<cidr::Ipv6Cidr>,
+    ipv6_subnets: (AtomicUsize, Vec<cidr::Ipv6Cidr>),
 }
 
 impl Config {
     // get next interface
     fn get_next_interface(&self) -> Option<IpAddr> {
-        if self.interfaces.is_empty() {
+        if self.interfaces.1.is_empty() {
             return None;
         }
-        let len = self.interfaces.len();
-        let new = get_next_index(len, &self.index_for_interfaces);
-        Some(self.interfaces[new])
+        let len = self.interfaces.1.len();
+        let new = get_next_index(len, &self.interfaces.0);
+        Some(self.interfaces.1[new])
     }
 
     // get next ipv6
     fn get_next_ipv6(&self) -> Option<IpAddr> {
-        if self.ipv6_subnets.is_empty() {
+        if self.ipv6_subnets.1.is_empty() {
             return None;
         }
-        let len = self.ipv6_subnets.len();
-        let new = get_next_index(len, &self.index_for_ipv6_subnets);
-        Some(self.ipv6_subnets[new].random_ipv6())
+        let len = self.ipv6_subnets.1.len();
+        let new = get_next_index(len, &self.ipv6_subnets.0);
+        Some(self.ipv6_subnets.1[new].random_ipv6())
     }
 }
 
 /// Client round robin balancer
 pub struct ClientRoundRobinBalancer {
-    pool: Vec<ClientAgent>,
-    index: AtomicUsize,
     config: Config,
+    pool: (AtomicUsize, Vec<ClientAgent>),
 }
 
 impl ClientRoundRobinBalancer {
@@ -198,10 +193,8 @@ impl ClientRoundRobinBalancer {
             connect_timeout: args.connect_timeout as u64,
             pool_idle_timeout: args.pool_idle_timeout as u64,
             tcp_keepalive: args.tcp_keepalive as u64,
-            interfaces,
-            ipv6_subnets,
-            index_for_interfaces: AtomicUsize::new(0),
-            index_for_ipv6_subnets: AtomicUsize::new(0),
+            interfaces: (AtomicUsize::new(0), interfaces),
+            ipv6_subnets: (AtomicUsize::new(0), ipv6_subnets),
             impersonate_uas: args.impersonate_uas.clone(),
         };
 
@@ -216,13 +209,14 @@ impl ClientRoundRobinBalancer {
 
         // Join direct connection clients to pool
         if args.enable_direct {
-            if config.interfaces.is_empty() {
+            if config.interfaces.1.is_empty() {
                 // if no interface is specified, join a client with no bind address
                 join_client(None, None);
             } else {
                 // join a client for each interface
                 config
                     .interfaces
+                    .1
                     .iter()
                     .for_each(|i| join_client(Some(*i), None));
             }
@@ -246,9 +240,8 @@ impl ClientRoundRobinBalancer {
         }
 
         Ok(Self {
-            pool,
             config,
-            index: AtomicUsize::new(0),
+            pool: (AtomicUsize::new(0), pool),
         })
     }
 }
@@ -287,16 +280,16 @@ impl ClientRoundRobinBalancer {
     /// Get next client
     pub fn next(&self) -> ClientAgent {
         // if there is only one client, return it
-        if self.pool.len() == 1 {
-            let client = self.pool.first().expect("Init client failed");
-            if !self.config.ipv6_subnets.is_empty() {
+        if self.pool.1.len() == 1 {
+            let client = self.pool.1.first().expect("Init client failed");
+            if !self.config.ipv6_subnets.1.is_empty() {
                 return self.rebuild_client_with_ipv6(client);
             }
             return client.clone();
         }
 
-        let new = get_next_index(self.pool.len(), &self.index);
-        self.pool[new].clone()
+        let new = get_next_index(self.pool.1.len(), &self.pool.0);
+        self.pool.1[new].clone()
     }
 }
 

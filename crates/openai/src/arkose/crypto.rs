@@ -82,7 +82,7 @@ fn ase_decrypt(content: Vec<u8>, password: &str) -> anyhow::Result<Vec<u8>> {
     // bytes for iv
     let iv = hex_to_bytes(&encode_data.iv).ok_or(ArkoseError::HexDecodeError)?;
     // bytes for key
-    let (key, _) = (default_evp_kdf(password.as_bytes(), &salt).map_err(|s| anyhow::anyhow!(s)))?;
+    let (key, _) = default_evp_kdf(password.as_bytes(), &salt).map_err(|s| anyhow::anyhow!(s))?;
 
     let mut out_buf = vec![0u8; ct.len()];
 

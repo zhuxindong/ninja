@@ -1,4 +1,4 @@
-use super::error::ResponseError;
+use super::error::{ProxyError, ResponseError};
 use crate::{gpt_model::GPTModel, with_context, URL_CHATGPT_API};
 use moka::sync::Cache;
 use std::str::FromStr;
@@ -9,9 +9,7 @@ static PUID_CACHE: OnceCell<Cache<String, String>> = OnceCell::const_new();
 pub(super) fn reduce_key(token: &str) -> Result<String, ResponseError> {
     let token_profile = crate::token::check(token)
         .map_err(ResponseError::Unauthorized)?
-        .ok_or(ResponseError::BadRequest(anyhow::anyhow!(
-            "invalid access token"
-        )))?;
+        .ok_or(ResponseError::BadRequest(ProxyError::InvalidAccessToken))?;
     Ok(token_profile.email().to_owned())
 }
 

@@ -4,7 +4,7 @@ use axum::response::IntoResponse;
 use axum::response::Response;
 use axum::Json;
 use eventsource_stream::EventStreamError;
-use serde_json::json;
+use serde::ser::SerializeStruct;
 
 use crate::auth::error::AuthError;
 
@@ -46,13 +46,27 @@ pub enum ProxyError {
     EventSourceStreamError(EventStreamError<reqwest::Error>),
     #[error("Deserialize error ({0})")]
     DeserializeError(serde_json::Error),
+    #[error("Invalid access token")]
+    InvalidAccessToken,
 }
 
 // Make our own error that wraps `anyhow::Error`.
 pub struct ResponseError {
-    msg: Option<String>,
     code: StatusCode,
+    msg: Option<String>,
     path: Option<String>,
+}
+
+impl serde::Serialize for ResponseError {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ::serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("ResponseError", 2)?;
+        state.serialize_field("code", &self.code.as_str())?;
+        state.serialize_field("msg", &self.msg)?;
+        state.end()
+    }
 }
 
 impl ResponseError {
@@ -63,32 +77,20 @@ impl ResponseError {
             path: None,
         }
     }
-
-    pub fn msg(&self) -> Option<&str> {
-        self.msg.as_deref()
-    }
-
-    pub fn code(&self) -> &StatusCode {
-        &self.code
-    }
 }
 
-// Tell axum how to convert `AppError` into a response.
+// Tell axum how to convert `ResponseError` into a response.
 impl IntoResponse for ResponseError {
     fn into_response(self) -> Response {
         if let Some(path) = self.path {
             return (self.code, [(LOCATION, &path)], ()).into_response();
         }
-        let body = Json(json!({
-            "code": self.code.as_str(),
-            "msg": self.msg,
-        }));
-        (self.code, [(CONTENT_TYPE, "application/json")], body).into_response()
+        (self.code, [(CONTENT_TYPE, "application/json")], Json(self)).into_response()
     }
 }
 
 // This enables using `?` on functions that return `Result<_, anyhow::Error>` to turn them into
-// `Result<_, AppError>`. That way you don't need to do that manually.
+// `Result<_, ResponseError>`. That way you don't need to do that manually.
 impl<E> From<E> for ResponseError
 where
     E: Into<anyhow::Error>,
