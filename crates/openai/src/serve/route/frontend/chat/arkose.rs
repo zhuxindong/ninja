@@ -89,7 +89,13 @@ async fn proxy(
         }
     }
 
-    for header in &[header::CONNECTION, header::CONTENT_LENGTH, header::HOST] {
+    for header in &[
+        header::CONNECTION,
+        header::CONTENT_LENGTH,
+        header::ACCEPT,
+        header::ACCEPT_ENCODING,
+        header::HOST,
+    ] {
         s.headers.remove(header);
     }
 
