@@ -24,7 +24,7 @@ pub async fn start_challenge<'a>(arkose_token: &'a ArkoseToken) -> anyhow::Resul
         .unwrap_or_default();
 
     let mut headers = header::HeaderMap::new();
-    headers.insert(header::REFERER, format!("https://tcr9i.chat.openai.com/fc/assets/ec-game-core/game-core/1.15.0/standard/index.html?session={}", value.replace("|", "&")).parse()?);
+    headers.insert(header::REFERER, format!("https://tcr9i.chat.openai.com/fc/assets/ec-game-core/game-core/1.17.1/standard/index.html?session={}", value.replace("|", "&")).parse()?);
     headers.insert(header::DNT, header::HeaderValue::from_static("1"));
 
     let mut session = Session {
@@ -109,7 +109,6 @@ impl<'a> Session<'_> {
         }
 
         let challenge = resp.json::<Challenge>().await?;
-
         debug!("challenge: {:#?}", challenge);
 
         self.game_type = challenge.game_data.game_type as u32;

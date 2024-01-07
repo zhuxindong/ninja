@@ -11,7 +11,7 @@ use std::str::FromStr;
 use self::session::Session;
 use super::{LOGIN_INDEX, SESSION_ID};
 use crate::constant::API_AUTH_SESSION_COOKIE_KEY;
-use crate::debug;
+use crate::now_duration;
 use crate::serve::error::ResponseError;
 
 /// ChatGPT session Extension
@@ -41,22 +41,30 @@ where
 
     async fn from_request(req: Request<B>, _: &S) -> Result<Self, Self::Rejection> {
         let (parts, _) = req.into_parts().into();
+
+        // Extract session from cookie
         let jar = CookieJar::from_headers(&parts.headers);
-        match jar.get(SESSION_ID) {
-            Some(c) => {
-                let session = extract_session(c.value())?;
-                let session_token = jar
-                    .get(API_AUTH_SESSION_COOKIE_KEY)
-                    .map(|c| c.value().to_owned());
-                Ok(SessionExt {
-                    session,
-                    session_token,
-                    jar,
-                    headers: parts.headers.clone(),
-                })
-            }
-            None => Err(ResponseError::TempporaryRedirect(LOGIN_INDEX)),
+        let cookie = jar
+            .get(SESSION_ID)
+            .ok_or(ResponseError::TempporaryRedirect(LOGIN_INDEX))?;
+        let session = extract_session(cookie.value())?;
+
+        // Compare the current timestamp with the expiration time of the session
+        let current_timestamp = now_duration()
+            .map_err(ResponseError::InternalServerError)?
+            .as_secs() as i64;
+        if session.expires < current_timestamp {
+            return Err(ResponseError::TempporaryRedirect(LOGIN_INDEX));
         }
+
+        Ok(SessionExt {
+            session,
+            session_token: jar
+                .get(API_AUTH_SESSION_COOKIE_KEY)
+                .map(|c| c.value().to_owned()),
+            jar,
+            headers: parts.headers.clone(),
+        })
     }
 }
 
@@ -110,11 +118,9 @@ where
 fn extract_session(cookie_value: &str) -> Result<Session, ResponseError> {
     Session::from_str(cookie_value)
         .map_err(|_| ResponseError::TempporaryRedirect(LOGIN_INDEX))
-        .and_then(|session| match crate::token::check(&session.access_token) {
-            Ok(_) => Ok(session),
-            Err(err) => {
-                debug!("Session token is invalid: {}", err);
-                Err(ResponseError::TempporaryRedirect(LOGIN_INDEX))
-            }
+        .and_then(|session| {
+            crate::token::check(&session.access_token)
+                .map_err(|_| ResponseError::TempporaryRedirect(LOGIN_INDEX))
+                .and_then(|_| Ok(session))
         })
 }

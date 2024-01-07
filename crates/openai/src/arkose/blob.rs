@@ -20,6 +20,7 @@ pub async fn get_blob(typed: Type, identifier: Option<String>) -> anyhow::Result
                 .await?;
             Ok(Some(resp.data))
         }
+        (Type::SignUp, Some(identifier)) => Ok(Some(identifier)),
         _ => Ok(None),
     }
 }

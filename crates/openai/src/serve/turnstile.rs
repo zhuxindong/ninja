@@ -1,15 +1,15 @@
-use super::error::ResponseError;
 use crate::{serve::error::ProxyError, with_context};
+use std::net::IpAddr;
 
 pub(super) async fn cf_turnstile_check(
-    addr: &std::net::IpAddr,
+    addr: IpAddr,
     cf_response: Option<&str>,
-) -> Result<(), ResponseError> {
+) -> Result<(), ProxyError> {
     #[derive(serde::Serialize)]
     struct CfCaptchaForm<'a> {
         secret: &'a str,
         response: &'a str,
-        remoteip: &'a std::net::IpAddr,
+        remoteip: &'a IpAddr,
         idempotency_key: String,
     }
 
@@ -18,24 +18,24 @@ pub(super) async fn cf_turnstile_check(
     if let Some(turnsile) = ctx.cf_turnstile() {
         let response = cf_response
             .filter(|r| !r.is_empty())
-            .ok_or_else(|| ResponseError::BadRequest(ProxyError::MissingCfCaptchaResponse))?;
+            .ok_or_else(|| ProxyError::CfMissingCaptcha)?;
 
         let form = CfCaptchaForm {
             secret: &turnsile.secret_key,
             response,
-            remoteip: addr,
+            remoteip: &addr,
             idempotency_key: crate::uuid::uuid(),
         };
 
-        let resp = ctx
+        let _ = ctx
             .api_client()
             .post("https://challenges.cloudflare.com/turnstile/v0/siteverify")
             .form(&form)
             .send()
             .await
-            .map_err(ResponseError::InternalServerError)?;
-
-        let _ = resp.error_for_status().map_err(ResponseError::BadRequest)?;
+            .map_err(ProxyError::RequestError)?
+            .error_for_status()
+            .map_err(ProxyError::CfError)?;
     }
     Ok(())
 }

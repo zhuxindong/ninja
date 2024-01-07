@@ -325,7 +325,7 @@ async fn post_access_token(
     account: axum::Form<AuthAccount>,
 ) -> Result<impl IntoResponse, ResponseError> {
     // check username/email in whitelist
-    whitelist::check_whitelist(&account.username)?;
+    whitelist::check_whitelist(&account.username).map_err(ResponseError::Forbidden)?;
 
     if let Some(auth_key) = with_context!(auth_key) {
         // check bearer token exist

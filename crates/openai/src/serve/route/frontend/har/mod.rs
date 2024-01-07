@@ -337,6 +337,7 @@ impl Header for PlatformType {
             PlatformType(arkose::Type::GPT4) => "gpt4",
             PlatformType(arkose::Type::Auth) => "auth",
             PlatformType(arkose::Type::Platform) => "platform",
+            PlatformType(arkose::Type::SignUp) => "signup",
         };
         let value = HeaderValue::from_str(s).expect("invalid header value");
         values.extend(std::iter::once(value));

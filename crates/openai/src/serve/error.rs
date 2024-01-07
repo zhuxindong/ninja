@@ -40,14 +40,22 @@ pub enum ProxyError {
     AccessNotInWhitelist,
     #[error("Auth Key required!")]
     AuthKeyRequired,
-    #[error("Missing cf_captcha_response")]
-    MissingCfCaptchaResponse,
     #[error("event-source stream error ({0})")]
     EventSourceStreamError(EventStreamError<reqwest::Error>),
     #[error("Deserialize error ({0})")]
     DeserializeError(serde_json::Error),
     #[error("Invalid access token")]
     InvalidAccessToken,
+
+    /// Cloudflare error
+    #[error("Missing cf_captcha_response")]
+    CfMissingCaptcha,
+    #[error("Cloudflare error ({0})")]
+    CfError(reqwest::Error),
+
+    /// Request error
+    #[error("Request error ({0})")]
+    RequestError(reqwest::Error),
 }
 
 // Make our own error that wraps `anyhow::Error`.

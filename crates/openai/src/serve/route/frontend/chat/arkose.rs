@@ -16,7 +16,7 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::{routing::any, Router};
 
-use super::ext::ArkoseSessionExt;
+use super::session::ArkoseSessionExt;
 
 pub(super) fn config(router: Router, args: &Args) -> Router {
     // Enable arkose endpoint proxy
@@ -30,13 +30,13 @@ pub(super) fn config(router: Router, args: &Args) -> Router {
 }
 
 async fn proxy(
-    mut ext: ArkoseSessionExt<HashMap<String, String>>,
+    mut s: ArkoseSessionExt<HashMap<String, String>>,
 ) -> Result<impl IntoResponse, ResponseError> {
-    let req_path = ext
+    let req_path = s
         .uri
         .path_and_query()
         .map(|p| p.as_str())
-        .unwrap_or(ext.uri.path());
+        .unwrap_or(s.uri.path());
 
     // try to get static resource
     if let Ok(resp) = get_static_resource(Path(req_path.to_owned())).await {
@@ -47,7 +47,7 @@ async fn proxy(
 
     if req_path.contains("/fc/gt2/public_key/") {
         let pk = req_path.trim_start_matches("/fc/gt2/public_key/");
-        match ArkoseToken::new_from_context(Type::from_pk(pk)?, ext.session.map(|s| s.access_token))
+        match ArkoseToken::new_from_context(Type::from_pk(pk)?, s.session.map(|s| s.access_token))
             .await
         {
             Ok(arkose_token) => {
@@ -89,32 +89,25 @@ async fn proxy(
         }
     }
 
-    for header in &[
-        header::CONNECTION,
-        header::CONTENT_LENGTH,
-        header::ACCEPT,
-        header::ACCEPT_ENCODING,
-        header::HOST,
-    ] {
-        ext.headers.remove(header);
+    for header in &[header::CONNECTION, header::CONTENT_LENGTH, header::HOST] {
+        s.headers.remove(header);
     }
 
-    let client = with_context!(arkose_client);
-    let url = format!("https://client-api.arkoselabs.com{}", req_path);
+    let url = format!("https://tcr9i.chat.openai.com{req_path}");
 
-    let resp = match ext.body {
+    let resp = match s.body {
         Some(form) => {
-            client
-                .request(ext.method, url)
-                .headers(ext.headers)
+            with_context!(arkose_client)
+                .request(s.method, url)
+                .headers(s.headers)
                 .form(&form.0)
                 .send()
                 .await
         }
         None => {
-            client
-                .request(ext.method, url)
-                .headers(ext.headers)
+            with_context!(arkose_client)
+                .request(s.method, url)
+                .headers(s.headers)
                 .send()
                 .await
         }
@@ -138,12 +131,10 @@ fn create_response_with_data(
 
 fn create_response(resp: reqwest::Response) -> Result<impl IntoResponse, ResponseError> {
     let mut builder = Response::builder().status(resp.status());
-
     // Copy headers
     for ele in resp.headers() {
         builder = builder.header(ele.0, ele.1);
     }
-
     Ok(builder
         .body(StreamBody::new(resp.bytes_stream()))
         .map_err(ResponseError::InternalServerError)?)

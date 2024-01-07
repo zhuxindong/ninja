@@ -25,7 +25,7 @@ pub(crate) async fn auth_middleware<B>(
     // Check if the token is valid
     match token::check_for_u8(token.as_bytes()) {
         Ok(Some(profile)) => {
-            whitelist::check_whitelist(profile.email())?;
+            whitelist::check_whitelist(profile.email()).map_err(ResponseError::Forbidden)?;
             Ok(next.run(request).await)
         }
         Ok(None) => {
