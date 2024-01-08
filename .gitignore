@@ -32,3 +32,4 @@ ca
 *.har
 har/*.har
 patch/.patch
+*.patch
