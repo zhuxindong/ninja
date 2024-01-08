@@ -15,7 +15,7 @@ pub enum AuthError {
     ServerError(reqwest::Error),
 
     /// Failed Error
-    #[error("Failed login")]
+    #[error("Failed login, it may be an IP or speed limit issue, please try again")]
     FailedLogin,
     #[error("Failed to get access token (error {0:?})")]
     FailedAccessToken(String),

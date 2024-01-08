@@ -171,49 +171,64 @@ impl WebAuthProvider {
 
         // 1. /authorize/resume?state=xxx
         // 2. https://chat.openai.com/auth/login
-        if resp.status().is_redirection() {
-            let location = AuthClient::get_location_path(&resp.headers())?;
-            if location.contains("https://chat.openai.com/") {
-                warn!("WebAuthProvider::authenticate_password: invalid location path: {location}");
-                return Err(AuthError::InvalidLocationPath);
-            }
 
-            let resp = self
-                .0
-                .get(format!("{OPENAI_OAUTH_URL}{location}"))
-                .ext_context(ctx)
-                .send()
-                .await
-                .map_err(AuthError::FailedRequest)?
-                .ext_context(ctx);
-
-            debug!("authenticate_password redirect url: {}", resp.url());
-
-            if resp.status().is_redirection() {
-                let location = AuthClient::get_location_path(resp.headers())?;
-                if location.starts_with("/u/mfa-otp-challenge") {
-                    let mfa = ctx.account.mfa.clone().ok_or(AuthError::MFARequired)?;
-                    return self.authenticate_mfa(ctx, &mfa, location).await;
-                }
-
-                let resp = self
-                    .0
-                    .get(location)
-                    .ext_context(ctx)
-                    .send()
-                    .await
-                    .map_err(AuthError::FailedRequest)?
-                    .ext_context(ctx);
-
-                // maybe auth failed
-                let _ = AuthClient::check_auth_callback_state(resp.url())?;
-
-                // If resp status is found return get_access_token
-                if resp.status() == StatusCode::FOUND {
-                    return self.get_access_token(ctx).await;
-                }
-            }
+        let location = AuthClient::get_location_path(&resp.headers())?;
+        if location.contains("https://chat.openai.com/") {
+            warn!("WebAuthProvider::authenticate_password: invalid location path: {location}");
+            return Err(AuthError::InvalidLocationPath);
         }
+
+        // If the location contains "/authorize/resume?", it means that the login was successful.
+        if location.starts_with("/authorize/resume?") {
+            return self.authenticate_resume(ctx, location).await;
+        }
+
+        Err(AuthError::FailedLogin)
+    }
+
+    async fn authenticate_resume(
+        &self,
+        ctx: &mut RequestContext<'_>,
+        location: &str,
+    ) -> AuthResult<model::AccessToken> {
+        let resp = self
+            .0
+            .get(format!("{OPENAI_OAUTH_URL}{location}"))
+            .ext_context(ctx)
+            .send()
+            .await
+            .map_err(AuthError::FailedRequest)?
+            .ext_context(ctx);
+
+        // If resp status is client error return InvalidEmailOrPassword
+        if resp.status().is_client_error() {
+            return Err(AuthError::InvalidEmailOrPassword);
+        }
+
+        // If get_location_path returns an error, it means that the location is invalid.
+        let location = AuthClient::get_location_path(resp.headers())?;
+        if location.starts_with("/u/mfa-otp-challenge") {
+            let mfa = ctx.account.mfa.clone().ok_or(AuthError::MFARequired)?;
+            return self.authenticate_mfa(ctx, &mfa, location).await;
+        }
+
+        let resp = self
+            .0
+            .get(location)
+            .ext_context(ctx)
+            .send()
+            .await
+            .map_err(AuthError::FailedRequest)?
+            .ext_context(ctx);
+
+        // maybe auth failed
+        let _ = AuthClient::check_auth_callback_state(resp.url())?;
+
+        // If resp status is found return get_access_token
+        if resp.status() == StatusCode::FOUND {
+            return self.get_access_token(ctx).await;
+        }
+
         Err(AuthError::FailedLogin)
     }
 
