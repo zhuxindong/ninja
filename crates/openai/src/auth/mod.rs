@@ -52,7 +52,7 @@ pub struct AuthClient {
 }
 
 impl AuthClient {
-    pub async fn do_session(&self, session: &str) -> AuthResult<model::AccessToken> {
+    pub async fn refresh_session(&self, session: &str) -> AuthResult<model::AccessToken> {
         let resp = self
             .inner
             .get(format!("{URL_CHATGPT_API}/api/auth/session"))
@@ -69,7 +69,7 @@ impl AuthClient {
         Self::exstract_session_hanlder(resp).await
     }
 
-    pub async fn do_dashboard_login(&self, access_token: &str) -> AuthResult<model::DashSession> {
+    pub async fn dashboard_login(&self, access_token: &str) -> AuthResult<model::DashSession> {
         let access_token = access_token.replace("Bearer ", "");
         let resp = self
             .inner
@@ -82,7 +82,7 @@ impl AuthClient {
         Self::response_handle(resp).await
     }
 
-    pub async fn do_get_api_key_list(&self, sensitive_id: &str) -> AuthResult<model::ApiKeyList> {
+    pub async fn api_key_list(&self, sensitive_id: &str) -> AuthResult<model::ApiKeyList> {
         let resp = self
             .inner
             .get(format!("{OPENAI_API_URL}/dashboard/user/api_keys"))
@@ -93,7 +93,7 @@ impl AuthClient {
         Self::response_handle(resp).await
     }
 
-    pub async fn do_api_key<'a>(
+    pub async fn api_key<'a>(
         &self,
         sensitive_id: &str,
         data: ApiKeyData<'a>,

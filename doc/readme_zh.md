@@ -165,10 +165,11 @@ services:
 - Authorization
   > 除了登录，都使用`Authorization: Bearer xxxx`
   - 登录: `/auth/token`，表单`option`可选参数，默认为`web`登录，返回`AccessToken`与`Session`；参数为`apple`/`platform`，返回`AccessToken`与`RefreshToken`
-  - 刷新 `RefreshToken`: `POST /auth/refresh_token`
-  - 撤销 `RefreshToken`: `POST /auth/revoke_token`
-  - 刷新 `Session`: `POST /auth/refresh_session`
-  - 获取 `Sess token`: `POST /auth/sess_token`
+  - 刷新 `RefreshToken`: `POST /auth/refresh_token`，支持`platform`/`apple`撤销
+  - 撤销 `RefreshToken`: `POST /auth/revoke_token`, 支持`platform`/`apple`撤销
+  - 刷新 `Session`: `POST /auth/refresh_session`，使用`web`登录返回的`Session`刷新
+  - 获取 `Sess token`: `POST /auth/sess_token`，使用`platform`的`AccessToken`获取
+  - 获取 `Billing`: `GET /auth/billing`，使用`sess token`获取
   
   `Web登录`默认返回一个名为: `__Secure-next-auth.session-token`的cookie，客户端只需要保存这个cookie，调用`/auth/refresh_session`也可以刷新`AccessToken`
 

@@ -41,7 +41,7 @@ pub async fn prompt() -> anyhow::Result<()> {
 
         if let Some(auth_token) = state.first() {
             let pb = new_spinner("Login Dashboard...");
-            match client.do_dashboard_login(auth_token.access_token()).await {
+            match client.dashboard_login(auth_token.access_token()).await {
                 Ok(session) => {
                     pb.finish_and_clear();
                     loop {
@@ -93,7 +93,7 @@ async fn billing(client: &AuthClient, token: &str) -> anyhow::Result<()> {
 }
 
 async fn list_api_key(client: &AuthClient, token: &str) -> anyhow::Result<()> {
-    match client.do_get_api_key_list(token).await {
+    match client.api_key_list(token).await {
         Ok(api_key_list) => {
             if !api_key_list.data.is_empty() {
                 json_to_table("API KEY LIST", api_key_list.data);
@@ -126,7 +126,7 @@ async fn create_api_key(client: &AuthClient, token: &str) -> anyhow::Result<()> 
                     .arkose_token(&arkose_token)
                     .build();
 
-                match client.do_api_key(token, data).await {
+                match client.api_key(token, data).await {
                     Ok(api_key) => {
                         pb.finish_and_clear();
                         json_to_table("Field", api_key.key);
@@ -150,7 +150,7 @@ async fn create_api_key(client: &AuthClient, token: &str) -> anyhow::Result<()> 
 async fn delete_api_key(client: &AuthClient, token: &str) -> anyhow::Result<()> {
     let conf = Context::get_conf().await?;
 
-    match client.do_get_api_key_list(token).await {
+    match client.api_key_list(token).await {
         Ok(api_key_list) => {
             if api_key_list.data.is_empty() {
                 return Ok(());
@@ -182,7 +182,7 @@ async fn delete_api_key(client: &AuthClient, token: &str) -> anyhow::Result<()> 
                                     .arkose_token(&arkose_token)
                                     .build();
 
-                                if let Err(err) = client.do_api_key(token, data).await {
+                                if let Err(err) = client.api_key(token, data).await {
                                     pb.finish_and_clear();
                                     println!("Error: {}", err);
                                 } else {
