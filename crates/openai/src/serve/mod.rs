@@ -185,7 +185,8 @@ impl Serve {
             .route("/auth/refresh_token", post(post_refresh_token))
             .route("/auth/revoke_token", post(post_revoke_token))
             .route("/auth/refresh_session", post(post_refresh_session))
-            .route("/auth/sess_token", post(post_sess_token));
+            .route("/auth/sess_token", post(post_sess_token))
+            .route("/auth/billing", post(post_billing));
 
         let router = route::config(
             // Enable arkose token endpoint proxy
@@ -288,12 +289,25 @@ impl Serve {
     }
 }
 
+/// POST /auth/billing
+async fn post_billing(
+    TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
+) -> Result<impl IntoResponse, ResponseError> {
+    match with_context!(auth_client)
+        .billing_credit_grants(bearer.token())
+        .await
+    {
+        Ok(billing) => Ok(Json(billing)),
+        Err(err) => Err(ResponseError::BadRequest(err)),
+    }
+}
+
 /// POST /auth/refresh_session
 async fn post_refresh_session(
     TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
 ) -> Result<impl IntoResponse, ResponseError> {
     let session_token = with_context!(auth_client)
-        .do_session(bearer.token())
+        .refresh_session(bearer.token())
         .await
         .map_err(ResponseError::BadRequest)?;
 
@@ -311,7 +325,7 @@ async fn post_sess_token(
     TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
 ) -> Result<impl IntoResponse, ResponseError> {
     match with_context!(auth_client)
-        .do_dashboard_login(bearer.token())
+        .dashboard_login(bearer.token())
         .await
     {
         Ok(dash_session) => Ok(Json(dash_session)),

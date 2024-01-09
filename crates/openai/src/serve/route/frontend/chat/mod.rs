@@ -264,7 +264,7 @@ async fn login_token(
                 return Err(ResponseError::TempporaryRedirect(LOGIN_INDEX));
             }
             let access_token = with_context!(auth_client)
-                .do_session(access_token)
+                .refresh_session(access_token)
                 .await
                 .map_err(ResponseError::BadRequest)?;
             let authentication_token =
@@ -328,7 +328,7 @@ async fn logout(s: SessionExt) -> Result<Response<Body>, ResponseError> {
 async fn session(s: SessionExt) -> Result<Response<Body>, ResponseError> {
     // Refresh session
     let new_session = if let Some(c) = s.session_token {
-        match with_context!(auth_client).do_session(&c).await {
+        match with_context!(auth_client).refresh_session(&c).await {
             Ok(access_token) => {
                 let authentication_token = Token::try_from(access_token)?;
                 Some(Session::from(authentication_token))
