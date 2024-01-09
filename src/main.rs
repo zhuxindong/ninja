@@ -105,6 +105,7 @@ impl std::fmt::Debug for AgentImpersonate {
             Impersonate::Safari15_6_1 => "safari15_6_1",
             Impersonate::Safari16 => "safari16",
             Impersonate::Safari16_5 => "safari16_5",
+            Impersonate::Safari17_2_1 => "safari17_2_1",
             Impersonate::OkHttp3_9 => "okhttp3_9",
             Impersonate::OkHttp3_11 => "okhttp3_11",
             Impersonate::OkHttp3_13 => "okhttp3_13",
@@ -139,6 +140,7 @@ fn print_ua_help() {
         AgentImpersonate(Impersonate::Safari15_6_1),
         AgentImpersonate(Impersonate::Safari16),
         AgentImpersonate(Impersonate::Safari16_5),
+        AgentImpersonate(Impersonate::Safari17_2_1),
     ]
     .into_iter()
     .map(|x| format!("{:?}", x))
