@@ -316,7 +316,7 @@ fn build_client(
 
     // disable keep alive
     if disable_keep_alive {
-        builder = builder.tcp_keepalive(None);
+        builder = builder.tcp_keepalive(None).pool_max_idle_per_host(0);
     } else {
         builder = builder
             .tcp_keepalive(Duration::from_secs(config.tcp_keepalive))
@@ -368,7 +368,7 @@ fn build_auth_client(
 
     // disable keep alive
     if disable_keep_alive {
-        builder = builder.tcp_keepalive(None);
+        builder = builder.tcp_keepalive(None).pool_max_idle_per_host(0);
     } else {
         builder = builder
             .tcp_keepalive(Duration::from_secs(config.tcp_keepalive))
