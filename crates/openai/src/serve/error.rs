@@ -47,6 +47,10 @@ pub enum ProxyError {
     #[error("Invalid access token")]
     InvalidAccessToken,
 
+    /// get access token profile error
+    #[error("Get access token profile error")]
+    GetAccessTokenProfileError,
+
     /// Cloudflare error
     #[error("Missing cf_captcha_response")]
     CfMissingCaptcha,
