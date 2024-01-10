@@ -9,8 +9,7 @@ use serde::de::DeserializeOwned;
 use std::str::FromStr;
 
 use self::session::Session;
-use super::{LOGIN_INDEX, SESSION_ID};
-use crate::constant::API_AUTH_SESSION_COOKIE_KEY;
+use super::{LOGIN_INDEX, SESSION_ID, SESSION_TOKEN_ID};
 use crate::now_duration;
 use crate::serve::error::ResponseError;
 
@@ -53,15 +52,14 @@ where
         let current_timestamp = now_duration()
             .map_err(ResponseError::InternalServerError)?
             .as_secs() as i64;
-        if session.expires < current_timestamp {
+        if current_timestamp > session.expires {
             return Err(ResponseError::TempporaryRedirect(LOGIN_INDEX));
         }
 
+        // The access token may be expired
         Ok(SessionExt {
             session,
-            session_token: jar
-                .get(API_AUTH_SESSION_COOKIE_KEY)
-                .map(|c| c.value().to_owned()),
+            session_token: jar.get(SESSION_TOKEN_ID).map(|c| c.value().to_owned()),
             jar,
             headers: parts.headers.clone(),
         })

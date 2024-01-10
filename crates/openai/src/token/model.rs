@@ -88,10 +88,11 @@ struct Organization {
     title: String,
 }
 
-impl TryFrom<String> for Profile {
+/// Convert jwt body(id token) to profile
+impl TryFrom<&str> for Profile {
     type Error = anyhow::Error;
 
-    fn try_from(value: String) -> Result<Self, Self::Error> {
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
         let split_jwt_strings: Vec<_> = value.split('.').collect();
         let jwt_body = split_jwt_strings
             .get(1)
@@ -103,6 +104,7 @@ impl TryFrom<String> for Profile {
     }
 }
 
+/// Convert access token to token
 impl TryFrom<AccessToken> for Token {
     type Error = anyhow::Error;
 
@@ -112,8 +114,8 @@ impl TryFrom<AccessToken> for Token {
                 let expires_time = value
                     .session_token
                     .clone()
-                    .ok_or(anyhow::anyhow!("session is none"))?
-                    .expires
+                    .map(|s| s.expires)
+                    .flatten()
                     .ok_or(anyhow::anyhow!("session expires is none"))?;
 
                 Ok(Self {
@@ -130,7 +132,7 @@ impl TryFrom<AccessToken> for Token {
                 })
             }
             AccessToken::OAuth(value) => {
-                let profile = Profile::try_from(value.id_token)?;
+                let profile = Profile::try_from(value.id_token.as_str())?;
                 Ok(Self {
                     access_token: value.access_token,
                     refresh_token: Some(value.refresh_token),
@@ -146,16 +148,16 @@ impl TryFrom<AccessToken> for Token {
     }
 }
 
+/// Convert refresh token to token
 impl TryFrom<RefreshToken> for Token {
     type Error = anyhow::Error;
 
     fn try_from(value: RefreshToken) -> Result<Self, Self::Error> {
-        let profile = Profile::try_from(value.id_token)?;
-        let expires = now_duration()?.as_secs() as i64 + value.expires_in;
+        let profile = Profile::try_from(value.id_token.as_str())?;
         Ok(Self {
             access_token: value.access_token,
             refresh_token: Some(value.refresh_token),
-            expires,
+            expires: now_duration()?.as_secs() as i64 + value.expires_in,
             user_id: profile.https_api_openai_com_auth.user_id,
             name: profile.name,
             email: profile.email,

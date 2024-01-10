@@ -1,8 +1,8 @@
 mod arkose;
 mod cookier;
+mod props;
 mod session;
 
-use anyhow::anyhow;
 use axum::body;
 use axum::body::Body;
 use axum::extract::ConnectInfo;
@@ -31,11 +31,9 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::OnceLock;
-use time::format_description::well_known::Rfc3339;
 use tower::ServiceBuilder;
 use tower_http::ServiceBuilderExt;
 
-use crate::constant::API_AUTH_SESSION_COOKIE_KEY;
 use crate::constant::ARKOSE_ENDPOINT;
 use crate::constant::AUTH_KEY;
 use crate::constant::CSRF_TOKEN;
@@ -46,7 +44,7 @@ use crate::constant::SITE_KEY;
 use crate::constant::SUPPORT_APPLE;
 use crate::constant::USERNAME;
 use crate::context::args::Args;
-use crate::debug;
+use crate::serve::error::ProxyError;
 use crate::serve::error::ResponseError;
 use crate::serve::middleware::csrf;
 use crate::serve::proxy::header_convert;
@@ -66,7 +64,8 @@ use super::get_static_resource;
 
 const HOME_INDEX: &str = "/";
 const LOGIN_INDEX: &str = "/auth/login";
-const SESSION_ID: &str = "ninja_session";
+const SESSION_ID: &str = "session";
+const SESSION_TOKEN_ID: &str = "session_token";
 const PUID_ID: &str = "_puid";
 const BUILD_ID: &str = "eFlZtDCQUjuHAccnRY3au";
 const TEMP_404: &str = "404.htm";
@@ -135,7 +134,7 @@ pub(super) fn config(router: Router, args: &Args) -> Router {
         .route(
             // {share_id}.json
             &format!("/_next/data/{BUILD_ID}/share/:share_id"),
-            get(get_share_chat_info),
+            get(share_chat_info),
         )
         .route(
             &format!("/_next/data/{BUILD_ID}/share/:share_id/continue.json"),
@@ -206,27 +205,31 @@ async fn login(
 
     match with_context!(auth_client).do_access_token(&account).await {
         Ok(access_token) => {
-            let authentication_token =
-                Token::try_from(access_token).map_err(ResponseError::InternalServerError)?;
-            let session = Session::from(authentication_token);
-
-            let cookie = cookier::build_cookie(SESSION_ID, session.to_string()?, session.expires)?;
+            // Build session
+            let session = Session::from(
+                Token::try_from(access_token).map_err(ResponseError::InternalServerError)?,
+            );
 
             let mut builder = Response::builder()
                 .status(StatusCode::SEE_OTHER)
-                .header(header::LOCATION, HOME_INDEX)
-                .header(header::SET_COOKIE, cookie.to_string());
+                .header(header::LOCATION, HOME_INDEX);
 
-            if let Some(value) = session.session_token {
+            // Set the Session
+            let cookie = cookier::build_cookie(SESSION_ID, session.to_string()?, session.expires)?;
+            builder = builder.header(header::SET_COOKIE, cookie.to_string());
+
+            // Set the Session-Token
+            if let Some(session_token) = session.session_token {
                 let session_cookie =
-                    cookier::build_cookie(API_AUTH_SESSION_COOKIE_KEY, value, session.expires)?;
+                    cookier::build_cookie(SESSION_TOKEN_ID, session_token, session.expires)?;
                 builder = builder.header(header::SET_COOKIE, session_cookie.to_string())
             }
 
-            Ok(builder
+            let response = builder
                 .body(Body::empty())
-                .map_err(ResponseError::InternalServerError)?
-                .into_response())
+                .map_err(ResponseError::InternalServerError)?;
+
+            Ok(response.into_response())
         }
         Err(err) => Ok(err_handler(err.to_string()).into_response()),
     }
@@ -239,16 +242,18 @@ async fn login_token(
     let access_token = bearer.token();
     // Check input token type
     let session = match access_token {
+        // Access token
         s if s.split('.').count() == 3 => {
             let token_prefile = crate::token::check(s)
                 .map_err(ResponseError::Unauthorized)?
-                .ok_or(ResponseError::InternalServerError(anyhow!(
-                    "get access token profile error"
-                )))?;
+                .ok_or_else(|| {
+                    ResponseError::InternalServerError(ProxyError::GetAccessTokenProfileError)
+                })?;
             // Check if the request is in the whitelist
             whitelist::check_whitelist(&token_prefile.email()).map_err(ResponseError::Forbidden)?;
             Session::from((s, token_prefile))
         }
+        // Refresh token
         s if s.len() > 40 && s.len() < 100 => {
             let refresh_token = with_context!(auth_client)
                 .do_refresh_token(access_token)
@@ -258,6 +263,7 @@ async fn login_token(
                 Token::try_from(refresh_token).map_err(ResponseError::InternalServerError)?;
             Session::from(authentication_token)
         }
+        // Session token
         _ => {
             // If the session is empty, then redirect to the login page
             if bearer.token().is_empty() {
@@ -277,16 +283,15 @@ async fn login_token(
         .status(StatusCode::OK)
         .header(header::LOCATION, HOME_INDEX);
 
+    // Session
     // Consider using secure(true) based on your security requirements
     let cookie = cookier::build_cookie(SESSION_ID, session.to_string()?, session.expires)?;
-
-    // Set session cookie
     builder = builder.header(header::SET_COOKIE, cookie.to_string());
 
+    // Session-Token
     // If the session not empty, then set session token
     if let Some(value) = session.session_token {
-        let session_cookie =
-            cookier::build_cookie(API_AUTH_SESSION_COOKIE_KEY, value, session.expires)?;
+        let session_cookie = cookier::build_cookie(SESSION_TOKEN_ID, value, session.expires)?;
         builder = builder.header(header::SET_COOKIE, session_cookie.to_string())
     }
 
@@ -298,18 +303,11 @@ async fn login_token(
 }
 
 /// Logout, will remove cookie
-async fn logout(s: SessionExt) -> Result<Response<Body>, ResponseError> {
-    // If the session is empty, then redirect to the login page
-    if let Some(refresh_token) = s.session.refresh_token {
-        let _ = with_context!(auth_client)
-            .do_revoke_token(&refresh_token)
-            .await;
-    }
-
+async fn logout() -> Result<Response<Body>, ResponseError> {
     // Clear session
     let session_cookie = cookier::clear_cookie(SESSION_ID);
     // Clear session token
-    let session_token_cookie = cookier::clear_cookie(API_AUTH_SESSION_COOKIE_KEY);
+    let session_token_cookie = cookier::clear_cookie(SESSION_TOKEN_ID);
     // Clear puid
     let puid_cookie = cookier::clear_cookie(PUID_ID);
 
@@ -325,74 +323,64 @@ async fn logout(s: SessionExt) -> Result<Response<Body>, ResponseError> {
 }
 
 /// Get session
-async fn session(s: SessionExt) -> Result<Response<Body>, ResponseError> {
+async fn session(mut s: SessionExt) -> Result<Response<Body>, ResponseError> {
     // Refresh session
-    let new_session = if let Some(c) = s.session_token {
-        match with_context!(auth_client).refresh_session(&c).await {
-            Ok(access_token) => {
-                let authentication_token = Token::try_from(access_token)?;
-                Some(Session::from(authentication_token))
-            }
-            Err(err) => {
-                debug!("Get session token error: {}", err);
-                None
-            }
+    let new_session = if let Some(session_token) = s.session_token.as_ref() {
+        match with_context!(auth_client)
+            .refresh_session(session_token)
+            .await
+        {
+            Ok(access_token) => Some(Session::from(Token::try_from(access_token)?)),
+            Err(_) => None,
         }
     } else if let Some(refresh_token) = s.session.refresh_token.as_ref() {
         match with_context!(auth_client)
             .do_refresh_token(&refresh_token)
             .await
         {
-            Ok(new_refresh_token) => {
-                let authentication_token = Token::try_from(new_refresh_token)?;
-                Some(Session::from(authentication_token))
-            }
-            Err(err) => {
-                debug!("Refresh token error: {}", err);
-                None
-            }
+            Ok(refresh_token) => Some(Session::from(Token::try_from(refresh_token)?)),
+            Err(_) => None,
         }
     } else {
         None
     };
 
+    // If the session is empty, then redirect to the login page
     if let Some(new_session) = new_session {
-        return create_response_from_session(&new_session);
+        s.session = new_session;
+    } else {
+        // Check access token is expired
+        let _ = crate::token::check(&s.session.access_token)
+            .map_err(|_| ResponseError::TempporaryRedirect(LOGIN_INDEX))?;
     }
 
-    create_response_from_session(&s.session)
+    create_response_from_session(s.session)
 }
 
 /// Create response from session
-fn create_response_from_session(session: &Session) -> Result<Response<Body>, ResponseError> {
-    let body = session_to_body(session)?;
-    Ok(Response::builder()
+fn create_response_from_session(s: Session) -> Result<Response<Body>, ResponseError> {
+    let mut builder = Response::builder()
         .status(StatusCode::OK)
-        .header(header::LOCATION, LOGIN_INDEX)
-        .header(header::SET_COOKIE, session.to_string()?) // Note: This might not be what you want
+        .header(header::LOCATION, LOGIN_INDEX);
+
+    // Convert to body string
+    let body = props::session_props(&s)?.to_string();
+
+    // Update the Session
+    let session = cookier::build_cookie(SESSION_ID, s.to_string()?, s.expires)?;
+    builder = builder.header(header::SET_COOKIE, session.to_string());
+
+    // Update the Session-Token
+    if let Some(session_token) = s.session_token {
+        let session = cookier::build_cookie(SESSION_TOKEN_ID, session_token, s.expires)?;
+        builder = builder.header(header::SET_COOKIE, session.to_string())
+    }
+
+    let response = builder
         .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
         .body(Body::from(body))
-        .map_err(ResponseError::InternalServerError)?)
-}
-
-/// Convert session to body
-fn session_to_body(session: &Session) -> anyhow::Result<String> {
-    let expires = time::OffsetDateTime::from_unix_timestamp(session.expires)
-        .map(|v| v.format(&Rfc3339))??;
-    let props = serde_json::json!({
-        "user": {
-            "id": session.user_id,
-            "name": session.email,
-            "email": session.email,
-            "image": null,
-            "picture": null,
-            "groups": [],
-        },
-        "expires" : expires,
-        "accessToken": session.access_token,
-        "authProvider": "auth0"
-    });
-    Ok(props.to_string())
+        .map_err(ResponseError::InternalServerError)?;
+    Ok(response)
 }
 
 /// Get auth me
@@ -442,73 +430,20 @@ async fn chat(
         }
         None => TEMP_CHAT,
     };
-    let props = serde_json::json!({
-        "props": {
-            "pageProps": {
-                "user": {
-                    "id": s.session.user_id,
-                    "name": s.session.email,
-                    "email": s.session.email,
-                    "image": null,
-                    "picture": null,
-                    "groups": [],
-                },
-                "serviceStatus": {},
-                "userCountry": "US",
-                "geoOk": true,
-                "serviceAnnouncement": {
-                    "paid": {},
-                    "public": {}
-                },
-                "isUserInCanPayGroup": true
-            },
-            "__N_SSP": true
-        },
-        "page": "/[[...default]]",
-        "query": query.0,
-        "buildId": BUILD_ID,
-        "assetPrefix": "https://cdn.oaistatic.com",
-        "isFallback": false,
-        "gssp": true,
-        "scriptLoader": []
-    });
+    let props = props::chat_props(&s.session, query).to_string();
     let mut ctx = tera::Context::new();
-    ctx.insert(
-        "props",
-        &serde_json::to_string(&props).map_err(ResponseError::InternalServerError)?,
-    );
+    ctx.insert("props", &props);
     settings_template_data(&mut ctx);
     return render_template(template_name, &ctx);
 }
 
 /// Get conversation chat info
 async fn chat_info(s: SessionExt) -> Result<Response<Body>, ResponseError> {
-    let body = serde_json::json!({
-        "pageProps": {
-            "user": {
-                "id": s.session.user_id,
-                "name": s.session.email,
-                "email": s.session.email,
-                "image": null,
-                "picture": null,
-                "groups": [],
-            },
-            "serviceStatus": {},
-            "userCountry": "US",
-            "geoOk": true,
-            "serviceAnnouncement": {
-                "paid": {},
-                "public": {}
-            },
-            "isUserInCanPayGroup": true
-        },
-        "__N_SSP": true
-    });
-
+    let props = props::chat_info_props(&s.session);
     Ok(Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-        .body(Body::from(body.to_string()))
+        .body(Body::from(props.to_string()))
         .map_err(ResponseError::InternalServerError)?)
 }
 
@@ -541,59 +476,16 @@ async fn share_chat(
                 });
             }
 
-            let props = serde_json::json!({
-                        "props": {
-                            "pageProps": {
-                                "sharedConversationId": share_id,
-                                "serverResponse": {
-                                    "type": "data",
-                                    "data": share_data
-                                },
-                                "continueMode": false,
-                                "moderationMode": false,
-                                "chatPageProps": {},
-                            },
-                            "__N_SSP": true
-                        },
-                        "page": "/share/[[...shareParams]]",
-                        "query": {
-                            "shareParams": vec![share_id]
-                        },
-                        "buildId": BUILD_ID,
-                        "assetPrefix": "https://cdn.oaistatic.com",
-                        "isFallback": false,
-                        "gssp": true,
-                        "scriptLoader": []
-                    }
-            );
+            let props = props::share_chat_for_ok_props(share_id, share_data).to_string();
             let mut ctx = tera::Context::new();
-            ctx.insert(
-                "props",
-                &serde_json::to_string(&props).map_err(ResponseError::InternalServerError)?,
-            );
+            ctx.insert("props", &props);
             settings_template_data(&mut ctx);
             render_template(TEMP_SHARE, &ctx)
         }
         Err(_) => {
-            let props = serde_json::json!({
-                "props": {
-                    "pageProps": {"statusCode": 404}
-                },
-                "page": "/_error",
-                "query": {},
-                "buildId": BUILD_ID,
-                "assetPrefix": "https://cdn.oaistatic.com",
-                "nextExport": true,
-                "isFallback": false,
-                "gip": true,
-                "scriptLoader": []
-            });
-
+            let props = props::share_chat_for_err_props().to_string();
             let mut ctx = tera::Context::new();
-            ctx.insert(
-                "props",
-                &serde_json::to_string(&props).map_err(ResponseError::InternalServerError)?,
-            );
+            ctx.insert("props", &props);
             settings_template_data(&mut ctx);
             render_template(TEMP_404, &ctx)
         }
@@ -601,7 +493,7 @@ async fn share_chat(
 }
 
 /// Get conversation share chat info
-async fn get_share_chat_info(
+async fn share_chat_info(
     share_id: Path<String>,
     extract: SessionExt,
 ) -> Result<Response<Body>, ResponseError> {
@@ -629,34 +521,18 @@ async fn get_share_chat_info(
                 });
             }
 
-            let props = serde_json::json!({
-                "pageProps": {
-                    "sharedConversationId": share_id,
-                    "serverResponse": {
-                        "type": "data",
-                        "data": share_data,
-                    },
-                    "continueMode": false,
-                    "moderationMode": false,
-                    "chatPageProps": {},
-                },
-                "__N_SSP": true
-            }
-            );
+            let props = props::share_chat_info_props(share_id, share_data).to_string();
             Ok(Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                .body(Body::from(
-                    serde_json::to_string(&props).map_err(ResponseError::InternalServerError)?,
-                ))
+                .body(Body::from(props))
                 .map_err(ResponseError::InternalServerError)?)
         }
         Err(_) => Ok(Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
             .body(Body::from(
-                serde_json::to_string(&serde_json::json!({"notFound": true}))
-                    .map_err(ResponseError::InternalServerError)?,
+                serde_json::json!({"notFound": true}).to_string(),
             ))
             .map_err(ResponseError::InternalServerError)?),
     };
@@ -674,18 +550,14 @@ async fn share_chat_continue(share_id: Path<String>) -> Result<Response<Body>, R
 /// Get conversation share chat continue info
 async fn share_chat_continue_info(
     share_id: Path<String>,
-    extract: SessionExt,
+    s: SessionExt,
 ) -> Result<Response<Body>, ResponseError> {
     let resp = with_context!(api_client)
         .get(format!(
             "{URL_CHATGPT_API}/backend-api/share/{}",
             share_id.0
         ))
-        .headers(header_convert(
-            &extract.headers,
-            &extract.jar,
-            URL_CHATGPT_API,
-        )?)
+        .headers(header_convert(&s.headers, &s.jar, URL_CHATGPT_API)?)
         .send()
         .await
         .map_err(ResponseError::InternalServerError)?;
@@ -700,66 +572,21 @@ async fn share_chat_continue_info(
                     data.insert("continue_conversation_url".to_owned(), json!(new_value))
                 });
             }
-            let props = serde_json::json!({
-                "pageProps": {
-                    "user": {
-                        "id": extract.session.user_id,
-                        "name": extract.session.email,
-                        "email": extract.session.email,
-                        "image": null,
-                        "picture": null,
-                        "groups": [],
-                    },
-                    "serviceStatus": {},
-                    "userCountry": "US",
-                    "geoOk": true,
-                    "serviceAnnouncement": {
-                        "paid": {},
-                        "public": {}
-                    },
-                    "isUserInCanPayGroup": true,
-                    "sharedConversationId": share_id.0,
-                    "serverResponse": {
-                        "type": "data",
-                        "data": share_data,
-                    },
-                    "continueMode": true,
-                    "moderationMode": false,
-                    "chatPageProps": {
-                        "user": {
-                            "id": extract.session.user_id,
-                            "name": extract.session.email,
-                            "email": extract.session.email,
-                            "image": null,
-                            "picture": null,
-                            "groups": [],
-                        },
-                        "serviceStatus": {},
-                        "userCountry": "US",
-                        "geoOk": true,
-                        "serviceAnnouncement": {
-                            "paid": {},
-                            "public": {}
-                        },
-                        "isUserInCanPayGroup": true,
-                    },
-                },
-                "__N_SSP": true
-            });
+
+            let props = props::share_chat_continue_info_props(&s.session, share_id.0, share_data)
+                .to_string();
+
             Ok(Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref())
-                .body(Body::from(
-                    serde_json::to_string(&props).map_err(ResponseError::InternalServerError)?,
-                ))
+                .body(Body::from(props))
                 .map_err(ResponseError::InternalServerError)?)
         }
         Err(_) => Ok(Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "same-origin")
             .body(Body::from(
-                serde_json::to_string(&serde_json::json!({"notFound": true}))
-                    .map_err(ResponseError::InternalServerError)?,
+                serde_json::json!({"notFound": true}).to_string(),
             ))
             .map_err(ResponseError::InternalServerError)?),
     }
@@ -777,25 +604,8 @@ async fn redirect_to_home() -> Result<Response<Body>, ResponseError> {
 /// 404 error
 async fn error_404() -> Result<Response<Body>, ResponseError> {
     let mut ctx = tera::Context::new();
-    let props = json!(
-        {
-            "props": {
-                "pageProps": {"statusCode": 404}
-            },
-            "page": "/_error",
-            "query": {},
-            "buildId": BUILD_ID,
-            "assetPrefix": "https://cdn.oaistatic.com",
-            "nextExport": true,
-            "isFallback": false,
-            "gip": false,
-            "scriptLoader": []
-        }
-    );
-    ctx.insert(
-        "props",
-        &serde_json::to_string(&props).map_err(ResponseError::InternalServerError)?,
-    );
+    let props = props::error_404_props().to_string();
+    ctx.insert("props", &props);
     render_template(TEMP_404, &ctx)
 }
 
@@ -836,21 +646,25 @@ fn render_template(name: &str, context: &tera::Context) -> Result<Response<Body>
 
 /// Settings html template data
 fn settings_template_data(ctx: &mut tera::Context) {
-    let g_ctx = with_context!();
+    let context = with_context!();
 
-    g_ctx.auth_key().map(|_| {
+    // If auth key is not empty, well close the auth page
+    context.auth_key().map(|_| {
         ctx.insert(AUTH_KEY, EMPTY);
     });
 
-    g_ctx.cf_turnstile().map(|site_key| {
+    // If the turnstile is not empty, well enable the turnstile captcha
+    context.cf_turnstile().map(|site_key| {
         ctx.insert(SITE_KEY, &site_key.site_key);
     });
 
-    g_ctx.pop_preauth_cookie().map(|_| {
+    // If the preauth cookie is not empty, well enable the preauth cookie
+    context.pop_preauth_cookie().map(|_| {
         ctx.insert(SUPPORT_APPLE, EMPTY);
     });
 
-    g_ctx
+    // If the arkose endpoint is not empty, well enable the arkose captcha
+    context
         .arkose_endpoint()
         .map(|arkose_endpoint| ctx.insert(ARKOSE_ENDPOINT, arkose_endpoint));
 }
