@@ -298,7 +298,7 @@ async fn post_billing(
         .await
     {
         Ok(billing) => Ok(Json(billing)),
-        Err(err) => Err(ResponseError::BadRequest(err)),
+        Err(err) => Err(err.into()),
     }
 }
 
@@ -316,7 +316,9 @@ async fn post_refresh_session(
             let resp: Response<Body> = session_token.try_into()?;
             Ok(resp)
         }
-        _ => Err(ResponseError::BadRequest(ProxyError::SessionNotFound)),
+        _ => Err(ResponseError::ExpectationFailed(
+            ProxyError::SessionNotFound,
+        )),
     }
 }
 
@@ -329,7 +331,7 @@ async fn post_sess_token(
         .await
     {
         Ok(dash_session) => Ok(Json(dash_session)),
-        Err(err) => Err(ResponseError::BadRequest(err)),
+        Err(err) => Err(err.into()),
     }
 }
 
@@ -367,7 +369,7 @@ async fn post_refresh_token(
         .await
     {
         Ok(refresh_token) => Ok(Json(refresh_token)),
-        Err(err) => Err(ResponseError::BadRequest(err)),
+        Err(err) => Err(err.into()),
     }
 }
 
@@ -380,7 +382,7 @@ async fn post_revoke_token(
         .await
     {
         Ok(_) => Ok(StatusCode::OK),
-        Err(err) => Err(ResponseError::BadRequest(err)),
+        Err(err) => Err(err.into()),
     }
 }
 
