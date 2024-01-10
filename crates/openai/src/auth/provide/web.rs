@@ -281,11 +281,12 @@ impl WebAuthProvider {
             .ext_context(ctx)
             .send()
             .await
-            .map_err(AuthError::FailedRequest)?
-            .error_for_status()
-            .map_err(AuthClient::handle_error)?;
+            .map_err(AuthError::FailedRequest)?;
 
-        AuthClient::exstract_session_hanlder(resp).await
+        match resp.error_for_status_ref() {
+            Ok(_) => AuthClient::exstract_session_hanlder(resp).await,
+            Err(err) => Err(AuthClient::handle_error(resp, err).await),
+        }
     }
 }
 

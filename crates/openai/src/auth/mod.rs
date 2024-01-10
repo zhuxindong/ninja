@@ -62,11 +62,12 @@ impl AuthClient {
             )
             .send()
             .await
-            .map_err(AuthError::FailedRequest)?
-            .error_for_status()
-            .map_err(AuthClient::handle_error)?;
+            .map_err(AuthError::FailedRequest)?;
 
-        Self::exstract_session_hanlder(resp).await
+        match resp.error_for_status_ref() {
+            Ok(_) => Self::exstract_session_hanlder(resp).await,
+            Err(err) => Err(Self::handle_error(resp, err).await),
+        }
     }
 
     pub async fn dashboard_login(&self, access_token: &str) -> AuthResult<model::DashSession> {
@@ -151,47 +152,32 @@ impl AuthClient {
                     .map_err(AuthError::DeserializeError)?;
                 Ok(result)
             }
-            Err(err) => Err(Self::handle_error(err)),
+            Err(err) => Err(Self::handle_error(resp, err).await),
         }
     }
 
     async fn response_handle_unit(resp: reqwest::Response) -> AuthResult<()> {
         match resp.error_for_status_ref() {
             Ok(_) => Ok(()),
-            Err(err) => Err(Self::handle_error(err)),
+            Err(err) => Err(Self::handle_error(resp, err).await),
         }
     }
 
-    fn handle_error(err: reqwest::Error) -> AuthError {
+    async fn handle_error(resp: reqwest::Response, err: reqwest::Error) -> AuthError {
         match err.status() {
-            Some(
-                status_code @ (StatusCode::UNAUTHORIZED
-                | StatusCode::REQUEST_TIMEOUT
-                | StatusCode::TOO_MANY_REQUESTS
-                | StatusCode::BAD_REQUEST
-                | StatusCode::PAYMENT_REQUIRED
-                | StatusCode::FORBIDDEN
-                | StatusCode::INTERNAL_SERVER_ERROR
-                | StatusCode::BAD_GATEWAY
-                | StatusCode::SERVICE_UNAVAILABLE
-                | StatusCode::GATEWAY_TIMEOUT),
-            ) => {
-                if status_code == StatusCode::UNAUTHORIZED {
-                    return AuthError::Unauthorized(err);
-                }
-                if status_code == StatusCode::TOO_MANY_REQUESTS {
-                    return AuthError::TooManyRequests(err);
-                }
-                if status_code == StatusCode::BAD_REQUEST {
-                    return AuthError::BadRequest(err);
-                }
-                if status_code == StatusCode::FORBIDDEN {
-                    return AuthError::Forbidden(err);
+            Some(status_code) => {
+                // Extract the error message from the response
+                let msg = resp.text().await.unwrap_or_default();
+                match status_code {
+                    StatusCode::UNAUTHORIZED => AuthError::Unauthorized(msg),
+                    StatusCode::TOO_MANY_REQUESTS => AuthError::TooManyRequests(msg),
+                    StatusCode::BAD_REQUEST => AuthError::BadRequest(msg),
+                    StatusCode::FORBIDDEN => AuthError::Forbidden(msg),
+                    _ => AuthError::ServerError(err),
                 }
             }
-            _ => {}
+            _ => AuthError::ServerError(err),
         }
-        AuthError::ServerError(err)
     }
 
     fn generate_code_verifier() -> String {

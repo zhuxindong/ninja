@@ -3,15 +3,15 @@ pub enum AuthError {
     /// Request Error
     #[error(transparent)]
     FailedRequest(#[from] reqwest::Error),
-    #[error("Bad request (error {0:?})")]
-    BadRequest(reqwest::Error),
-    #[error("Too many requests (error {0:?})")]
-    TooManyRequests(reqwest::Error),
-    #[error("Unauthorized request (error {0:?})")]
-    Unauthorized(reqwest::Error),
-    #[error("Forbidden request (error {0:?})")]
-    Forbidden(reqwest::Error),
-    #[error("Server error ({0:?})")]
+    #[error("Bad request (error {0})")]
+    BadRequest(String),
+    #[error("Too many requests ({0})")]
+    TooManyRequests(String),
+    #[error("Unauthorized request ({0})")]
+    Unauthorized(String),
+    #[error("Forbidden request ({0})")]
+    Forbidden(String),
+    #[error("Server error ({0})")]
     ServerError(reqwest::Error),
 
     /// Failed Error

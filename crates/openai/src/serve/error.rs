@@ -1,12 +1,10 @@
+use crate::auth::error::AuthError;
 use axum::http::header::{CONTENT_TYPE, LOCATION};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::response::Response;
 use axum::Json;
 use eventsource_stream::EventStreamError;
-use serde::ser::SerializeStruct;
-
-use crate::auth::error::AuthError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum ProxyError {
@@ -40,7 +38,7 @@ pub enum ProxyError {
     AccessNotInWhitelist,
     #[error("Auth Key required!")]
     AuthKeyRequired,
-    #[error("event-source stream error ({0})")]
+    #[error("Event-source stream error ({0})")]
     EventSourceStreamError(EventStreamError<reqwest::Error>),
     #[error("Deserialize error ({0})")]
     DeserializeError(serde_json::Error),
@@ -63,29 +61,20 @@ pub enum ProxyError {
 }
 
 // Make our own error that wraps `anyhow::Error`.
+#[derive(serde::Serialize)]
 pub struct ResponseError {
-    code: StatusCode,
+    code: u16,
     msg: Option<String>,
+    // 3xx, not serialize
+    #[serde(skip)]
     path: Option<String>,
-}
-
-impl serde::Serialize for ResponseError {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: ::serde::Serializer,
-    {
-        let mut state = serializer.serialize_struct("ResponseError", 2)?;
-        state.serialize_field("code", &self.code.as_str())?;
-        state.serialize_field("msg", &self.msg)?;
-        state.end()
-    }
 }
 
 impl ResponseError {
     pub fn new(msg: String, code: StatusCode) -> Self {
         Self {
             msg: Some(msg),
-            code,
+            code: code.as_u16(),
             path: None,
         }
     }
@@ -94,10 +83,22 @@ impl ResponseError {
 // Tell axum how to convert `ResponseError` into a response.
 impl IntoResponse for ResponseError {
     fn into_response(self) -> Response {
+        // Convert our error into a response with the appropriate status code.
+        let status_code =
+            StatusCode::from_u16(self.code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+
+        // 3xx, redirect
         if let Some(path) = self.path {
-            return (self.code, [(LOCATION, &path)], ()).into_response();
+            return (status_code, [(LOCATION, &path)], ()).into_response();
         }
-        (self.code, [(CONTENT_TYPE, "application/json")], Json(self)).into_response()
+
+        // 4xx, 5xx, json
+        (
+            status_code,
+            [(CONTENT_TYPE, "application/json")],
+            Json(self),
+        )
+            .into_response()
     }
 }
 
@@ -108,64 +109,45 @@ where
     E: Into<anyhow::Error>,
 {
     fn from(err: E) -> Self {
-        let err = err.into();
+        let err: anyhow::Error = err.into();
+        let err_msg = err.to_string();
 
-        // Make ResponseError
-        let make_error = |msg: String, code: StatusCode| ResponseError {
-            msg: Some(msg),
-            code,
+        let make_error = |code: StatusCode| ResponseError {
+            msg: Some(err_msg),
+            code: code.as_u16(),
             path: None,
         };
 
+        // Try to downcast the error to our own AuthError type.
         if let Some(auth_error) = err.downcast_ref::<AuthError>() {
-            match auth_error {
-                // 500
-                AuthError::FailedRequest(_)
-                | AuthError::ServerError(_)
-                | AuthError::FailedLogin
-                | AuthError::FailedAccessToken(_)
-                | AuthError::FailedCallbackCode
-                | AuthError::FailedCallbackURL
-                | AuthError::FailedAuthorizedUrl
-                | AuthError::FailedState
-                | AuthError::FailedCsrfToken
-                | AuthError::FailedAuthSessionCookie
-                | AuthError::DeserializeError(_)
-                | AuthError::NotSupportedImplementation
-                | AuthError::PreauthCookieNotFound
-                | AuthError::InvalidRegex(_) => {
-                    make_error(auth_error.to_string(), StatusCode::INTERNAL_SERVER_ERROR)
-                }
-                // 400
+            return match auth_error {
+                // 4xx
                 AuthError::BadRequest(_)
+                | AuthError::InvalidRequest(_)
                 | AuthError::InvalidArkoseToken(_)
                 | AuthError::InvalidLoginUrl(_)
                 | AuthError::InvalidEmailOrPassword
-                | AuthError::InvalidRequest(_)
                 | AuthError::InvalidEmail
                 | AuthError::InvalidLocation
                 | AuthError::InvalidRefreshToken
                 | AuthError::InvalidLocationPath
                 | AuthError::MFAFailed
-                | AuthError::MFARequired => {
-                    make_error(auth_error.to_string(), StatusCode::BAD_REQUEST)
-                }
+                | AuthError::MFARequired => make_error(StatusCode::BAD_REQUEST),
                 // 401
-                AuthError::Unauthorized(_) => {
-                    make_error(auth_error.to_string(), StatusCode::UNAUTHORIZED)
-                }
+                AuthError::Unauthorized(_) => make_error(StatusCode::UNAUTHORIZED),
                 // 403
                 AuthError::Forbidden(_) | AuthError::InvalidLogin(_) => {
-                    make_error(auth_error.to_string(), StatusCode::FORBIDDEN)
+                    make_error(StatusCode::FORBIDDEN)
                 }
                 // 429
-                AuthError::TooManyRequests(_) => {
-                    make_error(auth_error.to_string(), StatusCode::TOO_MANY_REQUESTS)
-                }
-            }
-        } else {
-            make_error(err.to_string(), StatusCode::INTERNAL_SERVER_ERROR)
+                AuthError::TooManyRequests(_) => make_error(StatusCode::TOO_MANY_REQUESTS),
+                // 5xx
+                _ => make_error(StatusCode::INTERNAL_SERVER_ERROR),
+            };
         }
+
+        // default 500
+        make_error(StatusCode::INTERNAL_SERVER_ERROR)
     }
 }
 
@@ -174,11 +156,12 @@ macro_rules! static_err {
         #[allow(non_snake_case, missing_docs)]
         pub fn $name<E>(err: E) -> ResponseError
         where
-            E: Into<anyhow::Error>,
+            E: Into<anyhow::Error> + ToString,
         {
+            let code: StatusCode = $status;
             ResponseError {
-                msg: Some(err.into().to_string()),
-                code: $status,
+                msg: Some(err.to_string()),
+                code: code.as_u16(),
                 path: None,
             }
         }
@@ -189,9 +172,10 @@ macro_rules! static_3xx {
     ($name:ident, $status:expr) => {
         #[allow(non_snake_case, missing_docs)]
         pub fn $name(path: &str) -> ResponseError {
+            let code: StatusCode = $status;
             ResponseError {
                 msg: None,
-                code: $status,
+                code: code.as_u16(),
                 path: Some(path.to_string()),
             }
         }
