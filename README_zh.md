@@ -17,7 +17,7 @@
 
 逆向工程的 `ChatGPT` 代理（绕过 Cloudflare 403 Access Denied）
 
-> 局限性: 无法绕过 OpenAI 的彻底 IP 禁令
+> 由于`ArkoseLabs`不断地更新修复，项目`Arkose`相关模块应用闭源补丁进行发布，如果你担心安全问题，请你不要使用它。
 
 ### 特性
 
