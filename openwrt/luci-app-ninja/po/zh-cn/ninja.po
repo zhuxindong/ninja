@@ -31,17 +31,14 @@ msgstr "监听主机"
 msgid "Port"
 msgstr "监听端口"
 
-msgid "Workers"
-msgstr "工作线程"
-
 msgid "Proxies"
 msgstr "代理"
 
-msgid "Turn off direct connection"
-msgstr "关闭直连"
+msgid "Turn on direct connection"
+msgstr "开启直连"
 
-msgid "Turn off direct connection using proxy"
-msgstr "关闭直连使用代理"
+msgid "Turn on direct connection using proxy"
+msgstr "开启直连使用代理"
 
 msgid "TCP Keep-Alive (seconds)"
 msgstr "TCP保活机制 (秒)"
@@ -91,8 +88,8 @@ msgstr "默认监听端口: 7999"
 msgid "Default 1 worker thread"
 msgstr "默认 1 个工作线程"
 
-msgid "Supports http/https/socks5, format: protocol://user:pass@ip:port"
-msgstr "支持http/https/socks5，格式: protocol://user:pass@ip:port"
+msgid "Supports http/https/socks5/socks5h, format: protocol://user:pass@ip:port"
+msgstr "支持http/https/socks5/socks5h，格式: protocol://user:pass@ip:port"
 
 msgid "Default 60 seconds"
 msgstr "默认 60 秒"
@@ -184,9 +181,6 @@ msgstr "启用 Cookie 存储"
 msgid "Disable WebUI"
 msgstr "禁用 WebUI"
 
-msgid "WebUI API prefix"
-msgstr "WebUI API 前缀"
-
 msgid "CF Site Key"
 msgstr "CF Site Key"
 
@@ -204,9 +198,6 @@ msgstr "连接池空闲超时"
 
 msgid "Set an optional timeout for idle sockets being kept-alive"
 msgstr "设置保持活动的空闲套接字的可选超时"
-
-msgid "Interface"
-msgstr "绑定网卡"
 
 msgid "Bind address for outgoing connections"
 msgstr "出站连接绑定地址"
@@ -229,11 +220,14 @@ msgstr "Preauth MITM 服务绑定地址"
 msgid "MITM Upstream proxy"
 msgstr "MITM 上游代理"
 
-msgid "Supports http/https/socks5, format: protocol://user:pass@ip:port"
-msgstr "支持http/https/socks5，格式: protocol://user:pass@ip:port"
+msgid "Supports http/https/socks5/socks5h, format: protocol://user:pass@ip:port"
+msgstr "支持http/https/socks5/socks5h，格式: protocol://user:pass@ip:port"
 
 msgid "Preauth MITM server CA certificate file path"
 msgstr "Preauth MITM 服务 CA 证书文件路径"
 
 msgid "Preauth MITM server CA private key file path"
 msgstr "Preauth MITM 服务 CA 私钥文件路径"
+
+msgid "Enable ChatGPT GPT-3.5 ArkoseLabs"
+msgstr "启用 ChatGPT GPT-3.5 ArkoseLabs"

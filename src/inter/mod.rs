@@ -20,7 +20,7 @@ use inquire::{
 use openai::arkose::{funcaptcha, ArkoseToken, Type};
 use openai::{
     auth::{model::AuthStrategy, provide::AuthProvider},
-    token::model::AuthenticateToken,
+    token::model::Token,
 };
 use serde::Serialize;
 use serde_json::json;
@@ -114,7 +114,7 @@ pub async fn check_authorization() -> anyhow::Result<()> {
                         let pb = new_spinner("Initializing login...");
                         match client.do_refresh_token(refresh_token).await {
                             Ok(refresh_token) => {
-                                let new_token = AuthenticateToken::try_from(refresh_token)?;
+                                let new_token = Token::try_from(refresh_token)?;
                                 *token = new_token;
                                 change = true;
                                 pb.finish_and_clear();

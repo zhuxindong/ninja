@@ -21,31 +21,22 @@ pub fn check_root() {
 
 #[cfg(target_os = "linux")]
 /// Try to add a route to the given subnet to the loopback interface.
-pub(crate) fn sysctl_route_add_ipv6_subnet(subnet: Option<(std::net::Ipv6Addr, u8)>) {
-    match subnet {
-        None => return,
-        Some((v6, len)) => {
-            if !nix::unistd::Uid::effective().is_root() {
-                return;
-            }
+pub(crate) fn sysctl_route_add_ipv6_subnet(subnet: &cidr::Ipv6Cidr) {
+    if !nix::unistd::Uid::effective().is_root() {
+        return;
+    }
 
-            let res = std::process::Command::new("ip")
-                .args(&["route", "add", "local", &format!("{v6}/{len}"), "dev", "lo"])
-                .output();
-            if let Some(result) = res.err() {
-                println!("Failed to add route to the loopback interface: {}", result);
-            }
-        }
+    let res = std::process::Command::new("ip")
+        .args(&["route", "add", "local", &format!("{subnet}"), "dev", "lo"])
+        .output();
+    if let Err(err) = res {
+        println!("Failed to add route to the loopback interface: {}", err);
     }
 }
 
 #[cfg(target_os = "linux")]
 /// Try to remove a route to the given subnet to the loopback interface.
-pub(crate) fn sysctl_ipv6_no_local_bind(enable: bool) {
-    if !enable {
-        return;
-    }
-
+pub(crate) fn sysctl_ipv6_no_local_bind() {
     if !nix::unistd::Uid::effective().is_root() {
         return;
     }

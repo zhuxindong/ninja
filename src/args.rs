@@ -1,6 +1,6 @@
 use crate::parse;
 use clap::{Args, Subcommand};
-use openai::arkose::funcaptcha::Solver;
+use openai::{arkose::funcaptcha::solver::Solver, proxy};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -60,6 +60,8 @@ pub enum ServeSubcommand {
     Log,
     /// Generate MITM CA certificate
     Genca,
+    /// Show the impersonate user-agent list
+    UA,
     /// Generate config template file (toml format file)
     GT {
         /// Configuration template output to file (toml format file)
@@ -84,49 +86,52 @@ pub struct ServeArgs {
     #[clap(short, long, env = "BIND", default_value = "0.0.0.0:7999", value_parser = parse::parse_socket_addr)]
     pub(super) bind: Option<std::net::SocketAddr>,
 
-    /// Server worker-pool size (Recommended number of CPU cores)
-    #[clap(short = 'W', long, default_value = "1")]
-    pub(super) workers: usize,
-
-    /// Enforces a limit on the concurrent number of requests the underlying
+    /// Server Enforces a limit on the concurrent number of requests the underlying
     #[clap(long, default_value = "1024")]
     pub(super) concurrent_limit: usize,
 
-    /// Server proxies pool, Only support http/https/socks5 protocol
-    #[clap(short = 'x',long, env = "PROXIES", value_parser = parse::parse_proxies_url, group = "proxy")]
-    pub(super) proxies: Option<std::vec::Vec<String>>,
+    /// Server/Client timeout (seconds)
+    #[clap(long, default_value = "360")]
+    pub(super) timeout: usize,
 
-    /// Bind address for outgoing connections (or IPv6 subnet fallback to Ipv4)
-    #[clap(short = 'i', long, env = "INTERFACE", value_parser = parse::parse_host)]
-    pub(super) interface: Option<std::net::IpAddr>,
+    /// Server/Client connect timeout (seconds)
+    #[clap(long, default_value = "5")]
+    pub(super) connect_timeout: usize,
 
-    /// IPv6 subnet, Example: 2001:19f0:6001:48e4::/64
-    #[clap(long, short = 'I', env = "IPV6_SUBNET", value_parser = parse::parse_ipv6_subnet, group = "proxy")]
-    pub(super) ipv6_subnet: Option<(std::net::Ipv6Addr, u8)>,
+    /// Server/Client TCP keepalive (seconds)
+    #[clap(long, default_value = "60")]
+    pub(super) tcp_keepalive: usize,
 
-    /// Disable direct connection
-    #[clap(long, env = "DISABLE_DIRECT")]
-    pub(super) disable_direct: bool,
+    /// Server/Client No TCP keepalive
+    #[clap(short = 'H', long, env = "NO_TCP_KEEPALIVE", default_value = "false")]
+    pub(super) no_keepalive: bool,
+
+    /// Keep the client alive on an idle socket with an optional timeout set
+    #[clap(long, default_value = "90")]
+    pub(super) pool_idle_timeout: usize,
+
+    /// Client proxy, support multiple proxy, use ',' to separate, Format: proto|type
+    /// Proto: all/api/auth/arkose, default: all
+    /// Type: interface/proxy/ipv6 subnet，proxy type only support: socks5/http/https
+    /// Example: all|socks5://192.168.1.1:1080, api|10.0.0.1, auth|2001:db8::/32, http://192.168.1.1:1081
+    #[clap(short = 'x',long, env = "PROXIES", value_parser = parse::parse_proxies_url, verbatim_doc_comment)]
+    pub(super) proxies: Option<std::vec::Vec<proxy::Proxy>>,
+
+    /// Enable direct connection
+    #[clap(long, env = "ENABLE_DIRECT")]
+    pub(super) enable_direct: bool,
+
+    /// Impersonate User-Agent, separate multiple ones with ","
+    #[clap(short = 'I',long, env = "IMPERSONATE_UA", value_parser = parse::parse_impersonate_uas, verbatim_doc_comment)]
+    pub(super) impersonate_uas: Option<std::vec::Vec<String>>,
 
     /// Enabled Cookie Store
     #[clap(long, env = "COOKIE_STORE")]
     pub(super) cookie_store: bool,
 
-    /// Client timeout (seconds)
-    #[clap(long, default_value = "360")]
-    pub(super) timeout: usize,
-
-    /// Client connect timeout (seconds)
-    #[clap(long, default_value = "20")]
-    pub(super) connect_timeout: usize,
-
-    /// TCP keepalive (seconds)
-    #[clap(long, default_value = "60")]
-    pub(super) tcp_keepalive: usize,
-
-    /// Set an optional timeout for idle sockets being kept-alive
-    #[clap(long, default_value = "90")]
-    pub(super) pool_idle_timeout: usize,
+    /// Use fastest DNS resolver
+    #[clap(long, env = "FASTEST_DNS")]
+    pub(super) fastest_dns: bool,
 
     /// TLS certificate file path
     #[clap(long, env = "TLS_CERT", requires = "tls_key")]
@@ -136,18 +141,6 @@ pub struct ServeArgs {
     #[clap(long, env = "TLS_KEY", requires = "tls_cert")]
     pub(super) tls_key: Option<PathBuf>,
 
-    /// Login Authentication Key
-    #[clap(short = 'A', long, env = "AUTH_KEY")]
-    pub(super) auth_key: Option<String>,
-
-    /// WebUI api prefix
-    #[clap(long, env = "API_PREFIX", value_parser = parse::parse_url)]
-    pub(super) api_prefix: Option<String>,
-
-    /// Disable WebUI
-    #[clap(short = 'D', long, env = "DISABLE_WEBUI")]
-    pub(super) disable_webui: bool,
-
     /// Cloudflare turnstile captcha site key
     #[clap(long, env = "CF_SECRET_KEY", requires = "cf_secret_key")]
     pub(super) cf_site_key: Option<String>,
@@ -156,9 +149,37 @@ pub struct ServeArgs {
     #[clap(long, env = "CF_SITE_KEY", requires = "cf_site_key")]
     pub(super) cf_secret_key: Option<String>,
 
+    /// Login Authentication Key
+    #[clap(short = 'A', long, env = "AUTH_KEY")]
+    pub(super) auth_key: Option<String>,
+
+    /// Disable WebUI
+    #[clap(short = 'D', long, env = "DISABLE_WEBUI")]
+    pub(super) disable_webui: bool,
+
+    /// Enable file endpoint proxy
+    #[clap(short = 'F', long, env = "ENABLE_FILE_PROXY")]
+    pub(super) enable_file_proxy: bool,
+
+    /// Enable arkose token endpoint proxy
+    #[clap(short = 'G', long, env = "ENABLE_ARKOSE_PROXY")]
+    pub(super) enable_arkose_proxy: bool,
+
+    /// Visitor email whitelist
+    #[clap(short = 'W', long, env = "VISITOR_EMAIL_WHITELIST", value_parser = parse::parse_email_whitelist)]
+    pub(super) visitor_email_whitelist: Option<std::vec::Vec<String>>,
+
     /// Arkose endpoint, Example: https://client-api.arkoselabs.com
     #[clap(long, value_parser = parse::parse_url)]
     pub(super) arkose_endpoint: Option<String>,
+
+    /// Enable Arkose GPT-3.5 experiment
+    #[clap(short = 'E', long, default_value = "false")]
+    pub(super) arkose_gpt3_experiment: bool,
+
+    /// Enable Arkose GPT-3.5 experiment solver
+    #[clap(short = 'S', long, default_value = "false")]
+    pub(super) arkose_gpt3_experiment_solver: bool,
 
     /// About the browser HAR directory path requested by ChatGPT GPT-3.5 ArkoseLabs
     #[clap(long, value_parser = parse::parse_dir_path)]
@@ -232,13 +253,15 @@ pub struct ServeArgs {
     )]
     pub(super) pbind: Option<std::net::SocketAddr>,
 
-    /// Preauth MITM server upstream proxy, Only support http/https/socks5 protocol
+    /// Preauth MITM server upstream proxy
+    /// Supports: http/https/socks5/socks5h
     #[clap(
         short = 'X',
         long,
         env = "PREAUTH_UPSTREAM",
         value_parser = parse::parse_url,
-        requires = "pbind"
+        requires = "pbind",
+        verbatim_doc_comment
     )]
     pub(super) pupstream: Option<String>,
 

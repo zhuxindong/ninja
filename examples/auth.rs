@@ -7,7 +7,7 @@ use openai::auth::{
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let ctx = openai::context::ContextArgs::builder()
+    let ctx = openai::context::args::Args::builder()
         .arkose_auth_har_dir(PathBuf::from(
             "/Users/gngpp/VSCode/ninja/login.chat.openai.com.har",
         ))
@@ -16,7 +16,6 @@ async fn main() -> anyhow::Result<()> {
     let email = std::env::var("EMAIL")?;
     let password = std::env::var("PASSWORD")?;
     let auth = openai::auth::AuthClientBuilder::builder()
-        .user_agent(openai::HEADER_UA)
         .timeout(time::Duration::from_secs(30))
         .connect_timeout(time::Duration::from_secs(10))
         .build();
@@ -29,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
                 .build(),
         )
         .await?;
-    let auth_token = openai::token::model::AuthenticateToken::try_from(token)?;
+    let auth_token = openai::token::model::Token::try_from(token)?;
     println!("AuthenticationToken: {:#?}", auth_token);
     println!("AccessToken: {}", auth_token.access_token());
 

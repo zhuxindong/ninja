@@ -40,7 +40,7 @@ impl Context {
 
         let proxies = conf.proxy.map(|p| vec![p]).unwrap_or(vec![]);
 
-        let args = openai::context::ContextArgs::builder()
+        let args = openai::context::Args::builder()
             .arkose_gpt4_har_dir(arkose_gpt4_har_dir)
             .arkose_auth_har_dir(arkose_auth_har_dir)
             .arkose_platform_har_dir(arkose_platform_har_dir)

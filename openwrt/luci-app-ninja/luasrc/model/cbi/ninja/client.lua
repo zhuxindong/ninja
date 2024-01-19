@@ -12,13 +12,10 @@ s.anonymous = true
 o = s:option(Flag, "enabled", translate("Enabled"))
 o.rmempty = false
 
-o = s:option(Value, "proxies", translate("Proxies"), translate("Supports http/https/socks5, format: protocol://user:pass@ip:port"))
+o = s:option(Value, "proxies", translate("Proxies"), translate("Supports http/https/socks5/socks5h, format: protocol://user:pass@ip:port"))
 
-o = s:option(Value, "interface", translate("Interface"), translate("Bind address for outgoing connections"))
 
-o = s:option(Value, "ipv6_subnet", translate("Ipv6 Subnet"), translate("IPv6 subnet, Example: 2001:19f0:6001:48e4::/64"))
-
-o = s:option(Flag, "disable_direct", translate("Turn off direct connection"), translate("Turn off direct connection using proxy"))
+o = s:option(Flag, "enable_direct", translate("Turn on direct connection"), translate("Turn on direct connection using proxy"))
 o.rmempty = false
 
 o = s:option(Value, "level", translate("Log Level"), translate("info/debug/warn/trace/error"))
@@ -26,9 +23,6 @@ o.default = "info"
 
 o = s:option(Value, "bind", translate("Bind Address"), translate("Default listening address: 0.0.0.0:7999"))
 o.default = "0.0.0.0:7999"
-
-o = s:option(Value, "workers", translate("Workers"), translate("Default 1 worker thread"))
-o.default = "1"
 
 o = s:option(Value, "concurrent_limit", translate("Concurrent Limit"), translate("Default 100 concurrent connections"))
 o.default = "100"
@@ -54,12 +48,12 @@ o.rmempty = false
 o = s:option(Value, "auth_key", translate("Auth Key"), translate("Login Authentication Key"))
 o.password = true
 
-o = s:option(Value, "api_prefix", translate("WebUI API prefix"))
-
 o = s:option(Value, "cf_site_key", translate("CF Site Key"), translate("Cloudflare turnstile captcha site key"))
 
 o = s:option(Value, "cf_secret_key", translate("CF Secret Key"), translate("Cloudflare turnstile captcha secret key"))
 o.password = true
+
+o = s:option(Flag, "arkose_gpt3_experiment", translate("Enable ChatGPT GPT-3.5 ArkoseLabs"))
 
 o = s:option(Value, "arkose_gpt3_har_dir", translate("ChatGPT GPT-3.5 HAR directory path"), translate("About the browser HAR directory path requested by ChatGPT GPT-3.5 ArkoseLabs"))
 
@@ -104,7 +98,7 @@ o.default = "86400"
 
 o = s:option(Value, "pbind", translate("Preauth MITM server bind address"))
 
-o = s:option(Value, "pupstream", translate("MITM Upstream proxy"), translate("Supports http/https/socks5, format: protocol://user:pass@ip:port"))
+o = s:option(Value, "pupstream", translate("MITM Upstream proxy"), translate("Supports http/https/socks5/socks5h, format: protocol://user:pass@ip:port"))
 
 o = s:option(Value, "pcert", translate("Preauth MITM server CA certificate file path"))
 
